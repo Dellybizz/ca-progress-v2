@@ -1,11 +1,21 @@
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardBody } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
+import { redirect } from "next/navigation";
+import { LoginPanel } from "@/components/auth/login-panel";
+import { optionalUser, resolvePostAuthDestination } from "@/lib/auth/server";
+import { sanitizeReturnPath } from "@/lib/auth/navigation";
 
-export default function LoginPage() {
-  return <div className="auth-preview"><div className="auth-preview__heading"><Badge tone="brand">Phase 1 visual preview</Badge><h2>Welcome back to focused preparation.</h2><p>Authentication is deliberately not connected until Phase 2. This screen establishes the finished interaction language only.</p></div><Card className="auth-card"><CardBody><div className="auth-actions"><Button size="lg" disabled><span className="provider-mark">G</span>Continue with Google</Button><Button size="lg" variant="secondary" disabled><Icon name="timer" size={18}/>Continue with phone</Button></div><div className="auth-divider"><span>or</span></div><Input label="Phone number preview" placeholder="+91 98765 43210" disabled hint="OTP behavior arrives in Phase 2."/><Button size="lg" variant="ghost" disabled>Continue as guest</Button><p className="auth-terms">No auth calls, sessions or production accounts are created in Phase 1.</p></CardBody></Card><EmptyState compact icon="shield" title="Identity is intentionally deferred" description="The UI is production-shaped, but Google, OTP and guest session logic remain Phase 2 work."/><Link href="/dashboard" className="ui-text-link">View the student design preview <Icon name="arrow" size={15}/></Link></div>;
+export const dynamic = "force-dynamic";
+
+const errors: Record<string, string> = {
+  google_unavailable: "Google sign-in is not configured for this staging project yet.",
+  missing_auth_code: "The sign-in callback was missing its authorization code. Please try again.",
+  auth_callback_failed: "We could not complete that sign-in. Please try again.",
+};
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const params = await searchParams;
+  const next = sanitizeReturnPath(typeof params.next === "string" ? params.next : null);
+  const user = await optionalUser();
+  if (user) redirect(await resolvePostAuthDestination(next));
+  const errorKey = typeof params.error === "string" ? params.error : "";
+  return <LoginPanel next={next} initialError={errors[errorKey] ?? null}/>;
 }

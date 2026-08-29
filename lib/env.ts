@@ -9,7 +9,7 @@ export function getPublicRuntimeConfig() {
   return {
     appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || "CA Progress",
     appEnv: normalizeEnvironment(process.env.NEXT_PUBLIC_APP_ENV),
-    appVersion: process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "phase-0",
+    appVersion: process.env.NEXT_PUBLIC_APP_VERSION?.trim() || "phase-2",
   } as const;
 }
 
@@ -23,4 +23,10 @@ export function getSupabaseAdminConfig() {
   const publicConfig = getSupabasePublicConfig();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
   return { ...publicConfig, serviceRoleKey, configured: Boolean(publicConfig.url && serviceRoleKey) } as const;
+}
+
+export function getAuthServerConfig() {
+  const adminConfig = getSupabaseAdminConfig();
+  const rateLimitSalt = process.env.AUTH_RATE_LIMIT_SALT?.trim() || "";
+  return { ...adminConfig, rateLimitSalt, configured: Boolean(adminConfig.configured && rateLimitSalt.length >= 32) } as const;
 }

@@ -6,9 +6,9 @@ import { getSupabasePublicConfig } from "@/lib/env";
 import type { Database } from "./database.types";
 
 export async function createServerSupabaseClient() {
+  const cookieStore = await cookies();
   const config = getSupabasePublicConfig();
   if (!config.configured) throw new Error("V2 Supabase server configuration is missing.");
-  const cookieStore = await cookies();
 
   return createServerClient<Database>(config.url, config.publishableKey, {
     cookies: {
@@ -17,8 +17,7 @@ export async function createServerSupabaseClient() {
         try {
           cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
         } catch {
-          // Server Components can read cookies but cannot always write them.
-          // Phase 2 introduces the auth refresh boundary responsible for cookie writes.
+          // Server Components cannot write cookies; proxy.ts refreshes and persists sessions.
         }
       },
     },

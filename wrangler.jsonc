@@ -11,7 +11,7 @@
   "vars": {
     "NEXT_PUBLIC_APP_NAME": "CA Progress",
     "NEXT_PUBLIC_APP_ENV": "staging",
-    "NEXT_PUBLIC_APP_VERSION": "phase-1"
+    "NEXT_PUBLIC_APP_VERSION": "phase-2"
   },
   "observability": { "enabled": true }
 }

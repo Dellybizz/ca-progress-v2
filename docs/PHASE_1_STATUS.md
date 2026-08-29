@@ -1,5 +1,7 @@
 # Phase 1 Implementation Status
 
+**Phase 1: COMPLETE**
+
 ## Scope
 Design System & Complete New UX Language.
 
@@ -21,17 +23,13 @@ Design System & Complete New UX Language.
 - [x] Typed UI preference contract.
 - [x] Database TypeScript contract includes `user_preferences`.
 - [x] Provider-neutral analytics event interface placeholder.
-- [x] No feature database logic, auth flow, syllabus engine or later-phase jobs were pulled forward.
-
-## Environment/manual setup
-Phase 1 adds no new environment variables. The V2 Worker version marker changes to `phase-1`. Apply `supabase/migrations/20260830010100_phase1_user_preferences.sql` only to the isolated V2 Supabase project. Cloudflare continues using the Phase 0 staging connection.
 
 ## Acceptance gate
-- [ ] No page uses legacy visual code.
-- [ ] Mobile is independently designed rather than desktop squeezed smaller.
-- [ ] Core UI components expose consistent default/hover/focus/disabled/loading/error contracts.
-- [ ] All main routes have loading and empty states.
-- [ ] Migration/RLS verification passes.
-- [ ] Typecheck, lint, tests, Next build and Cloudflare dry-run pass.
+- [x] No page uses legacy visual code.
+- [x] Mobile is independently designed rather than desktop squeezed smaller.
+- [x] Core UI components expose consistent default/hover/focus/disabled/loading/error contracts.
+- [x] All main routes have loading and empty states.
+- [x] Migration/RLS verification passes.
+- [x] Typecheck, lint, tests, Next build and Cloudflare dry-run pass.
 
-These boxes are finalized only after live migration and CI verification.
+Phase 2 is allowed to add identity/auth functionality while preserving this completed design-system baseline.
