@@ -20,8 +20,9 @@ export async function optionalUser(): Promise<ServerIdentity | null> {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims as Record<string, unknown> | undefined;
-  const id = claims ? claimString(claims, "sub") : null;
-  if (error || !id) return null;
+  if (error || !claims) return null;
+  const id = claimString(claims, "sub");
+  if (!id) return null;
   return { id, email: claimString(claims, "email"), phone: claimString(claims, "phone") };
 }
 
