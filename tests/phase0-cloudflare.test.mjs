@@ -15,6 +15,7 @@ test("Cloudflare Workers is the configured deployment path", () => {
 
 test("staging Worker cannot be mistaken for the legacy project", () => {
   const wrangler = readFileSync(join(root, "wrangler.jsonc"), "utf8");
-  assert.match(wrangler, /ca-progress-v2-staging/);
-  assert.match(wrangler, /NEXT_PUBLIC_APP_ENV/);
+  assert.match(wrangler, /"name"\s*:\s*"ca-progress-v2"/);
+  assert.match(wrangler, /"NEXT_PUBLIC_APP_ENV"\s*:\s*"staging"/);
+  assert.match(wrangler, /"NEXT_PUBLIC_APP_VERSION"\s*:\s*"phase-0"/);
 });
