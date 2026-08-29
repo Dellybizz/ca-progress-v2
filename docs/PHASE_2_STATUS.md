@@ -28,22 +28,20 @@ The active authentication choice was revised by the project owner from Google + 
 ## V2 database state
 - [x] `phase2_auth_profiles` applied to the isolated V2 Supabase project.
 - [x] `phase2_auth_function_permissions` applied.
+- [x] `phase2_social_login_only` applied to retire obsolete phone OTP rate-limit storage.
 - [x] Profile/user-preference own-row policies remain intact.
 - [x] Private `avatars` bucket has authenticated own-folder select/insert/update/delete policies.
 - [x] `handle_new_auth_user()` RPC execute permissions remain revoked from public/anon/authenticated roles.
-- [x] Phone OTP rate-limit storage is retired by the Phase 2 social-login-only cleanup migration.
 
-## CI expectation for provider revision
-The revised Phase 2 branch must continue to pass:
+## CI verification
+Provider-revision PR run: `33280332033`.
 
-- [ ] dependency install
-- [ ] TypeScript
-- [ ] ESLint
-- [ ] complete Phase 0 + 1 + 2 test suite
-- [ ] Next.js production build
-- [ ] OpenNext / Cloudflare dry-run
-
-These boxes are updated after the provider-revision PR CI completes.
+- [x] dependency install
+- [x] TypeScript
+- [x] ESLint
+- [x] complete Phase 0 + 1 + 2 test suite
+- [x] Next.js production build
+- [x] OpenNext / Cloudflare dry-run
 
 ## External/manual dependencies
 - [ ] Google OAuth client credentials entered into the V2 Supabase Google provider and tested end-to-end.
