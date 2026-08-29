@@ -1,15 +1,8 @@
 "use client";
 
-export function RouteErrorView({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  return (
-    <main className="public-content">
-      <p className="eyebrow">CA Progress V2</p>
-      <h1 className="page-title">This V2 route could not load.</h1>
-      <section className="state-card" data-tone="danger">
-        <h2>Safe error state</h2>
-        <p>{error.digest ? `Reference: ${error.digest}` : "No sensitive diagnostic details are exposed here."}</p>
-        <div className="error-actions"><button type="button" onClick={reset}>Try again</button></div>
-      </section>
-    </main>
-  );
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
+
+export function RouteErrorView({ title = "This preview hit a temporary issue", message = "The V2 shell is safe. Retry this route or return to the dashboard.", reset }: { title?: string; message?: string; reset?: () => void; error?: Error & { digest?: string } }) {
+  return <section className="route-error" role="alert"><div className="route-error__icon"><Icon name="shield" size={22}/></div><div><span className="eyebrow">Safe error state</span><h1>{title}</h1><p>{message}</p><div className="route-error__actions">{reset ? <Button onClick={reset}>Try again</Button> : null}<Button variant="secondary" onClick={() => { window.location.href = "/dashboard"; }}>Go to dashboard</Button></div></div></section>;
 }

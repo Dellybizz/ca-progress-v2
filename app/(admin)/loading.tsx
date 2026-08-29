@@ -1,2 +1,2 @@
 import { LoadingState } from "@/components/states/loading-state";
-export default function AdminLoading() { return <LoadingState label="Loading admin boundary…" />; }
+export default function Loading() { return <LoadingState label="Loading admin preview" />; }

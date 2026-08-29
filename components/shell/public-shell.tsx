@@ -1,19 +1,6 @@
 import Link from "next/link";
 import { EnvironmentBanner } from "./environment-banner";
+import { Badge } from "@/components/ui/badge";
+import { Icon } from "@/components/ui/icon";
 
-export function PublicShell({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <EnvironmentBanner />
-      <div className="public-shell">
-        <header className="public-header">
-          <Link href="/dashboard" className="brand">
-            <span className="brand-mark">CA</span>
-            <span className="brand-copy"><strong>CA Progress</strong><span>V2 staging foundation</span></span>
-          </Link>
-        </header>
-        <main className="public-content">{children}</main>
-      </div>
-    </>
-  );
-}
+export function PublicShell({ children }: { children: React.ReactNode }) { return <><EnvironmentBanner/><div className="public-shell"><header className="public-header"><Link href="/dashboard" className="public-brand"><span className="sidebar-brand__mark">CP</span><span><strong>CA Progress</strong><small>V2 staging</small></span></Link><Badge tone="brand">Phase 1 UX</Badge></header><div className="public-grid"><aside className="public-visual"><div className="public-visual__orb"/><div className="public-visual__content"><span className="public-kicker"><Icon name="sparkles" size={16}/>A calmer way to prepare</span><h1>One focused workspace for the complete CA journey.</h1><p>Phase 1 establishes the visual language for planning, progress, study, revision and community before any account logic is connected.</p><div className="public-proof"><span><Icon name="check"/>Mobile-first</span><span><Icon name="check"/>Accessible</span><span><Icon name="check"/>Cloudflare staging</span></div></div></aside><main className="public-content">{children}</main></div></div></>; }
