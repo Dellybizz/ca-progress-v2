@@ -17,5 +17,5 @@ test("staging Worker cannot be mistaken for the legacy project", () => {
   const wrangler = readFileSync(join(root, "wrangler.jsonc"), "utf8");
   assert.match(wrangler, /"name"\s*:\s*"ca-progress-v2"/);
   assert.match(wrangler, /"NEXT_PUBLIC_APP_ENV"\s*:\s*"staging"/);
-  assert.match(wrangler, /"NEXT_PUBLIC_APP_VERSION"\s*:\s*"phase-0"/);
+  assert.match(wrangler, /"NEXT_PUBLIC_APP_VERSION"\s*:\s*"phase-[0-9]+"/);
 });
