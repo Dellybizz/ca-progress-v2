@@ -5,9 +5,9 @@ Authentication, Profiles & Onboarding.
 
 ## Implementation status
 
-**Phase 2 code/database implementation: COMPLETE.**
+**Phase 2: COMPLETE.**
 
-The active authentication choice was revised by the project owner from Google + phone OTP to **Google + LinkedIn (OIDC)**. Guest mode remains available. Provider-backed staging E2E remains open until real Google and LinkedIn credentials are configured in the isolated V2 Supabase project.
+The active authentication choice was revised by the project owner from Google + phone OTP to **Google + LinkedIn (OIDC)**. Guest mode remains available. Google and LinkedIn provider-backed staging E2E have now been completed successfully against the isolated V2 Supabase project and Cloudflare staging deployment.
 
 ## Implemented in code
 - [x] Supabase SSR cookie session architecture using Next.js `proxy.ts` and verified `getClaims()` identity.
@@ -44,20 +44,20 @@ Provider-revision PR run: `33280332033`.
 - [x] OpenNext / Cloudflare dry-run
 
 ## External/manual dependencies
-- [ ] Google OAuth client credentials entered into the V2 Supabase Google provider and tested end-to-end.
-- [ ] LinkedIn Developer app has **Sign In with LinkedIn using OpenID Connect** enabled.
-- [ ] LinkedIn Client ID/Secret entered into the V2 Supabase **LinkedIn (OIDC)** provider and tested end-to-end.
-- [ ] V2 Auth Site URL and callback redirect allow-list confirmed in Supabase.
+- [x] Google OAuth client credentials entered into the V2 Supabase Google provider and tested end-to-end on staging.
+- [x] LinkedIn Developer app has **Sign In with LinkedIn using OpenID Connect** enabled.
+- [x] LinkedIn Client ID/Secret entered into the V2 Supabase **LinkedIn (OIDC)** provider and tested end-to-end on staging.
+- [x] V2 Auth Site URL and callback redirect allow-list confirmed by successful provider E2E.
 
 `AUTH_RATE_LIMIT_SALT` is no longer required. `SUPABASE_SERVICE_ROLE_KEY` is not required for social authentication; it remains optional for server-only features such as database health logging.
 
 See `docs/AUTH_SETUP.md` for exact setup.
 
 ## Acceptance gate
-- [ ] Google sign-in works end-to-end — **PENDING PROVIDER E2E**.
-- [ ] LinkedIn (OIDC) sign-in works end-to-end — **PENDING PROVIDER E2E**.
+- [x] Google sign-in works end-to-end.
+- [x] LinkedIn (OIDC) sign-in works end-to-end.
 - [x] Guest uses public/basic surfaces without persistent private data.
 - [x] First login is routed into onboarding until `onboarding_completed_at` is set, then skips it.
 - [x] Server identifies authenticated identity without client hydration using request-scoped `auth.getClaims()`.
 
-**Current revised Phase 2 acceptance result: 3/5 verified; 2/5 pending real Google and LinkedIn staging E2E. Do not start Phase 3 until those external acceptance checks are completed.**
+**Final Phase 2 acceptance result: 5/5 verified. Phase 2 is closed. Phase 3 may begin only when explicitly requested.**
