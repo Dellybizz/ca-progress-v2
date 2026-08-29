@@ -1,28 +1,37 @@
 # Phase 0 Implementation Status
 
-This file records the Phase 0 acceptance gate after implementation in the isolated build workspace.
+Phase 0 is complete for the isolated CA Progress V2 foundation.
 
 ## Acceptance gate
 
-- [x] Legacy `ca-progress` source is not modified by this implementation package.
-- [ ] V2 staging URL deployed independently — deployment configuration is complete, but an actual Cloudflare staging URL requires access to the user's Cloudflare account and a new V2 repository/project.
-- [ ] Full dependency install/typecheck/lint/Next build/Cloudflare dry-run — quality commands and CI are configured, but the current sandbox cannot reach the npm registry to install project dependencies.
-- [x] Browser/server/admin Supabase client modules are separated.
+- [x] Legacy `ca-progress` source remains untouched by the V2 implementation.
+- [x] V2 deploys independently to Cloudflare Workers staging at `https://ca-progress-v2.habeebaasif622.workers.dev`.
+- [x] Full CI passes: dependency install, TypeScript typecheck, ESLint, smoke tests, Next.js build and Cloudflare/OpenNext dry-run.
+- [x] Browser/server/admin Supabase client modules are separated and the service-role client is server-only.
 - [x] No giant global context or all-in-one Tracker component exists.
 
-## Checks completed in this workspace
+## Verified checks
 
-- `node --test tests/*.test.mjs`: **10/10 passed**.
-- TypeScript/TSX parser validation: **36 files parsed with zero syntax diagnostics**.
-- JSON/JSONC parsing: **passed**.
-- Migration contract smoke checks verify RLS declarations and initial policies.
-- Cloudflare-only smoke check verifies `wrangler.jsonc` + OpenNext configuration and absence of a `vercel.json` deployment file.
+GitHub Actions workflow run `33274741220` passed on the Phase 0 codebase:
 
-## Environment work still required
+- `npm install --no-audit --no-fund`: PASS
+- `npm run typecheck`: PASS
+- `npm run lint`: PASS
+- `npm test`: PASS — 10/10 tests
+- `npm run build`: PASS
+- `npm run cf:check`: PASS
 
-1. Create a brand-new V2 Supabase staging project.
-2. Apply `supabase/migrations/20260830000100_phase0_core.sql` to that project.
-3. Create a brand-new V2 GitHub repository and upload this source tree.
-4. Connect that repository/project to Cloudflare Workers staging.
-5. Configure Cloudflare/GitHub environment values described in `docs/CLOUDFLARE_STAGING.md`.
-6. Run the full CI workflow with registry access and record its result before Phase 1.
+Cloudflare connected build/deploy also completed successfully for Worker `ca-progress-v2`.
+
+## Supabase V2
+
+- Isolated project: `CA Progress V2`
+- Project ref: `wgdhpzbgyjqjlgntibqg`
+- Region: `ap-south-1`
+- Live migration: `20260829200411 phase0_core`
+- RLS verified for `profiles`, `app_settings` and `system_health_log`.
+- `system_health_log` intentionally has no client policy; service-role access only.
+
+## Phase boundary
+
+Phase 0 contains architecture, deployment, database isolation, route/shell placeholders, health/logging infrastructure and CI only. Final design-system work begins in Phase 1; authentication/onboarding behavior begins in Phase 2.
