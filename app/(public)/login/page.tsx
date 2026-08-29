@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 const errors: Record<string, string> = {
   google_unavailable: "Google sign-in is not configured for this staging project yet.",
+  linkedin_unavailable: "LinkedIn sign-in is not configured for this staging project yet.",
   missing_auth_code: "The sign-in callback was missing its authorization code. Please try again.",
   auth_callback_failed: "We could not complete that sign-in. Please try again.",
 };

@@ -16,12 +16,6 @@ export type Database = {
         Update: { created_at?: string; is_public?: boolean; key?: string; updated_at?: string; value?: Json }
         Relationships: []
       }
-      auth_otp_rate_limits: {
-        Row: { event_type: string; id: number; ip_hash: string; phone_hash: string; requested_at: string }
-        Insert: { event_type: string; id?: number; ip_hash: string; phone_hash: string; requested_at?: string }
-        Update: { event_type?: string; id?: number; ip_hash?: string; phone_hash?: string; requested_at?: string }
-        Relationships: []
-      }
       profiles: {
         Row: { attempt_key: string | null; avatar_url: string | null; ca_level: string | null; created_at: string; daily_target_minutes: number | null; display_name: string | null; group_choice: string | null; onboarding_completed_at: string | null; onboarding_step: number; updated_at: string; user_id: string }
         Insert: { attempt_key?: string | null; avatar_url?: string | null; ca_level?: string | null; created_at?: string; daily_target_minutes?: number | null; display_name?: string | null; group_choice?: string | null; onboarding_completed_at?: string | null; onboarding_step?: number; updated_at?: string; user_id: string }

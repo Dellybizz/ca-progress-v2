@@ -24,9 +24,3 @@ export function getSupabaseAdminConfig() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
   return { ...publicConfig, serviceRoleKey, configured: Boolean(publicConfig.url && serviceRoleKey) } as const;
 }
-
-export function getAuthServerConfig() {
-  const adminConfig = getSupabaseAdminConfig();
-  const rateLimitSalt = process.env.AUTH_RATE_LIMIT_SALT?.trim() || "";
-  return { ...adminConfig, rateLimitSalt, configured: Boolean(adminConfig.configured && rateLimitSalt.length >= 32) } as const;
-}
