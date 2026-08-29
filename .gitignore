@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# next/open-next/cloudflare build output
+.next/
+.open-next/
+.wrangler/
+
+# local environment values
+.env
+.env.local
+.env.*.local
+.dev.vars
+
+# test/coverage output
+coverage/
+
+# OS/editor
+.DS_Store
+*.log
+
+# generated Cloudflare types
+cloudflare-env.d.ts

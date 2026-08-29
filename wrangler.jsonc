@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ca-progress-v2-staging",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets"
+  },
+  "vars": {
+    "NEXT_PUBLIC_APP_NAME": "CA Progress",
+    "NEXT_PUBLIC_APP_ENV": "staging",
+    "NEXT_PUBLIC_APP_VERSION": "phase-0"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
