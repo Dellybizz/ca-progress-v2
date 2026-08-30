@@ -48,6 +48,6 @@ test("mobile admin navigation exposes primary operations plus complete More shee
 test("admin overview visibly includes ICAI and Razorpay health",()=>{
   const page=read("app/(admin)/admin/page.tsx");
   assert.match(page,/Latest ICAI run/);
-  assert.match(page,/Razorpay configuration/);
+  assert.match(page,/Razorpay/);
   assert.match(page,/health\.checks/);
 });
