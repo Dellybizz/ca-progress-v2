@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname; const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("Phase 7 upload validation runs on the server and checks size MIME extension and magic bytes", () => {
+test("Phase 7 upload validation runs on the server and stores bytes in Cloudflare R2", () => {
   const validation = read("lib/resources/validation.ts");
   const route = read("app/api/resources/upload/route.ts");
   assert.match(validation, /RESOURCE_MAX_BYTES = 10 \* 1024 \* 1024/);
@@ -15,10 +15,20 @@ test("Phase 7 upload validation runs on the server and checks size MIME extensio
   assert.match(validation, /0xd0, 0xcf, 0x11, 0xe0/);
   assert.match(route, /validateUploadFile\(file\)/);
   assert.match(route, /getResourceR2Bucket\(\)/);
-  assert.match(route, /phase7_create_uploaded_resource/);
+  assert.match(route, /bucket\.put\(storagePath, validated\.bytes/);
+  assert.match(route, /RESOURCE_R2_STORAGE_BUCKET/);
   assert.match(route, /content-length/);
   assert.match(route, /crypto\.randomUUID\(\)/);
-  assert.doesNotMatch(route, /createAdminSupabaseClient/);
+  assert.doesNotMatch(route, /\.storage\.from\(|admin\.storage/);
+});
+
+test("Phase 7 R2 upload persists metadata only through the server service role", () => {
+  const route = read("app/api/resources/upload/route.ts");
+  assert.match(route, /getSupabaseAdminConfig\(\)/);
+  assert.match(route, /createAdminSupabaseClient\(\)/);
+  assert.match(route, /admin\.from\("uploaded_resources"\)\.insert/);
+  assert.match(route, /METADATA_SERVICE_NOT_CONFIGURED/);
+  assert.doesNotMatch(route, /phase7_create_uploaded_resource/);
 });
 
 test("Phase 7 upload API returns stable JSON errors and checks Cloudflare R2 readiness", () => {
@@ -39,6 +49,7 @@ test("Phase 7 upload drawer tolerates empty or non-JSON proxy responses", () => 
   assert.doesNotMatch(library, /await response\.json\(\)/);
   assert.match(library, /CLIENT_UPLOAD_MAX_BYTES = 10 \* 1024 \* 1024/);
   assert.match(library, /uploadFallbackMessage\(response\.status\)/);
+  assert.match(library, /stored in Cloudflare R2/);
 });
 
 test("Phase 7 sanitizes filenames and rich note content server-side", () => {
