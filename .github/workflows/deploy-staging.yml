@@ -18,7 +18,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       NEXT_PUBLIC_APP_ENV: staging
       NEXT_PUBLIC_APP_NAME: CA Progress
-      NEXT_PUBLIC_APP_VERSION: phase-3
+      NEXT_PUBLIC_APP_VERSION: phase-8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,3 +29,7 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run cf:deploy
+
+# Phase 8 runtime secrets (SUPABASE_SERVICE_ROLE_KEY and ICAI_CRON_SECRET) are
+# stored on the Cloudflare Worker itself, not echoed through this workflow.
+# wrangler.jsonc uses keep_vars=true so dashboard-managed secrets survive deploys.

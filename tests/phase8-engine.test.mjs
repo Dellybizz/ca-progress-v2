@@ -1,0 +1,60 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = new URL("../", import.meta.url).pathname;
+const read = (path) => readFileSync(join(root, path), "utf8");
+
+test("daily ICAI sync is a Cloudflare scheduled job independent of user traffic", () => {
+  const wrangler = read("wrangler.jsonc");
+  const worker = read("custom-worker.ts");
+  const route = read("app/api/cron/icai-sync/route.ts");
+  assert.match(wrangler, /"main"\s*:\s*"\.\/custom-worker\.ts"/);
+  assert.match(wrangler, /"crons"\s*:\s*\["30 0 \* \* \*"\]/);
+  assert.match(worker, /scheduled\(/);
+  assert.match(worker, /x-icai-cron-secret/);
+  assert.match(route, /timingSafeEqual/);
+  assert.match(route, /runIcaiSync\(\{ trigger: "cron" \}\)/);
+});
+
+test("sync runner supports conditional fetch, backoff, pacing and last-verified failure isolation", () => {
+  const sync = read("lib/icai/sync.ts");
+  const migration = read("supabase/migrations/20260830080100_phase8_icai_sync_engine.sql");
+  assert.match(sync, /If-None-Match/);
+  assert.match(sync, /If-Modified-Since/);
+  assert.match(sync, /retryDelay/);
+  assert.match(sync, /Retry-After|retry-after/);
+  assert.match(sync, /requestIntervalSeconds/);
+  assert.match(sync, /MAX_HTML_BYTES/);
+  assert.match(sync, /icai_sync_record_unchanged/);
+  assert.match(sync, /icai_sync_mark_source_failure/);
+  assert.match(migration, /icai_sync_mark_source_failure[\s\S]*update public\.icai_sources[\s\S]*update public\.icai_sync_runs/i);
+  assert.doesNotMatch(migration, /icai_sync_mark_source_failure[\s\S]*delete from public\.icai_resources/i);
+});
+
+test("unchanged resources are deterministic and are not duplicated", () => {
+  const sync = read("lib/icai/sync.ts");
+  const migration = read("supabase/migrations/20260830080100_phase8_icai_sync_engine.sql");
+  assert.match(sync, /sha256Hex\(`\$\{source\.id\}:\$\{item\.officialUrl\}`\)/);
+  assert.match(migration, /v_existing_resource\.content_hash = v_item->>'content_hash'/);
+  assert.match(migration, /last_seen_at = now\(\), source_snapshot_id = v_snapshot_id/);
+  assert.match(migration, /unique \(source_id, official_url\)/);
+});
+
+test("attempt selection consumes verified exam_attempts instead of hardcoded month arrays", () => {
+  const auth = read("lib/auth/server.ts");
+  assert.match(auth, /from\("exam_attempts"\)/);
+  assert.match(auth, /eq\("verification_status", "verified"\)/);
+  assert.match(auth, /verified_exam_attempt/);
+  assert.doesNotMatch(auth, /const\s+attemptMonths\s*=/);
+});
+
+test("source adapters are restricted to official ICAI hosts and keep metadata-only links", () => {
+  const sync = read("lib/icai/sync.ts");
+  const html = read("lib/icai/html.ts");
+  const docs = read("docs/ICAI_SYNC_SETUP.md");
+  assert.match(sync, /isApprovedIcaiUrl\(source\.officialUrl\)/);
+  assert.match(html, /host === "icai\.org" \|\| host\.endsWith\("\.icai\.org"\)/);
+  assert.match(docs, /does not copy ICAI PDF\/study-material bodies/i);
+});
