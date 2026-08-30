@@ -52,16 +52,16 @@ test("webhook verifies raw-body signature before trusting the event and re-fetch
 test("verify, webhook, duplicate delivery and retries converge on one purchased entitlement", () => {
   assert.match(worker, /source: "verify"/);
   assert.match(worker, /source: "webhook"/);
-  assert.match(reconcile, /for update/i);
-  assert.match(reconcile, /on conflict \(provider, provider_event_key\) do nothing/i);
-  assert.match(reconcile, /if not v_event_inserted then/i);
-  assert.match(reconcile, /where us\.source = 'razorpay'[\s\S]*?us\.source_order_id = v_order\.provider_order_id/i);
-  assert.match(reconcile, /if v_existing_grant_id is not null then/i);
+  assert.match(reconcile, /where provider_order_id=p_provider_order_id for update/i);
+  assert.match(reconcile, /on conflict\(provider,provider_event_key\) do nothing/i);
+  assert.match(reconcile, /if v_event_id is null then/i);
+  assert.match(reconcile, /where source='razorpay' and source_order_id=v_order\.provider_order_id/i);
+  assert.match(reconcile, /if found then[\s\S]*?alreadyGranted/i);
   assert.match(reconcile, /phase11_add_plan_duration/i);
 });
 
 test("same-tier extension starts from a still-valid expiry and cannot shorten it", () => {
-  assert.match(reconcile, /us\.ends_at > v_paid_at/i);
-  assert.match(reconcile, /v_start_at := v_same_tier_end/i);
-  assert.match(reconcile, /v_end_at := public\.phase11_add_plan_duration\(v_start_at, v_plan\.duration_value, v_plan\.duration_unit\)/i);
+  assert.match(reconcile, /us\.ends_at>coalesce\(p_paid_at,now\(\)\)/i);
+  assert.match(reconcile, /if found then v_start=v_current\.ends_at; v_event_kind='extended'/i);
+  assert.match(reconcile, /v_end=public\.phase11_add_plan_duration\(v_start,v_plan\.duration_value,v_plan\.duration_unit\)/i);
 });
