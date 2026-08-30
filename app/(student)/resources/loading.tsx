@@ -1,0 +1,1 @@
+export default function Loading() { return <div className="phase7-loading" aria-label="Loading resource library"><div className="phase7-loading__hero"/><div className="phase7-loading__controls"/><div className="phase7-loading__card"/><div className="phase7-loading__card"/></div>; }

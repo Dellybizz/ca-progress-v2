@@ -16,7 +16,8 @@ export const studentNavigation: NavItem[] = [
   { label: "Activity", href: "/activity", icon: "sparkles" },
   { label: "Syllabus", href: "/syllabus", icon: "book" },
   { label: "ICAI Updates", href: "/updates", icon: "bell" },
-  { label: "ICAI Resources", href: "/resources/icai", icon: "book" },
+  { label: "Resources", href: "/resources", icon: "book" },
+  { label: "ICAI Resources", href: "/resources/icai", icon: "shield" },
   { label: "Tests", href: "/tests", icon: "tests" },
   { label: "Notes", href: "/notes", icon: "notes" },
   { label: "Community", href: "/community", icon: "community" },
@@ -27,6 +28,7 @@ export const adminNavigation: NavItem[] = [
   { label: "Admin overview", href: "/admin", icon: "shield", exact: true },
   { label: "Syllabus preview", href: "/admin/syllabus", icon: "book" },
   { label: "ICAI Sync", href: "/admin/icai-sync", icon: "bell" },
+  { label: "Resource moderation", href: "/admin/resources/moderation", icon: "notes" },
 ];
 
 export function DesktopNavigation({ area }: { area: "student" | "admin" }) {
@@ -34,7 +36,9 @@ export function DesktopNavigation({ area }: { area: "student" | "admin" }) {
   const nav = area === "admin" ? adminNavigation : studentNavigation;
   return <nav className="sidebar-nav" aria-label={`${area} navigation`}>{nav.map((item) => {
     const subjectRoute = item.href === "/syllabus" && pathname.startsWith("/subjects/");
-    const active = pathname === item.href || subjectRoute || (!item.exact && item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+    const userResourceRoute = item.href === "/resources" && pathname.startsWith("/resources/") && !pathname.startsWith("/resources/icai");
+    const nestedRoute = !item.exact && item.href !== "/dashboard" && item.href !== "/resources" && pathname.startsWith(`${item.href}/`);
+    const active = pathname === item.href || subjectRoute || userResourceRoute || nestedRoute;
     return <Link key={item.href} href={item.href} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}><Icon name={item.icon} size={19}/><span>{item.label}</span>{active ? <i className="sidebar-nav__active" aria-hidden="true"/> : null}</Link>;
   })}</nav>;
 }
