@@ -16,9 +16,11 @@ test("heavy ICAI background processing lives outside the Next OpenNext Worker", 
   assert.doesNotMatch(proxy, /@supabase\/supabase-js/);
 });
 
-test("ICAI service is private and linked to the web Worker with a Service Binding", () => {
-  const web = read("wrangler.jsonc");
+test("ICAI service is private and linked only in the final web deployment config", () => {
+  const bootstrap = read("wrangler.jsonc");
+  const web = read("wrangler.web.jsonc");
   const service = read("workers/icai-sync/wrangler.jsonc");
+  assert.doesNotMatch(bootstrap, /"services"\s*:/);
   assert.match(web, /"services"\s*:\s*\[/);
   assert.match(web, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(web, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);
@@ -27,17 +29,19 @@ test("ICAI service is private and linked to the web Worker with a Service Bindin
   assert.doesNotMatch(service, /"routes"\s*:/);
 });
 
-test("deploy order creates the target Worker before the web Worker references it", () => {
+test("deployment self-bootstraps target Worker before deploying bound web Worker", () => {
   const pkg = JSON.parse(read("package.json"));
-  assert.match(pkg.scripts["cf:deploy"], /cf:deploy:icai[\s\S]*opennextjs-cloudflare deploy/);
+  assert.equal(pkg.scripts.deploy, "npm run cf:deploy");
+  assert.match(pkg.scripts["cf:deploy"], /cf:deploy:icai[\s\S]*cf:deploy:web/);
   assert.match(pkg.scripts["cf:deploy:icai"], /workers\/icai-sync\/wrangler\.jsonc/);
-  assert.match(pkg.scripts["cf:preview:multi"], /wrangler dev -c wrangler\.jsonc -c workers\/icai-sync\/wrangler\.jsonc/);
+  assert.match(pkg.scripts["cf:deploy:web"], /opennextjs-cloudflare deploy --config=wrangler\.web\.jsonc/);
+  assert.match(pkg.scripts["cf:preview:multi"], /wrangler dev -c wrangler\.web\.jsonc -c workers\/icai-sync\/wrangler\.jsonc/);
 });
 
 test("repository enforces headroom below Cloudflare hard bundle limits", () => {
   const pkg = JSON.parse(read("package.json"));
   const gate = read("scripts/check-cloudflare-size-budget.mjs");
-  assert.match(pkg.scripts["cf:check:web"], /--budget-mib 2\.70/);
+  assert.match(pkg.scripts["cf:check:web"], /--config wrangler\.web\.jsonc --budget-mib 2\.70/);
   assert.match(pkg.scripts["cf:check:icai"], /--budget-mib 1\.50/);
   assert.match(pkg.scripts["cf:check"], /cf:check:icai[\s\S]*cf:check:web/);
   assert.match(gate, /compressedMiB > budgetMiB/);
