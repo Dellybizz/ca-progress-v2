@@ -34,6 +34,16 @@ The scheduled handler in `custom-worker.ts` also calls the service directly. Thi
 
 The internal Worker has no `workers.dev` endpoint and no public routes. The target Worker is deployed before the web Worker so the service binding resolves safely.
 
+## Bootstrap-safe configurations
+
+Cloudflare requires a Service Binding target to exist before the caller can be deployed. To make the first modular deployment reproducible rather than requiring a one-off placeholder Worker:
+
+- `wrangler.jsonc` is the repository/bootstrap config and deliberately contains no service binding. This lets Workers Builds parse the repository before the new internal Worker exists.
+- `workers/icai-sync/wrangler.jsonc` deploys the private target Worker.
+- `wrangler.web.jsonc` is the final web deployment config and adds `ICAI_SYNC_SERVICE` only after that target has been created.
+
+Both web configs preserve the same Worker name, R2 binding, required secrets, cron schedule and Phase 10 runtime variables. The only intentional difference is the final Service Binding.
+
 ## Bundle budgets
 
 `npm run cf:check` builds OpenNext and enforces repository budgets using Wrangler dry-run output:
@@ -48,8 +58,10 @@ These are repository budgets, intentionally lower than platform hard limits. A p
 `npm run cf:deploy` performs:
 
 1. OpenNext web build and guarded unused-OG stripping;
-2. deployment of `ca-progress-v2-icai-sync`;
-3. deployment of `ca-progress-v2` with its service binding.
+2. deployment of `ca-progress-v2-icai-sync` using its private Worker config;
+3. deployment of `ca-progress-v2` using `wrangler.web.jsonc`, which adds the now-valid Service Binding.
+
+`npm run deploy` is an alias for this same ordered deployment so Cloudflare Workers Builds can use the repository-defined deploy command.
 
 For local Cloudflare multi-worker testing use `npm run cf:preview:multi`.
 
