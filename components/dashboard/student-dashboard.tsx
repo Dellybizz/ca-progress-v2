@@ -60,12 +60,12 @@ function GuestDashboard() {
 function OnboardingDashboard({ displayName }: { displayName: string }) {
   return (
     <div className="student-dashboard">
-      <PageHeader preview={false} eyebrow="Student home" title={`Finish your setup, ${displayName}.`} description="The dashboard needs your level, group and attempt before it can safely scope academic and ICAI information." />
+      <PageHeader preview={false} eyebrow="Student home" title={`Finish your setup, ${displayName}.`} description="The dashboard needs your level, group and a verified attempt before it can safely scope academic and ICAI information." />
       <Card className="dashboard-access-card">
         <CardBody>
           <span className="dashboard-access-card__icon"><Icon name="target" size={24} /></span>
-          <div><Badge tone="warning">Setup incomplete</Badge><h2>Complete your academic profile</h2><p>This prevents Foundation, Intermediate or Final subjects and official updates from being mixed together.</p></div>
-          <Link className="dashboard-primary-link" href="/onboarding?next=%2Fdashboard">Continue setup <Icon name="arrow" size={16} /></Link>
+          <div><Badge tone="warning">Setup incomplete</Badge><h2>Review your academic profile</h2><p>Choose a verified attempt and confirm your CA level/group. New users will be routed through onboarding automatically.</p></div>
+          <Link className="dashboard-primary-link" href="/settings/profile">Review academic profile <Icon name="arrow" size={16} /></Link>
         </CardBody>
       </Card>
     </div>
