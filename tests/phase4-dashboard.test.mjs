@@ -59,6 +59,15 @@ test("dashboard has route-specific skeleton, error, empty and permission states"
   assert.match(ui, /No matching ICAI updates yet/);
 });
 
+test("completed early profiles with an undecided or stale attempt get a recoverable settings state", () => {
+  const service = read("lib/dashboard/service.ts");
+  const ui = read("components/dashboard/student-dashboard.tsx");
+  assert.match(service, /profile\.attempt_key === "undecided"/);
+  assert.match(service, /if \(!academic\) return setupRequired/);
+  assert.match(ui, /href="\/settings\/profile"/);
+  assert.match(ui, /Review academic profile/);
+});
+
 test("dashboard only posts lightweight authenticated analytics and never exposes a read endpoint", () => {
   const route = read("app/api/dashboard/events/route.ts");
   const client = read("components/dashboard/dashboard-interactions.tsx");
