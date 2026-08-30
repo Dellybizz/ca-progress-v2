@@ -1,0 +1,94 @@
+/* Login/public-shell responsive hardening.
+   Keeps the auth card and supporting copy readable on real desktop widths without
+   changing the authentication flow. */
+.public-content:has(.auth-v2-layout) {
+  max-width: 1040px;
+  min-width: 0;
+}
+
+.auth-v2-layout,
+.auth-v2-intro,
+.auth-v2-card {
+  min-width: 0;
+}
+
+.auth-v2-intro h1 {
+  max-width: 560px;
+  text-wrap: balance;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.auth-v2-intro > p {
+  max-width: 580px;
+}
+
+.auth-v2-card {
+  max-width: 440px;
+}
+
+@media (min-width: 1400px) {
+  .public-content:has(.auth-v2-layout) {
+    padding-left: clamp(36px, 4vw, 72px);
+    padding-right: clamp(36px, 4vw, 72px);
+  }
+
+  .auth-v2-layout {
+    width: 100%;
+    grid-template-columns: minmax(260px, 1fr) minmax(360px, 440px);
+    gap: clamp(36px, 4vw, 64px);
+    align-items: center;
+  }
+
+  .auth-v2-intro {
+    padding: 0;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1399px) {
+  .public-content:has(.auth-v2-layout) {
+    max-width: 620px;
+  }
+
+  .auth-v2-layout {
+    width: 100%;
+    max-width: 480px;
+    margin-inline: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .auth-v2-intro {
+    display: none;
+  }
+}
+
+@media (max-width: 899px) {
+  .public-content:has(.auth-v2-layout) {
+    max-width: 620px;
+    align-items: flex-start;
+  }
+
+  .auth-v2-layout {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .auth-v2-intro {
+    padding: var(--space-2) 0 0;
+  }
+
+  .auth-trust-list {
+    margin-top: var(--space-5);
+  }
+}
+
+@media (max-width: 520px) {
+  .auth-v2-intro h1 {
+    font-size: clamp(30px, 9vw, 42px);
+  }
+
+  .auth-v2-card {
+    max-width: none;
+  }
+}
