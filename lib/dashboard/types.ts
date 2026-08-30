@@ -93,10 +93,10 @@ export type DashboardReadyModel = {
     tests: number | null;
   };
   progress: {
-    status: "awaiting_phase5";
-    overallPercent: number | null;
-    groups: Array<{ code: string; name: string; subjectCount: number; chapterCount: number; percent: number | null }>;
-    subjects: Array<DashboardAcademicSubject & { percent: number | null }>;
+    status: "tracked";
+    overallPercent: number;
+    groups: Array<{ code: string; name: string; subjectCount: number; chapterCount: number; percent: number }>;
+    subjects: Array<DashboardAcademicSubject & { percent: number }>;
   };
   study: {
     status: "awaiting_phase6";
