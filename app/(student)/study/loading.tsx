@@ -1,0 +1,1 @@
+export default function Loading() { return <div className="phase6-loading" aria-label="Loading study timer"><div className="phase6-loading__hero"/><div className="phase6-loading__row"/><div className="phase6-loading__card"/></div>; }

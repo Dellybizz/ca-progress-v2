@@ -7,45 +7,22 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { getProgressPageModel } from "@/lib/progress/service";
+import { getStudyPageModel } from "@/lib/study/service";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Analytics | CA Progress" };
-
-function Meter({ value }: { value: number }) {
-  return <div className="analytics-meter" aria-label={`${value}%`}><span style={{ width: `${value}%` }}/></div>;
-}
+function Meter({ value }: { value: number }) { return <div className="analytics-meter" aria-label={`${value}%`}><span style={{ width: `${value}%` }}/></div>; }
+function studyTime(seconds: number) { const minutes = Math.round(seconds / 60); if (minutes < 60) return `${minutes}m`; const hours = Math.floor(minutes / 60); const rest = minutes % 60; return rest ? `${hours}h ${rest}m` : `${hours}h`; }
 
 export default async function AnalyticsPage() {
-  const model = await getProgressPageModel();
+  const [model, study] = await Promise.all([getProgressPageModel(), getStudyPageModel()]);
   if (model.mode === "guest") return <div className="progress-page"><LoginRequired next="/analytics" title="Sign in to view private analytics"/></div>;
-  if (model.mode === "setup") return <div className="progress-page"><PageHeader preview={false} eyebrow="Analytics" title="Complete your academic profile first." description="Analytics are scoped to your applicable chapters and verified attempt."/><Link className="ui-button ui-button--primary" href="/settings/profile">Review profile</Link></div>;
-  if (!model.chapters.length) {
-    return <div className="progress-page analytics-page"><PageHeader preview={false} eyebrow="Analytics" title="No applicable chapters are available yet." description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Analytics will appear when the verified syllabus contains chapters for this selection.`}/><EmptyState icon="chart" title="Nothing to analyse yet" description="Your analytics are derived only from applicable normalized chapter rows. Review your academic profile if this selection looks unexpected." action={<Link className="ui-button ui-button--primary" href="/settings/profile">Review academic profile</Link>}/></div>;
-  }
+  if (model.mode === "setup") return <div className="progress-page"><PageHeader preview={false} eyebrow="Analytics" title="Complete your academic profile first." description="Analytics are scoped to your applicable chapters, verified attempt and completed study sessions."/><Link className="ui-button ui-button--primary" href="/settings/profile">Review profile</Link></div>;
+  const studyAnalytics = study.mode === "ready" ? study.analytics : null;
   const analytics = model.analytics;
-  return (
-    <div className="progress-page analytics-page">
-      <PageHeader preview={false} eyebrow="Analytics" title="Progress analytics from the rows you actually saved." description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. No manually maintained totals are used.`} actions={<Link className="dashboard-header-link" href="/progress">Open tracker</Link>}/>
-      <section className="analytics-hero-grid">
-        <Card><CardBody><span>Overall stage progress</span><strong>{analytics.overallPercent}%</strong><Meter value={analytics.overallPercent}/><small>Completed + revisions + tests across {analytics.chapterCount} chapters</small></CardBody></Card>
-        <Card><CardBody><span>Completion</span><strong>{analytics.completionPercent}%</strong><Meter value={analytics.completionPercent}/><small>{analytics.completedCount} chapters completed</small></CardBody></Card>
-        <Card><CardBody><span>Revision coverage</span><strong>{analytics.revisionPercent}%</strong><Meter value={analytics.revisionPercent}/><small>{analytics.revision1Count} first · {analytics.revision2Count} second revisions</small></CardBody></Card>
-        <Card><CardBody><span>Test coverage</span><strong>{analytics.testPercent}%</strong><Meter value={analytics.testPercent}/><small>{analytics.test1Count} Test 1 · {analytics.test2Count} Test 2</small></CardBody></Card>
-      </section>
-      <section className="analytics-grid">
-        <Card>
-          <CardHeader title="This week" description="Derived from accepted progress events, excluding changes later undone." action={<Badge tone="brand">7 days</Badge>}/>
-          <CardBody><div className="analytics-consistency"><div><Icon name="sparkles"/><strong>{analytics.stagesAddedLast7Days}</strong><span>stages added</span></div><div><Icon name="calendar"/><strong>{analytics.activeDaysLast7Days}</strong><span>active days</span></div></div></CardBody>
-        </Card>
-        <Card>
-          <CardHeader title="Group progress" description="Aggregated directly from chapter rows."/>
-          <CardBody><div className="analytics-list">{analytics.groups.map((group) => <div key={group.code}><span><strong>{group.name}</strong><small>{group.completedCount}/{group.chapterCount} chapters completed</small></span><b>{group.overallPercent}%</b><Meter value={group.overallPercent}/></div>)}</div></CardBody>
-        </Card>
-      </section>
-      <Card>
-        <CardHeader title="Subject progress" description="Completion, revision and test coverage by applicable subject."/>
-        <CardBody><div className="analytics-subject-table">{analytics.subjects.map((subject) => <Link key={subject.id} href={`/subjects/${subject.slug}/progress`}><span><strong>{subject.title}</strong><small>{subject.groupName} · {subject.chapterCount} chapters</small></span><span><em>Done {subject.completionPercent}%</em><em>Rev {subject.revisionPercent}%</em><em>Tests {subject.testPercent}%</em></span><b>{subject.overallPercent}%</b><Icon name="chevron" size={16}/></Link>)}</div></CardBody>
-      </Card>
-    </div>
-  );
+  return <div className="progress-page analytics-page">
+    <PageHeader preview={false} eyebrow="Analytics" title="Study and progress analytics from normalized source rows." description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. No manually maintained totals are used. No manual studyHours array is maintained; study time comes directly from normalized study_sessions.`} actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link></div>}/>
+    {studyAnalytics ? <><section className="phase6-metric-strip"><Card><CardBody><Icon name="clock"/><span><strong>{studyTime(studyAnalytics.todaySeconds)}</strong><small>studied today</small></span></CardBody></Card><Card><CardBody><Icon name="timer"/><span><strong>{studyTime(studyAnalytics.last7DaysSeconds)}</strong><small>last 7 days</small></span></CardBody></Card><Card><CardBody><Icon name="sparkles"/><span><strong>{studyAnalytics.streakDays}</strong><small>day streak</small></span></CardBody></Card><Card><CardBody><Icon name="chart"/><span><strong>{studyAnalytics.sessionCountLast7Days}</strong><small>sessions / 7 days</small></span></CardBody></Card></section><Card><CardHeader title="Recent study sessions" description="Finishing the Phase 6 timer inserts a study_session row; this panel reads those rows directly." action={<Badge tone="brand">Live source</Badge>}/><CardBody>{studyAnalytics.recentSessions.length ? <div className="phase6-session-list">{studyAnalytics.recentSessions.slice(0,6).map((session) => <div key={session.id}><span><strong>{session.chapterTitle ?? session.subjectTitle ?? "General study"}</strong><small>{new Date(session.endedAt).toLocaleString()}</small></span><b>{studyTime(session.durationSeconds)}</b></div>)}</div> : <EmptyState compact icon="timer" title="No completed study sessions yet" description="Finish a Study timer and the analytics on this page update from the new database row immediately."/>}</CardBody></Card></> : null}
+    {!model.chapters.length ? <EmptyState icon="chart" title="Nothing to analyse yet for chapter progress" description="Study analytics above can still exist, but chapter-stage analytics require an applicable verified syllabus." action={<Link className="ui-button ui-button--primary" href="/settings/profile">Review academic profile</Link>}/> : <><section className="analytics-hero-grid"><Card><CardBody><span>Overall stage progress</span><strong>{analytics.overallPercent}%</strong><Meter value={analytics.overallPercent}/><small>Completed + revisions + tests across {analytics.chapterCount} chapters</small></CardBody></Card><Card><CardBody><span>Completion</span><strong>{analytics.completionPercent}%</strong><Meter value={analytics.completionPercent}/><small>{analytics.completedCount} chapters completed</small></CardBody></Card><Card><CardBody><span>Revision coverage</span><strong>{analytics.revisionPercent}%</strong><Meter value={analytics.revisionPercent}/><small>{analytics.revision1Count} first · {analytics.revision2Count} second revisions</small></CardBody></Card><Card><CardBody><span>Test coverage</span><strong>{analytics.testPercent}%</strong><Meter value={analytics.testPercent}/><small>{analytics.test1Count} Test 1 · {analytics.test2Count} Test 2</small></CardBody></Card></section><section className="analytics-grid"><Card><CardHeader title="Progress actions this week" description="Derived from accepted progress events, excluding changes later undone." action={<Badge tone="brand">7 days</Badge>}/><CardBody><div className="analytics-consistency"><div><Icon name="sparkles"/><strong>{analytics.stagesAddedLast7Days}</strong><span>stages added</span></div><div><Icon name="calendar"/><strong>{analytics.activeDaysLast7Days}</strong><span>active days</span></div></div></CardBody></Card><Card><CardHeader title="Group progress" description="Aggregated directly from chapter rows."/><CardBody><div className="analytics-list">{analytics.groups.map((group) => <div key={group.code}><span><strong>{group.name}</strong><small>{group.completedCount}/{group.chapterCount} chapters completed</small></span><b>{group.overallPercent}%</b><Meter value={group.overallPercent}/></div>)}</div></CardBody></Card></section><Card><CardHeader title="Subject progress" description="Completion, revision and test coverage by applicable subject."/><CardBody><div className="analytics-subject-table">{analytics.subjects.map((subject) => <Link key={subject.id} href={`/subjects/${subject.slug}/progress`}><span><strong>{subject.title}</strong><small>{subject.groupName} · {subject.chapterCount} chapters</small></span><span><em>Done {subject.completionPercent}%</em><em>Rev {subject.revisionPercent}%</em><em>Tests {subject.testPercent}%</em></span><b>{subject.overallPercent}%</b><Icon name="chevron" size={16}/></Link>)}</div></CardBody></Card></>}
+  </div>;
 }
