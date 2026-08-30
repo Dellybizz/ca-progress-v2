@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: { default: "CA Progress V2", template: "%s · CA Progress V2" },
-  description: "CA Progress V2 staging - Phase 1 design system and new UX language.",
+  description: "CA Progress V2 staging - Phase 3 syllabus and academic data engine.",
   robots: { index: false, follow: false },
 };
 

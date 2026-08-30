@@ -1,0 +1,90 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = new URL("../", import.meta.url).pathname;
+const read = (path) => readFileSync(join(root, path), "utf8");
+
+test("Phase 3 required routes and academic domain services exist", () => {
+  for (const path of [
+    "app/(student)/syllabus/page.tsx",
+    "app/(student)/subjects/[subjectSlug]/page.tsx",
+    "app/api/academic/search/route.ts",
+    "app/(admin)/admin/syllabus/page.tsx",
+    "lib/academic/query.ts",
+    "lib/academic/types.ts",
+    "components/academic/syllabus-explorer.tsx",
+    "components/academic/subject-detail.tsx",
+  ]) assert.equal(existsSync(join(root, path)), true, path);
+});
+
+test("academic query service reads normalized DB tables and filters by group and attempt", () => {
+  const source = read("lib/academic/query.ts");
+  for (const table of ["course_levels", "course_groups", "subjects", "syllabus_versions", "chapters", "topics", "attempt_syllabus_map"]) assert.match(source, new RegExp(`from\\(\"${table}\"\\)`));
+  assert.match(source, /versionForSubject/);
+  assert.match(source, /attempt_key === attempt/);
+  assert.match(source, /allowedGroupIds/);
+  assert.match(source, /selectedGroup/);
+});
+
+test("syllabus page contains no hardcoded academic syllabus arrays", () => {
+  const pages = [read("app/(student)/syllabus/page.tsx"), read("app/(student)/subjects/[subjectSlug]/page.tsx")].join("\n");
+  assert.equal(/Advanced Accounting|Corporate and Other Laws|Business Laws|Financial Reporting/.test(pages), false);
+  assert.equal(/const\s+(subjects|chapters|topics)\s*=\s*\[/.test(pages), false);
+  assert.match(pages, /getAcademicCatalog|getSubjectBySlug/);
+});
+
+test("responsive student explorer exposes level group attempt search and chapter hierarchy", () => {
+  const explorer = read("components/academic/syllabus-explorer.tsx");
+  for (const marker of ["academic-level-tabs", "academic-filter-group", "academic-attempt-filter", "academic-search", "academic-chapter-tree"]) assert.match(explorer, new RegExp(marker));
+  assert.match(explorer, /\/api\/academic\/search/);
+  assert.match(explorer, /accounting_standard/);
+  const css = read("app/styles/academic.css");
+  assert.match(css, /@media \(max-width: 900px\)/);
+  assert.match(css, /@media \(max-width: 620px\)/);
+});
+
+test("subject rows are progress-ready without implementing progress writes", () => {
+  const subject = read("components/academic/subject-detail.tsx");
+  assert.match(subject, /data-academic-chapter-id/);
+  assert.match(subject, /data-academic-topic-id/);
+  assert.match(subject, /Not tracked yet/);
+  assert.match(subject, /Phase 5/);
+  assert.equal(/\.from\(|fetch\([^)]*progress|insert\(|update\(/.test(subject), false);
+});
+
+test("academic search API validates input and disables shared caching", () => {
+  const route = read("app/api/academic/search/route.ts");
+  assert.match(route, /q\.length > 100/);
+  assert.match(route, /q\.length < 2/);
+  assert.match(route, /searchAcademicCatalog/);
+  assert.match(route, /private, no-store/);
+  assert.match(route, /status: 503/);
+});
+
+test("admin syllabus surface is preview-only in Phase 3", () => {
+  const admin = read("app/(admin)/admin/syllabus/page.tsx");
+  assert.match(admin, /Read-only admin preview/);
+  assert.match(admin, /No editing in Phase 3/);
+  assert.equal(/fetch\(|insert\(|update\(|delete\(/.test(admin), false);
+});
+
+test("desktop and mobile navigation expose the syllabus explorer", () => {
+  const desktop = read("components/shell/navigation.tsx");
+  const mobile = read("components/shell/mobile-nav-placeholder.tsx");
+  assert.match(desktop, /label: \"Syllabus\"/);
+  assert.match(desktop, /href: \"\/syllabus\"/);
+  assert.match(mobile, /\/subjects/);
+  assert.match(mobile, /studentNavigation\.slice\(4\)/);
+});
+
+test("Phase 3 replaces the Phase 2 attempt placeholder with applicability-backed options", () => {
+  const server = read("lib/auth/server.ts");
+  const validation = read("lib/profile/validation.ts");
+  assert.match(server, /attempt_syllabus_map/);
+  assert.match(server, /course_levels/);
+  assert.match(server, /verified_academic_attempt/);
+  assert.match(validation, /attemptAppliesToLevel/);
+  assert.match(validation, /Choose an attempt applicable to this CA level/);
+});
