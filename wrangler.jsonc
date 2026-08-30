@@ -5,6 +5,9 @@
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
+  "secrets": {
+    "required": ["SUPABASE_SERVICE_ROLE_KEY"]
+  },
   "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
   "r2_buckets": [
     {

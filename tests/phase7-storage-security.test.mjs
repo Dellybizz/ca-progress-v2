@@ -11,6 +11,7 @@ test("Phase 7 files use a private Cloudflare R2 Worker binding", () => {
   const migration = read("supabase/migrations/20260830153000_phase7_cloudflare_r2_resource_storage.sql");
   assert.match(wrangler, /"binding": "USER_RESOURCES_R2"/);
   assert.match(wrangler, /"bucket_name": "ca-progress-v2-staging-user-resources"/);
+  assert.match(wrangler, /"required": \["SUPABASE_SERVICE_ROLE_KEY"\]/);
   assert.match(r2, /getCloudflareContext/);
   assert.match(r2, /RESOURCE_R2_STORAGE_BUCKET/);
   assert.match(access, /row\.owner_user_id === identity\.id \|\| \(row\.visibility === "shared" && row\.moderation_status === "approved"\)/);
