@@ -3,7 +3,7 @@ import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
 import { CalendarClient } from "@/components/planner/calendar-client";
 import { PageHeader } from "@/components/ui/page-header";
-import { getCalendarPageModel } from "@/lib/planner/service";
+import { getCalendarPageModel } from "@/lib/planner/calendar";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Calendar | CA Progress" };
