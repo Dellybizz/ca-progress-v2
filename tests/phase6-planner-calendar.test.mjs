@@ -1,0 +1,48 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = new URL("../", import.meta.url).pathname;
+const read = (path) => readFileSync(join(root, path), "utf8");
+const migration = read("supabase/migrations/20260830130000_phase6_study_planner_calendar.sql");
+
+test("planner schema is normalized with tasks goals and simple user events", () => {
+  for (const table of ["tasks", "goals", "user_calendar_events"]) assert.match(migration, new RegExp(`create table public\\.${table}`));
+  assert.match(migration, /task_kind text not null default 'study'/);
+  assert.match(migration, /estimated_minutes integer not null default 30/);
+  assert.match(migration, /due_date date not null/);
+  assert.match(migration, /starts_at timestamptz not null/);
+});
+
+test("planner rows have strict own-user CRUD RLS and task academic guards", () => {
+  for (const policy of ["tasks_select_own", "tasks_insert_own", "tasks_update_own", "tasks_delete_own", "goals_select_own", "user_calendar_events_select_own"]) assert.match(migration, new RegExp(policy));
+  const hardening = read("supabase/migrations/20260830133000_phase6_timezone_and_task_guard.sql");
+  assert.match(hardening, /tasks_validate_academic_scope/);
+  assert.match(hardening, /Task subject is not applicable/);
+  assert.match(hardening, /Task chapter does not belong to the selected subject/);
+});
+
+test("calendar is a composed view over tasks goals user events and verified ICAI exam events", () => {
+  const service = read("lib/planner/service.ts");
+  for (const source of ["tasks", "goals", "user_calendar_events", "exam_attempts", "exam_events"]) assert.match(service, new RegExp(`from\\(\"${source}\"\\)`));
+  assert.match(service, /verification_status.*verified/);
+  assert.match(service, /readOnly: true/);
+  assert.doesNotMatch(migration, /create table public\.calendar_items/);
+});
+
+test("calendar UI keeps official exam markers read-only while personal events are editable", () => {
+  const calendar = read("components/planner/calendar-client.tsx");
+  assert.match(calendar, /Official ICAI/);
+  assert.match(calendar, /item\.readOnly/);
+  assert.match(calendar, /Verified official event — read only/);
+  assert.match(calendar, /action: editingId \? "update" : "create"/);
+  assert.match(calendar, /action: "delete"/);
+});
+
+test("activity timeline is derived from study sessions and progress events", () => {
+  const service = read("lib/planner/service.ts");
+  assert.match(service, /from\("study_sessions"\)/);
+  assert.match(service, /from\("progress_events"\)/);
+  assert.doesNotMatch(migration, /create table public\.activity/);
+});
