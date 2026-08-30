@@ -17,7 +17,16 @@ Implemented in isolated CA Progress V2 only:
 - auditable moderator action log;
 - responsive desktop split chat and mobile full-viewport WhatsApp-style experience;
 - `/community`, `/community/[channel]`, `/admin/community/moderation` plus loading/error/empty/permission states;
+- covering indexes for Phase 10 foreign-key lookup paths;
 - Cloudflare free-plan bundle optimization that removes unused Next.js OG runtime only when application source does not use it, then minifies the Worker.
+
+Verified against the V2 database:
+
+- all Phase 10 Community tables have RLS enabled;
+- authenticated table access is SELECT-only; INSERT/UPDATE/DELETE are not granted directly;
+- Community Realtime publication contains messages, reactions, pins and notifications;
+- a transactional smoke test verified unread 0 → 1 → 0 behavior, restricted student writes, and moderator audit logging, then rolled back all smoke data;
+- Supabase performance advisor no longer reports unindexed foreign keys for Phase 10 tables.
 
 Preserved boundaries:
 
