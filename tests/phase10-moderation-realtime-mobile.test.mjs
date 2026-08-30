@@ -37,7 +37,7 @@ test("Realtime subscribes only to the active channel and is cleaned up on naviga
 
 test("mobile Community chat owns the dynamic viewport and contains scrolling without horizontal overflow", () => {
   const css = read("app/styles/phase10.css");
-  assert.match(css, /@media\(max-width:760px\)/);
+  assert.match(css, /@media\(max-width:720px\)/);
   assert.match(css, /height:calc\(100dvh/);
   assert.match(css, /min-height:0/);
   assert.match(css, /overflow:hidden/);
