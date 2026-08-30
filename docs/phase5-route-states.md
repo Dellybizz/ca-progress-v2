@@ -1,0 +1,1 @@
+Progress and analytics routes provide guest/login-required, setup-required, loading, empty and error states; tracker controls expose locked dependency and saving/error/saved interaction states.
