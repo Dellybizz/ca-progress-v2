@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
+import { getSupabaseAdminConfig } from "@/lib/env";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { cleanText, nullableId } from "@/lib/resources/validation";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+function metadataUnavailable() {
+  return NextResponse.json({ error: "Resource metadata service is temporarily unavailable." }, { status: 503 });
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!getSupabaseAdminConfig().configured) return metadataUnavailable();
+
   const { id } = await params;
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; }
@@ -27,21 +35,23 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (found.error) return NextResponse.json({ error: found.error.message }, { status: 400 });
   if (!found.data) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
 
-  const response = await supabase.rpc("phase7_update_uploaded_resource", {
-    p_resource_id: id,
-    p_title: title,
-    p_description: description,
-    p_subject_id: subjectId,
-    p_chapter_id: chapterId,
-    p_visibility: visibility,
-  });
+  const admin = createAdminSupabaseClient();
+  const response = await admin.from("uploaded_resources")
+    .update({ title, description, subject_id: subjectId, chapter_id: chapterId, visibility })
+    .eq("id", id)
+    .eq("owner_user_id", identity.id)
+    .select("id,moderation_status")
+    .single();
+
   if (response.error) return NextResponse.json({ error: response.error.message }, { status: 400 });
-  return NextResponse.json({ id, status: response.data });
+  return NextResponse.json({ id: response.data.id, status: response.data.moderation_status });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  if (!getSupabaseAdminConfig().configured) return metadataUnavailable();
+
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
   const found = await supabase.from("uploaded_resources").select("id,owner_user_id,storage_bucket,storage_path").eq("id", id).eq("owner_user_id", identity.id).maybeSingle();
@@ -61,7 +71,8 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Cloudflare R2 could not delete this file." }, { status: 502 });
   }
 
-  const deleted = await supabase.rpc("phase7_delete_uploaded_resource", { p_resource_id: id });
+  const admin = createAdminSupabaseClient();
+  const deleted = await admin.from("uploaded_resources").delete().eq("id", id).eq("owner_user_id", identity.id);
   if (deleted.error) return NextResponse.json({ error: deleted.error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
