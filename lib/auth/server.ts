@@ -3,8 +3,8 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { getSupabasePublicConfig } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Database, Json } from "@/lib/supabase/database.types";
-import type { AttemptOption } from "@/lib/profile/validation";
+import type { Database } from "@/lib/supabase/database.types";
+import type { AttemptOption, CALevel } from "@/lib/profile/validation";
 import { loginPathFor, sanitizeReturnPath } from "./navigation";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -55,24 +55,30 @@ export async function ensureUserBootstrap() {
   return { id: user.id, email: user.email ?? null, phone: user.phone ?? null } satisfies ServerIdentity;
 }
 
-function parseAttemptOptions(value: Json): AttemptOption[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  const options = (value as Record<string, Json | undefined>).options;
-  if (!Array.isArray(options)) return [];
-  return options.flatMap((item) => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
-    const record = item as Record<string, Json | undefined>;
-    if (typeof record.key !== "string" || typeof record.label !== "string") return [];
-    return [{ key: record.key, label: record.label, kind: typeof record.kind === "string" ? record.kind : undefined }];
-  });
+function attemptLabel(key: string) {
+  const [year, month] = key.split("-");
+  const monthName = ({ "01": "January", "05": "May", "09": "September", "11": "November" } as Record<string, string>)[month] ?? month;
+  return `${monthName} ${year}`;
 }
 
 export async function loadAttemptOptions(): Promise<AttemptOption[]> {
   if (!getSupabasePublicConfig().configured) return [{ key: "undecided", label: "Not decided yet", kind: "build_fallback" }];
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase.from("app_settings").select("value").eq("key", "onboarding.attempt_options").maybeSingle();
-  const options = data ? parseAttemptOptions(data.value) : [];
-  return options.length ? options : [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
+  const [maps, levels] = await Promise.all([
+    supabase.from("attempt_syllabus_map").select("attempt_key, level_id"),
+    supabase.from("course_levels").select("id, code").eq("is_active", true),
+  ]);
+  if (maps.error || levels.error || !maps.data?.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
+  const levelById = new Map(levels.data.map((level) => [level.id, level.code as CALevel]));
+  const options = new Map<string, Set<CALevel>>();
+  for (const row of maps.data) {
+    const level = levelById.get(row.level_id);
+    if (!level) continue;
+    const current = options.get(row.attempt_key) ?? new Set<CALevel>();
+    current.add(level);
+    options.set(row.attempt_key, current);
+  }
+  return [...options.entries()].sort(([a], [b]) => b.localeCompare(a)).map(([key, applicableLevels]) => ({ key, label: attemptLabel(key), kind: "verified_academic_attempt", levels: [...applicableLevels] }));
 }
 
 export async function resolvePostAuthDestination(next: string) {
