@@ -18,7 +18,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       NEXT_PUBLIC_APP_ENV: staging
       NEXT_PUBLIC_APP_NAME: CA Progress
-      NEXT_PUBLIC_APP_VERSION: phase-10
+      NEXT_PUBLIC_APP_VERSION: phase-11
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,7 +30,8 @@ jobs:
       - run: npm test
       - run: npm run cf:deploy
 
-# Existing V2 runtime secrets remain active; Phase 10 adds no new secret.
-# Community Realtime uses the existing public Supabase URL/publishable key with RLS.
-# Phase 7 resource bytes continue to use the private USER_RESOURCES_R2 binding.
-# wrangler.jsonc uses keep_vars=true so dashboard-managed secrets survive deploys.
+# Runtime secrets remain dashboard-managed and are preserved with keep_vars=true.
+# Phase 11 deploy order creates/updates private ICAI and Billing Workers before the web Worker.
+# Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET as secrets on
+# ca-progress-v2-billing. Until configured, paid checkout fails closed without changing plans.
+# Phase 7 resource bytes remain private in USER_RESOURCES_R2.
