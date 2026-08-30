@@ -158,28 +158,31 @@ export function PricingClient({
             tone: "info",
             text: "Payment received. Verifying it with Razorpay before activating your plan…",
           });
-          const verifyResponse = await fetch("/api/payments/verify", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify(result),
-          });
-          const verified = (await verifyResponse.json()) as {
-            error?: string;
-            providerStatus?: string;
-            reconciliation?: { status?: string };
-          };
-          if (!verifyResponse.ok) {
-            throw new Error(
-              verified.error ||
-                "Payment verification failed. The webhook can still reconcile a captured payment safely.",
-            );
-          }
-          setBusy(null);
-          if (verified.providerStatus !== "captured") {
+          try {
+            const verifyResponse = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(result),
+            });
+            const verified = (await verifyResponse.json()) as {
+              error?: string;
+              providerStatus?: string;
+              reconciliation?: { status?: string };
+            };
+            setBusy(null);
+            if (!verifyResponse.ok) {
+              router.push("/billing?payment=pending");
+              return;
+            }
+            if (verified.providerStatus !== "captured") {
+              router.push("/billing?payment=pending");
+              return;
+            }
+            router.push("/billing?payment=success");
+          } catch {
+            setBusy(null);
             router.push("/billing?payment=pending");
-            return;
           }
-          router.push("/billing?payment=success");
         },
       });
 
