@@ -41,7 +41,7 @@ test("verified exam events drive countdown and live ICAI resources can refresh w
 
 test("Phase 4 UI exposes every planned dashboard surface without fabricating future data", () => {
   const ui = read("components/dashboard/student-dashboard.tsx");
-  for (const marker of ["Attempt countdown", "Today", "Progress", "Study target", "Latest ICAI changes", "Alerts & consistency", "Quick actions", "What to study next"]) assert.match(ui, new RegExp(marker, "i"));
+  for (const marker of ["CountdownHero", "Today", "Progress", "Study target", "Latest ICAI changes", "Alerts & consistency", "Quick actions", "What to study next"]) assert.match(ui, new RegExp(marker, "i"));
   for (const action of ["Start Study", "Add Task", "Add Note", "Open Progress"]) assert.match(read("lib/dashboard/service.ts"), new RegExp(action));
   assert.match(ui, /Not tracked yet/);
   assert.match(ui, /No fake daily totals/);
