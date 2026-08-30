@@ -10,8 +10,13 @@ course_groups: Table<{ code:string; created_at:string; id:string; is_active:bool
 course_levels: Table<{ code:string; created_at:string; id:string; is_active:boolean; name:string; sort_order:number; updated_at:string }>;
 dashboard_events: Table<{ action_key:string|null; context:Json; created_at:string; event_type:string; id:string; occurred_at:string; user_id:string }>;
 goals: Table<{ completed_at:string|null; created_at:string; description:string|null; due_date:string; id:string; status:string; title:string; updated_at:string; user_id:string }>;
+notes: Table<{ body_html:string; body_text:string; chapter_id:string|null; created_at:string; id:string; moderation_status:string; owner_label:string; published_at:string|null; subject_id:string|null; title:string; updated_at:string; user_id:string; visibility:string }>;
+note_tags: Table<{ created_at:string; id:string; name:string; normalized_name:string; user_id:string }>;
+note_tag_map: Table<{ created_at:string; note_id:string; tag_id:string; user_id:string }>;
 profiles: Table<{ attempt_key:string|null; avatar_url:string|null; ca_level:string|null; created_at:string; daily_target_minutes:number|null; display_name:string|null; group_choice:string|null; onboarding_completed_at:string|null; onboarding_step:number; timezone:string; updated_at:string; user_id:string }>;
 progress_events: Table<{ action:string; chapter_id:string; created_at:string; id:string; new_state:Json; previous_state:Json; reverts_event_id:string|null; stage:string; undone_at:string|null; user_id:string }>;
+resource_moderation: Table<{ action:string; actor_user_id:string|null; created_at:string; entity_type:string; from_status:string|null; id:string; note_id:string|null; notes:string|null; to_status:string; uploaded_resource_id:string|null }>;
+resource_reports: Table<{ created_at:string; details:string|null; entity_type:string; id:string; note_id:string|null; reason:string; reporter_user_id:string; reviewed_at:string|null; reviewed_by:string|null; status:string; uploaded_resource_id:string|null }>;
 study_sessions: Table<{ break_target_seconds:number|null; chapter_id:string|null; created_at:string; duration_seconds:number; ended_at:string; focus_target_seconds:number|null; id:string; mode:string; started_at:string; subject_id:string|null; timezone:string; user_id:string }>;
 study_timer_state: Table<{ break_target_seconds:number|null; chapter_id:string|null; created_at:string; elapsed_seconds:number; focus_target_seconds:number|null; last_interaction_at:string; mode:string; paused_at:string|null; running_since:string|null; started_at:string; status:string; subject_id:string|null; timezone:string; updated_at:string; user_id:string }>;
 subjects: Table<{ code:string; created_at:string; group_id:string; id:string; is_active:boolean; level_id:string; paper_label:string; slug:string; sort_order:number; source_url:string; subject_kind:string; title:string; updated_at:string }>;
@@ -19,6 +24,7 @@ syllabus_versions: Table<{ content_hash:string|null; created_at:string; effectiv
 system_health_log: Table<{ component:string; correlation_id:string|null; created_at:string; details:Json; id:number; status:string }>;
 tasks: Table<{ chapter_id:string|null; completed_at:string|null; created_at:string; due_at:string; estimated_minutes:number; id:string; notes:string|null; sort_order:number; status:string; subject_id:string|null; task_kind:string; title:string; updated_at:string; user_id:string }>;
 topics: Table<{ chapter_id:string; created_at:string; id:string; sort_order:number; source_url:string|null; stable_key:string; title:string; topic_kind:string; unit_number:string|null; updated_at:string }>;
+uploaded_resources: Table<{ chapter_id:string|null; created_at:string; description:string|null; extension:string; id:string; mime_type:string; moderation_status:string; original_filename:string; owner_label:string; owner_user_id:string; published_at:string|null; safe_filename:string; size_bytes:number; storage_bucket:string; storage_path:string; subject_id:string|null; title:string; updated_at:string; visibility:string }>;
 user_calendar_events: Table<{ all_day:boolean; created_at:string; ends_at:string|null; id:string; notes:string|null; starts_at:string; title:string; updated_at:string; user_id:string }>;
 user_preferences: Table<{ accent:string; created_at:string; density:string; reduce_motion:boolean; theme:string; updated_at:string; user_id:string }>;
 icai_sources: Table<{ adapter_config:Json; adapter_key:string; authoritative_listing:boolean; consecutive_failures:number; created_at:string; etag:string|null; id:string; is_active:boolean; last_attempt_at:string|null; last_content_hash:string|null; last_error:string|null; last_error_at:string|null; last_modified:string|null; last_success_at:string|null; level_codes:string[]; name:string; official_url:string; parser_version:string; request_interval_seconds:number; resource_types:string[]; source_type:string; timeout_ms:number; trust_level:string; updated_at:string }>;
@@ -37,6 +43,10 @@ icai_sync_apply_source_batch: { Args:{ p_attempts?:Json; p_events?:Json; p_resou
 icai_sync_mark_source_failure: { Args:{ p_error:string; p_run_id:string; p_source_id:string }; Returns:undefined };
 icai_sync_record_unchanged: { Args:{ p_run_id:string; p_snapshot:Json; p_source_id:string }; Returns:Json };
 phase6_set_timezone: { Args:{ p_timezone:string }; Returns:undefined };
+phase7_can_moderate: { Args:Record<string,never>; Returns:boolean };
+phase7_moderate_resource: { Args:{ p_entity_type:string; p_entity_id:string; p_decision:string; p_notes?:string|null }; Returns:undefined };
+phase7_report_resource: { Args:{ p_entity_type:string; p_entity_id:string; p_reason:string; p_details?:string|null }; Returns:string };
+phase7_save_note: { Args:{ p_note_id:string|null; p_title:string; p_body_html:string; p_body_text:string; p_subject_id:string|null; p_chapter_id:string|null; p_tags:string[]; p_visibility:string }; Returns:string };
 progress_chapter_is_applicable: { Args:{ p_chapter_id:string; p_user_id:string }; Returns:boolean };
 progress_set_stage: { Args:{ p_chapter_id:string; p_enabled:boolean; p_stage:string }; Returns:Json };
 progress_undo_event: { Args:{ p_event_id:string }; Returns:Json };
