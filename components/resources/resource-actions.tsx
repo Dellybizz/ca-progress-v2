@@ -7,8 +7,13 @@ import type { UploadCard, ResourceEntityType } from "@/lib/resources/types";
 
 async function jsonRequest(url: string, init: RequestInit) {
   const response = await fetch(url, init);
-  const payload = await response.json() as { error?: string; url?: string };
-  if (!response.ok) throw new Error(payload.error || "Request failed.");
+  const raw = await response.text();
+  let payload: { error?: string } = {};
+  if (raw) {
+    try { payload = JSON.parse(raw) as { error?: string }; }
+    catch { payload = { error: response.ok ? undefined : `Request failed (${response.status}).` }; }
+  }
+  if (!response.ok) throw new Error(payload.error || `Request failed (${response.status}).`);
   return payload;
 }
 
@@ -18,11 +23,11 @@ export function ResourceAccessButtons({ resource, canManage, canReport }: { reso
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function open(download: boolean) {
-    setBusy(true); setError(null);
-    try { const payload = await jsonRequest(`/api/resources/${resource.id}/access${download ? "?download=1" : ""}`, { cache: "no-store" }); if (payload.url) window.open(payload.url, "_blank", "noopener,noreferrer"); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : "Resource could not be opened."); }
-    finally { setBusy(false); }
+  function open(download: boolean) {
+    setError(null);
+    const target = `/api/resources/${resource.id}/access${download ? "?download=1" : ""}`;
+    const opened = window.open(target, "_blank", "noopener,noreferrer");
+    if (!opened) setError("Your browser blocked the file window. Allow pop-ups for this site and try again.");
   }
 
   async function saveVisibility() {
@@ -51,7 +56,7 @@ export function ResourceAccessButtons({ resource, canManage, canReport }: { reso
     finally { setBusy(false); }
   }
 
-  return <div className="phase7-resource-actions"><div className="phase7-action-row"><button disabled={busy} className="ui-button ui-button--primary" onClick={() => void open(false)}><Icon name="book" size={17}/> Preview</button><button disabled={busy} className="ui-button ui-button--secondary" onClick={() => void open(true)}><Icon name="arrow" size={17}/> Download</button>{canReport ? <button disabled={busy} className="ui-button ui-button--secondary" onClick={() => void report()}><Icon name="shield" size={17}/> Report</button> : null}</div>{canManage ? <div className="phase7-owner-controls"><label><span>Visibility</span><select value={visibility} onChange={(event) => setVisibility(event.target.value as UploadCard["visibility"])}><option value="private">Private</option><option value="shared">Share with Community</option></select></label><button disabled={busy || visibility === resource.visibility} className="ui-button ui-button--secondary" onClick={() => void saveVisibility()}>Save visibility</button><button disabled={busy} className="phase7-danger-button" onClick={() => void remove()}>Delete file</button></div> : null}{canManage && visibility === "shared" ? <div className="phase7-policy-note"><Icon name="shield" size={17}/><span>Changing a private file to Shared submits it for moderation. Changes to an approved shared item return it to pending review.</span></div> : null}{error ? <div className="phase7-inline-error" role="alert">{error}</div> : null}</div>;
+  return <div className="phase7-resource-actions"><div className="phase7-action-row"><button disabled={busy} className="ui-button ui-button--primary" onClick={() => open(false)}><Icon name="book" size={17}/> Preview</button><button disabled={busy} className="ui-button ui-button--secondary" onClick={() => open(true)}><Icon name="arrow" size={17}/> Download</button>{canReport ? <button disabled={busy} className="ui-button ui-button--secondary" onClick={() => void report()}><Icon name="shield" size={17}/> Report</button> : null}</div>{canManage ? <div className="phase7-owner-controls"><label><span>Visibility</span><select value={visibility} onChange={(event) => setVisibility(event.target.value as UploadCard["visibility"])}><option value="private">Private</option><option value="shared">Share with Community</option></select></label><button disabled={busy || visibility === resource.visibility} className="ui-button ui-button--secondary" onClick={() => void saveVisibility()}>Save visibility</button><button disabled={busy} className="phase7-danger-button" onClick={() => void remove()}>Delete file</button></div> : null}{canManage && visibility === "shared" ? <div className="phase7-policy-note"><Icon name="shield" size={17}/><span>Changing a private file to Shared submits it for moderation. Changes to an approved shared item return it to pending review.</span></div> : null}{error ? <div className="phase7-inline-error" role="alert">{error}</div> : null}</div>;
 }
 
 export function NoteOwnerActions({ id, canReport }: { id: string; canReport: boolean }) {

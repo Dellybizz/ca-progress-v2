@@ -10,7 +10,6 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { StudySubjectOption } from "@/lib/study/types";
-import { RESOURCE_BUCKET, SIGNED_URL_SECONDS } from "./validation";
 import type { ModerationPageModel, ModerationQueueItem, ModerationReport, NoteCard, NoteDetailModel, OfficialResourceCard, ResourceDetailModel, ResourceLibraryModel, UploadCard } from "./types";
 
 type NoteRow = Database["public"]["Tables"]["notes"]["Row"];
@@ -190,21 +189,6 @@ export async function getResourceDetailModel(resourceId: string): Promise<Resour
   const row = response.data as UploadRow;
   const canManage = row.owner_user_id === identity.id;
   return { mode: "ready", resource: uploadDto(row, names, identity.id), canManage, canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved" };
-}
-
-export async function createResourceSignedUrl(resourceId: string, download: boolean) {
-  const identity = await optionalUser();
-  if (!identity) return null;
-  const supabase = await createServerSupabaseClient();
-  const response = await supabase.from("uploaded_resources").select("id,owner_user_id,visibility,moderation_status,storage_bucket,storage_path,safe_filename").eq("id", resourceId).maybeSingle();
-  if (response.error || !response.data) return null;
-  const row = response.data;
-  const allowed = row.owner_user_id === identity.id || (row.visibility === "shared" && row.moderation_status === "approved");
-  if (!allowed || row.storage_bucket !== RESOURCE_BUCKET) return null;
-  const admin = createAdminSupabaseClient();
-  const signed = await admin.storage.from(RESOURCE_BUCKET).createSignedUrl(row.storage_path, SIGNED_URL_SECONDS, download ? { download: row.safe_filename } : undefined);
-  if (signed.error) throw new Error(`Signed resource access could not be created: ${signed.error.message}`);
-  return signed.data.signedUrl;
 }
 
 export async function getResourceModerationPageModel(): Promise<ModerationPageModel> {

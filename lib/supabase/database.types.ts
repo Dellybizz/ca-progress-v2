@@ -44,9 +44,12 @@ icai_sync_mark_source_failure: { Args:{ p_error:string; p_run_id:string; p_sourc
 icai_sync_record_unchanged: { Args:{ p_run_id:string; p_snapshot:Json; p_source_id:string }; Returns:Json };
 phase6_set_timezone: { Args:{ p_timezone:string }; Returns:undefined };
 phase7_can_moderate: { Args:Record<string,never>; Returns:boolean };
+phase7_create_uploaded_resource: { Args:{ p_title:string; p_description:string|null; p_subject_id:string|null; p_chapter_id:string|null; p_original_filename:string; p_safe_filename:string; p_storage_path:string; p_mime_type:string; p_extension:string; p_size_bytes:number; p_visibility:string }; Returns:{ id:string; moderation_status:string }[] };
+phase7_delete_uploaded_resource: { Args:{ p_resource_id:string }; Returns:boolean };
 phase7_moderate_resource: { Args:{ p_entity_type:string; p_entity_id:string; p_decision:string; p_notes?:string|null }; Returns:undefined };
 phase7_report_resource: { Args:{ p_entity_type:string; p_entity_id:string; p_reason:string; p_details?:string|null }; Returns:string };
 phase7_save_note: { Args:{ p_note_id:string|null; p_title:string; p_body_html:string; p_body_text:string; p_subject_id:string|null; p_chapter_id:string|null; p_tags:string[]; p_visibility:string }; Returns:string };
+phase7_update_uploaded_resource: { Args:{ p_resource_id:string; p_title:string; p_description:string|null; p_subject_id:string|null; p_chapter_id:string|null; p_visibility:string }; Returns:string };
 progress_chapter_is_applicable: { Args:{ p_chapter_id:string; p_user_id:string }; Returns:boolean };
 progress_set_stage: { Args:{ p_chapter_id:string; p_enabled:boolean; p_stage:string }; Returns:Json };
 progress_undo_event: { Args:{ p_event_id:string }; Returns:Json };

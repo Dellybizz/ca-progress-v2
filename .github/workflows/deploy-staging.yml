@@ -31,6 +31,7 @@ jobs:
       - run: npm run cf:deploy
 
 # Phase 8 runtime secrets (SUPABASE_SERVICE_ROLE_KEY and ICAI_CRON_SECRET) remain active.
-# Phase 7 also uses SUPABASE_SERVICE_ROLE_KEY server-side for validated private Storage writes
-# and short-lived signed resource access. It is never exposed to the browser.
+# Phase 7 user file BYTES use the private USER_RESOURCES_R2 binding declared in wrangler.jsonc.
+# Phase 7 metadata mutations still use the dashboard-managed server-only SUPABASE_SERVICE_ROLE_KEY.
+# R2 binding access itself does not require an R2 access key or secret inside application code.
 # wrangler.jsonc uses keep_vars=true so dashboard-managed secrets survive deploys.
