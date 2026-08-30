@@ -24,7 +24,8 @@
     "cf:typegen": "wrangler types --config wrangler.web.jsonc --env-interface CloudflareEnv cloudflare-env.d.ts",
     "cf:check:icai": "node scripts/check-cloudflare-size-budget.mjs --config workers/icai-sync/wrangler.jsonc --budget-mib 1.50",
     "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.web.jsonc --budget-mib 2.70",
-    "cf:check": "npm run cf:build && npm run cf:check:icai && npm run cf:check:web"
+    "cf:check": "npm run cf:build && npm run cf:check:icai && npm run cf:check:web",
+    "cf:smoke": "node scripts/smoke-cloudflare-runtime.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",
