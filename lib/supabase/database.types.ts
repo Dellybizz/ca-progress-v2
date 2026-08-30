@@ -4,11 +4,13 @@ export type Database = { __InternalSupabase: { PostgrestVersion: "14.5" }; publi
 academic_change_events: Table<{ action:string; created_at:string; entity_id:string; entity_type:string; id:number; source_url:string|null; summary:string }>;
 app_settings: Table<{ created_at:string; is_public:boolean; key:string; updated_at:string; value:Json }>;
 attempt_syllabus_map: Table<{ attempt_key:string; created_at:string; group_id:string; id:number; level_id:string; subject_id:string; syllabus_version_id:string }>;
+chapter_progress: Table<{ chapter_id:string; completed_at:string|null; created_at:string; revision_1_at:string|null; revision_2_at:string|null; test_1_at:string|null; test_2_at:string|null; updated_at:string; user_id:string }>;
 chapters: Table<{ chapter_kind:string; chapter_number:string; created_at:string; id:string; section_key:string|null; slug:string; sort_order:number; source_url:string|null; stable_key:string; syllabus_version_id:string; title:string; updated_at:string }>;
 course_groups: Table<{ code:string; created_at:string; id:string; is_active:boolean; is_default:boolean; level_id:string; name:string; sort_order:number; updated_at:string }>;
 course_levels: Table<{ code:string; created_at:string; id:string; is_active:boolean; name:string; sort_order:number; updated_at:string }>;
 dashboard_events: Table<{ action_key:string|null; context:Json; created_at:string; event_type:string; id:string; occurred_at:string; user_id:string }>;
 profiles: Table<{ attempt_key:string|null; avatar_url:string|null; ca_level:string|null; created_at:string; daily_target_minutes:number|null; display_name:string|null; group_choice:string|null; onboarding_completed_at:string|null; onboarding_step:number; updated_at:string; user_id:string }>;
+progress_events: Table<{ action:string; chapter_id:string; created_at:string; id:string; new_state:Json; previous_state:Json; reverts_event_id:string|null; stage:string; undone_at:string|null; user_id:string }>;
 subjects: Table<{ code:string; created_at:string; group_id:string; id:string; is_active:boolean; level_id:string; paper_label:string; slug:string; sort_order:number; source_url:string; subject_kind:string; title:string; updated_at:string }>;
 syllabus_versions: Table<{ content_hash:string|null; created_at:string; effective_from:string; effective_to:string|null; id:string; source_label:string; source_url:string; source_verified_at:string; status:string; subject_id:string; supersedes_version_id:string|null; title:string; updated_at:string; verification_method:string; version_key:string }>;
 system_health_log: Table<{ component:string; correlation_id:string|null; created_at:string; details:Json; id:number; status:string }>;
@@ -29,4 +31,7 @@ icai_review_decide: { Args:{ p_decision:string; p_notes?:string; p_review_id:str
 icai_sync_apply_source_batch: { Args:{ p_attempts?:Json; p_events?:Json; p_resources?:Json; p_run_id:string; p_snapshot:Json; p_source_id:string }; Returns:Json };
 icai_sync_mark_source_failure: { Args:{ p_error:string; p_run_id:string; p_source_id:string }; Returns:undefined };
 icai_sync_record_unchanged: { Args:{ p_run_id:string; p_snapshot:Json; p_source_id:string }; Returns:Json };
+progress_chapter_is_applicable: { Args:{ p_chapter_id:string; p_user_id:string }; Returns:boolean };
+progress_set_stage: { Args:{ p_chapter_id:string; p_enabled:boolean; p_stage:string }; Returns:Json };
+progress_undo_event: { Args:{ p_event_id:string }; Returns:Json };
 }; Enums:{[_ in never]:never}; CompositeTypes:{[_ in never]:never} } };
