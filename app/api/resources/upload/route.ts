@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
+import { assertOperationalMutationAllowed } from "@/lib/admin/operations";
 import { createResourceMetadataWithinQuota, getResourceStorageAccess } from "@/lib/billing/service";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { cleanText, nullableId, RESOURCE_MAX_BYTES, validateUploadFile } from "@/lib/resources/validation";
@@ -16,6 +17,8 @@ export async function POST(request: Request) {
   try {
     const identity = await optionalUser();
     if (!identity) return jsonError("Authentication required.", 401, "AUTH_REQUIRED");
+    try { await assertOperationalMutationAllowed("resources.upload", identity.id); }
+    catch (error) { return jsonError(error instanceof Error ? error.message : "Resource uploads are temporarily unavailable.", 503, (error as { code?: string }).code || "UPLOAD_DISABLED"); }
     const adminConfig = getSupabaseAdminRuntimeConfig();
     if (!adminConfig.configured) return jsonError("Resource metadata service is temporarily unavailable. The server-only Supabase credential is not configured.", 503, "METADATA_SERVICE_NOT_CONFIGURED");
 
