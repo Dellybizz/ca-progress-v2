@@ -51,7 +51,8 @@ test("Phase 8 navigation and responsive stylesheet are wired into both shells", 
   assert.match(nav, /\/updates/);
   assert.match(nav, /\/resources\/icai/);
   assert.match(nav, /\/admin\/icai-sync/);
-  assert.match(mobile, /\/admin\/icai-sync/);
+  assert.match(mobile, /import \{ adminNavigation, studentNavigation \} from "\.\/navigation"/);
+  assert.match(mobile, /adminNavigation\.filter/);
   assert.match(globals, /styles\/icai\.css/);
   assert.match(css, /@media \(max-width: 760px\)/);
 });
