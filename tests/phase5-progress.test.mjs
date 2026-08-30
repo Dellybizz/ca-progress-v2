@@ -60,8 +60,11 @@ test("progress surfaces are real routes with optimistic autosave and normalized 
   assert.match(client, /Undo last change/);
   assert.match(service, /from\("chapter_progress"\)/);
   assert.match(service, /from\("progress_events"\)/);
+  assert.match(service, /gte\("created_at", sevenDaysAgo\)/);
   assert.match(analytics, /No manually maintained totals are used/);
+  assert.match(analytics, /Nothing to analyse yet/);
   assert.match(subject, /getProgressPageModel\(subjectSlug\)/);
+  assert.match(subject, /notFound\(\)/);
 });
 
 test("responsive Phase 5 styles include independent mobile treatment", () => {
