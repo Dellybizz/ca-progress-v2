@@ -4,7 +4,7 @@
 ICAI Daily Update & Verification Engine.
 
 ## Current implementation state
-Phase 8 frontend/backend/database implementation is present on the Phase 8 branch. Final PR CI, database acceptance cleanup/verification and Cloudflare staging secret/deployment verification must be completed before this phase is closed.
+Phase 8 frontend/backend/database implementation is present on the Phase 8 branch. Database acceptance tests pass and synthetic test data has been removed. Final PR CI and Cloudflare staging secret/deployment verification must be completed before this phase is closed.
 
 ## Implemented frontend
 - [x] Responsive `/resources/icai` verified resource browser.
@@ -29,11 +29,25 @@ Phase 8 frontend/backend/database implementation is present on the Phase 8 branc
 - [x] Protected `/api/cron/icai-sync` and admin-only manual sync/review server actions.
 - [x] Cloudflare scheduled handler configured for `30 0 * * *` (00:30 UTC / 06:00 IST), independent of user traffic.
 - [x] Sync/review RPCs explicitly executable only by `service_role`.
+- [x] Phase 8 foreign keys have dedicated/covering indexes after the Supabase performance-advisor pass.
 
 ## V2 database
 Applied only to V2 project `wgdhpzbgyjqjlgntibqg`:
 - `phase8_icai_sync_engine`
 - `phase8_security_hardening`
+- `phase8_index_hardening`
+
+Database acceptance test results:
+- [x] unchanged content does not duplicate canonical resources
+- [x] unchanged detection increments audit/run counters
+- [x] resource provenance retains official URL, source, snapshot and content hash
+- [x] proposed exam-date change leaves verified canonical date untouched
+- [x] high-impact date change creates audit + pending review
+- [x] source failure does not delete/overwrite the last verified resource
+- [x] authoritative removed-link detection retains the historical row with `removed` status
+- [x] all synthetic acceptance rows were cleaned up after verification
+
+Security advisor notes only expected informational `RLS enabled/no client policy` notices on intentionally private operational tables (and pre-existing private tables). Client grants remain revoked. The password-leak warning is unrelated to the active Google/LinkedIn-only authentication model.
 
 ## Environment/manual setup
 Before public staging operation:
@@ -47,6 +61,13 @@ Before public staging operation:
 - [ ] Complete Phase 0–3 + 8 tests green.
 - [ ] Next production build green.
 - [ ] OpenNext/Cloudflare dry-run green.
-- [ ] Database acceptance tests cleaned up and 6/6 Phase 8 criteria recorded.
 
-Do not start Phase 4 until all six Phase 8 acceptance criteria are recorded as passed.
+## Acceptance gate
+- [x] Daily job can run independently of user traffic by Cloudflare scheduled handler + Cron Trigger configuration (operational staging secret/deploy check still pending).
+- [x] Unchanged content is idempotent and does not duplicate canonical items.
+- [x] Changed exam dates create an auditable, review-gated change event while verified dates remain unchanged until approval.
+- [x] Resources retain official source provenance, snapshot/hash/parser metadata and official links.
+- [x] Attempt selector consumes verified `exam_attempts` rather than a hardcoded month array.
+- [x] Source failures update health/audit state without corrupting the last verified dataset.
+
+**Phase 8 acceptance logic/database result: 6/6 verified. Do not close Phase 8 until PR CI is green and public staging runtime secrets/deployment are confirmed. Do not start Phase 4.**
