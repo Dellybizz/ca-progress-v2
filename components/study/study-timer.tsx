@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -17,44 +17,69 @@ function minutesLabel(seconds: number) { const minutes = Math.round(seconds / 60
 
 export function StudyTimer({ model }: { model: StudyReadyModel }) {
   const router = useRouter();
+  const timer = model.timer;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
-  const baseAt = useRef(Date.now());
-  const [subjectId, setSubjectId] = useState(model.timer?.subjectId ?? "");
-  const [chapterId, setChapterId] = useState(model.timer?.chapterId ?? "");
-  const [mode, setMode] = useState<"stopwatch" | "pomodoro">(model.timer?.mode ?? "pomodoro");
-  const [focusMinutes, setFocusMinutes] = useState(Math.round((model.timer?.focusTargetSeconds ?? 1500) / 60));
-  const [breakMinutes, setBreakMinutes] = useState(Math.round((model.timer?.breakTargetSeconds ?? 300) / 60));
-  const timer = model.timer;
+  const [elapsed, setElapsed] = useState(timer?.elapsedSeconds ?? 0);
+  const [subjectId, setSubjectId] = useState(timer?.subjectId ?? "");
+  const [chapterId, setChapterId] = useState(timer?.chapterId ?? "");
+  const [mode, setMode] = useState<"stopwatch" | "pomodoro">(timer?.mode ?? "pomodoro");
+  const [focusMinutes, setFocusMinutes] = useState(Math.round((timer?.focusTargetSeconds ?? 1500) / 60));
+  const [breakMinutes, setBreakMinutes] = useState(Math.round((timer?.breakTargetSeconds ?? 300) / 60));
   const selectedSubject = useMemo(() => model.subjects.find((subject) => subject.id === subjectId) ?? null, [model.subjects, subjectId]);
 
-  useEffect(() => { baseAt.current = Date.now(); setNow(Date.now()); }, [timer?.status, timer?.elapsedSeconds, timer?.lastInteractionAt]);
-  useEffect(() => { if (!timer || timer.status !== "running" || timer.abandoned) return; const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id); }, [timer]);
   useEffect(() => {
     if (!timer || timer.status !== "running" || timer.abandoned) return;
-    const id = window.setInterval(() => { void fetch("/api/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "touch" }), keepalive: true }); }, 5 * 60 * 1000);
+    const id = window.setInterval(() => setElapsed((value) => Math.min(43_200, value + 1)), 1000);
     return () => window.clearInterval(id);
   }, [timer]);
 
-  const elapsed = timer ? Math.min(43_200, timer.elapsedSeconds + (timer.status === "running" && !timer.abandoned ? Math.max(0, Math.floor((now - baseAt.current) / 1000)) : 0)) : 0;
+  useEffect(() => {
+    if (!timer || timer.status !== "running" || timer.abandoned) return;
+    const id = window.setInterval(() => {
+      void fetch("/api/study/timer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "touch" }),
+        keepalive: true,
+      });
+    }, 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [timer]);
+
   const remaining = timer?.mode === "pomodoro" && timer.focusTargetSeconds ? Math.max(0, timer.focusTargetSeconds - elapsed) : null;
 
   async function mutate(body: Record<string, unknown>) {
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
-      const response = await fetch("/api/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await fetch("/api/study/timer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       const payload = await response.json() as StudyTimerMutationResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Timer could not be updated.");
       router.refresh();
-    } catch (err) { setError(err instanceof Error ? err.message : "Timer could not be updated."); }
-    finally { setBusy(false); }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Timer could not be updated.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function start(event: FormEvent) {
     event.preventDefault();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    await mutate({ action: "start", subjectId: subjectId || null, chapterId: chapterId || null, mode, focusMinutes: mode === "pomodoro" ? focusMinutes : null, breakMinutes: mode === "pomodoro" ? breakMinutes : null, timezone });
+    await mutate({
+      action: "start",
+      subjectId: subjectId || null,
+      chapterId: chapterId || null,
+      mode,
+      focusMinutes: mode === "pomodoro" ? focusMinutes : null,
+      breakMinutes: mode === "pomodoro" ? breakMinutes : null,
+      timezone,
+    });
   }
 
   if (timer) return (
