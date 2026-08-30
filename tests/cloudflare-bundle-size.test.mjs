@@ -30,6 +30,6 @@ test("Cloudflare builds strip the unused Vercel OG runtime before Wrangler bundl
   assert.match(pkg.scripts["cf:build"], /patch-opennext-vercel-og\.mjs/);
   assert.match(pkg.scripts["cf:deploy"], /npm run cf:build/);
   assert.match(pkg.scripts["cf:check"], /npm run cf:build/);
-  assert.match(patch, /@vercel\/og\/index\\\.edge\\\.js/);
+  assert.ok(patch.includes("@vercel\\/og\\/index\\.edge\\.js"));
   assert.match(patch, /Refusing to strip @vercel\/og because application source uses OG image generation/);
 });
