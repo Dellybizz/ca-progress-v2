@@ -5,17 +5,12 @@
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
-  "assets": {
-    "binding": "ASSETS",
-    "directory": ".open-next/assets"
-  },
-  "triggers": {
-    "crons": ["30 0 * * *"]
-  },
+  "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
+  "triggers": { "crons": ["30 0 * * *"] },
   "vars": {
     "NEXT_PUBLIC_APP_NAME": "CA Progress",
     "NEXT_PUBLIC_APP_ENV": "staging",
-    "NEXT_PUBLIC_APP_VERSION": "phase-5"
+    "NEXT_PUBLIC_APP_VERSION": "phase-6"
   },
   "observability": { "enabled": true }
 }
