@@ -24,10 +24,11 @@ test("Phase 7 upload validation runs on the server and stores bytes in Cloudflar
 
 test("Phase 7 R2 upload persists metadata only through the server service role", () => {
   const route = read("app/api/resources/upload/route.ts");
-  assert.match(route, /getSupabaseAdminConfig\(\)/);
+  assert.match(route, /getSupabaseAdminRuntimeConfig\(\)/);
   assert.match(route, /createAdminSupabaseClient\(\)/);
   assert.match(route, /admin\.from\("uploaded_resources"\)\.insert/);
   assert.match(route, /METADATA_SERVICE_NOT_CONFIGURED/);
+  assert.doesNotMatch(route, /getSupabaseAdminConfig\(\)/);
   assert.doesNotMatch(route, /phase7_create_uploaded_resource/);
 });
 
