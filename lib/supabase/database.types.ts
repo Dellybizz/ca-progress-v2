@@ -1,91 +1,31 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
-
-export type Database = {
-  __InternalSupabase: { PostgrestVersion: "14.5" }
-  public: {
-    Tables: {
-      academic_change_events: {
-        Row: { action: string; created_at: string; entity_id: string; entity_type: string; id: number; source_url: string | null; summary: string }
-        Insert: { action: string; created_at?: string; entity_id: string; entity_type: string; id?: number; source_url?: string | null; summary: string }
-        Update: { action?: string; created_at?: string; entity_id?: string; entity_type?: string; id?: number; source_url?: string | null; summary?: string }
-        Relationships: []
-      }
-      app_settings: {
-        Row: { created_at: string; is_public: boolean; key: string; updated_at: string; value: Json }
-        Insert: { created_at?: string; is_public?: boolean; key: string; updated_at?: string; value?: Json }
-        Update: { created_at?: string; is_public?: boolean; key?: string; updated_at?: string; value?: Json }
-        Relationships: []
-      }
-      attempt_syllabus_map: {
-        Row: { attempt_key: string; created_at: string; group_id: string; id: number; level_id: string; subject_id: string; syllabus_version_id: string }
-        Insert: { attempt_key: string; created_at?: string; group_id: string; id?: number; level_id: string; subject_id: string; syllabus_version_id: string }
-        Update: { attempt_key?: string; created_at?: string; group_id?: string; id?: number; level_id?: string; subject_id?: string; syllabus_version_id?: string }
-        Relationships: []
-      }
-      chapters: {
-        Row: { chapter_kind: string; chapter_number: string; created_at: string; id: string; section_key: string | null; slug: string; sort_order: number; source_url: string | null; stable_key: string; syllabus_version_id: string; title: string; updated_at: string }
-        Insert: { chapter_kind?: string; chapter_number: string; created_at?: string; id: string; section_key?: string | null; slug: string; sort_order: number; source_url?: string | null; stable_key: string; syllabus_version_id: string; title: string; updated_at?: string }
-        Update: { chapter_kind?: string; chapter_number?: string; created_at?: string; id?: string; section_key?: string | null; slug?: string; sort_order?: number; source_url?: string | null; stable_key?: string; syllabus_version_id?: string; title?: string; updated_at?: string }
-        Relationships: []
-      }
-      course_groups: {
-        Row: { code: string; created_at: string; id: string; is_active: boolean; is_default: boolean; level_id: string; name: string; sort_order: number; updated_at: string }
-        Insert: { code: string; created_at?: string; id: string; is_active?: boolean; is_default?: boolean; level_id: string; name: string; sort_order: number; updated_at?: string }
-        Update: { code?: string; created_at?: string; id?: string; is_active?: boolean; is_default?: boolean; level_id?: string; name?: string; sort_order?: number; updated_at?: string }
-        Relationships: []
-      }
-      course_levels: {
-        Row: { code: string; created_at: string; id: string; is_active: boolean; name: string; sort_order: number; updated_at: string }
-        Insert: { code: string; created_at?: string; id: string; is_active?: boolean; name: string; sort_order: number; updated_at?: string }
-        Update: { code?: string; created_at?: string; id?: string; is_active?: boolean; name?: string; sort_order?: number; updated_at?: string }
-        Relationships: []
-      }
-      profiles: {
-        Row: { attempt_key: string | null; avatar_url: string | null; ca_level: string | null; created_at: string; daily_target_minutes: number | null; display_name: string | null; group_choice: string | null; onboarding_completed_at: string | null; onboarding_step: number; updated_at: string; user_id: string }
-        Insert: { attempt_key?: string | null; avatar_url?: string | null; ca_level?: string | null; created_at?: string; daily_target_minutes?: number | null; display_name?: string | null; group_choice?: string | null; onboarding_completed_at?: string | null; onboarding_step?: number; updated_at?: string; user_id: string }
-        Update: { attempt_key?: string | null; avatar_url?: string | null; ca_level?: string | null; created_at?: string; daily_target_minutes?: number | null; display_name?: string | null; group_choice?: string | null; onboarding_completed_at?: string | null; onboarding_step?: number; updated_at?: string; user_id?: string }
-        Relationships: []
-      }
-      subjects: {
-        Row: { code: string; created_at: string; group_id: string; id: string; is_active: boolean; level_id: string; paper_label: string; slug: string; sort_order: number; source_url: string; subject_kind: string; title: string; updated_at: string }
-        Insert: { code: string; created_at?: string; group_id: string; id: string; is_active?: boolean; level_id: string; paper_label: string; slug: string; sort_order: number; source_url: string; subject_kind?: string; title: string; updated_at?: string }
-        Update: { code?: string; created_at?: string; group_id?: string; id?: string; is_active?: boolean; level_id?: string; paper_label?: string; slug?: string; sort_order?: number; source_url?: string; subject_kind?: string; title?: string; updated_at?: string }
-        Relationships: []
-      }
-      syllabus_versions: {
-        Row: { content_hash: string | null; created_at: string; effective_from: string; effective_to: string | null; id: string; source_label: string; source_url: string; source_verified_at: string; status: string; subject_id: string; supersedes_version_id: string | null; title: string; updated_at: string; verification_method: string; version_key: string }
-        Insert: { content_hash?: string | null; created_at?: string; effective_from: string; effective_to?: string | null; id: string; source_label?: string; source_url: string; source_verified_at: string; status: string; subject_id: string; supersedes_version_id?: string | null; title: string; updated_at?: string; verification_method?: string; version_key: string }
-        Update: { content_hash?: string | null; created_at?: string; effective_from?: string; effective_to?: string | null; id?: string; source_label?: string; source_url?: string; source_verified_at?: string; status?: string; subject_id?: string; supersedes_version_id?: string | null; title?: string; updated_at?: string; verification_method?: string; version_key?: string }
-        Relationships: []
-      }
-      system_health_log: {
-        Row: { component: string; correlation_id: string | null; created_at: string; details: Json; id: number; status: string }
-        Insert: { component: string; correlation_id?: string | null; created_at?: string; details?: Json; id?: number; status: string }
-        Update: { component?: string; correlation_id?: string | null; created_at?: string; details?: Json; id?: number; status?: string }
-        Relationships: []
-      }
-      topics: {
-        Row: { chapter_id: string; created_at: string; id: string; sort_order: number; source_url: string | null; stable_key: string; title: string; topic_kind: string; unit_number: string | null; updated_at: string }
-        Insert: { chapter_id: string; created_at?: string; id: string; sort_order: number; source_url?: string | null; stable_key: string; title: string; topic_kind?: string; unit_number?: string | null; updated_at?: string }
-        Update: { chapter_id?: string; created_at?: string; id?: string; sort_order?: number; source_url?: string | null; stable_key?: string; title?: string; topic_kind?: string; unit_number?: string | null; updated_at?: string }
-        Relationships: []
-      }
-      user_preferences: {
-        Row: { accent: string; created_at: string; density: string; reduce_motion: boolean; theme: string; updated_at: string; user_id: string }
-        Insert: { accent?: string; created_at?: string; density?: string; reduce_motion?: boolean; theme?: string; updated_at?: string; user_id: string }
-        Update: { accent?: string; created_at?: string; density?: string; reduce_motion?: boolean; theme?: string; updated_at?: string; user_id?: string }
-        Relationships: []
-      }
-    }
-    Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
-    Enums: { [_ in never]: never }
-    CompositeTypes: { [_ in never]: never }
-  }
-}
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+type Table<Row, Insert = Partial<Row>, Update = Partial<Row>> = { Row: Row; Insert: Insert; Update: Update; Relationships: [] };
+export type Database = { __InternalSupabase: { PostgrestVersion: "14.5" }; public: { Tables: {
+academic_change_events: Table<{ action:string; created_at:string; entity_id:string; entity_type:string; id:number; source_url:string|null; summary:string }>;
+app_settings: Table<{ created_at:string; is_public:boolean; key:string; updated_at:string; value:Json }>;
+attempt_syllabus_map: Table<{ attempt_key:string; created_at:string; group_id:string; id:number; level_id:string; subject_id:string; syllabus_version_id:string }>;
+chapters: Table<{ chapter_kind:string; chapter_number:string; created_at:string; id:string; section_key:string|null; slug:string; sort_order:number; source_url:string|null; stable_key:string; syllabus_version_id:string; title:string; updated_at:string }>;
+course_groups: Table<{ code:string; created_at:string; id:string; is_active:boolean; is_default:boolean; level_id:string; name:string; sort_order:number; updated_at:string }>;
+course_levels: Table<{ code:string; created_at:string; id:string; is_active:boolean; name:string; sort_order:number; updated_at:string }>;
+profiles: Table<{ attempt_key:string|null; avatar_url:string|null; ca_level:string|null; created_at:string; daily_target_minutes:number|null; display_name:string|null; group_choice:string|null; onboarding_completed_at:string|null; onboarding_step:number; updated_at:string; user_id:string }>;
+subjects: Table<{ code:string; created_at:string; group_id:string; id:string; is_active:boolean; level_id:string; paper_label:string; slug:string; sort_order:number; source_url:string; subject_kind:string; title:string; updated_at:string }>;
+syllabus_versions: Table<{ content_hash:string|null; created_at:string; effective_from:string; effective_to:string|null; id:string; source_label:string; source_url:string; source_verified_at:string; status:string; subject_id:string; supersedes_version_id:string|null; title:string; updated_at:string; verification_method:string; version_key:string }>;
+system_health_log: Table<{ component:string; correlation_id:string|null; created_at:string; details:Json; id:number; status:string }>;
+topics: Table<{ chapter_id:string; created_at:string; id:string; sort_order:number; source_url:string|null; stable_key:string; title:string; topic_kind:string; unit_number:string|null; updated_at:string }>;
+user_preferences: Table<{ accent:string; created_at:string; density:string; reduce_motion:boolean; theme:string; updated_at:string; user_id:string }>;
+icai_sources: Table<{ adapter_config:Json; adapter_key:string; authoritative_listing:boolean; consecutive_failures:number; created_at:string; etag:string|null; id:string; is_active:boolean; last_attempt_at:string|null; last_content_hash:string|null; last_error:string|null; last_error_at:string|null; last_modified:string|null; last_success_at:string|null; level_codes:string[]; name:string; official_url:string; parser_version:string; request_interval_seconds:number; resource_types:string[]; source_type:string; timeout_ms:number; trust_level:string; updated_at:string }>;
+icai_sync_runs: Table<{ changed_items:number; completed_at:string|null; details:Json; error_summary:string|null; id:string; new_items:number; parser_version:string; pending_reviews:number; removed_items:number; requested_by:string|null; source_failed:number; source_processed:number; source_succeeded:number; source_total:number; started_at:string; status:string; trigger_type:string; unchanged_items:number }>;
+icai_source_snapshots: Table<{ canonical_hash:string; content_length:number|null; created_at:string; etag:string|null; fetched_at:string; http_status:number; id:string; is_changed:boolean; last_modified:string|null; metadata:Json; parsed_item_count:number; parser_version:string; run_id:string; source_id:string }>;
+exam_attempts: Table<{ attempt_key:string; content_hash:string; created_at:string; end_date:string|null; first_seen_at:string; id:string; label:string; last_changed_at:string; last_seen_at:string; level_id:string; metadata:Json; source_id:string|null; source_snapshot_id:string|null; source_url:string; start_date:string|null; status:string; updated_at:string; verification_method:string; verification_status:string }>;
+exam_events: Table<{ attempt_id:string; content_hash:string; created_at:string; end_time:string|null; event_date:string; event_type:string; first_seen_at:string; id:string; last_changed_at:string; last_seen_at:string; metadata:Json; source_id:string; source_snapshot_id:string|null; source_url:string; start_time:string|null; subject_id:string|null; title:string; updated_at:string; verification_status:string }>;
+icai_resources: Table<{ content_hash:string; created_at:string; first_seen_at:string; id:string; last_changed_at:string; last_seen_at:string; metadata:Json; official_url:string; parser_version:string; published_on:string|null; replaced_by_resource_id:string|null; resource_type:string; source_id:string; source_snapshot_id:string|null; status:string; summary:string|null; title:string; updated_at:string; verification_status:string }>;
+resource_attempt_map: Table<{ attempt_id:string; created_at:string; resource_id:string }>;
+resource_subject_map: Table<{ created_at:string; resource_id:string; subject_id:string }>;
+icai_change_events: Table<{ applied_at:string|null; change_type:string; decision_status:string; detected_at:string; entity_id:string; entity_type:string; field_name:string|null; id:number; new_value:Json|null; old_value:Json|null; review_notes:string|null; reviewed_by:string|null; risk_level:string; run_id:string; source_id:string }>;
+icai_review_queue: Table<{ change_event_id:number; confidence:number; created_at:string; decision_notes:string|null; entity_id:string; entity_type:string; id:string; proposed_patch:Json; reason:string; reviewed_at:string|null; reviewed_by:string|null; run_id:string; source_id:string; status:string; title:string; updated_at:string }>;
+}; Views: { [_ in never]: never }; Functions: {
+icai_review_decide: { Args:{ p_decision:string; p_notes?:string; p_review_id:string; p_reviewer:string }; Returns:Json };
+icai_sync_apply_source_batch: { Args:{ p_attempts?:Json; p_events?:Json; p_resources?:Json; p_run_id:string; p_snapshot:Json; p_source_id:string }; Returns:Json };
+icai_sync_mark_source_failure: { Args:{ p_error:string; p_run_id:string; p_source_id:string }; Returns:undefined };
+icai_sync_record_unchanged: { Args:{ p_run_id:string; p_snapshot:Json; p_source_id:string }; Returns:Json };
+}; Enums:{[_ in never]:never}; CompositeTypes:{[_ in never]:never} } };

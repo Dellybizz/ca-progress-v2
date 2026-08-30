@@ -1,0 +1,6 @@
+import { NextResponse } from "next/server";
+import { getIcaiSyncConfig } from "@/lib/env";
+import { runIcaiSync } from "@/lib/icai/sync";
+export const dynamic = "force-dynamic";
+function timingSafeEqual(left: string, right: string) { const size = Math.max(left.length, right.length); let mismatch = left.length ^ right.length; for (let index = 0; index < size; index += 1) mismatch |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0); return mismatch === 0; }
+export async function POST(request: Request) { const config = getIcaiSyncConfig(); if (!config.cronSecret) return NextResponse.json({ ok: false, error: "ICAI cron secret is not configured." }, { status: 503, headers: { "Cache-Control": "private, no-store" } }); const supplied = request.headers.get("x-icai-cron-secret") ?? ""; if (!supplied || !timingSafeEqual(supplied, config.cronSecret)) return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401, headers: { "Cache-Control": "private, no-store" } }); try { const summary = await runIcaiSync({ trigger: "cron" }); return NextResponse.json({ ok: true, summary }, { headers: { "Cache-Control": "private, no-store" } }); } catch (error) { return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : "ICAI synchronization failed." }, { status: 500, headers: { "Cache-Control": "private, no-store" } }); } }
