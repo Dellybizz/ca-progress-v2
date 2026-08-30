@@ -1,1 +1,0 @@
-Implemented Phase 5 scope: normalized chapter progress, event history, server/database validation, guarded undo, tracker filters/search, automatic save feedback, derived analytics, per-subject progress, responsive states and tests. No later-phase domain tables are introduced.

@@ -1,1 +1,0 @@
-Review Phase 5 against the four acceptance checkpoints before merge.

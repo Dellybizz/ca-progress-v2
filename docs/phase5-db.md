@@ -1,1 +1,0 @@
-Database migration has been applied to the isolated V2 Supabase staging project.

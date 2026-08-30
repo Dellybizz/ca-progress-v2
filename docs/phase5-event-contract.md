@@ -1,1 +1,0 @@
-Events retain previous/new state for audit and guarded undo.

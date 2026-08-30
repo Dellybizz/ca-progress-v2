@@ -1,1 +1,0 @@
-Tracker UI includes filters, search, stage locks, optimistic state, auto-save feedback, undo and responsive mobile cards.

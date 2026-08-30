@@ -1,1 +1,0 @@
-`chapter_progress` and `progress_events` are the Phase 5 sources of truth; analytics are derived.
