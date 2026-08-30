@@ -1,0 +1,1 @@
+CI gate: typecheck, lint, tests, Next build, Cloudflare dry-run.
