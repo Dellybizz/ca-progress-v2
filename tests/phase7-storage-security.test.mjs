@@ -18,8 +18,15 @@ test("Phase 7 files use a private server-signed Storage path", () => {
   assert.doesNotMatch(service, /getPublicUrl/);
 });
 
-test("upload metadata cannot be forged through normal authenticated table writes", () => {
-  const hardening = read("supabase/migrations/20260830141500_phase7_storage_write_hardening.sql");
-  assert.match(hardening, /revoke insert, update, delete on public\.uploaded_resources from authenticated/);
-  assert.match(hardening, /grant select on public\.uploaded_resources to authenticated/);
+test("Phase 7 metadata mutations are limited to intended server or RPC paths", () => {
+  const storageHardening = read("supabase/migrations/20260830141500_phase7_storage_write_hardening.sql");
+  const privilegeHardening = read("supabase/migrations/20260830142000_phase7_privilege_hardening.sql");
+  assert.match(storageHardening, /revoke insert, update, delete on public\.uploaded_resources from authenticated/);
+  assert.match(privilegeHardening, /revoke all on public\.uploaded_resources from anon, authenticated/);
+  assert.match(privilegeHardening, /revoke all on public\.note_tags from anon, authenticated/);
+  assert.match(privilegeHardening, /revoke all on public\.note_tag_map from anon, authenticated/);
+  assert.match(privilegeHardening, /grant select on public\.notes, public\.note_tags, public\.note_tag_map, public\.uploaded_resources, public\.resource_moderation, public\.resource_reports to authenticated/);
+  assert.match(privilegeHardening, /grant delete on public\.notes to authenticated/);
+  assert.match(privilegeHardening, /server_service_role_only/);
+  assert.match(privilegeHardening, /authorized_signed_urls_only/);
 });
