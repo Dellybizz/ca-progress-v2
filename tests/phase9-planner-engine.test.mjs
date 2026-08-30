@@ -34,7 +34,7 @@ test("forecast safely reacts to attempt/profile planning changes and labels fall
   assert.match(sql, /profile_planning_changed/);
   assert.match(service, /attemptMonthAnchor/);
   assert.match(service, /"attempt_month"/);
-  assert.match(forecast, /selected attempt month as a planning estimate/i);
+  assert.match(forecast, /selected attempt month only as a planning estimate/i);
 });
 
 test("meaningful events trigger recomputation instead of constant full recalculation", () => {
