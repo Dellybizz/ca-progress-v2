@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { ProgressPage } from "@/components/progress/progress-page";
 import { getProgressPageModel } from "@/lib/progress/service";
 
@@ -12,5 +13,6 @@ export async function generateMetadata({ params }: { params: Promise<{ subjectSl
 export default async function SubjectProgressPage({ params }: { params: Promise<{ subjectSlug: string }> }) {
   const { subjectSlug } = await params;
   const model = await getProgressPageModel(subjectSlug);
+  if (model.mode === "ready" && !model.chapters.length) notFound();
   return <ProgressPage model={model} subjectLocked/>;
 }
