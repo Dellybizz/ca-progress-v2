@@ -30,3 +30,9 @@ test("public login copy is product-facing rather than internal phase/debug langu
   assert.match(login, /Continue as Guest/);
   assert.match(login, /Remember this device/);
 });
+
+test("manual Cloudflare staging deployment reports the current Phase 4 version", () => {
+  const workflow = read(".github/workflows/deploy-staging.yml");
+  assert.match(workflow, /NEXT_PUBLIC_APP_VERSION:\s*phase-4/);
+  assert.doesNotMatch(workflow, /NEXT_PUBLIC_APP_VERSION:\s*phase-8/);
+});
