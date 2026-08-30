@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { getProgressPageModel } from "@/lib/progress/service";
@@ -18,6 +19,9 @@ export default async function AnalyticsPage() {
   const model = await getProgressPageModel();
   if (model.mode === "guest") return <div className="progress-page"><LoginRequired next="/analytics" title="Sign in to view private analytics"/></div>;
   if (model.mode === "setup") return <div className="progress-page"><PageHeader preview={false} eyebrow="Analytics" title="Complete your academic profile first." description="Analytics are scoped to your applicable chapters and verified attempt."/><Link className="ui-button ui-button--primary" href="/settings/profile">Review profile</Link></div>;
+  if (!model.chapters.length) {
+    return <div className="progress-page analytics-page"><PageHeader preview={false} eyebrow="Analytics" title="No applicable chapters are available yet." description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Analytics will appear when the verified syllabus contains chapters for this selection.`}/><EmptyState icon="chart" title="Nothing to analyse yet" description="Your analytics are derived only from applicable normalized chapter rows. Review your academic profile if this selection looks unexpected." action={<Link className="ui-button ui-button--primary" href="/settings/profile">Review academic profile</Link>}/></div>;
+  }
   const analytics = model.analytics;
   return (
     <div className="progress-page analytics-page">
