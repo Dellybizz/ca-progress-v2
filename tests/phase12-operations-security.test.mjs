@@ -21,9 +21,10 @@ test("central authorization reads fresh admin_users state and existing admin hel
   assert.match(central,/admin_users\?user_id=eq\./);
   assert.match(central,/is_active=eq\.true/);
   assert.match(central,/roleRank/);
-  assert.match(legacy,/getAdminRoleForUser\(user\.id\)/);
+  assert.match(legacy,/getAdminRoleForUser\(userId\)/);
   assert.match(legacy,/freshRole \?\? "student"/);
-  assert.match(legacy,/Compatibility only while the Phase 12 migration is not yet present\/configured/);
+  assert.match(legacy,/Compatibility only before the Phase 12 migration\/server credential is available/);
+  assert.match(legacy,/getClaims\(\)/);
 });
 
 test("role-changing and platform-commercial mutations require owner level",()=>{
