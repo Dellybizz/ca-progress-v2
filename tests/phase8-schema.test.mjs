@@ -43,6 +43,6 @@ test("Phase 8 database supports auditable review-gated date changes and historic
   assert.match(migration, /High-impact exam attempt dates changed/i);
   assert.match(migration, /High-impact exam date or time changed/i);
   assert.match(migration, /decision_status.*pending_review/is);
-  assert.match(migration, /status = 'removed'/i);
+  assert.match(migration, /status\s*=\s*'removed'/i);
   assert.doesNotMatch(migration, /delete from public\.icai_resources\s+where source_id/i);
 });

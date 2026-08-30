@@ -37,8 +37,8 @@ test("unchanged resources are deterministic and are not duplicated", () => {
   const sync = read("lib/icai/sync.ts");
   const migration = read("supabase/migrations/20260830080100_phase8_icai_sync_engine.sql");
   assert.match(sync, /sha256Hex\(`\$\{source\.id\}:\$\{item\.officialUrl\}`\)/);
-  assert.match(migration, /v_existing_resource\.content_hash = v_item->>'content_hash'/);
-  assert.match(migration, /last_seen_at = now\(\), source_snapshot_id = v_snapshot_id/);
+  assert.match(migration, /v_existing_resource\.content_hash\s*=\s*v_item->>'content_hash'/);
+  assert.match(migration, /last_seen_at\s*=\s*now\(\)\s*,\s*source_snapshot_id\s*=\s*v_snapshot_id/);
   assert.match(migration, /unique \(source_id, official_url\)/);
 });
 

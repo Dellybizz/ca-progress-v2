@@ -79,12 +79,15 @@ test("desktop and mobile navigation expose the syllabus explorer", () => {
   assert.match(mobile, /studentNavigation\.slice\(4\)/);
 });
 
-test("Phase 3 replaces the Phase 2 attempt placeholder with applicability-backed options", () => {
+test("Phase 3 applicability mapping remains intact after Phase 8 promotes exam_attempts to the picker", () => {
   const server = read("lib/auth/server.ts");
   const validation = read("lib/profile/validation.ts");
-  assert.match(server, /attempt_syllabus_map/);
+  const migration = read("supabase/migrations/20260830030100_phase3_academic_engine.sql");
+  assert.match(migration, /create table public\.attempt_syllabus_map/);
+  assert.match(server, /from\("exam_attempts"\)/);
   assert.match(server, /course_levels/);
-  assert.match(server, /verified_academic_attempt/);
+  assert.match(server, /verified_exam_attempt/);
+  assert.doesNotMatch(server, /onboarding\.attempt_options/);
   assert.match(validation, /attemptAppliesToLevel/);
   assert.match(validation, /Choose an attempt applicable to this CA level/);
 });
