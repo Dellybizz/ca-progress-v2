@@ -8,7 +8,15 @@ const emittedOgPatterns = [
   /import\(\s*["']next\/dist\/compiled\/@vercel\/og\/index\.edge\.js["']\s*\)/g,
   /import\(\s*["']next\/dist\/compiled\/@vercel\/og\/index\.node\.js["']\s*\)/g,
 ];
-const replacement = 'Promise.reject(new Error("@vercel/og is disabled: CA Progress V2 does not use Next.js OG image generation"))';
+
+// The generated Next runtime may evaluate its lazy-import expression while
+// bootstrapping ordinary SSR routes even when the application never requests
+// OG image generation. Replacing it with Promise.reject() therefore risks an
+// unhandled rejection and a Worker-level 500. Resolve an inert module instead:
+// the heavy @vercel/og code is still excluded from Wrangler's bundle, while
+// unrelated routes remain safe to execute. The source guard below ensures we
+// fail the build before doing this if CA Progress ever starts using next/og.
+const replacement = "Promise.resolve(Object.freeze({}))";
 
 async function filesUnder(directory, allowedExtensions = null) {
   const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
