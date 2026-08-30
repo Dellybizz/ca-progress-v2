@@ -63,10 +63,11 @@ test("academic search API validates input and disables shared caching", () => {
   assert.match(route, /status: 503/);
 });
 
-test("admin syllabus surface is preview-only in Phase 3", () => {
+test("admin syllabus registry stays read-only while Phase 12 owns controlled writes", () => {
   const admin = read("app/(admin)/admin/syllabus/page.tsx");
-  assert.match(admin, /Read-only admin preview/);
-  assert.match(admin, /No editing in Phase 3/);
+  assert.match(admin, /Operations registry/);
+  assert.match(admin, /Controlled Phase 12 writes/);
+  assert.match(admin, /href="\/admin\/content"/);
   assert.equal(/fetch\(|insert\(|update\(|delete\(/.test(admin), false);
 });
 
