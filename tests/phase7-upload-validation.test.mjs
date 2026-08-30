@@ -19,6 +19,26 @@ test("Phase 7 upload validation runs on the server and checks size MIME extensio
   assert.match(route, /crypto\.randomUUID\(\)/);
 });
 
+test("Phase 7 upload API always returns JSON errors and checks secure storage readiness", () => {
+  const route = read("app/api/resources/upload/route.ts");
+  assert.match(route, /function jsonError/);
+  assert.match(route, /getSupabaseAdminConfig\(\)/);
+  assert.match(route, /STORAGE_NOT_CONFIGURED/);
+  assert.match(route, /UPLOAD_SERVER_ERROR/);
+  assert.match(route, /try \{[\s\S]*optionalUser\(\)/);
+  assert.match(route, /catch \(error\)[\s\S]*jsonError\("The upload service hit an unexpected server error/);
+});
+
+test("Phase 7 upload drawer tolerates empty or non-JSON proxy responses", () => {
+  const library = read("components/resources/resource-library.tsx");
+  assert.match(library, /await response\.text\(\)/);
+  assert.match(library, /if \(!body\.trim\(\)\) return \{\}/);
+  assert.match(library, /JSON\.parse\(body\)/);
+  assert.doesNotMatch(library, /await response\.json\(\)/);
+  assert.match(library, /CLIENT_UPLOAD_MAX_BYTES = 10 \* 1024 \* 1024/);
+  assert.match(library, /uploadFallbackMessage\(response\.status\)/);
+});
+
 test("Phase 7 sanitizes filenames and rich note content server-side", () => {
   const validation = read("lib/resources/validation.ts");
   const notes = read("app/api/notes/route.ts");

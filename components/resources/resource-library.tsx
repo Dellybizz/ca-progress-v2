@@ -10,9 +10,25 @@ import { Icon } from "@/components/ui/icon";
 import type { ResourceLibraryReady, UploadCard, NoteCard } from "@/lib/resources/types";
 import { NoteEditor } from "./note-editor";
 
+const CLIENT_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+
 function bytes(value: number) { if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`; return `${(value / (1024 * 1024)).toFixed(1)} MB`; }
 function statusTone(status: string) { return status === "approved" ? "success" : status === "rejected" || status === "reported" ? "danger" : status === "pending" ? "warning" : "neutral"; }
 function matches(value: string, query: string) { return value.toLowerCase().includes(query); }
+
+async function readApiPayload(response: Response): Promise<{ error?: string }> {
+  const body = await response.text();
+  if (!body.trim()) return {};
+  try { return JSON.parse(body) as { error?: string }; }
+  catch { return {}; }
+}
+
+function uploadFallbackMessage(status: number) {
+  if (status === 413) return "This upload is larger than the 10 MB file limit.";
+  if (status === 401) return "Your session expired. Sign in again and retry the upload.";
+  if (status >= 500) return "The upload service returned a server error. Please retry in a moment.";
+  return `Upload failed (${status}). Please check the file and try again.`;
+}
 
 function NoteCardView({ note }: { note: NoteCard }) {
   return <Link href={`/notes/${note.id}`} className="phase7-document-card phase7-document-card--note"><div className="phase7-document-icon"><Icon name="notes"/></div><div className="phase7-document-copy"><div className="phase7-document-title"><strong>{note.title}</strong><Badge tone={statusTone(note.moderationStatus)}>{note.isOwner ? note.moderationStatus : "Community · Approved"}</Badge></div><p>{note.excerpt || "Rich-text note"}</p><div className="phase7-document-meta"><span>{note.chapterTitle ?? note.subjectTitle ?? "General note"}</span>{note.tags.slice(0, 3).map((tag) => <span key={tag}>#{tag}</span>)}<span>{note.ownerLabel}</span></div></div><Icon name="chevron" size={17}/></Link>;
@@ -29,11 +45,20 @@ function UploadPanel({ model, close }: { model: ResourceLibraryReady; close: () 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(null);
     try {
-      const form = new FormData(event.currentTarget); form.set("subjectId", subjectId); form.set("chapterId", chapterId); form.set("visibility", visibility);
-      const response = await fetch("/api/resources/upload", { method: "POST", body: form }); const payload = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Upload failed.");
+      const form = new FormData(event.currentTarget);
+      const selectedFile = form.get("file");
+      if (!(selectedFile instanceof File) || selectedFile.size === 0) throw new Error("Choose a file to upload.");
+      if (selectedFile.size > CLIENT_UPLOAD_MAX_BYTES) throw new Error("This file is larger than the 10 MB upload limit.");
+
+      form.set("subjectId", subjectId); form.set("chapterId", chapterId); form.set("visibility", visibility);
+      const response = await fetch("/api/resources/upload", { method: "POST", body: form });
+      const payload = await readApiPayload(response);
+      if (!response.ok) throw new Error(payload.error || uploadFallbackMessage(response.status));
       close(); router.refresh();
-    } catch (caught) { setError(caught instanceof Error ? caught.message : "Upload failed."); } finally { setBusy(false); }
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Upload failed.";
+      setError(message === "Failed to fetch" ? "The upload request could not reach the server. Check your connection and try again." : message);
+    } finally { setBusy(false); }
   }
   return <div className="phase7-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><aside className="phase7-upload-drawer" role="dialog" aria-modal="true" aria-label="Upload resource"><div className="phase7-drawer-head"><div><span>Private Storage</span><h2>Upload a resource</h2></div><button onClick={close} aria-label="Close upload drawer"><Icon name="close"/></button></div><form onSubmit={submit} className="phase7-form"><label><span>File</span><input name="file" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"/><small>PDF, images, DOC or DOCX · maximum 10 MB. Type, extension, size and file signature are revalidated on the server.</small></label><label><span>Title</span><input name="title" maxLength={160} placeholder="Audit chapter 3 summary"/></label><label><span>Description</span><textarea name="description" maxLength={4000} rows={4} placeholder="Optional context for this file"/></label><label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">No subject</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label><label><span>Chapter</span><select disabled={!selectedSubject} value={chapterId} onChange={(event) => setChapterId(event.target.value)}><option value="">No chapter</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label><label><span>Visibility</span><select value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="private">Private</option><option value="shared">Share with Community</option></select></label><div className="phase7-policy-note"><Icon name={visibility === "private" ? "lock" : "shield"} size={17}/><span>{visibility === "private" ? "Private files stay in your user-scoped storage path and are opened with short-lived signed URLs." : "Community uploads are hidden until a moderator approves them."}</span></div>{error ? <div className="phase7-inline-error" role="alert">{error}</div> : null}<button disabled={busy} type="submit" className="ui-button ui-button--primary">{busy ? "Uploading…" : "Upload resource"}</button></form></aside></div>;
 }
