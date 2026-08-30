@@ -1,0 +1,1 @@
+Current progress state is chapter-granular, private, timestamped and auto-saved through validated RPCs.
