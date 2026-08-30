@@ -2,18 +2,20 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { assertOperationalMutationAllowed } from "@/lib/admin/operations";
 import { requireAdminOperator } from "@/lib/authorization/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { runIcaiSync } from "@/lib/icai/sync";
 
 function message(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown Phase 8 operation error.";
+  return error instanceof Error ? error.message : "Unknown ICAI operation error.";
 }
 
 export async function runIcaiSyncAction() {
   let destination = "/admin/icai-sync";
   try {
     const operator = await requireAdminOperator();
+    await assertOperationalMutationAllowed("icai.sync", operator.user.id);
     const result = await runIcaiSync({ trigger: "manual", requestedBy: operator.user.id });
     revalidatePath("/admin/icai-sync");
     revalidatePath("/updates");
