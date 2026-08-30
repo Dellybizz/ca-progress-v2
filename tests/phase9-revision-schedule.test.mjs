@@ -16,7 +16,21 @@ test("chapter completion drives future revision due items from configurable inte
 
 test("preferred study days adjust generated revision dates while manual due dates are protected", () => {
   const sql = read("supabase/migrations/20260830170000_phase9_smart_revision_planner.sql");
+  const hardening = read("supabase/migrations/20260830170500_phase9_revision_schedule_completion_hardening.sql");
   assert.match(sql, /phase9_align_preferred_day/);
   assert.match(sql, /manual_due_at/);
-  assert.match(sql, /where public\.revision_due_items\.manual_due_at is null/);
+  assert.match(hardening, /manual_due_at is null then excluded\.due_at/);
+  assert.match(hardening, /completed_at = case/);
+});
+
+test("progress trigger handles DELETE before accessing NEW and INSERT before accessing OLD", () => {
+  const hardening = read("supabase/migrations/20260830171000_phase9_trigger_safety.sql");
+  const deleteBranch = hardening.indexOf("if tg_op = 'DELETE' then");
+  const firstNewRead = hardening.indexOf("v_user_id := new.user_id");
+  const insertBranch = hardening.indexOf("if tg_op = 'INSERT' then");
+  const firstOldComparison = hardening.indexOf("new.completed_at is distinct from old.completed_at");
+  assert.ok(deleteBranch >= 0 && deleteBranch < firstNewRead);
+  assert.ok(insertBranch >= 0 && insertBranch < firstOldComparison);
+  assert.match(hardening, /return old;/);
+  assert.match(hardening, /return new;/);
 });
