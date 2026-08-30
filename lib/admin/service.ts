@@ -1,16 +1,13 @@
 import "server-only";
 
-import { optionalUser } from "@/lib/auth/server";
+import { type AdminOperator } from "@/lib/admin/authorization";
 import { invokeBillingService } from "@/lib/billing/service-binding";
 import { getResourceR2Bucket } from "@/lib/resources/r2";
 import { getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
 
-export type AdminRole = "moderator" | "admin" | "owner" | "parent_owner";
-export type AdminOperator = { userId: string; role: AdminRole };
+export { canManageOperations, canManagePlatform, canManageRoles, getAdminRoleForUser, requireAdminOperator } from "@/lib/admin/authorization";
+export type { AdminOperator, AdminRole } from "@/lib/admin/authorization";
 export type HealthState = "ok" | "degraded" | "not_configured";
-
-const roleRank: Record<AdminRole, number> = { moderator: 10, admin: 20, owner: 30, parent_owner: 40 };
-const validRoles = new Set<AdminRole>(Object.keys(roleRank) as AdminRole[]);
 
 function config() {
   const value = getSupabaseAdminRuntimeConfig();
@@ -39,24 +36,6 @@ async function rpc(name: string, body: Record<string, unknown>) {
   return rest(`rpc/${name}`, { method: "POST", body: JSON.stringify(body) });
 }
 
-export async function getAdminRoleForUser(userId: string): Promise<AdminRole | null> {
-  const data = await rest(`admin_users?user_id=eq.${encodeURIComponent(userId)}&is_active=eq.true&select=role&limit=1`);
-  const role = Array.isArray(data) && data[0] && typeof (data[0] as { role?: unknown }).role === "string" ? String((data[0] as { role: string }).role) : "";
-  return validRoles.has(role as AdminRole) ? role as AdminRole : null;
-}
-
-export async function requireAdminOperator(minimum: AdminRole = "moderator"): Promise<AdminOperator> {
-  const identity = await optionalUser();
-  if (!identity) throw new Error("ADMIN_AUTH_REQUIRED");
-  const role = await getAdminRoleForUser(identity.id);
-  if (!role || roleRank[role] < roleRank[minimum]) throw new Error("ADMIN_ACCESS_DENIED");
-  return { userId: identity.id, role };
-}
-
-export function canManageRoles(role: AdminRole) { return roleRank[role] >= roleRank.owner; }
-export function canManagePlatform(role: AdminRole) { return roleRank[role] >= roleRank.owner; }
-export function canManageOperations(role: AdminRole) { return roleRank[role] >= roleRank.admin; }
-
 export type MemberRow = {
   user_id: string; email: string | null; display_name: string; role: string; admin_active: boolean;
   plan_tier: string; plan_name: string; subscription_ends_at: string | null; user_created_at: string; total_count: number;
@@ -74,7 +53,7 @@ export async function listMembers(operator: AdminOperator, input: { page: number
   return { rows, total: rows[0]?.total_count ? Number(rows[0].total_count) : 0, page: input.page, limit: input.limit };
 }
 
-export async function setMemberRole(operator: AdminOperator, targetUserId: string, role: AdminRole) {
+export async function setMemberRole(operator: AdminOperator, targetUserId: string, role: import("@/lib/admin/authorization").AdminRole) {
   return rpc("phase12_set_admin_role", { p_actor: operator.userId, p_target: targetUserId, p_new_role: role, p_request_id: crypto.randomUUID() });
 }
 export async function setMemberAdminActive(operator: AdminOperator, targetUserId: string, active: boolean) {
