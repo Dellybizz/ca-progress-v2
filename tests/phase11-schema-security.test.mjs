@@ -74,7 +74,7 @@ test("unapproved prices and storage allowances remain unconfigured", () => {
 
 test("resource storage enforcement is aggregate and atomic when a quota is configured", () => {
   assert.match(quota, /pg_advisory_xact_lock/i);
-  assert.match(quota, /coalesce\(sum\(ur\.size_bytes\), 0\)/i);
+  assert.match(quota, /coalesce\(sum\(r\.size_bytes\),0\)/i);
   assert.match(quota, /phase11_effective_entitlement/i);
   assert.match(quota, /storage allowance/i);
   assert.match(quota, /insert into public\.uploaded_resources/i);
