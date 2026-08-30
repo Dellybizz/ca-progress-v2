@@ -28,6 +28,15 @@ function groupLabel(groupChoice: string, groups: Array<{ code: string; name: str
   return groups.find((group) => group.code === groupChoice)?.name ?? groupChoice.replaceAll("_", " ");
 }
 
+function setupRequired(identity: { id: string }, displayName: string, generatedAt: string): DashboardPageModel {
+  return {
+    mode: "onboarding",
+    generatedAt,
+    viewer: { authenticated: true, id: identity.id, displayName },
+    reason: "profile_incomplete",
+  };
+}
+
 export async function getDashboardPageModel(now = new Date()): Promise<DashboardPageModel> {
   const generatedAt = now.toISOString();
   const identity = await optionalUser();
@@ -40,19 +49,16 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
     || !isCALevel(profile.ca_level)
     || !isGroupChoice(profile.group_choice)
     || !profile.attempt_key
+    || profile.attempt_key === "undecided"
     || !profile.daily_target_minutes
   ) {
-    return {
-      mode: "onboarding",
-      generatedAt,
-      viewer: { authenticated: true, id: identity.id, displayName },
-      reason: "profile_incomplete",
-    };
+    return setupRequired(identity, displayName, generatedAt);
   }
 
   const today = dateKey(now);
   const academic = await getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key);
-  if (!academic) throw new Error("Your selected CA level is not available in the verified academic catalog.");
+  if (!academic) return setupRequired(identity, displayName, generatedAt);
+
   const live = await getDashboardLiveReference({
     levelId: academic.level.id,
     levelCode: academic.level.code,
