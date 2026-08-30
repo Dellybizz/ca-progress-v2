@@ -32,9 +32,7 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
     "Subscription audit",
     "No paid transactions yet",
     "Retry payment",
-    "payment ===",
   ]) {
-    if (phrase === "payment ===") continue;
     assert.ok(billing.includes(phrase), `${phrase} should be represented`);
   }
   assert.match(billing, /state === "success"/);
@@ -71,13 +69,18 @@ test("server-side entitlement checks cover protected Phase 11 integrations", () 
 });
 
 test("earlier completed phase regression suites remain in the repository", () => {
-  for (const phase of ["phase2", "phase3", "phase4", "phase5", "phase6", "phase7", "phase8", "phase9", "phase10"]) {
-    const files = [
-      `${phase}-routes-responsive.test.mjs`,
-      `${phase}-schema-security.test.mjs`,
-      `${phase}-architecture.test.mjs`,
-      `${phase}-community.test.mjs`,
-    ];
-    assert.ok(files.some((file) => existsSync(join(root, "tests", file))), `at least one ${phase} regression test should remain`);
+  const representatives = [
+    "phase2-auth.test.mjs",
+    "phase3-academic.test.mjs",
+    "phase4-dashboard.test.mjs",
+    "phase5-progress.test.mjs",
+    "phase6-study.test.mjs",
+    "phase7-storage-security.test.mjs",
+    "phase8-engine.test.mjs",
+    "phase9-planner-engine.test.mjs",
+    "phase10-schema-security.test.mjs",
+  ];
+  for (const file of representatives) {
+    assert.equal(existsSync(join(root, "tests", file)), true, `${file} should remain`);
   }
 });
