@@ -15,7 +15,7 @@ export function CommunityChannelList({ groups, activeSlug }: { groups: Community
       <div>{group.channels.map((channel) => {
         const active = channel.slug === activeSlug;
         return <Link key={channel.id} href={`/community/${channel.slug}`} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}>
-          <span className={`phase10-channel-icon phase10-channel-icon--${channel.kind}`}><Icon name={channel.kind === "announcements" ? "bell" : channel.kind === "resources" ? "book" : channel.kind === "doubts" ? "community" : "chat"} size={18}/></span>
+          <span className={`phase10-channel-icon phase10-channel-icon--${channel.kind}`}><Icon name={channel.kind === "announcements" ? "bell" : channel.kind === "resources" ? "book" : "community"} size={18}/></span>
           <span className="phase10-channel-copy"><span><strong>{channel.title}</strong>{channel.latestAt ? <time>{new Date(channel.latestAt).toLocaleDateString(undefined,{month:"short",day:"numeric"})}</time> : null}</span><small>{channel.latestAuthor ? `${channel.latestAuthor}: ` : ""}{preview(channel.latestBody)}</small></span>
           {channel.unreadCount > 0 ? <span className="phase10-unread" aria-label={`${channel.unreadCount} unread`}>{channel.unreadCount > 99 ? "99+" : channel.unreadCount}</span> : null}
         </Link>;
