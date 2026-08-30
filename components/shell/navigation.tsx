@@ -24,6 +24,8 @@ export const studentNavigation: NavItem[] = [
   { label: "Tests", href: "/tests", icon: "tests" },
   { label: "Notes", href: "/notes", icon: "notes" },
   { label: "Community", href: "/community", icon: "community" },
+  { label: "Pricing", href: "/pricing", icon: "sparkles" },
+  { label: "Billing", href: "/billing", icon: "shield" },
   { label: "Settings", href: "/settings", icon: "settings" },
 ];
 

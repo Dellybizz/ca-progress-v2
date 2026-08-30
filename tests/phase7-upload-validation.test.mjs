@@ -22,11 +22,17 @@ test("Phase 7 upload validation runs on the server and stores bytes in Cloudflar
   assert.doesNotMatch(route, /\.storage\.from\(|admin\.storage/);
 });
 
-test("Phase 7 R2 upload persists metadata only through the server service role", () => {
+test("Phase 7 R2 upload persists metadata only through the server service role after Phase 11 quota integration", () => {
   const route = read("app/api/resources/upload/route.ts");
+  const billingService = read("lib/billing/service.ts");
+  const quotaMigration = read("supabase/migrations/20260830212500_phase11_atomic_resource_quota.sql");
   assert.match(route, /getSupabaseAdminRuntimeConfig\(\)/);
-  assert.match(route, /createAdminSupabaseClient\(\)/);
-  assert.match(route, /admin\.from\("uploaded_resources"\)\.insert/);
+  assert.match(route, /createResourceMetadataWithinQuota/);
+  assert.match(billingService, /import "server-only"/);
+  assert.match(billingService, /getSupabaseAdminRuntimeConfig\(\)/);
+  assert.match(billingService, /rpc\/phase11_create_uploaded_resource/);
+  assert.match(quotaMigration, /revoke all on function public\.phase11_create_uploaded_resource[\s\S]*from public,anon,authenticated/);
+  assert.match(quotaMigration, /grant execute on function public\.phase11_create_uploaded_resource[\s\S]*to service_role/);
   assert.match(route, /METADATA_SERVICE_NOT_CONFIGURED/);
   assert.doesNotMatch(route, /getSupabaseAdminConfig\(\)/);
   assert.doesNotMatch(route, /phase7_create_uploaded_resource/);

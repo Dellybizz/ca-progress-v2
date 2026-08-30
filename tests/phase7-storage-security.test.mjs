@@ -23,18 +23,24 @@ test("Phase 7 files use a private Cloudflare R2 Worker binding", () => {
   assert.doesNotMatch(access, /getPublicUrl|createSignedUrl/);
 });
 
-test("Phase 7 resource metadata mutations stay server-service-role-only", () => {
+test("Phase 7 resource metadata mutations stay server-service-role-only after Phase 11 quota integration", () => {
   const rpcMigration = read("supabase/migrations/20260830153000_phase7_cloudflare_r2_resource_storage.sql");
   const hardening = read("supabase/migrations/20260830154500_phase7_r2_rpc_privilege_hardening.sql");
   const upload = read("app/api/resources/upload/route.ts");
+  const billingService = read("lib/billing/service.ts");
+  const quotaMigration = read("supabase/migrations/20260830212500_phase11_atomic_resource_quota.sql");
   const resourceRoute = read("app/api/resources/[id]/route.ts");
   assert.match(rpcMigration, /create or replace function public\.phase7_create_uploaded_resource/);
   assert.match(hardening, /revoke execute on function public\.phase7_create_uploaded_resource[\s\S]*from authenticated/);
   assert.match(hardening, /revoke execute on function public\.phase7_update_uploaded_resource[\s\S]*from authenticated/);
   assert.match(hardening, /revoke execute on function public\.phase7_delete_uploaded_resource[\s\S]*from authenticated/);
   assert.match(hardening, /metadata_mutations\":\"server_service_role_only/);
-  assert.match(upload, /createAdminSupabaseClient\(\)/);
-  assert.match(upload, /admin\.from\("uploaded_resources"\)\.insert/);
+  assert.match(upload, /createResourceMetadataWithinQuota/);
+  assert.match(billingService, /import "server-only"/);
+  assert.match(billingService, /getSupabaseAdminRuntimeConfig\(\)/);
+  assert.match(billingService, /rpc\/phase11_create_uploaded_resource/);
+  assert.match(quotaMigration, /revoke all on function public\.phase11_create_uploaded_resource[\s\S]*from public,anon,authenticated/);
+  assert.match(quotaMigration, /grant execute on function public\.phase11_create_uploaded_resource[\s\S]*to service_role/);
   assert.match(resourceRoute, /createAdminSupabaseClient\(\)/);
   assert.match(resourceRoute, /admin\.from\("uploaded_resources"\)/);
   assert.doesNotMatch(upload, /admin\.storage|\.storage\.from\(/);

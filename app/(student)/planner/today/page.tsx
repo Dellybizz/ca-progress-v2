@@ -1,14 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
+import { FeatureLock } from "@/components/billing/feature-lock";
 import { TodayPlanClient } from "@/components/planner/today-plan-client";
 import { PageHeader } from "@/components/ui/page-header";
+import { optionalUser } from "@/lib/auth/server";
+import { getEntitlementForUser } from "@/lib/billing/service";
 import { getTodayPlanPageModel } from "@/lib/smart-planner/service";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Today Plan | CA Progress" };
 
 export default async function TodayPlanPage() {
+  const identity = await optionalUser();
+  if (identity) {
+    const access = await getEntitlementForUser(identity.id, "planner.smart");
+    if (!access.allowed) return <div className="phase9-page"><PageHeader preview={false} eyebrow="Smart Planner" title="Smart planning is not included in your current plan." description="Your existing progress and manual planner data remain available."/><FeatureLock planName={access.planName} title="Unlock Smart Planner" description={access.upgradeMessage || "Compare plans to enable explainable daily recommendations."}/></div>;
+  }
   const model = await getTodayPlanPageModel();
   if (model.mode === "guest") return <div className="phase9-page"><LoginRequired next="/planner/today" title="Sign in to generate your Today Plan"/></div>;
   if (model.mode === "setup") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Smart Planner" title="Complete your academic profile first." description="The revision engine needs your CA level, group, attempt and daily target before it can make safe recommendations."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
