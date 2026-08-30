@@ -40,6 +40,18 @@ test("Phase 7 resource metadata mutations stay server-service-role-only", () => 
   assert.doesNotMatch(resourceRoute, /admin\.storage|\.storage\.from\(/);
 });
 
+test("server-only Supabase credentials resolve from Cloudflare runtime bindings", () => {
+  const runtimeEnv = read("lib/cloudflare/runtime-env.ts");
+  const admin = read("lib/supabase/admin.ts");
+  const upload = read("app/api/resources/upload/route.ts");
+  assert.match(runtimeEnv, /getCloudflareContext/);
+  assert.match(runtimeEnv, /process\.env\[name\]/);
+  assert.match(admin, /getServerRuntimeValue\("SUPABASE_SERVICE_ROLE_KEY"\)/);
+  assert.match(admin, /getSupabaseAdminRuntimeConfig/);
+  assert.match(upload, /getSupabaseAdminRuntimeConfig\(\)/);
+  assert.doesNotMatch(upload, /getSupabaseAdminConfig/);
+});
+
 test("legacy Supabase Storage policies remain non-public during transition", () => {
   const storageHardening = read("supabase/migrations/20260830141500_phase7_storage_write_hardening.sql");
   assert.match(storageHardening, /drop policy if exists "user_resources_select_own"/);
