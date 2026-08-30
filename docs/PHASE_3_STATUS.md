@@ -5,7 +5,7 @@ CA Syllabus & Academic Data Engine.
 
 ## Implementation status
 
-**Phase 3 implementation is feature-complete on the phase branch; final CI/acceptance verification is pending.**
+**Phase 3 code, database work and all four planned acceptance criteria are complete and merged to `main`. Public Cloudflare staging deployment verification remains an operational check because the current environment cannot directly reach the Worker URL.**
 
 ## Implemented frontend
 - [x] Responsive `/syllabus` explorer with Foundation / Intermediate / Final tabs.
@@ -25,11 +25,13 @@ CA Syllabus & Academic Data Engine.
 - [x] `effective_from`, `effective_to`, status and `supersedes_version_id` versioning contract.
 - [x] Public read-only RLS policies for reference metadata; all client writes revoked.
 - [x] Service-only `academic_change_events` audit table.
-- [x] Search/filter indexes for level/group/attempt/version/title lookups.
+- [x] Search/filter and foreign-key covering indexes for level/group/attempt/version/title lookups.
 - [x] Phase 2 onboarding/profile attempt picker now reads Phase 3 attempt applicability instead of the placeholder setting.
 
 ## V2 staging database
-Applied migration: `phase3_academic_engine`.
+Applied only to isolated V2 Supabase project `wgdhpzbgyjqjlgntibqg`:
+- `phase3_academic_engine`
+- `phase3_academic_index_hardening`
 
 Verified staging row counts after import:
 - 3 levels
@@ -49,21 +51,21 @@ See `docs/ACADEMIC_DATA_SOURCES.md`. Academic structure was manually verified ag
 - [x] No new secrets or provider-dashboard setup required.
 - [x] Existing V2 Supabase public URL/publishable key remain the only required academic runtime configuration.
 - [x] Cloudflare staging version marker advanced to `phase-3`.
+- [ ] Confirm that the public staging Worker has deployed the merged `main` revision. If connected deployment did not run automatically, manually run the existing `Deploy V2 Staging to Cloudflare` workflow.
 
 ## CI verification
-- [ ] dependency install
-- [ ] TypeScript
-- [ ] ESLint
-- [ ] complete Phase 0 + 1 + 2 + 3 test suite
-- [ ] Next.js production build
-- [ ] OpenNext / Cloudflare dry-run
+Branch CI run `33283992502` and post-merge `main` CI run `33284085720` are green.
+- [x] dependency install
+- [x] TypeScript
+- [x] ESLint
+- [x] complete Phase 0 + 1 + 2 + 3 test suite — 52/52 passed on `main`
+- [x] Next.js production build
+- [x] OpenNext / Cloudflare dry-run
 
 ## Acceptance gate
 - [x] Foundation, Intermediate and Final coexist in the same normalized catalog.
 - [x] A syllabus version can be superseded without deleting historical structure.
 - [x] Academic query service returns subjects only for the selected level/group/attempt mapping.
 - [x] Syllabus arrays are not hardcoded in page components; pages consume the typed DB query service.
-- [ ] Final branch CI is green.
-- [ ] Post-merge main CI/staging verification is green.
 
-**Do not start the next phase until this document records a green final CI and Phase 3 is explicitly closed.**
+**Phase 3 acceptance result: 4/4 verified. Do not start the next phase until the public staging deployment is confirmed.**
