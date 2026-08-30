@@ -1,0 +1,93 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const root = new URL("../", import.meta.url).pathname;
+const read = (path) => readFileSync(join(root, path), "utf8");
+
+test("Phase 4 dashboard route uses one server-side aggregation service instead of the Phase 1 mock", () => {
+  const page = read("app/(student)/dashboard/page.tsx");
+  assert.match(page, /getDashboardPageModel/);
+  assert.match(page, /StudentDashboard/);
+  assert.match(page, /force-dynamic/);
+  assert.doesNotMatch(page, /DashboardPreview|fetch\(/);
+});
+
+test("dashboard aggregator personalizes from private profile then composes cached reference data", () => {
+  const service = read("lib/dashboard/service.ts");
+  const reference = read("lib/dashboard/reference.ts");
+  assert.match(service, /getProfileForUser/);
+  assert.match(service, /profile\.ca_level/);
+  assert.match(service, /profile\.group_choice/);
+  assert.match(service, /profile\.attempt_key/);
+  assert.match(service, /getDashboardAcademicReference/);
+  assert.match(service, /getDashboardLiveReference/);
+  assert.match(reference, /unstable_cache/);
+  assert.match(reference, /revalidate: 900/);
+  assert.match(reference, /revalidate: 60/);
+});
+
+test("verified exam events drive countdown and live ICAI resources can refresh without deploy", () => {
+  const reference = read("lib/dashboard/reference.ts");
+  const service = read("lib/dashboard/service.ts");
+  assert.match(reference, /from\("exam_events"\)/);
+  assert.match(reference, /verification_status/);
+  assert.match(reference, /from\("icai_resources"\)/);
+  assert.match(reference, /status.*active/);
+  assert.match(service, /upcomingExam\?\.eventDate \?\? live\.attempt\?\.startDate/);
+  assert.match(service, /sourceKind: upcomingExam \? "exam_event" : "attempt"/);
+});
+
+test("Phase 4 UI exposes every planned dashboard surface without fabricating future data", () => {
+  const ui = read("components/dashboard/student-dashboard.tsx");
+  for (const marker of ["Attempt countdown", "Today", "Progress", "Study target", "Latest ICAI changes", "Alerts & consistency", "Quick actions", "What to study next"]) assert.match(ui, new RegExp(marker, "i"));
+  for (const action of ["Start Study", "Add Task", "Add Note", "Open Progress"]) assert.match(read("lib/dashboard/service.ts"), new RegExp(action));
+  assert.match(ui, /Not tracked yet/);
+  assert.match(ui, /No fake daily totals/);
+  assert.doesNotMatch(ui, /72%|68%|18h 40m|Sample daily goal/);
+});
+
+test("dashboard has route-specific skeleton, error, empty and permission states", () => {
+  for (const path of ["app/(student)/dashboard/loading.tsx", "app/(student)/dashboard/error.tsx"]) assert.equal(existsSync(join(root, path)), true, path);
+  const loading = read("app/(student)/dashboard/loading.tsx");
+  const ui = read("components/dashboard/student-dashboard.tsx");
+  assert.match(loading, /smart-dashboard-hero/);
+  assert.match(loading, /dashboard-skeleton-card/);
+  assert.match(ui, /Guest mode/);
+  assert.match(ui, /Setup incomplete/);
+  assert.match(ui, /No matching ICAI updates yet/);
+});
+
+test("dashboard only posts lightweight authenticated analytics and never exposes a read endpoint", () => {
+  const route = read("app/api/dashboard/events/route.ts");
+  const client = read("components/dashboard/dashboard-interactions.tsx");
+  assert.match(route, /optionalUser/);
+  assert.match(route, /dashboard_events/);
+  assert.match(route, /private, no-store/);
+  assert.match(route, /dashboard_view/);
+  assert.match(route, /quick_action/);
+  assert.match(client, /keepalive: true/);
+  assert.equal(existsSync(join(root, "app/api/dashboard/route.ts")), false);
+});
+
+test("dashboard source graph does not import Community or Admin feature bundles", () => {
+  const source = [
+    read("app/(student)/dashboard/page.tsx"),
+    read("components/dashboard/student-dashboard.tsx"),
+    read("components/dashboard/dashboard-interactions.tsx"),
+    read("lib/dashboard/service.ts"),
+    read("lib/dashboard/reference.ts"),
+  ].join("\n");
+  assert.doesNotMatch(source, /components\/mock\/dashboard-preview/);
+  assert.doesNotMatch(source, /@\/.*community|@\/.*admin\//i);
+});
+
+test("dashboard CSS has independent responsive mobile and desktop contracts", () => {
+  const css = read("app/styles/student-dashboard.css");
+  assert.match(css, /grid-template-columns:minmax\(0,1\.55fr\)/);
+  assert.match(css, /@media \(max-width:1050px\)/);
+  assert.match(css, /@media \(max-width:720px\)/);
+  assert.match(css, /@media \(max-width:440px\)/);
+  assert.match(css, /prefers-reduced-motion/);
+});

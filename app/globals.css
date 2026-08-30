@@ -2,6 +2,7 @@
 @import "./styles/shell.css";
 @import "./styles/components.css";
 @import "./styles/dashboard.css";
+@import "./styles/student-dashboard.css";
 @import "./styles/surfaces.css";
 @import "./styles/auth.css";
 @import "./styles/academic.css";
