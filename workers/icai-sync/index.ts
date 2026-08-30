@@ -14,7 +14,7 @@ function json(data: unknown, status = 200) {
   });
 }
 
-export default {
+const icaiSyncWorker = {
   async fetch(request: Request) {
     const url = new URL(request.url);
     if (request.method !== "POST" || url.pathname !== "/run") return json({ ok: false, error: "Not found." }, 404);
@@ -39,3 +39,5 @@ export default {
     }
   },
 };
+
+export default icaiSyncWorker;
