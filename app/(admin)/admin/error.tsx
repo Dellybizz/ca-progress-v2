@@ -1,0 +1,2 @@
+"use client";
+export default function AdminError({ reset }: { error: Error & { digest?: string }; reset: () => void }) { return <div className="phase12-page"><section className="phase12-route-error"><strong>Operations data could not be loaded.</strong><p>No admin change has been made. Retry the server-authorized request.</p><button className="ui-button ui-button--primary" onClick={reset}>Try again</button></section></div>; }
