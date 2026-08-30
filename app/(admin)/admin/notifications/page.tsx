@@ -8,8 +8,7 @@ import { getNotificationTemplates, requireAdminOperator } from "@/lib/admin/serv
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsAdminPage() {
-  let operator;
-  try { operator=await requireAdminOperator("admin"); }
+  try { await requireAdminOperator("admin"); }
   catch { return <AdminDenied message="Admin, owner or parent-owner access is required for notification templates."/>; }
   const templates=await getNotificationTemplates();
   return <div className="phase12-page"><PageHeader preview={false} eyebrow="Operations · Notifications" title="Notification composer and templates" description="Create reusable, auditable copy templates. Phase 12 stores templates only; no delivery is implied until a delivery workflow explicitly consumes one."/>
