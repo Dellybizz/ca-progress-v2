@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
+import { FeatureLock } from "@/components/billing/feature-lock";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { optionalUser } from "@/lib/auth/server";
+import { getEntitlementForUser } from "@/lib/billing/service";
 import { getForecastPageModel } from "@/lib/smart-planner/service";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +16,11 @@ function statusLabel(status: string) {
 }
 
 export default async function ForecastPage() {
+  const identity = await optionalUser();
+  if (identity) {
+    const access = await getEntitlementForUser(identity.id, "analytics.forecast");
+    if (!access.allowed) return <div className="phase9-page"><PageHeader preview={false} eyebrow="Forecast" title="Completion forecast is not included in your current plan." description="Your progress data remains intact and available in the normal tracker."/><FeatureLock planName={access.planName} title="Unlock completion forecasting" description={access.upgradeMessage || "Compare plans to enable pace and completion forecasting."}/></div>;
+  }
   const model = await getForecastPageModel();
   if (model.mode === "guest") return <div className="phase9-page"><LoginRequired next="/analytics/forecast" title="Sign in to view your completion forecast"/></div>;
   if (model.mode === "setup") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Forecast" title="Complete your academic profile first." description="Forecasting requires a selected CA attempt and applicable syllabus."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
