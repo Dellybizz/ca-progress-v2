@@ -4,7 +4,7 @@ export type IconName =
   | "home" | "calendar" | "chart" | "timer" | "tests" | "notes" | "book"
   | "community" | "settings" | "shield" | "search" | "bell" | "more" | "close"
   | "chevron" | "arrow" | "check" | "sparkles" | "clock" | "target" | "layers"
-  | "plus" | "sun" | "moon" | "command";
+  | "plus" | "sun" | "moon" | "command" | "lock";
 
 const paths: Record<IconName, ReactNode> = {
   home: <><path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.8V21h13V9.8"/><path d="M9.5 21v-6h5v6"/></>,
@@ -32,6 +32,7 @@ const paths: Record<IconName, ReactNode> = {
   sun: <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41"/></>,
   moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>,
   command: <><path d="M9 6a3 3 0 1 0-3 3h3V6ZM15 6a3 3 0 1 1 3 3h-3V6ZM9 15H6a3 3 0 1 0 3 3v-3ZM15 15h3a3 3 0 1 1-3 3v-3Z"/><path d="M9 9h6v6H9z"/></>,
+  lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
 };
 
 export function Icon({ name, size = 20, ...props }: { name: IconName; size?: number } & Omit<SVGProps<SVGSVGElement>, "name">) {
