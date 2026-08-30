@@ -23,33 +23,14 @@ type ChapterRow = Database["public"]["Tables"]["chapters"]["Row"];
 type TopicRow = Database["public"]["Tables"]["topics"]["Row"];
 type AttemptMapRow = Database["public"]["Tables"]["attempt_syllabus_map"]["Row"];
 
-type RawAcademic = {
-  levels: LevelRow[];
-  groups: GroupRow[];
-  subjects: SubjectRow[];
-  versions: VersionRow[];
-  chapters: ChapterRow[];
-  topics: TopicRow[];
-  attemptMap: AttemptMapRow[];
-};
+type RawAcademic = { levels: LevelRow[]; groups: GroupRow[]; subjects: SubjectRow[]; versions: VersionRow[]; chapters: ChapterRow[]; topics: TopicRow[]; attemptMap: AttemptMapRow[] };
 
 function levelDto(row: LevelRow): AcademicLevel {
   return { id: row.id, code: row.code as AcademicLevelCode, name: row.name, sortOrder: row.sort_order };
 }
 
 function versionDto(row: VersionRow): AcademicVersion {
-  return {
-    id: row.id,
-    key: row.version_key,
-    title: row.title,
-    status: row.status as AcademicVersion["status"],
-    effectiveFrom: row.effective_from,
-    effectiveTo: row.effective_to,
-    supersedesVersionId: row.supersedes_version_id,
-    sourceUrl: row.source_url,
-    sourceLabel: row.source_label,
-    sourceVerifiedAt: row.source_verified_at,
-  };
+  return { id: row.id, key: row.version_key, title: row.title, status: row.status as AcademicVersion["status"], effectiveFrom: row.effective_from, effectiveTo: row.effective_to, supersedesVersionId: row.supersedes_version_id, sourceUrl: row.source_url, sourceLabel: row.source_label, sourceVerifiedAt: row.source_verified_at };
 }
 
 async function loadRawAcademic(): Promise<RawAcademic> {
@@ -63,63 +44,30 @@ async function loadRawAcademic(): Promise<RawAcademic> {
     supabase.from("topics").select("*").order("sort_order"),
     supabase.from("attempt_syllabus_map").select("*").order("attempt_key"),
   ]);
-
   const firstError = [levels.error, groups.error, subjects.error, versions.error, chapters.error, topics.error, attemptMap.error].find(Boolean);
   if (firstError) throw new AcademicDataError(firstError.message);
-
-  return {
-    levels: levels.data ?? [],
-    groups: groups.data ?? [],
-    subjects: subjects.data ?? [],
-    versions: versions.data ?? [],
-    chapters: chapters.data ?? [],
-    topics: topics.data ?? [],
-    attemptMap: attemptMap.data ?? [],
-  };
+  return { levels: levels.data ?? [], groups: groups.data ?? [], subjects: subjects.data ?? [], versions: versions.data ?? [], chapters: chapters.data ?? [], topics: topics.data ?? [], attemptMap: attemptMap.data ?? [] };
 }
 
 function versionForSubject(raw: RawAcademic, subjectId: string, attempt?: string | null) {
   if (attempt) {
     const mapped = raw.attemptMap.find((item) => item.attempt_key === attempt && item.subject_id === subjectId);
-    if (!mapped) return null;
-    return raw.versions.find((item) => item.id === mapped.syllabus_version_id) ?? null;
+    return mapped ? raw.versions.find((item) => item.id === mapped.syllabus_version_id) ?? null : null;
   }
-  return raw.versions
-    .filter((item) => item.subject_id === subjectId && item.status === "published")
-    .sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0] ?? null;
+  return raw.versions.filter((item) => item.subject_id === subjectId && item.status === "published").sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0] ?? null;
 }
 
 function subjectDto(raw: RawAcademic, subject: SubjectRow, version: VersionRow): AcademicSubject {
-  const chapterRows = raw.chapters.filter((item) => item.syllabus_version_id === version.id);
-  const chapters: AcademicChapter[] = chapterRows.map((chapter) => ({
+  const chapters: AcademicChapter[] = raw.chapters.filter((item) => item.syllabus_version_id === version.id).map((chapter) => ({
     id: chapter.id,
     stableKey: chapter.stable_key,
     number: chapter.chapter_number,
     title: chapter.title,
     sectionKey: chapter.section_key,
     kind: chapter.chapter_kind,
-    topics: raw.topics.filter((topic) => topic.chapter_id === chapter.id).map((topic) => ({
-      id: topic.id,
-      stableKey: topic.stable_key,
-      unitNumber: topic.unit_number,
-      title: topic.title,
-      kind: topic.topic_kind,
-    })),
+    topics: raw.topics.filter((topic) => topic.chapter_id === chapter.id).map((topic) => ({ id: topic.id, stableKey: topic.stable_key, unitNumber: topic.unit_number, title: topic.title, kind: topic.topic_kind })),
   }));
-
-  return {
-    id: subject.id,
-    code: subject.code,
-    slug: subject.slug,
-    paperLabel: subject.paper_label,
-    title: subject.title,
-    kind: subject.subject_kind,
-    levelId: subject.level_id,
-    groupId: subject.group_id,
-    sourceUrl: subject.source_url,
-    version: versionDto(version),
-    chapters,
-  };
+  return { id: subject.id, code: subject.code, slug: subject.slug, paperLabel: subject.paper_label, title: subject.title, kind: subject.subject_kind, levelId: subject.level_id, groupId: subject.group_id, sourceUrl: subject.source_url, version: versionDto(version), chapters };
 }
 
 function normalizeSelection(raw: RawAcademic, selection: AcademicSelection) {
@@ -127,39 +75,27 @@ function normalizeSelection(raw: RawAcademic, selection: AcademicSelection) {
   if (!levels.length) throw new AcademicDataError("No academic levels are published.");
   const selectedLevel = levels.find((level) => level.code === selection.level) ?? levels[0];
   const groupsForLevel = raw.groups.filter((group) => group.level_id === selectedLevel.id);
-  const requestedGroup = selection.group && groupsForLevel.some((group) => group.code === selection.group) ? selection.group : null;
+  const isAggregateGroup = selection.group === "all" || selection.group === "both";
+  const requestedGroup = isAggregateGroup ? "all" : selection.group && groupsForLevel.some((group) => group.code === selection.group) ? selection.group : null;
   const selectedGroup = requestedGroup ?? groupsForLevel.find((group) => group.is_default)?.code ?? groupsForLevel[0]?.code ?? "all";
   const attempts = [...new Set(raw.attemptMap.filter((item) => item.level_id === selectedLevel.id).map((item) => item.attempt_key))].sort().reverse();
   const selectedAttempt = selection.attempt && attempts.includes(selection.attempt) ? selection.attempt : null;
   return { levels, selectedLevel, groupsForLevel, selectedGroup, attempts, selectedAttempt };
 }
 
+function allowedGroupIds(groups: GroupRow[], selectedGroup: string) {
+  return new Set((selectedGroup === "all" || selectedGroup === "both" ? groups : groups.filter((group) => group.code === selectedGroup)).map((group) => group.id));
+}
+
 export async function getAcademicCatalog(selection: AcademicSelection = {}): Promise<AcademicCatalog> {
   const raw = await loadRawAcademic();
   const normalized = normalizeSelection(raw, selection);
-  const groups = normalized.groupsForLevel.map((group) => ({
-    id: group.id,
-    code: group.code,
-    name: group.name,
-    sortOrder: group.sort_order,
-    isDefault: group.is_default,
-  }));
-
-  const groupRows = normalized.selectedGroup === "all" || normalized.selectedGroup === "both"
-    ? normalized.groupsForLevel
-    : normalized.groupsForLevel.filter((group) => group.code === normalized.selectedGroup);
-  const groupIds = new Set(groupRows.map((group) => group.id));
-
-  const subjects = raw.subjects
-    .filter((subject) => subject.level_id === normalized.selectedLevel.id && groupIds.has(subject.group_id))
-    .map((subject) => {
-      const version = versionForSubject(raw, subject.id, normalized.selectedAttempt);
-      return version ? subjectDto(raw, subject, version) : null;
-    })
-    .filter((subject): subject is AcademicSubject => Boolean(subject));
-
-  const sourceVerifiedAt = subjects.map((subject) => subject.version.sourceVerifiedAt).sort().at(-1) ?? null;
-
+  const groups = normalized.groupsForLevel.map((group) => ({ id: group.id, code: group.code, name: group.name, sortOrder: group.sort_order, isDefault: group.is_default }));
+  const groupIds = allowedGroupIds(normalized.groupsForLevel, normalized.selectedGroup);
+  const subjects = raw.subjects.filter((subject) => subject.level_id === normalized.selectedLevel.id && groupIds.has(subject.group_id)).map((subject) => {
+    const version = versionForSubject(raw, subject.id, normalized.selectedAttempt);
+    return version ? subjectDto(raw, subject, version) : null;
+  }).filter((subject): subject is AcademicSubject => Boolean(subject));
   return {
     levels: normalized.levels,
     groups,
@@ -168,7 +104,7 @@ export async function getAcademicCatalog(selection: AcademicSelection = {}): Pro
     selectedGroup: normalized.selectedGroup,
     selectedAttempt: normalized.selectedAttempt,
     subjects,
-    sourceVerifiedAt,
+    sourceVerifiedAt: subjects.map((subject) => subject.version.sourceVerifiedAt).sort().at(-1) ?? null,
   };
 }
 
@@ -177,8 +113,7 @@ export async function getSubjectBySlug(slug: string, attempt?: string | null): P
   const subject = raw.subjects.find((item) => item.slug === slug);
   if (!subject) return null;
   const version = versionForSubject(raw, subject.id, attempt);
-  if (!version) return null;
-  return subjectDto(raw, subject, version);
+  return version ? subjectDto(raw, subject, version) : null;
 }
 
 export async function searchAcademicCatalog(query: string, selection: AcademicSelection = {}, limit = 24): Promise<AcademicSearchResult[]> {
@@ -186,11 +121,11 @@ export async function searchAcademicCatalog(query: string, selection: AcademicSe
   if (q.length < 2) return [];
   const raw = await loadRawAcademic();
   const normalized = normalizeSelection(raw, selection);
-  const allowedGroups = normalized.selectedGroup === "all" || normalized.selectedGroup === "both"
-    ? new Set(normalized.groupsForLevel.map((group) => group.id))
-    : new Set(normalized.groupsForLevel.filter((group) => group.code === normalized.selectedGroup).map((group) => group.id));
+  const allowedGroups = allowedGroupIds(normalized.groupsForLevel, normalized.selectedGroup);
   const levelById = new Map(raw.levels.map((level) => [level.id, level]));
   const groupById = new Map(raw.groups.map((group) => [group.id, group]));
+  const topicsByChapter = new Map<string, TopicRow[]>();
+  for (const topic of raw.topics) topicsByChapter.set(topic.chapter_id, [...(topicsByChapter.get(topic.chapter_id) ?? []), topic]);
   const results: AcademicSearchResult[] = [];
 
   for (const subject of raw.subjects) {
@@ -201,24 +136,14 @@ export async function searchAcademicCatalog(query: string, selection: AcademicSe
     const group = groupById.get(subject.group_id);
     if (!level || !group) continue;
     const base = { subjectSlug: subject.slug, subjectTitle: subject.title, levelCode: level.code as AcademicLevelCode, groupCode: group.code };
-
-    if (`${subject.paper_label} ${subject.title} ${subject.code}`.toLocaleLowerCase().includes(q)) {
-      results.push({ type: "subject", id: subject.id, title: subject.title, subtitle: `${level.name} · ${group.name} · ${subject.paper_label}`, ...base });
-    }
-
-    const chapterRows = raw.chapters.filter((chapter) => chapter.syllabus_version_id === version.id);
-    for (const chapter of chapterRows) {
-      if (`${chapter.chapter_number} ${chapter.title} ${chapter.section_key ?? ""}`.toLocaleLowerCase().includes(q)) {
-        results.push({ type: "chapter", id: chapter.id, title: chapter.title, subtitle: `${subject.title} · Chapter ${chapter.chapter_number}`, chapterId: chapter.id, ...base });
-      }
-      for (const topic of raw.topics.filter((item) => item.chapter_id === chapter.id)) {
-        if (`${topic.unit_number ?? ""} ${topic.title}`.toLocaleLowerCase().includes(q)) {
-          results.push({ type: "topic", id: topic.id, title: topic.title, subtitle: `${subject.title} · ${chapter.title}`, chapterId: chapter.id, ...base });
-        }
+    if (`${subject.paper_label} ${subject.title} ${subject.code}`.toLocaleLowerCase().includes(q)) results.push({ type: "subject", id: subject.id, title: subject.title, subtitle: `${level.name} · ${group.name} · ${subject.paper_label}`, ...base });
+    for (const chapter of raw.chapters.filter((item) => item.syllabus_version_id === version.id)) {
+      if (`${chapter.chapter_number} ${chapter.title} ${chapter.section_key ?? ""}`.toLocaleLowerCase().includes(q)) results.push({ type: "chapter", id: chapter.id, title: chapter.title, subtitle: `${subject.title} · Chapter ${chapter.chapter_number}`, chapterId: chapter.id, ...base });
+      for (const topic of topicsByChapter.get(chapter.id) ?? []) {
+        if (`${topic.unit_number ?? ""} ${topic.title}`.toLocaleLowerCase().includes(q)) results.push({ type: "topic", id: topic.id, title: topic.title, subtitle: `${subject.title} · ${chapter.title}`, chapterId: chapter.id, ...base });
       }
     }
   }
-
   return results.slice(0, Math.max(1, Math.min(limit, 50)));
 }
 
@@ -227,8 +152,7 @@ export async function getAcademicVersionPreview(): Promise<AcademicVersionPrevie
   const subjectById = new Map(raw.subjects.map((subject) => [subject.id, subject]));
   const levelById = new Map(raw.levels.map((level) => [level.id, level]));
   const groupById = new Map(raw.groups.map((group) => [group.id, group]));
-
-  return raw.versions.map((version) => {
+  const previews = raw.versions.map((version) => {
     const subject = subjectById.get(version.subject_id);
     if (!subject) throw new AcademicDataError("A syllabus version is missing its subject.");
     const level = levelById.get(subject.level_id);
@@ -236,14 +160,7 @@ export async function getAcademicVersionPreview(): Promise<AcademicVersionPrevie
     if (!level || !group) throw new AcademicDataError("A subject is missing its level or group.");
     const chapterIds = raw.chapters.filter((chapter) => chapter.syllabus_version_id === version.id).map((chapter) => chapter.id);
     const chapterSet = new Set(chapterIds);
-    return {
-      ...versionDto(version),
-      subjectTitle: subject.title,
-      subjectSlug: subject.slug,
-      levelName: level.name,
-      groupName: group.name,
-      chapterCount: chapterIds.length,
-      topicCount: raw.topics.filter((topic) => chapterSet.has(topic.chapter_id)).length,
-    };
-  }).sort((a, b) => `${a.levelName}-${a.subjectTitle}-${b.effectiveFrom}`.localeCompare(`${b.levelName}-${b.subjectTitle}-${a.effectiveFrom}`));
+    return { ...versionDto(version), subjectTitle: subject.title, subjectSlug: subject.slug, levelName: level.name, groupName: group.name, chapterCount: chapterIds.length, topicCount: raw.topics.filter((topic) => chapterSet.has(topic.chapter_id)).length };
+  });
+  return previews.sort((a, b) => a.levelName.localeCompare(b.levelName) || a.subjectTitle.localeCompare(b.subjectTitle) || b.effectiveFrom.localeCompare(a.effectiveFrom));
 }
