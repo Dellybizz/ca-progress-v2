@@ -15,6 +15,17 @@ test("every new admin API re-authorizes on the server",()=>{
   }
 });
 
+test("central authorization reads fresh admin_users state and existing admin helpers consult it first",()=>{
+  const central=read("lib/admin/authorization.ts");
+  const legacy=read("lib/authorization/server.ts");
+  assert.match(central,/admin_users\?user_id=eq\./);
+  assert.match(central,/is_active=eq\.true/);
+  assert.match(central,/roleRank/);
+  assert.match(legacy,/getAdminRoleForUser\(user\.id\)/);
+  assert.match(legacy,/freshRole \?\? "student"/);
+  assert.match(legacy,/Compatibility only while the Phase 12 migration is not yet present\/configured/);
+});
+
 test("role-changing and platform-commercial mutations require owner level",()=>{
   assert.match(read("app/api/admin/members/route.ts"),/requireAdminOperator\("owner"\)/);
   assert.match(read("app/api/admin/platform/route.ts"),/requireAdminOperator\("owner"\)/);
