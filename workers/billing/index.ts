@@ -168,7 +168,7 @@ async function webhook(request: Request, env: Env, ctx: InternalContext) {
   return json({ ok: true, reconciliation: result });
 }
 
-export default {
+const billingWorker = {
   async fetch(request: Request, env: Env) {
     try {
       const ctx = requireInternal(request);
@@ -185,3 +185,5 @@ export default {
     }
   },
 };
+
+export default billingWorker;
