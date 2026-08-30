@@ -134,14 +134,17 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
   const subjects = subjectSlug ? catalog.subjects.filter((subject) => subject.slug === subjectSlug) : catalog.subjects;
   const chapterIds = subjects.flatMap((subject) => subject.chapters.map((chapter) => chapter.id));
   const supabase = await createServerSupabaseClient();
-  const [progressResponse, eventResponse] = await Promise.all([
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const [progressResponse, eventResponse, weeklyEventResponse] = await Promise.all([
     chapterIds.length ? supabase.from("chapter_progress").select("*").eq("user_id", identity.id).in("chapter_id", chapterIds) : Promise.resolve({ data: [], error: null }),
     chapterIds.length ? supabase.from("progress_events").select("*").eq("user_id", identity.id).in("chapter_id", chapterIds).order("created_at", { ascending: false }).limit(120) : Promise.resolve({ data: [], error: null }),
+    chapterIds.length ? supabase.from("progress_events").select("*").eq("user_id", identity.id).in("chapter_id", chapterIds).gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(1000) : Promise.resolve({ data: [], error: null }),
   ]);
-  const error = progressResponse.error || eventResponse.error;
+  const error = progressResponse.error || eventResponse.error || weeklyEventResponse.error;
   if (error) throw new Error(`Progress data could not be loaded: ${error.message}`);
   const rows = (progressResponse.data ?? []) as ProgressRow[];
   const events = (eventResponse.data ?? []) as EventRow[];
+  const weeklyEvents = (weeklyEventResponse.data ?? []) as EventRow[];
   const rowByChapter = new Map(rows.map((row) => [row.chapter_id, row]));
   const groupsById = new Map(catalog.groups.map((group) => [group.id, group]));
   const chapters: ProgressChapter[] = subjects.flatMap((subject) => {
@@ -179,7 +182,7 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
     attemptKey: profile.attempt_key,
     groupLabel: groupLabel(profile.group_choice, catalog.groups),
     chapters,
-    analytics: buildAnalytics(chapters, events),
+    analytics: buildAnalytics(chapters, weeklyEvents),
     history,
   } satisfies ProgressReadyModel;
 }
