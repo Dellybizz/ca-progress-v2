@@ -18,7 +18,7 @@ Phase 7 implements Personal Notes, Uploads & Resource Library only in the isolat
 
 - Private file bytes are not readable or writable directly by authenticated browser clients.
 - R2 access is provided through the Worker binding `USER_RESOURCES_R2`; no R2 access key is exposed to the browser.
-- Uploaded resource metadata is read-only to authenticated clients; create/update/delete mutations use authenticated security-definer RPCs.
+- Uploaded resource metadata is read-only to authenticated clients; create/update/delete mutations remain server-only through the Supabase service role after user ownership/authentication checks.
 - Note insert/update is RPC-controlled; owner delete remains RLS-protected.
 - Shared content is not readable to other users until moderation status is `approved`.
 - Reporting an approved shared item immediately changes it to `reported`, hiding it from Community reads until moderation.
