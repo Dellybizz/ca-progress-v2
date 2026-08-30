@@ -6,6 +6,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
   "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
+  "r2_buckets": [
+    {
+      "binding": "USER_RESOURCES_R2",
+      "bucket_name": "ca-progress-v2-staging-user-resources"
+    }
+  ],
   "triggers": { "crons": ["30 0 * * *"] },
   "vars": {
     "NEXT_PUBLIC_APP_NAME": "CA Progress",
