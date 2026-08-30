@@ -89,6 +89,13 @@ export type IcaiPublicFilters = {
   type?: string | null;
 };
 
+export type IcaiNormalizedFilters = {
+  level: string;
+  attempt: string;
+  subject: string;
+  type: string;
+};
+
 export type IcaiResourceCard = {
   id: string;
   type: IcaiResourceType;
@@ -125,7 +132,7 @@ export type IcaiPublicCatalog = {
   levels: { code: string; name: string }[];
   attempts: { id: string; key: string; label: string; levelCode: string }[];
   subjects: { id: string; title: string; levelCode: string }[];
-  filters: Required<IcaiPublicFilters>;
+  filters: IcaiNormalizedFilters;
   verifiedAt: string | null;
 };
 

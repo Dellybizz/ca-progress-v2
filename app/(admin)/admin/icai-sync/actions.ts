@@ -1,9 +1,53 @@
 "use server";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOperator } from "@/lib/authorization/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { runIcaiSync } from "@/lib/icai/sync";
-function message(error:unknown){return error instanceof Error?error.message:"Unknown Phase 8 operation error.";}
-export async function runIcaiSyncAction(){let destination="/admin/icai-sync";try{const operator=await requireAdminOperator();const result=await runIcaiSync({trigger:"manual",requestedBy:operator.user.id});revalidatePath("/admin/icai-sync");revalidatePath("/updates");revalidatePath("/resources/icai");destination=`/admin/icai-sync?notice=${encodeURIComponent(`Sync ${result.status}: ${result.newItems} new, ${result.changedItems} changed, ${result.pendingReviews} awaiting review.`)}`;}catch(error){destination=`/admin/icai-sync?error=${encodeURIComponent(message(error))}`;}redirect(destination);}
-export async function decideIcaiReviewAction(formData:FormData){let destination="/admin/icai-sync";try{const operator=await requireAdminOperator();const reviewId=String(formData.get("reviewId")??"");const decision=String(formData.get("decision")??"");if(!reviewId||!["approved","rejected"].includes(decision))throw new Error("Invalid review request.");const admin=createAdminSupabaseClient();const{error}=await admin.rpc("icai_review_decide",{p_review_id:reviewId,p_decision:decision,p_reviewer:operator.user.id,p_notes:null});if(error)throw error;revalidatePath("/admin/icai-sync");revalidatePath("/updates");revalidatePath("/resources/icai");destination=`/admin/icai-sync?notice=${encodeURIComponent(`Review ${decision}. The audit trail has been updated.`)}`;}catch(error){destination=`/admin/icai-sync?error=${encodeURIComponent(message(error))}`;}redirect(destination);}
+
+function message(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown Phase 8 operation error.";
+}
+
+export async function runIcaiSyncAction() {
+  let destination = "/admin/icai-sync";
+  try {
+    const operator = await requireAdminOperator();
+    const result = await runIcaiSync({ trigger: "manual", requestedBy: operator.user.id });
+    revalidatePath("/admin/icai-sync");
+    revalidatePath("/updates");
+    revalidatePath("/resources/icai");
+    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Sync ${result.status}: ${result.newItems} new, ${result.changedItems} changed, ${result.pendingReviews} awaiting review.`)}`;
+  } catch (error) {
+    destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`;
+  }
+  redirect(destination);
+}
+
+export async function decideIcaiReviewAction(formData: FormData) {
+  let destination = "/admin/icai-sync";
+  try {
+    const operator = await requireAdminOperator();
+    const reviewId = String(formData.get("reviewId") ?? "");
+    const decision = String(formData.get("decision") ?? "");
+    if (!reviewId || !["approved", "rejected"].includes(decision)) throw new Error("Invalid review request.");
+
+    const admin = createAdminSupabaseClient();
+    const { error } = await admin.rpc("icai_review_decide", {
+      p_review_id: reviewId,
+      p_decision: decision,
+      p_reviewer: operator.user.id,
+      p_notes: "",
+    });
+    if (error) throw error;
+
+    revalidatePath("/admin/icai-sync");
+    revalidatePath("/updates");
+    revalidatePath("/resources/icai");
+    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Review ${decision}. The audit trail has been updated.`)}`;
+  } catch (error) {
+    destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`;
+  }
+  redirect(destination);
+}
