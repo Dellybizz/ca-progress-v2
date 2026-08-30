@@ -40,7 +40,8 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
     getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key),
     getProgressPageModel(),
   ]);
-  if (!academic || progressModel.mode !== "ready") return setupRequired(identity, displayName, generatedAt);
+  if (!academic) return setupRequired(identity, displayName, generatedAt);
+  if (progressModel.mode !== "ready") return setupRequired(identity, displayName, generatedAt);
   const live = await getDashboardLiveReference({ levelId: academic.level.id, levelCode: academic.level.code, attemptKey: profile.attempt_key, subjectIds: academic.subjects.map((subject) => subject.id), today });
 
   const upcomingExam = live.examEvents[0] ?? null;
