@@ -16,12 +16,14 @@
     "ci": "npm run typecheck && npm run lint && npm run test && npm run build",
     "cf:build": "opennextjs-cloudflare build && node scripts/patch-opennext-vercel-og.mjs",
     "cf:preview": "npm run cf:build && opennextjs-cloudflare preview",
-    "cf:preview:multi": "npm run cf:build && wrangler dev -c wrangler.jsonc -c workers/icai-sync/wrangler.jsonc",
+    "cf:preview:multi": "npm run cf:build && wrangler dev -c wrangler.web.jsonc -c workers/icai-sync/wrangler.jsonc",
     "cf:deploy:icai": "wrangler deploy -c workers/icai-sync/wrangler.jsonc",
-    "cf:deploy": "npm run cf:build && npm run cf:deploy:icai && opennextjs-cloudflare deploy",
-    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "cf:deploy:web": "opennextjs-cloudflare deploy --config=wrangler.web.jsonc",
+    "cf:deploy": "npm run cf:build && npm run cf:deploy:icai && npm run cf:deploy:web",
+    "deploy": "npm run cf:deploy",
+    "cf:typegen": "wrangler types --config wrangler.web.jsonc --env-interface CloudflareEnv cloudflare-env.d.ts",
     "cf:check:icai": "node scripts/check-cloudflare-size-budget.mjs --config workers/icai-sync/wrangler.jsonc --budget-mib 1.50",
-    "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --budget-mib 2.70",
+    "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.web.jsonc --budget-mib 2.70",
     "cf:check": "npm run cf:build && npm run cf:check:icai && npm run cf:check:web"
   },
   "dependencies": {
