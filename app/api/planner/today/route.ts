@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
+import { assertOperationalMutationAllowed } from "@/lib/admin/operations";
 import { getEntitlementForUser } from "@/lib/billing/service";
 import { performTodayPlanAction } from "@/lib/smart-planner/service";
 import type { TodayPlanAction } from "@/lib/smart-planner/types";
@@ -20,6 +21,8 @@ function validAction(value: unknown): value is TodayPlanAction {
 export async function POST(request: Request) {
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Sign in to update Today Plan." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
+  try { await assertOperationalMutationAllowed("planner.smart", identity.id); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Smart Planner is temporarily unavailable.", code: (error as { code?: string }).code }, { status: 503, headers: { "Cache-Control": "private, no-store" } }); }
   const entitlement = await getEntitlementForUser(identity.id, "planner.smart");
   if (!entitlement.allowed) return NextResponse.json({ error: entitlement.upgradeMessage, code: "ENTITLEMENT_REQUIRED", feature: "planner.smart" }, { status: 403, headers: { "Cache-Control": "private, no-store" } });
   const body = await request.json().catch(() => null);
