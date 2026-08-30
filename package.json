@@ -14,11 +14,11 @@
     "test": "node --test tests/*.test.mjs",
     "test:smoke": "node --test tests/phase0-*.test.mjs",
     "ci": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:build": "opennextjs-cloudflare build && node scripts/patch-opennext-vercel-og.mjs",
+    "cf:preview": "npm run cf:build && opennextjs-cloudflare preview",
+    "cf:deploy": "npm run cf:build && opennextjs-cloudflare deploy",
     "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "cf:check": "opennextjs-cloudflare build && wrangler deploy --dry-run"
+    "cf:check": "npm run cf:build && wrangler deploy --dry-run"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",
