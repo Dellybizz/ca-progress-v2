@@ -1,0 +1,58 @@
+import { spawn } from "node:child_process";
+
+const host = "127.0.0.1";
+const port = 8787;
+const base = `http://${host}:${port}`;
+const routes = ["/settings", "/tests", "/admin", "/community"];
+
+const child = spawn(
+  process.platform === "win32" ? "npx.cmd" : "npx",
+  ["wrangler", "dev", "--local", "--config", "wrangler.jsonc", "--ip", host, "--port", String(port), "--var", "SUPABASE_SERVICE_ROLE_KEY:ci-smoke-only"],
+  {
+    env: { ...process.env, NO_COLOR: "1" },
+    stdio: ["ignore", "pipe", "pipe"],
+  },
+);
+
+let output = "";
+for (const stream of [child.stdout, child.stderr]) {
+  stream.setEncoding("utf8");
+  stream.on("data", (chunk) => {
+    output += chunk;
+    if (output.length > 40_000) output = output.slice(-40_000);
+  });
+}
+
+function stop() {
+  if (!child.killed) child.kill("SIGTERM");
+}
+
+async function waitForWorker() {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) throw new Error(`Wrangler exited before startup (code ${child.exitCode}).\n${output}`);
+    try {
+      const response = await fetch(`${base}/api/health`, { redirect: "manual" });
+      if (response.status < 500) return;
+    } catch {
+      // Worker is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Timed out waiting for local Cloudflare Worker.\n${output}`);
+}
+
+try {
+  await waitForWorker();
+  for (const route of routes) {
+    const response = await fetch(`${base}${route}`, { redirect: "manual" });
+    if (response.status >= 500) {
+      const body = (await response.text()).slice(0, 1000);
+      throw new Error(`${route} returned ${response.status}.\n${body}\n\nWrangler output:\n${output}`);
+    }
+    console.log(`[cloudflare-smoke] ${route} -> ${response.status}`);
+  }
+  console.log("[cloudflare-smoke] PASS: shared-shell routes do not return Worker-level 5xx responses.");
+} finally {
+  stop();
+}
