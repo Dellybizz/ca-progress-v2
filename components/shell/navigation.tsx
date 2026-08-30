@@ -8,9 +8,12 @@ export type NavItem = { label: string; href: string; icon: IconName; exact?: boo
 
 export const studentNavigation: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "home" },
-  { label: "Planner", href: "/planner", icon: "calendar" },
+  { label: "Today Plan", href: "/planner/today", icon: "sparkles" },
   { label: "Progress", href: "/progress", icon: "chart" },
   { label: "Study", href: "/study", icon: "timer" },
+  { label: "Planner", href: "/planner", icon: "calendar", exact: true },
+  { label: "Revision Settings", href: "/planner/revision-settings", icon: "settings" },
+  { label: "Forecast", href: "/analytics/forecast", icon: "chart" },
   { label: "Goals", href: "/goals", icon: "target" },
   { label: "Calendar", href: "/calendar", icon: "calendar" },
   { label: "Activity", href: "/activity", icon: "sparkles" },
