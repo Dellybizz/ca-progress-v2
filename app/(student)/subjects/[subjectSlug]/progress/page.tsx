@@ -14,5 +14,5 @@ export default async function SubjectProgressPage({ params }: { params: Promise<
   const { subjectSlug } = await params;
   const model = await getProgressPageModel(subjectSlug);
   if (model.mode === "ready" && !model.chapters.length) notFound();
-  return <ProgressPage model={model} subjectLocked/>;
+  return <ProgressPage model={model} subjectLocked next={`/subjects/${subjectSlug}/progress`}/>;
 }
