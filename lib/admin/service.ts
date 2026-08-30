@@ -153,7 +153,7 @@ export async function getOperationsHealth(operator: AdminOperator) {
   const [memberCount, openReports, pendingResources, failedPayments, latestSyncRaw, latestPaymentRaw, realtimeRaw, billingResponse, authResponse] = await Promise.all([
     count("profiles?select=user_id"),
     count("message_reports?status=eq.open&select=id"),
-    count("uploaded_resources?moderation_status=eq.pending_review&select=id"),
+    count("uploaded_resources?moderation_status=eq.pending&select=id"),
     count("payment_orders?status=eq.failed&select=id"),
     rest("icai_sync_runs?select=id,status,started_at,completed_at,source_processed,source_failed,pending_reviews,error_summary&order=started_at.desc&limit=1").catch(() => []),
     rest("payment_events?select=id,provider_status,source,event_type,created_at&order=created_at.desc&limit=1").catch(() => []),
