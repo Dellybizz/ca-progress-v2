@@ -33,10 +33,12 @@ test("role-changing and platform-commercial mutations require owner level",()=>{
   assert.match(read("app/api/admin/plans/route.ts"),/requireAdminOperator\("owner"\)/);
 });
 
-test("member APIs paginate and filter through the server RPC",()=>{
-  const service=read("lib/admin/service.ts");
+test("member APIs paginate and filter through the isolated admin worker RPC",()=>{
+  const worker=read("workers/admin-ops/index.ts");
   const route=read("app/api/admin/members/route.ts");
-  assert.match(service,/phase12_list_members/);
+  assert.match(worker,/phase12_list_members/);
+  assert.match(worker,/p_limit: limit/);
+  assert.match(worker,/Math\.min\(parsed, max\)/);
   assert.match(route,/Math\.min\(100/);
   assert.match(route,/searchParams\.get\("page"\)/);
   assert.match(route,/searchParams\.get\("q"\)/);
@@ -58,14 +60,31 @@ test("feature switches and maintenance are enforced on real server mutation path
   assert.match(operations,/getAdminRoleForUser/);
 });
 
-test("health service probes auth storage realtime Razorpay and ICAI state",()=>{
-  const service=read("lib/admin/service.ts");
-  assert.match(service,/\/auth\/v1\/health/);
-  assert.match(service,/getResourceR2Bucket/);
-  assert.match(service,/phase12_realtime_health/);
-  assert.match(service,/invokeBillingService\(\{ path: "\/health"/);
-  assert.match(service,/icai_sync_runs/);
-  assert.match(service,/payment_events/);
+test("health probes run in the isolated admin worker",()=>{
+  const worker=read("workers/admin-ops/index.ts");
+  assert.match(worker,/\/auth\/v1\/health/);
+  assert.match(worker,/USER_RESOURCES_R2/);
+  assert.match(worker,/phase12_realtime_health/);
+  assert.match(worker,/BILLING_SERVICE/);
+  assert.match(worker,/icai_sync_runs/);
+  assert.match(worker,/payment_events/);
+});
+
+test("admin backend is isolated behind a Cloudflare service binding",()=>{
+  const bridge=read("lib/admin/service.ts");
+  const worker=read("workers/admin-ops/index.ts");
+  const web=read("wrangler.web.jsonc");
+  const pkg=read("package.json");
+  assert.match(bridge,/ADMIN_OPS_SERVICE/);
+  assert.match(bridge,/admin-ops\.internal/);
+  assert.doesNotMatch(bridge,/invokeBillingService|getResourceR2Bucket|phase12_list_members/);
+  assert.match(worker,/x-ca-progress-internal/);
+  assert.match(worker,/admin_users\?user_id=eq\./);
+  assert.match(worker,/is_active=eq\.true/);
+  assert.match(web,/"ADMIN_OPS_SERVICE"/);
+  assert.match(web,/"ca-progress-v2-admin-ops"/);
+  assert.match(pkg,/cf:deploy:admin/);
+  assert.match(pkg,/cf:check:admin/);
 });
 
 test("earlier Phase 11 payment authority remains intact",()=>{
