@@ -13,17 +13,17 @@ export default async function AdminPage() {
   catch { return <AdminDenied message="Admin access required."/>; }
   const health = await getOperationsHealth(operator);
   const actions = [
-    ["Members","/admin/members","Roles.","community"],
-    ["ICAI Sync","/admin/icai-sync","Sync.","bell"],
-    ["Moderation","/admin/community/moderation","Reports.","shield"],
-    ["Content","/admin/content","States.","book"],
-    ["Plans","/admin/plans","Access.","sparkles"],
-    ["Platform","/admin/platform","Controls.","settings"],
-    ["Notifications","/admin/notifications","Templates.","bell"],
-    ["Audit Log","/admin/audit","History.","notes"],
+    ["Members","/admin/members","community"],
+    ["ICAI Sync","/admin/icai-sync","bell"],
+    ["Moderation","/admin/community/moderation","shield"],
+    ["Content","/admin/content","book"],
+    ["Plans","/admin/plans","sparkles"],
+    ["Platform","/admin/platform","settings"],
+    ["Notifications","/admin/notifications","bell"],
+    ["Audit Log","/admin/audit","notes"],
   ] as const;
   return <div className="phase12-page">
-    <PageHeader preview={false} eyebrow={`Operations · ${operator.role.replace("_"," ")}`} title="Admin control center" description="Operations and platform health."/>
+    <PageHeader preview={false} eyebrow={`Operations · ${operator.role.replace("_"," ")}`} title="Admin control center" description="Operations."/>
     <section className="phase12-metric-grid" aria-label="Operations summary">
       <Card><CardBody><span>Members</span><strong>{health.counts.members.toLocaleString("en-IN")}</strong></CardBody></Card>
       <Card><CardBody><span>Open reports</span><strong>{health.counts.openReports}</strong></CardBody></Card>
@@ -36,6 +36,6 @@ export default async function AdminPage() {
         {Object.entries(health.checks).map(([name,state]) => <div key={name}><span>{name === "razorpay" ? "Razorpay" : name === "icai" ? "ICAI sync" : name[0].toUpperCase()+name.slice(1)}</span><HealthBadge state={state}/></div>)}
       </div><div className="phase12-health-detail"><div><Icon name="bell"/><span><strong>Latest ICAI run</strong><small>{health.icai.latestSync ? `${String((health.icai.latestSync as { status?: unknown }).status ?? "unknown")} · ${new Date(String((health.icai.latestSync as { started_at?: unknown }).started_at ?? health.checkedAt)).toLocaleString("en-IN")}` : "No run"}</small></span></div><div><Icon name="shield"/><span><strong>Razorpay</strong><small>{health.razorpay.providerConfigured ? "Configured" : "Not configured"}{health.razorpay.webhookConfigured ? " · webhook ready" : " · webhook missing"}</small></span></div></div></CardBody>
     </Card>
-    <section className="phase12-action-grid">{actions.map(([label,href,description,icon]) => <Link key={href} href={href} className="phase12-action-card"><span><Icon name={icon}/></span><div><strong>{label}</strong><p>{description}</p></div><Icon name="arrow" size={16}/></Link>)}</section>
+    <section className="phase12-action-grid">{actions.map(([label,href,icon]) => <Link key={href} href={href} className="phase12-action-card"><span><Icon name={icon}/></span><strong>{label}</strong><Icon name="arrow" size={16}/></Link>)}</section>
   </div>;
 }
