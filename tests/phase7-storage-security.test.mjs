@@ -22,20 +22,22 @@ test("Phase 7 files use a private Cloudflare R2 Worker binding", () => {
   assert.doesNotMatch(access, /getPublicUrl|createSignedUrl/);
 });
 
-test("Phase 7 resource metadata mutations use authenticated security-definer RPCs", () => {
-  const migration = read("supabase/migrations/20260830153000_phase7_cloudflare_r2_resource_storage.sql");
+test("Phase 7 resource metadata mutations stay server-service-role-only", () => {
+  const rpcMigration = read("supabase/migrations/20260830153000_phase7_cloudflare_r2_resource_storage.sql");
+  const hardening = read("supabase/migrations/20260830154500_phase7_r2_rpc_privilege_hardening.sql");
   const upload = read("app/api/resources/upload/route.ts");
   const resourceRoute = read("app/api/resources/[id]/route.ts");
-  assert.match(migration, /create or replace function public\.phase7_create_uploaded_resource/);
-  assert.match(migration, /create or replace function public\.phase7_update_uploaded_resource/);
-  assert.match(migration, /create or replace function public\.phase7_delete_uploaded_resource/);
-  assert.match(migration, /position\(v_user_id::text \|\| '\/' in p_storage_path\) <> 1/);
-  assert.match(migration, /grant execute on function public\.phase7_create_uploaded_resource/);
-  assert.match(upload, /phase7_create_uploaded_resource/);
-  assert.match(resourceRoute, /phase7_update_uploaded_resource/);
-  assert.match(resourceRoute, /phase7_delete_uploaded_resource/);
-  assert.doesNotMatch(upload, /createAdminSupabaseClient/);
-  assert.doesNotMatch(resourceRoute, /admin\.storage|createAdminSupabaseClient/);
+  assert.match(rpcMigration, /create or replace function public\.phase7_create_uploaded_resource/);
+  assert.match(hardening, /revoke execute on function public\.phase7_create_uploaded_resource[\s\S]*from authenticated/);
+  assert.match(hardening, /revoke execute on function public\.phase7_update_uploaded_resource[\s\S]*from authenticated/);
+  assert.match(hardening, /revoke execute on function public\.phase7_delete_uploaded_resource[\s\S]*from authenticated/);
+  assert.match(hardening, /metadata_mutations\":\"server_service_role_only/);
+  assert.match(upload, /createAdminSupabaseClient\(\)/);
+  assert.match(upload, /admin\.from\("uploaded_resources"\)\.insert/);
+  assert.match(resourceRoute, /createAdminSupabaseClient\(\)/);
+  assert.match(resourceRoute, /admin\.from\("uploaded_resources"\)/);
+  assert.doesNotMatch(upload, /admin\.storage|\.storage\.from\(/);
+  assert.doesNotMatch(resourceRoute, /admin\.storage|\.storage\.from\(/);
 });
 
 test("legacy Supabase Storage policies remain non-public during transition", () => {
