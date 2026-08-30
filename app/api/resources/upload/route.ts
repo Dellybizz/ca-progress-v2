@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
-import { getSupabaseAdminConfig } from "@/lib/env";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { cleanText, nullableId, RESOURCE_MAX_BYTES, validateUploadFile } from "@/lib/resources/validation";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createAdminSupabaseClient, getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,7 +16,7 @@ export async function POST(request: Request) {
     const identity = await optionalUser();
     if (!identity) return jsonError("Authentication required.", 401, "AUTH_REQUIRED");
 
-    const adminConfig = getSupabaseAdminConfig();
+    const adminConfig = getSupabaseAdminRuntimeConfig();
     if (!adminConfig.configured) {
       return jsonError(
         "Resource metadata service is temporarily unavailable. The server-only Supabase credential is not configured.",
