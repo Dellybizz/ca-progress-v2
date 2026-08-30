@@ -14,16 +14,18 @@ test("Phase 7 upload validation runs on the server and checks size MIME extensio
   assert.match(validation, /0xff, 0xd8, 0xff/);
   assert.match(validation, /0xd0, 0xcf, 0x11, 0xe0/);
   assert.match(route, /validateUploadFile\(file\)/);
-  assert.match(route, /createAdminSupabaseClient\(\)/);
+  assert.match(route, /getResourceR2Bucket\(\)/);
+  assert.match(route, /phase7_create_uploaded_resource/);
   assert.match(route, /content-length/);
   assert.match(route, /crypto\.randomUUID\(\)/);
+  assert.doesNotMatch(route, /createAdminSupabaseClient/);
 });
 
-test("Phase 7 upload API always returns JSON errors and checks secure storage readiness", () => {
+test("Phase 7 upload API returns stable JSON errors and checks Cloudflare R2 readiness", () => {
   const route = read("app/api/resources/upload/route.ts");
   assert.match(route, /function jsonError/);
-  assert.match(route, /getSupabaseAdminConfig\(\)/);
-  assert.match(route, /STORAGE_NOT_CONFIGURED/);
+  assert.match(route, /R2_NOT_CONFIGURED/);
+  assert.match(route, /R2_UPLOAD_FAILED/);
   assert.match(route, /UPLOAD_SERVER_ERROR/);
   assert.match(route, /try \{[\s\S]*optionalUser\(\)/);
   assert.match(route, /catch \(error\)[\s\S]*jsonError\("The upload service hit an unexpected server error/);
