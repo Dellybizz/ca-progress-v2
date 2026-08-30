@@ -6,8 +6,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import type { ProgressPageModel } from "@/lib/progress/types";
 import { ProgressTracker } from "./progress-tracker";
 
-export function ProgressPage({ model, subjectLocked = false }: { model: ProgressPageModel; subjectLocked?: boolean }) {
-  if (model.mode === "guest") return <div className="progress-page"><LoginRequired next="/progress" title="Sign in to track chapter progress" /></div>;
+export function ProgressPage({ model, subjectLocked = false, next = "/progress" }: { model: ProgressPageModel; subjectLocked?: boolean; next?: string }) {
+  if (model.mode === "guest") return <div className="progress-page"><LoginRequired next={next} title="Sign in to track chapter progress" /></div>;
   if (model.mode === "setup") return (
     <div className="progress-page">
       <PageHeader preview={false} eyebrow="Progress" title={`Finish your academic setup, ${model.viewerName}.`} description="Progress is stored against the chapters applicable to your level, group and verified attempt." />
