@@ -101,7 +101,7 @@ export function PricingClient({
       return;
     }
     if (!authenticated) {
-      window.location.href = `/login?next=${encodeURIComponent("/pricing")}`;
+      router.push(`/login?next=${encodeURIComponent("/pricing")}`);
       return;
     }
     if (!plan.checkout_enabled || plan.price_subunits === null) {
