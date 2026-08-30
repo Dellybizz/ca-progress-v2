@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { cleanText, nullableId, RESOURCE_BUCKET, RESOURCE_MAX_BYTES, validateUploadFile } from "@/lib/resources/validation";
 
 export const dynamic = "force-dynamic";
@@ -32,16 +32,16 @@ export async function POST(request: Request) {
   const chapterId = nullableId(form.get("chapterId"));
   const visibility = form.get("visibility") === "shared" ? "shared" : "private";
   const storagePath = `${identity.id}/${crypto.randomUUID()}/${validated.safeFilename}`;
-  const supabase = await createServerSupabaseClient();
+  const admin = createAdminSupabaseClient();
 
-  const upload = await supabase.storage.from(RESOURCE_BUCKET).upload(storagePath, validated.bytes, {
+  const upload = await admin.storage.from(RESOURCE_BUCKET).upload(storagePath, validated.bytes, {
     contentType: validated.mimeType,
     cacheControl: "private, max-age=0",
     upsert: false,
   });
   if (upload.error) return NextResponse.json({ error: `File storage failed: ${upload.error.message}` }, { status: 400 });
 
-  const inserted = await supabase.from("uploaded_resources").insert({
+  const inserted = await admin.from("uploaded_resources").insert({
     owner_user_id: identity.id,
     title,
     description,
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   }).select("id,moderation_status").single();
 
   if (inserted.error) {
-    await supabase.storage.from(RESOURCE_BUCKET).remove([storagePath]);
+    await admin.storage.from(RESOURCE_BUCKET).remove([storagePath]);
     return NextResponse.json({ error: inserted.error.message }, { status: 400 });
   }
 
