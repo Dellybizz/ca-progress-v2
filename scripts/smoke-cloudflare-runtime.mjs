@@ -24,7 +24,9 @@ for (const stream of [child.stdout, child.stderr]) {
 }
 
 function stop() {
-  if (!child.killed) child.kill("SIGTERM");
+  child.stdout.destroy();
+  child.stderr.destroy();
+  if (child.exitCode === null) child.kill("SIGKILL");
 }
 
 async function waitForWorker() {
