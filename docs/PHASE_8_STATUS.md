@@ -4,7 +4,7 @@
 ICAI Daily Update & Verification Engine.
 
 ## Current implementation state
-Phase 8 frontend/backend/database implementation is present on the Phase 8 branch. Database acceptance tests pass and synthetic test data has been removed. Final PR CI and Cloudflare staging secret/deployment verification must be completed before this phase is closed.
+Phase 8 frontend/backend/database implementation and the full repository quality gate are complete on the Phase 8 branch. Database acceptance tests pass and synthetic test data has been removed. Public Cloudflare staging runtime secrets/deployment verification remains the final operational check before the phase is closed.
 
 ## Implemented frontend
 - [x] Responsive `/resources/icai` verified resource browser.
@@ -28,7 +28,7 @@ Phase 8 frontend/backend/database implementation is present on the Phase 8 branc
 - [x] Phase 2 attempt picker now consumes verified `exam_attempts`.
 - [x] Protected `/api/cron/icai-sync` and admin-only manual sync/review server actions.
 - [x] Cloudflare scheduled handler configured for `30 0 * * *` (00:30 UTC / 06:00 IST), independent of user traffic.
-- [x] Sync/review RPCs explicitly executable only by `service_role`.
+- [x] Sync/review RPCs explicitly executable only by `service_role`; live permission check confirms `anon=false`, `authenticated=false`, `service_role=true` for all four Phase 8 mutation RPCs.
 - [x] Phase 8 foreign keys have dedicated/covering indexes after the Supabase performance-advisor pass.
 
 ## V2 database
@@ -57,10 +57,15 @@ Before public staging operation:
 - [ ] Confirm the Cloudflare daily Cron Trigger and perform one successful/manual source verification run.
 
 ## Quality gate
-- [ ] Phase 8 PR CI green.
-- [ ] Complete Phase 0–3 + 8 tests green.
-- [ ] Next production build green.
-- [ ] OpenNext/Cloudflare dry-run green.
+PR CI run `33288182676` on head `810c1ffe835d261cb5cd2663e6dcea76114ccdbf` is green.
+- [x] dependency install
+- [x] TypeScript
+- [x] ESLint
+- [x] complete Phase 0 + 1 + 2 + 3 + 8 test suite — 69/69 passed
+- [x] Next.js production build
+- [x] OpenNext / Cloudflare dry-run
+- [x] Phase 8 routes present in production build: `/updates`, `/resources/icai`, `/admin/icai-sync`, `/api/cron/icai-sync`
+- [x] Cloudflare dry-run uses `NEXT_PUBLIC_APP_VERSION="phase-8"`
 
 ## Acceptance gate
 - [x] Daily job can run independently of user traffic by Cloudflare scheduled handler + Cron Trigger configuration (operational staging secret/deploy check still pending).
@@ -70,4 +75,4 @@ Before public staging operation:
 - [x] Attempt selector consumes verified `exam_attempts` rather than a hardcoded month array.
 - [x] Source failures update health/audit state without corrupting the last verified dataset.
 
-**Phase 8 acceptance logic/database result: 6/6 verified. Do not close Phase 8 until PR CI is green and public staging runtime secrets/deployment are confirmed. Do not start Phase 4.**
+**Phase 8 acceptance logic/database/code result: 6/6 verified. Do not close Phase 8 until post-merge `main` CI is green and public staging runtime secrets/deployment are confirmed. Do not start Phase 4.**
