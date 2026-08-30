@@ -28,9 +28,10 @@ function useMutation() {
 export function MemberRoleControl({ userId, currentRole, active, operatorRole }: { userId: string; currentRole: string; active: boolean; operatorRole: AdminRole }) {
   const mutation = useMutation();
   const options: AdminRole[] = operatorRole === "parent_owner" ? ["moderator","admin","owner"] : ["moderator","admin"];
-  const [role, setRole] = useState(options.includes(currentRole as AdminRole) ? currentRole : options[0]);
+  const initialRole: AdminRole = options.includes(currentRole as AdminRole) ? currentRole as AdminRole : options[0] ?? "moderator";
+  const [role, setRole] = useState<AdminRole>(initialRole);
   return <div className="phase12-inline-control">
-    <select aria-label="Admin role" value={role} disabled={mutation.busy || currentRole === "parent_owner"} onChange={(event) => setRole(event.target.value)}>{options.map((item) => <option key={item} value={item}>{item.replace("_"," ")}</option>)}</select>
+    <select aria-label="Admin role" value={role} disabled={mutation.busy || currentRole === "parent_owner"} onChange={(event) => setRole(event.target.value as AdminRole)}>{options.map((item) => <option key={item} value={item}>{item.replace("_"," ")}</option>)}</select>
     <button disabled={mutation.busy || currentRole === "parent_owner" || role === currentRole} onClick={() => void mutation.run(() => send("/api/admin/members","PATCH",{ action:"role",userId,role }))}>Save role</button>
     {currentRole !== "student" && currentRole !== "parent_owner" ? <button className="phase12-button-quiet" disabled={mutation.busy} onClick={() => void mutation.run(() => send("/api/admin/members","PATCH",{ action:"active",userId,active:!active }))}>{active ? "Disable admin" : "Restore admin"}</button> : null}
     {mutation.error ? <small className="phase12-error-text">{mutation.error}</small> : null}
