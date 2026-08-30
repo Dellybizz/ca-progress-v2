@@ -32,6 +32,7 @@ export const adminNavigation: NavItem[] = [
   { label: "Syllabus preview", href: "/admin/syllabus", icon: "book" },
   { label: "ICAI Sync", href: "/admin/icai-sync", icon: "bell" },
   { label: "Resource moderation", href: "/admin/resources/moderation", icon: "notes" },
+  { label: "Community moderation", href: "/admin/community/moderation", icon: "community" },
 ];
 
 export function DesktopNavigation({ area }: { area: "student" | "admin" }) {

@@ -1,0 +1,1 @@
+export default function Loading() { return <div className="phase10-channel-page"><div className="phase10-chat-loading" aria-busy="true"><aside/><section><header/><div/><div/><div/></section></div></div>; }

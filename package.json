@@ -14,11 +14,18 @@
     "test": "node --test tests/*.test.mjs",
     "test:smoke": "node --test tests/phase0-*.test.mjs",
     "ci": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "cf:build": "opennextjs-cloudflare build",
-    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "cf:check": "opennextjs-cloudflare build && wrangler deploy --dry-run"
+    "cf:build": "opennextjs-cloudflare build && node scripts/patch-opennext-vercel-og.mjs",
+    "cf:preview": "npm run cf:build && opennextjs-cloudflare preview",
+    "cf:preview:multi": "npm run cf:build && wrangler dev -c wrangler.web.jsonc -c workers/icai-sync/wrangler.jsonc",
+    "cf:deploy:icai": "wrangler deploy -c workers/icai-sync/wrangler.jsonc",
+    "cf:deploy:web": "opennextjs-cloudflare deploy --config=wrangler.web.jsonc",
+    "cf:deploy": "npm run cf:build && npm run cf:deploy:icai && npm run cf:deploy:web",
+    "deploy": "npm run cf:deploy",
+    "cf:typegen": "wrangler types --config wrangler.web.jsonc --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "cf:check:icai": "node scripts/check-cloudflare-size-budget.mjs --config workers/icai-sync/wrangler.jsonc --budget-mib 1.50",
+    "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.web.jsonc --budget-mib 2.70",
+    "cf:check": "npm run cf:build && npm run cf:check:icai && npm run cf:check:web",
+    "cf:smoke": "node scripts/smoke-cloudflare-runtime.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.5",

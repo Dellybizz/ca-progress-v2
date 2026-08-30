@@ -6,20 +6,24 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("daily ICAI sync is a Cloudflare scheduled job independent of user traffic", () => {
-  const wrangler = read("wrangler.jsonc");
+test("daily ICAI sync remains a Cloudflare scheduled job independent of user traffic", () => {
+  const bootstrap = read("wrangler.jsonc");
+  const wrangler = read("wrangler.web.jsonc");
   const worker = read("custom-worker.ts");
-  const route = read("app/api/cron/icai-sync/route.ts");
-  assert.match(wrangler, /"main"\s*:\s*"\.\/custom-worker\.ts"/);
+  const syncWorker = read("workers/icai-sync/wrangler.jsonc");
+  assert.match(bootstrap, /"main"\s*:\s*"\.\/custom-worker\.ts"/);
+  assert.doesNotMatch(bootstrap, /"services"\s*:/);
   assert.match(wrangler, /"crons"\s*:\s*\["30 0 \* \* \*"\]/);
+  assert.match(wrangler, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
+  assert.match(wrangler, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);
   assert.match(worker, /scheduled\(/);
-  assert.match(worker, /x-icai-cron-secret/);
-  assert.match(route, /timingSafeEqual/);
-  assert.match(route, /runIcaiSync\(\{ trigger: "cron" \}\)/);
+  assert.match(worker, /ICAI_SYNC_SERVICE\.fetch/);
+  assert.match(worker, /trigger:\s*"cron"/);
+  assert.match(syncWorker, /"workers_dev"\s*:\s*false/);
 });
 
-test("sync runner supports conditional fetch, backoff, pacing and last-verified failure isolation", () => {
-  const sync = read("lib/icai/sync.ts");
+test("sync engine supports conditional fetch, backoff, pacing and last-verified failure isolation", () => {
+  const sync = read("workers/icai-sync/sync-engine.ts");
   const migration = read("supabase/migrations/20260830080100_phase8_icai_sync_engine.sql");
   assert.match(sync, /If-None-Match/);
   assert.match(sync, /If-Modified-Since/);
@@ -34,7 +38,7 @@ test("sync runner supports conditional fetch, backoff, pacing and last-verified 
 });
 
 test("unchanged resources are deterministic and are not duplicated", () => {
-  const sync = read("lib/icai/sync.ts");
+  const sync = read("workers/icai-sync/sync-engine.ts");
   const migration = read("supabase/migrations/20260830080100_phase8_icai_sync_engine.sql");
   assert.match(sync, /sha256Hex\(`\$\{source\.id\}:\$\{item\.officialUrl\}`\)/);
   assert.match(migration, /v_existing_resource\.content_hash\s*=\s*v_item->>'content_hash'/);
@@ -51,10 +55,20 @@ test("attempt selection consumes verified exam_attempts instead of hardcoded mon
 });
 
 test("source adapters are restricted to official ICAI hosts and keep metadata-only links", () => {
-  const sync = read("lib/icai/sync.ts");
+  const sync = read("workers/icai-sync/sync-engine.ts");
   const html = read("lib/icai/html.ts");
   const docs = read("docs/ICAI_SYNC_SETUP.md");
   assert.match(sync, /isApprovedIcaiUrl\(source\.officialUrl\)/);
   assert.match(html, /host === "icai\.org" \|\| host\.endsWith\("\.icai\.org"\)/);
   assert.match(docs, /does not copy ICAI PDF\/study-material bodies/i);
+});
+
+test("the Next.js app delegates heavy ICAI sync work instead of bundling the parser", () => {
+  const proxy = read("lib/icai/sync.ts");
+  assert.match(proxy, /ICAI_SYNC_SERVICE/);
+  assert.match(proxy, /getCloudflareContext/);
+  assert.doesNotMatch(proxy, /from "\.\/adapters"/);
+  assert.doesNotMatch(proxy, /from "\.\/hash"/);
+  assert.doesNotMatch(proxy, /from "\.\/html"/);
+  assert.doesNotMatch(proxy, /parseOfficialSource|fetchOfficialPage|processSource/);
 });

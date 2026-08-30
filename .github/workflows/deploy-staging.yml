@@ -18,7 +18,7 @@ jobs:
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
       NEXT_PUBLIC_APP_ENV: staging
       NEXT_PUBLIC_APP_NAME: CA Progress
-      NEXT_PUBLIC_APP_VERSION: phase-9
+      NEXT_PUBLIC_APP_VERSION: phase-10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,8 +30,7 @@ jobs:
       - run: npm test
       - run: npm run cf:deploy
 
-# Phase 8 runtime secrets (SUPABASE_SERVICE_ROLE_KEY and ICAI_CRON_SECRET) remain active.
-# Phase 7 user file BYTES continue to use the private USER_RESOURCES_R2 binding.
-# Phase 9 uses the existing server-only SUPABASE_SERVICE_ROLE_KEY after request authorization;
-# no new Phase 9 secret or external service is required.
+# Existing V2 runtime secrets remain active; Phase 10 adds no new secret.
+# Community Realtime uses the existing public Supabase URL/publishable key with RLS.
+# Phase 7 resource bytes continue to use the private USER_RESOURCES_R2 binding.
 # wrangler.jsonc uses keep_vars=true so dashboard-managed secrets survive deploys.
