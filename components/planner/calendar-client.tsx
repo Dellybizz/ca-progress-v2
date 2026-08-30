@@ -1,24 +1,131 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import type { CalendarItem } from "@/lib/planner/types";
 
-function localInput(date = new Date(Date.now() + 60 * 60 * 1000)) { const offset = date.getTimezoneOffset() * 60_000; return new Date(date.valueOf() - offset).toISOString().slice(0, 16); }
+function localInput(date: Date) { const offset = date.getTimezoneOffset() * 60_000; return new Date(date.valueOf() - offset).toISOString().slice(0, 16); }
 function toLocalInput(value: string) { return localInput(new Date(value)); }
 function shiftMonth(month: string, offset: number) { const date = new Date(`${month}-01T12:00:00Z`); date.setUTCMonth(date.getUTCMonth() + offset); return date.toISOString().slice(0, 7); }
 
 export function CalendarClient({ month, items }: { month: string; items: CalendarItem[] }) {
-  const router = useRouter(); const [title, setTitle] = useState(""); const [notes, setNotes] = useState(""); const [startsAt, setStartsAt] = useState(localInput()); const [endsAt, setEndsAt] = useState(""); const [allDay, setAllDay] = useState(false); const [editingId, setEditingId] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
-  const monthDate = new Date(`${month}-01T12:00:00`); const days = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate(); const firstDay = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1).getDay();
-  const byDay = useMemo(() => { const map = new Map<number, CalendarItem[]>(); for (const item of items) { const date = new Date(item.startsAt); if (date.getFullYear() === monthDate.getFullYear() && date.getMonth() === monthDate.getMonth()) map.set(date.getDate(), [...(map.get(date.getDate()) ?? []), item]); } return map; }, [items, month]);
-  async function request(body: Record<string, unknown>) { setBusy(true); setError(null); try { const response = await fetch("/api/planner/calendar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const payload = await response.json() as { error?: string }; if (!response.ok) throw new Error(payload.error || "Calendar event could not be saved."); router.refresh(); return true; } catch (err) { setError(err instanceof Error ? err.message : "Calendar event could not be saved."); return false; } finally { setBusy(false); } }
-  function reset() { setEditingId(null); setTitle(""); setNotes(""); setStartsAt(localInput()); setEndsAt(""); setAllDay(false); }
-  async function submit(event: FormEvent) { event.preventDefault(); const body = { action: editingId ? "update" : "create", ...(editingId ? { id: editingId } : {}), title, notes, startsAt: new Date(startsAt).toISOString(), endsAt: endsAt ? new Date(endsAt).toISOString() : null, allDay }; if (await request(body)) reset(); }
-  function edit(item: CalendarItem) { if (item.source !== "user") return; setEditingId(item.id.replace(/^user:/, "")); setTitle(item.title); setNotes(""); setStartsAt(toLocalInput(item.startsAt)); setEndsAt(item.endsAt ? toLocalInput(item.endsAt) : ""); setAllDay(item.allDay); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [notes, setNotes] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [allDay, setAllDay] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const monthDate = new Date(`${month}-01T12:00:00`);
+  const monthYear = monthDate.getFullYear();
+  const monthIndex = monthDate.getMonth();
+  const days = new Date(monthYear, monthIndex + 1, 0).getDate();
+  const firstDay = new Date(monthYear, monthIndex, 1).getDay();
+  const byDay = new Map<number, CalendarItem[]>();
+  for (const item of items) {
+    const date = new Date(item.startsAt);
+    if (date.getFullYear() === monthYear && date.getMonth() === monthIndex) {
+      byDay.set(date.getDate(), [...(byDay.get(date.getDate()) ?? []), item]);
+    }
+  }
+
+  async function request(body: Record<string, unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/planner/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Calendar event could not be saved.");
+      router.refresh();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Calendar event could not be saved.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function reset() {
+    setEditingId(null);
+    setTitle("");
+    setNotes("");
+    setStartsAt("");
+    setEndsAt("");
+    setAllDay(false);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const body = {
+      action: editingId ? "update" : "create",
+      ...(editingId ? { id: editingId } : {}),
+      title,
+      notes,
+      startsAt: new Date(startsAt).toISOString(),
+      endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+      allDay,
+    };
+    if (await request(body)) reset();
+  }
+
+  function edit(item: CalendarItem) {
+    if (item.source !== "user") return;
+    setEditingId(item.id.replace(/^user:/, ""));
+    setTitle(item.title);
+    setNotes("");
+    setStartsAt(toLocalInput(item.startsAt));
+    setEndsAt(item.endsAt ? toLocalInput(item.endsAt) : "");
+    setAllDay(item.allDay);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   const cells = Array.from({ length: firstDay + days }, (_, index) => index < firstDay ? null : index - firstDay + 1);
-  return <div className="phase6-calendar-layout"><div className="phase6-calendar-main"><div className="phase6-calendar-nav"><Link href={`/calendar?month=${shiftMonth(month, -1)}`} aria-label="Previous month">←</Link><strong>{monthDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><Link href={`/calendar?month=${shiftMonth(month, 1)}`} aria-label="Next month">→</Link></div><Card><CardBody className="phase6-calendar-body"><div className="phase6-weekdays">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day) => <span key={day}>{day}</span>)}</div><div className="phase6-calendar-grid">{cells.map((day, index) => <div key={index} className={day ? "phase6-calendar-day" : "phase6-calendar-day is-blank"}>{day ? <><b>{day}</b><div>{(byDay.get(day) ?? []).map((item) => <button type="button" key={item.id} className={`phase6-calendar-chip phase6-calendar-chip--${item.source} phase6-calendar-chip--${item.kind}`} onClick={() => edit(item)} disabled={item.readOnly || item.source !== "user"} title={item.readOnly ? "Verified official event — read only" : item.title}><span>{item.title}</span>{item.readOnly ? <Icon name="lock" size={11}/> : null}</button>)}</div></> : null}</div>)}</div></CardBody></Card><div className="phase6-calendar-agenda"><Card><CardHeader title="Month agenda" description="Tasks, revision/test tasks, goals, your events and verified ICAI exams are composed here without duplicating source records."/><CardBody>{items.length ? <div className="phase6-agenda-list">{items.map((item) => <div key={item.id}><span className={`phase6-agenda-source phase6-agenda-source--${item.source}`}>{item.source === "icai" ? "Official ICAI" : item.kind}</span><span><strong>{item.title}</strong><small>{new Date(item.startsAt).toLocaleString()} {item.estimatedMinutes ? `· ${item.estimatedMinutes} min` : ""}</small></span>{item.source === "icai" && item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer">Source</a> : item.source === "task" ? <Link href="/planner">Task</Link> : item.source === "goal" ? <Link href="/goals">Goal</Link> : item.source === "user" ? <button onClick={() => edit(item)}>Edit</button> : null}</div>)}</div> : <div className="phase6-empty"><Icon name="calendar"/><strong>No calendar items this month</strong><p>Add a personal event or task; verified exam dates will appear automatically when available.</p></div>}</CardBody></Card></div></div><aside><Card><CardHeader title={editingId ? "Edit personal event" : "Add personal event"} description="Official ICAI exam events are intentionally read-only."/><CardBody><form className="phase6-form" onSubmit={submit}><label><span>Title</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)}/></label><label><span>Starts</span><input required type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)}/></label><label><span>Ends (optional)</span><input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)}/></label><label className="phase6-checkbox"><input type="checkbox" checked={allDay} onChange={(event) => setAllDay(event.target.checked)}/><span>All-day label</span></label><label><span>Notes</span><textarea rows={3} maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)}/></label>{error ? <div className="phase6-inline-error">{error}</div> : null}<div className="phase6-form-actions"><button className="ui-button ui-button--primary" disabled={busy}>{busy ? "Saving…" : editingId ? "Save changes" : "Add event"}</button>{editingId ? <><button type="button" className="ui-button ui-button--secondary" onClick={reset}>Cancel</button><button type="button" className="ui-button ui-button--ghost" disabled={busy} onClick={() => { if (window.confirm("Delete this personal event?")) void request({ action: "delete", id: editingId }).then((ok) => { if (ok) reset(); }); }}>Delete</button></> : null}</div></form></CardBody></Card><div className="phase6-calendar-legend"><span><i className="is-icai"/>Official exam</span><span><i className="is-task"/>Task/revision/test</span><span><i className="is-user"/>Personal event</span><span><i className="is-goal"/>Goal</span></div></aside></div>;
+
+  return (
+    <div className="phase6-calendar-layout">
+      <div className="phase6-calendar-main">
+        <div className="phase6-calendar-nav"><Link href={`/calendar?month=${shiftMonth(month, -1)}`} aria-label="Previous month">←</Link><strong>{monthDate.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong><Link href={`/calendar?month=${shiftMonth(month, 1)}`} aria-label="Next month">→</Link></div>
+        <Card>
+          <CardBody className="phase6-calendar-body">
+            <div className="phase6-weekdays">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day) => <span key={day}>{day}</span>)}</div>
+            <div className="phase6-calendar-grid">{cells.map((day, index) => <div key={index} className={day ? "phase6-calendar-day" : "phase6-calendar-day is-blank"}>{day ? <><b>{day}</b><div>{(byDay.get(day) ?? []).map((item) => <button type="button" key={item.id} className={`phase6-calendar-chip phase6-calendar-chip--${item.source} phase6-calendar-chip--${item.kind}`} onClick={() => edit(item)} disabled={item.readOnly || item.source !== "user"} title={item.readOnly ? "Verified official event — read only" : item.title}><span>{item.title}</span>{item.readOnly ? <Icon name="lock" size={11}/> : null}</button>)}</div></> : null}</div>)}</div>
+          </CardBody>
+        </Card>
+        <div className="phase6-calendar-agenda">
+          <Card>
+            <CardHeader title="Month agenda" description="Tasks, revision/test tasks, goals, your events and verified ICAI exams are composed here without duplicating source records."/>
+            <CardBody>{items.length ? <div className="phase6-agenda-list">{items.map((item) => <div key={item.id}><span className={`phase6-agenda-source phase6-agenda-source--${item.source}`}>{item.source === "icai" ? "Official ICAI" : item.kind}</span><span><strong>{item.title}</strong><small>{new Date(item.startsAt).toLocaleString()} {item.estimatedMinutes ? `· ${item.estimatedMinutes} min` : ""}</small></span>{item.source === "icai" && item.sourceUrl ? <a href={item.sourceUrl} target="_blank" rel="noreferrer">Source</a> : item.source === "task" ? <Link href="/planner">Task</Link> : item.source === "goal" ? <Link href="/goals">Goal</Link> : item.source === "user" ? <button onClick={() => edit(item)}>Edit</button> : null}</div>)}</div> : <div className="phase6-empty"><Icon name="calendar"/><strong>No calendar items this month</strong><p>Add a personal event or task; verified exam dates will appear automatically when available.</p></div>}</CardBody>
+          </Card>
+        </div>
+      </div>
+      <aside>
+        <Card>
+          <CardHeader title={editingId ? "Edit personal event" : "Add personal event"} description="Official ICAI exam events are intentionally read-only."/>
+          <CardBody>
+            <form className="phase6-form" onSubmit={submit}>
+              <label><span>Title</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)}/></label>
+              <label><span>Starts</span><input required type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)}/></label>
+              <label><span>Ends (optional)</span><input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)}/></label>
+              <label className="phase6-checkbox"><input type="checkbox" checked={allDay} onChange={(event) => setAllDay(event.target.checked)}/><span>All-day label</span></label>
+              <label><span>Notes</span><textarea rows={3} maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)}/></label>
+              {error ? <div className="phase6-inline-error">{error}</div> : null}
+              <div className="phase6-form-actions"><button className="ui-button ui-button--primary" disabled={busy}>{busy ? "Saving…" : editingId ? "Save changes" : "Add event"}</button>{editingId ? <><button type="button" className="ui-button ui-button--secondary" onClick={reset}>Cancel</button><button type="button" className="ui-button ui-button--ghost" disabled={busy} onClick={() => { if (window.confirm("Delete this personal event?")) void request({ action: "delete", id: editingId }).then((ok) => { if (ok) reset(); }); }}>Delete</button></> : null}</div>
+            </form>
+          </CardBody>
+        </Card>
+        <div className="phase6-calendar-legend"><span><i className="is-icai"/>Official exam</span><span><i className="is-task"/>Task/revision/test</span><span><i className="is-user"/>Personal event</span><span><i className="is-goal"/>Goal</span></div>
+      </aside>
+    </div>
+  );
 }
