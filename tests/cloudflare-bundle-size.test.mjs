@@ -24,7 +24,7 @@ test("application source does not use Next OG image generation", () => {
   }
 });
 
-test("Cloudflare builds strip the unused Vercel OG runtime before Wrangler bundles", () => {
+test("Cloudflare builds strip the unused Vercel OG runtime without creating rejected startup promises", () => {
   const pkg = JSON.parse(read("package.json"));
   const patch = read("scripts/patch-opennext-vercel-og.mjs");
   assert.match(pkg.scripts["cf:build"], /patch-opennext-vercel-og\.mjs/);
@@ -32,4 +32,13 @@ test("Cloudflare builds strip the unused Vercel OG runtime before Wrangler bundl
   assert.match(pkg.scripts["cf:check"], /npm run cf:build/);
   assert.ok(patch.includes("@vercel\\/og\\/index\\.edge\\.js"));
   assert.match(patch, /Refusing to strip @vercel\/og because application source uses OG image generation/);
+  assert.match(patch, /Promise\.resolve\(Object\.freeze\(\{\}\)\)/);
+  assert.doesNotMatch(patch, /const replacement\s*=\s*["']Promise\.reject/);
+});
+
+test("shared shell degrades to guest rendering instead of returning a Worker-level 500 when viewer lookup fails", () => {
+  const shell = read("components/shell/app-shell.tsx");
+  assert.match(shell, /try\s*\{[\s\S]*viewer\s*=\s*await loadViewer\(\)/);
+  assert.match(shell, /catch\s*\(error\)/);
+  assert.match(shell, /viewer\s*=\s*guestViewer/);
 });
