@@ -5,10 +5,10 @@ Phase 7 implements Personal Notes, Uploads & Resource Library only in the isolat
 ## Implemented
 
 - Rich-text personal notes with title, subject, chapter, tags and private/shared visibility.
-- Private `user-resources` Supabase Storage bucket for PDF, JPG/JPEG, PNG, WebP, DOC and DOCX files up to 10 MB.
+- Private Cloudflare R2 bucket `ca-progress-v2-staging-user-resources` for PDF, JPG/JPEG, PNG, WebP, DOC and DOCX files up to 10 MB.
 - Server-only upload path with authentication, size, extension, MIME and magic-byte validation plus safe filename normalization.
-- Database metadata separated from file bytes.
-- Short-lived signed private/shared file access after metadata authorization; no public Storage URLs.
+- Supabase Postgres remains the metadata, authorization and moderation source of truth; file bytes are stored in Cloudflare R2.
+- Private file delivery is streamed through an authorized Worker route; the R2 bucket has no public URL.
 - My / Shared / ICAI library views with visually distinct official ICAI resources.
 - Pending / approved / rejected / reported moderation states.
 - Moderator/admin/owner/parent-owner review route and report workflow.
@@ -17,7 +17,8 @@ Phase 7 implements Personal Notes, Uploads & Resource Library only in the isolat
 ## Security boundaries
 
 - Private file bytes are not readable or writable directly by authenticated browser clients.
-- Uploaded resource metadata is read-only to authenticated clients; mutation paths are server-controlled.
+- R2 access is provided through the Worker binding `USER_RESOURCES_R2`; no R2 access key is exposed to the browser.
+- Uploaded resource metadata is read-only to authenticated clients; create/update/delete mutations use authenticated security-definer RPCs.
 - Note insert/update is RPC-controlled; owner delete remains RLS-protected.
 - Shared content is not readable to other users until moderation status is `approved`.
 - Reporting an approved shared item immediately changes it to `reported`, hiding it from Community reads until moderation.
