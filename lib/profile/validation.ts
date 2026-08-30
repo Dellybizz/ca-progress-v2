@@ -31,10 +31,12 @@ export function attemptAppliesToLevel(option: AttemptOption, level: CALevel) {
 export function validateAcademicSelection(input: { level: unknown; group: unknown; attemptKey: unknown; dailyTargetMinutes: unknown }, attempts: AttemptOption[]) {
   if (!isCALevel(input.level)) return { ok: false as const, error: "Choose a valid CA level." };
   if (!isGroupChoice(input.group)) return { ok: false as const, error: "Choose a valid group." };
-  if (input.level === "foundation" && input.group !== "not_applicable") return { ok: false as const, error: "Foundation does not use a group selection in this onboarding contract." };
-  if (input.level !== "foundation" && input.group === "not_applicable") return { ok: false as const, error: "Choose Group 1, Group 2 or Both." };
-  if (typeof input.attemptKey !== "string" || !attempts.some((option) => option.key === input.attemptKey && attemptAppliesToLevel(option, input.level))) return { ok: false as const, error: "Choose an attempt applicable to this CA level." };
+  const level = input.level;
+  const group = input.group;
+  if (level === "foundation" && group !== "not_applicable") return { ok: false as const, error: "Foundation does not use a group selection in this onboarding contract." };
+  if (level !== "foundation" && group === "not_applicable") return { ok: false as const, error: "Choose Group 1, Group 2 or Both." };
+  if (typeof input.attemptKey !== "string" || !attempts.some((option) => option.key === input.attemptKey && attemptAppliesToLevel(option, level))) return { ok: false as const, error: "Choose an attempt applicable to this CA level." };
   const dailyTargetMinutes = normalizeDailyTarget(input.dailyTargetMinutes);
   if (dailyTargetMinutes === null) return { ok: false as const, error: "Daily target must be between 15 and 720 minutes." };
-  return { ok: true as const, value: { level: input.level, group: input.group, attemptKey: input.attemptKey, dailyTargetMinutes } };
+  return { ok: true as const, value: { level, group, attemptKey: input.attemptKey, dailyTargetMinutes } };
 }
