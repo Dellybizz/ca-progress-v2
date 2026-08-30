@@ -37,12 +37,15 @@ test("progress ownership is enforced with RLS and RPC-only writes", () => {
   assert.match(sql, /auth\.uid\(\)/);
 });
 
-test("undo refuses to overwrite a newer chapter state", () => {
-  const sql = read("supabase/migrations/20260830120100_phase5_progress_tracker.sql");
-  assert.match(sql, /create or replace function public\.progress_undo_event/);
-  assert.match(sql, /v_current <> v_event\.new_state/);
-  assert.match(sql, /undo would overwrite a newer change/);
-  assert.match(sql, /reverts_event_id/);
+test("undo refuses to overwrite a newer chapter state or newer same-state event", () => {
+  const base = read("supabase/migrations/20260830120100_phase5_progress_tracker.sql");
+  const hardening = read("supabase/migrations/20260830121500_phase5_guard_latest_undo.sql");
+  assert.match(base, /v_current <> v_event\.new_state/);
+  assert.match(base, /reverts_event_id/);
+  assert.match(hardening, /v_latest_event_id/);
+  assert.match(hardening, /order by created_at desc, id desc/);
+  assert.match(hardening, /v_latest_event_id is distinct from v_event\.id/);
+  assert.match(hardening, /undo would overwrite a newer change/);
 });
 
 test("progress surfaces are real routes with optimistic autosave and normalized analytics", () => {
