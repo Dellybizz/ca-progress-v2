@@ -7,10 +7,12 @@ const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
 
 test("daily ICAI sync remains a Cloudflare scheduled job independent of user traffic", () => {
-  const wrangler = read("wrangler.jsonc");
+  const bootstrap = read("wrangler.jsonc");
+  const wrangler = read("wrangler.web.jsonc");
   const worker = read("custom-worker.ts");
   const syncWorker = read("workers/icai-sync/wrangler.jsonc");
-  assert.match(wrangler, /"main"\s*:\s*"\.\/custom-worker\.ts"/);
+  assert.match(bootstrap, /"main"\s*:\s*"\.\/custom-worker\.ts"/);
+  assert.doesNotMatch(bootstrap, /"services"\s*:/);
   assert.match(wrangler, /"crons"\s*:\s*\["30 0 \* \* \*"\]/);
   assert.match(wrangler, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(wrangler, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);
