@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ca-progress-v2",
   "main": "./custom-worker.ts",
+  "minify": true,
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
