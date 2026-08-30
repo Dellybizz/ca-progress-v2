@@ -30,11 +30,17 @@ export const studentNavigation: NavItem[] = [
 ];
 
 export const adminNavigation: NavItem[] = [
-  { label: "Admin overview", href: "/admin", icon: "shield", exact: true },
-  { label: "Syllabus preview", href: "/admin/syllabus", icon: "book" },
+  { label: "Overview", href: "/admin", icon: "shield", exact: true },
+  { label: "Members", href: "/admin/members", icon: "community" },
+  { label: "Platform", href: "/admin/platform", icon: "settings" },
+  { label: "Plans & access", href: "/admin/plans", icon: "sparkles" },
+  { label: "Content", href: "/admin/content", icon: "book" },
   { label: "ICAI Sync", href: "/admin/icai-sync", icon: "bell" },
   { label: "Resource moderation", href: "/admin/resources/moderation", icon: "notes" },
   { label: "Community moderation", href: "/admin/community/moderation", icon: "community" },
+  { label: "Notifications", href: "/admin/notifications", icon: "bell" },
+  { label: "Audit log", href: "/admin/audit", icon: "notes" },
+  { label: "Syllabus registry", href: "/admin/syllabus", icon: "book" },
 ];
 
 export function DesktopNavigation({ area }: { area: "student" | "admin" }) {
