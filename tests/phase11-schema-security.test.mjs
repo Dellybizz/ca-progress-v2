@@ -41,8 +41,9 @@ test("browser roles cannot mutate protected subscription or payment state", () =
 
 test("current plan and entitlement resolution expire paid access on the server", () => {
   assert.match(schema, /create or replace function public\.phase11_current_plan_id/i);
-  assert.match(schema, /us\.starts_at <= p_at/i);
-  assert.match(schema, /us\.ends_at > p_at/i);
+  assert.match(schema, /us\.status='active'/i);
+  assert.match(schema, /us\.starts_at<=now\(\)/i);
+  assert.match(schema, /us\.ends_at is null or us\.ends_at>now\(\)/i);
   assert.match(schema, /create or replace function public\.phase11_effective_entitlement/i);
   assert.match(schema, /create or replace function public\.phase11_get_my_entitlement/i);
   assert.match(schema, /auth\.uid\(\)/i);
@@ -51,18 +52,20 @@ test("current plan and entitlement resolution expire paid access on the server",
 test("plan durations are explicit and reconciliation never hardcodes one month", () => {
   assert.match(schema, /duration_value integer not null/i);
   assert.match(schema, /duration_unit text not null/i);
-  assert.match(schema, /duration_unit in \('days', 'months', 'years'\)/i);
-  assert.match(schema, /phase11_add_plan_duration/i);
-  assert.match(schema, /p_duration_value/i);
-  assert.match(schema, /p_duration_unit/i);
+  assert.match(schema, /duration_unit in \('day','week','month','year','lifetime'\)/i);
+  assert.match(schema, /create or replace function public\.phase11_add_plan_duration\(p_base timestamptz, p_value integer, p_unit text\)/i);
+  assert.match(schema, /when 'day' then return p_base \+ make_interval\(days => p_value\)/i);
+  assert.match(schema, /when 'week' then return p_base \+ make_interval\(days => p_value \* 7\)/i);
+  assert.match(schema, /when 'month' then return p_base \+ make_interval\(months => p_value\)/i);
+  assert.match(schema, /when 'year' then return p_base \+ make_interval\(years => p_value\)/i);
   assert.doesNotMatch(schema + reconcile + quota + hardening, /\+\s*interval\s*'1\s+month'/i);
 });
 
 test("unapproved prices and storage allowances remain unconfigured", () => {
-  assert.match(schema, /'basic-monthly'[\s\S]*?null,\s*'INR'[\s\S]*?false/i);
-  assert.match(schema, /'basic-annual'[\s\S]*?null,\s*'INR'[\s\S]*?false/i);
-  assert.match(schema, /'pro-monthly'[\s\S]*?null,\s*'INR'[\s\S]*?false/i);
-  assert.match(schema, /'pro-annual'[\s\S]*?null,\s*'INR'[\s\S]*?false/i);
+  assert.match(schema, /\('basic','monthly',[^\n]*null,'INR',1,'month',true,false/i);
+  assert.match(schema, /\('basic','annual',[^\n]*null,'INR',1,'year',true,false/i);
+  assert.match(schema, /\('pro','monthly',[^\n]*null,'INR',1,'month',true,false/i);
+  assert.match(schema, /\('pro','annual',[^\n]*null,'INR',1,'year',true,false/i);
   assert.match(hardening, /feature_key = 'resources\.storage'/i);
   assert.match(hardening, /configured = false/i);
   assert.match(hardening, /limit_value = null/i);
