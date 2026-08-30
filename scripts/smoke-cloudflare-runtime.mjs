@@ -34,10 +34,13 @@ async function waitForWorker() {
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Wrangler exited before startup (code ${child.exitCode}).\n${output}`);
     try {
-      const response = await fetch(`${base}/api/health`, { redirect: "manual" });
+      const response = await fetch(`${base}/api/health`, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(2_000),
+      });
       if (response.status < 500) return;
     } catch {
-      // Worker is still starting.
+      // Worker is still starting or did not answer within the probe timeout.
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
@@ -47,7 +50,10 @@ async function waitForWorker() {
 try {
   await waitForWorker();
   for (const route of routes) {
-    const response = await fetch(`${base}${route}`, { redirect: "manual" });
+    const response = await fetch(`${base}${route}`, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(5_000),
+    });
     if (response.status >= 500) {
       const body = (await response.text()).slice(0, 1000);
       throw new Error(`${route} returned ${response.status}.\n${body}\n\nWrangler output:\n${output}`);
