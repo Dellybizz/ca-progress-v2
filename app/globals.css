@@ -2,7 +2,9 @@
 @import "./styles/shell.css";
 @import "./styles/components.css";
 @import "./styles/dashboard.css";
+@import "./styles/student-dashboard.css";
 @import "./styles/surfaces.css";
 @import "./styles/auth.css";
+@import "./styles/auth-login-fix.css";
 @import "./styles/academic.css";
 @import "./styles/icai.css";
