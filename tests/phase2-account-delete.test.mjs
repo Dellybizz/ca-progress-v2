@@ -35,7 +35,9 @@ test("governance prevents deleting parent owner or the only active owner", () =>
   const service = read("lib/auth/account-deletion.ts");
   assert.match(service, /PARENT_OWNER_DELETE_BLOCKED/);
   assert.match(service, /SOLE_OWNER_DELETE_BLOCKED/);
-  assert.match(service, /role=in\.\(owner,parent_owner\)/);
+  assert.match(service, /getAdminRoleForUser/);
+  assert.match(service, /\.in\("role", \["owner", "parent_owner"\]\)/);
+  assert.match(service, /OWNER_GOVERNANCE_LOOKUP_FAILED/);
 });
 
 test("requested existing V2 auth account is bootstrapped once as an audited active owner", () => {
