@@ -95,9 +95,70 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
   );
 }
 
+function TodayOverview({ model }: { model: DashboardReadyModel }) {
+  return (
+    <Link href="/planner/today" className="dashboard-overview-card" aria-label="Open today plan">
+      <header className="dashboard-overview-card__header">
+        <span className="dashboard-overview-card__icon"><Icon name="sparkles" size={17}/></span>
+        <div><strong>Today</strong><small>Your study plan</small></div>
+        <Icon name="chevron" size={14}/>
+      </header>
+      <div className="dashboard-overview-card__primary">
+        <strong>{model.today.tasks}</strong><span>tasks</span><small>{model.today.estimatedMinutes} min planned</small>
+      </div>
+      <div className="dashboard-overview-card__metrics">
+        <span><b>{model.today.revisions}</b> revisions</span>
+        <span><b>{model.today.tests}</b> tests</span>
+      </div>
+    </Link>
+  );
+}
+
+function StudyOverview({ model }: { model: DashboardReadyModel }) {
+  return (
+    <Link href="/study" className="dashboard-overview-card" aria-label="Open study mode">
+      <header className="dashboard-overview-card__header">
+        <span className="dashboard-overview-card__icon"><Icon name="timer" size={17}/></span>
+        <div><strong>Study</strong><small>Time & consistency</small></div>
+        <Icon name="chevron" size={14}/>
+      </header>
+      <div className="dashboard-overview-card__primary">
+        <strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><span>this week</span><small>{formatMinutes(model.study.dailyTargetMinutes)} daily target</small>
+      </div>
+      <div className="dashboard-overview-card__metrics dashboard-overview-card__metrics--three">
+        <span><b>{formatMinutes(model.study.weeklyTargetMinutes)}</b> weekly</span>
+        <span><b>{model.study.streakDays}</b> day{model.study.streakDays === 1 ? "" : "s"} streak</span>
+      </div>
+    </Link>
+  );
+}
+
+function ProgressOverview({ model }: { model: DashboardReadyModel }) {
+  return (
+    <Link href="/progress" className="dashboard-overview-card dashboard-overview-card--progress" aria-label="Open progress tracker">
+      <header className="dashboard-overview-card__header">
+        <span className="dashboard-overview-card__icon"><Icon name="chart" size={17}/></span>
+        <div><strong>Progress</strong><small>Your syllabus progress</small></div>
+        <Icon name="chevron" size={14}/>
+      </header>
+      <div className="dashboard-overview-card__primary">
+        <strong>{model.progress.overallPercent}%</strong><span>overall</span><small>{model.context.chapterCount} chapters tracked</small>
+      </div>
+      <div className="dashboard-overview-progress">
+        {model.progress.groups.slice(0, 2).map((group) => (
+          <div key={group.code}>
+            <span>{group.name}</span>
+            <i aria-hidden="true"><b style={{ width: `${group.percent}%` }}/></i>
+            <small>{group.percent}%</small>
+          </div>
+        ))}
+      </div>
+    </Link>
+  );
+}
+
 function ReadyDashboard({ model }: { model: DashboardReadyModel }) {
   const latestUpdate = model.icai.updates[0] ?? null;
-  const groupProgress = model.progress.groups.map((group) => `${group.name} ${group.percent}%`).join(" · ");
 
   return (
     <div className="student-dashboard student-dashboard--home">
@@ -111,19 +172,10 @@ function ReadyDashboard({ model }: { model: DashboardReadyModel }) {
 
       <AttemptStrip model={model}/>
 
-      <section className="dashboard-home-stats" aria-label="Study overview">
-        <Link href="/planner/today" className="dashboard-home-stat">
-          <span>Today</span><strong>{model.today.tasks}</strong><small>{model.today.estimatedMinutes} min planned</small>
-        </Link>
-        <Link href="/study" className="dashboard-home-stat">
-          <span>Study</span><strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><small>{formatMinutes(model.study.dailyTargetMinutes)} daily target</small>
-        </Link>
-        <Link href="/progress" className="dashboard-home-stat">
-          <span>Progress</span><strong>{model.progress.overallPercent}%</strong><small>{groupProgress || `${model.context.chapterCount} chapters`}</small>
-        </Link>
-        <Link href="/study" className="dashboard-home-stat">
-          <span>Streak</span><strong>{model.study.streakDays}</strong><small>{model.study.streakDays === 1 ? "day" : "days"}</small>
-        </Link>
+      <section className="dashboard-overview-grid" aria-label="Study overview">
+        <TodayOverview model={model}/>
+        <StudyOverview model={model}/>
+        <ProgressOverview model={model}/>
       </section>
 
       <section className="dashboard-home-grid">
