@@ -10,7 +10,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: v2-staging
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -28,9 +28,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-      - run: npm run cf:deploy
+      - name: Validate all Cloudflare Worker bundles and size budgets
+        run: npm run cf:check
+      - name: Deploy validated multi-Worker build
+        run: npm run cf:deploy:built
 
+# Staging deployment is intentionally orchestrated from GitHub Actions rather than
+# Cloudflare Connected Builds. Connected Builds enforce the one connected Worker
+# name, while this application deploys multiple independently named private Workers.
 # Runtime secrets remain dashboard-managed and are preserved with keep_vars=true.
-# Phase 12 adds no new secret or public service. The web Worker continues to use the
-# existing server-only Supabase credential and private ICAI/Billing/R2 bindings.
 # Razorpay secrets remain only on ca-progress-v2-billing.
