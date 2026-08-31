@@ -1,0 +1,56 @@
+/* Global mobile scroll normalization.
+   Keep document height content-driven and reserve bottom-nav space exactly once. */
+
+@media (max-width: 899px) {
+  html,
+  body {
+    min-height: 100%;
+    overflow-x: clip;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  /* The body already owns the viewport minimum. Do not stack another viewport
+     minimum on the app shell or its content column on mobile Safari. */
+  .app-shell,
+  .app-main,
+  .content-wrap {
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .app-shell,
+  .app-main {
+    overflow: visible;
+  }
+
+  /* Reserve the floating mobile navigation once at shell level. */
+  .content-wrap {
+    padding-bottom: calc(var(--bottom-nav-height) + 20px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* Older phase page wrappers also reserved bottom-nav height. Remove that
+     duplicate reserve while preserving their top and horizontal spacing. */
+  .content-wrap > [class*="-page"] {
+    min-height: 0 !important;
+    padding-bottom: 16px !important;
+  }
+
+  .content-wrap > .student-dashboard--home,
+  .content-wrap > .student-dashboard--simple-state {
+    min-height: 0 !important;
+    padding-bottom: 16px !important;
+  }
+
+  /* Keep navigation anchored to the visual viewport even after later page CSS. */
+  .mobile-bottom-nav {
+    position: fixed !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+}
