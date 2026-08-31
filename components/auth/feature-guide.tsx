@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
-import type { PrimaryUse } from "@/lib/profile/onboarding";
+import { primaryUseOptions, type PrimaryUse } from "@/lib/profile/onboarding";
 
 type Feature = { key: string; title: string; description: string; href: string; icon: IconName; tips: string[] };
 
@@ -37,13 +37,20 @@ const focusTours: Record<PrimaryUse, string[]> = {
 };
 const trendingKeys = ["community", "resources", "notes", "tests"];
 
-export function FeatureGuide({ primaryUse, next }: { primaryUse: PrimaryUse; next: string }) {
+function uniqueKeys(keys: string[]) {
+  return [...new Set(keys)];
+}
+
+export function FeatureGuide({ priorities, next }: { priorities: PrimaryUse[]; next: string }) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [includeTrending, setIncludeTrending] = useState(false);
   const [saving, setSaving] = useState(false);
-  const primaryKeys = focusTours[primaryUse];
-  const extraKeys = useMemo(() => trendingKeys.filter((key) => !primaryKeys.includes(key)).slice(0, 3), [primaryKeys]);
+  const primaryKeys = useMemo(() => uniqueKeys(priorities.flatMap((priority) => focusTours[priority])), [priorities]);
+  const extraKeys = useMemo(() => {
+    const unselected = primaryUseOptions.map((option) => option.key).filter((key) => !priorities.includes(key));
+    return uniqueKeys([...unselected.flatMap((priority) => focusTours[priority]), ...trendingKeys]).filter((key) => !primaryKeys.includes(key));
+  }, [priorities, primaryKeys]);
   const queue = includeTrending ? [...primaryKeys, ...extraKeys] : primaryKeys;
   const atTrendingPrompt = !includeTrending && index >= primaryKeys.length;
   const current = !atTrendingPrompt ? features[queue[index]] : null;
@@ -58,10 +65,10 @@ export function FeatureGuide({ primaryUse, next }: { primaryUse: PrimaryUse; nex
   }
 
   if (atTrendingPrompt) return <div className="feature-guide">
-    <header className="feature-guide__top"><div><Badge tone="brand">Quick guide</Badge><h1>Want a quick look at popular features too?</h1><p>You have seen the features closest to your goal. These are useful extras many students explore next.</p></div><Button variant="ghost" disabled={saving} onClick={() => finish("skip")}>Skip guide</Button></header>
+    <header className="feature-guide__top"><div><Badge tone="brand">Quick guide</Badge><h1>Want a tour of other useful features too?</h1><p>You have seen the features that match your priorities first. These are the remaining popular tools you may want to explore.</p></div><Button variant="ghost" disabled={saving} onClick={() => finish("skip")}>Skip guide</Button></header>
     <Card className="feature-guide__card"><CardBody>
       <div className="feature-guide__trending">{extraKeys.map((key) => { const feature = features[key]; return <article key={key}><span><Icon name={feature.icon}/></span><div><strong>{feature.title}</strong><p>{feature.description}</p></div></article>; })}</div>
-      <div className="feature-guide__actions"><Button variant="secondary" disabled={saving} onClick={() => finish("complete")}>Not now</Button><Button disabled={saving} onClick={() => { setIncludeTrending(true); setIndex(primaryKeys.length); }}>Show popular features <Icon name="arrow" size={16}/></Button></div>
+      <div className="feature-guide__actions"><Button variant="secondary" disabled={saving} onClick={() => finish("complete")}>Not now</Button><Button disabled={saving} onClick={() => { setIncludeTrending(true); setIndex(primaryKeys.length); }}>Tour other features <Icon name="arrow" size={16}/></Button></div>
     </CardBody></Card>
   </div>;
 
