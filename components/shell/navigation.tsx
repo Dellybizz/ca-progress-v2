@@ -8,7 +8,7 @@ import { Icon, type IconName } from "@/components/ui/icon";
 export type NavItem = { label: string; href: string; icon: IconName; exact?: boolean };
 
 type StudentNavGroup = {
-  key: "study" | "progress" | "resources" | "community";
+  key: "study" | "progress" | "resources" | "community" | "account";
   label: string;
   icon: IconName;
   items: NavItem[];
@@ -17,21 +17,24 @@ type StudentNavGroup = {
 export const studentNavigation: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "home" },
   { label: "Today Plan", href: "/planner/today", icon: "sparkles" },
+  { label: "Progress", href: "/progress", icon: "chart" },
   { label: "Study", href: "/study", icon: "timer" },
   { label: "Planner", href: "/planner", icon: "calendar", exact: true },
-  { label: "Calendar", href: "/calendar", icon: "calendar" },
-  { label: "Progress Tracker", href: "/progress", icon: "chart" },
   { label: "Revision Settings", href: "/planner/revision-settings", icon: "settings" },
   { label: "Forecast", href: "/analytics/forecast", icon: "chart" },
   { label: "Goals", href: "/goals", icon: "target" },
-  { label: "Tests", href: "/tests", icon: "tests" },
+  { label: "Calendar", href: "/calendar", icon: "calendar" },
+  { label: "Activity", href: "/activity", icon: "sparkles" },
   { label: "Syllabus", href: "/syllabus", icon: "book" },
   { label: "ICAI Updates", href: "/updates", icon: "bell" },
   { label: "Resources", href: "/resources", icon: "book" },
   { label: "ICAI Resources", href: "/resources/icai", icon: "shield" },
+  { label: "Tests", href: "/tests", icon: "tests" },
   { label: "Notes", href: "/notes", icon: "notes" },
   { label: "Community", href: "/community", icon: "community" },
-  { label: "Activity", href: "/activity", icon: "sparkles" },
+  { label: "Pricing", href: "/pricing", icon: "sparkles" },
+  { label: "Billing", href: "/billing", icon: "shield" },
+  { label: "Settings", href: "/settings", icon: "settings" },
 ];
 
 const studentGroups: StudentNavGroup[] = [
@@ -79,6 +82,16 @@ const studentGroups: StudentNavGroup[] = [
       { label: "Activity", href: "/activity", icon: "sparkles" },
     ],
   },
+  {
+    key: "account",
+    label: "Account",
+    icon: "settings",
+    items: [
+      { label: "Pricing", href: "/pricing", icon: "sparkles" },
+      { label: "Billing", href: "/billing", icon: "shield" },
+      { label: "Settings", href: "/settings", icon: "settings" },
+    ],
+  },
 ];
 
 export const adminNavigation: NavItem[] = [
@@ -104,7 +117,7 @@ function NavLink({ item, pathname, compact = false }: { item: NavItem; pathname:
       className={`${active ? "is-active" : ""}${compact ? " sidebar-nav__child" : ""}`}
       aria-current={active ? "page" : undefined}
     >
-      <Icon name={item.icon} size={compact ? 14 : 17}/>
+      <Icon name={item.icon} size={compact ? 16 : 19}/>
       <span>{item.label}</span>
       {active ? <i className="sidebar-nav__active" aria-hidden="true"/> : null}
     </Link>
@@ -122,9 +135,11 @@ function StudentDesktopNavigation({ pathname }: { pathname: string }) {
     if (activeGroup) setOpenGroup(activeGroup);
   }, [activeGroup]);
 
+  const dashboard = studentNavigation[0];
+
   return (
     <nav className="sidebar-nav sidebar-nav--grouped" aria-label="student navigation">
-      <NavLink item={{ label: "Dashboard", href: "/dashboard", icon: "home" }} pathname={pathname}/>
+      <NavLink item={dashboard} pathname={pathname}/>
       <div className="sidebar-nav-groups">
         {studentGroups.map((group) => {
           const expanded = openGroup === group.key;
@@ -137,9 +152,9 @@ function StudentDesktopNavigation({ pathname }: { pathname: string }) {
                 aria-expanded={expanded}
                 onClick={() => setOpenGroup((current) => current === group.key ? null : group.key)}
               >
-                <Icon name={group.icon} size={17}/>
+                <Icon name={group.icon} size={18}/>
                 <span>{group.label}</span>
-                <span className="sidebar-nav-group__chevron" aria-hidden="true"><Icon name="chevron" size={12}/></span>
+                <span className="sidebar-nav-group__chevron" aria-hidden="true"><Icon name="chevron" size={13}/></span>
               </button>
               {expanded ? (
                 <div className="sidebar-nav-group__items">
