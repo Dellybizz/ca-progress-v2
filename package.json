@@ -27,7 +27,7 @@
     "cf:check:icai": "node scripts/check-cloudflare-size-budget.mjs --config workers/icai-sync/wrangler.jsonc --budget-mib 1.50",
     "cf:check:billing": "node scripts/check-cloudflare-size-budget.mjs --config workers/billing/wrangler.jsonc --budget-mib 0.75",
     "cf:check:admin": "node scripts/check-cloudflare-size-budget.mjs --config workers/admin-ops/wrangler.jsonc --budget-mib 1.00",
-    "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.web.jsonc --budget-mib 2.80",
+    "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.web.jsonc --budget-mib 2.80 --report-top 20",
     "cf:check": "npm run cf:build && npm run cf:check:icai && npm run cf:check:billing && npm run cf:check:admin && npm run cf:check:web",
     "cf:smoke": "node scripts/smoke-cloudflare-runtime.mjs"
   },
