@@ -6,55 +6,68 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("OpenNext server routes are split into growth domains", () => {
+test("OpenNext compiles one web runtime instead of route-family deployment workers", () => {
   const config = read("open-next.config.ts");
-  for (const domain of ["admin", "community", "planning"]) assert.match(config, new RegExp(`${domain}:\\s*\\{`));
-  assert.match(config, /app\/\(admin\)\/admin\/page/);
-  assert.match(config, /app\/\(student\)\/community\/page/);
-  assert.match(config, /app\/\(student\)\/planner\/page/);
-});
-
-test("public Worker is ingress-only and never imports the default Next server bundle", () => {
-  const router = read("custom-worker.ts");
-  assert.match(router, /middleware\/handler\.mjs/);
-  assert.doesNotMatch(router, /\.open-next\/worker\.js/);
-  assert.doesNotMatch(router, /server-functions\/default\/handler\.mjs/);
-  for (const binding of ["CORE_WEB_SERVICE", "ADMIN_WEB_SERVICE", "COMMUNITY_WEB_SERVICE", "PLANNING_WEB_SERVICE"]) assert.match(router, new RegExp(binding));
-});
-
-test("split Next server Workers are private service-binding targets", () => {
+  assert.match(config, /defineCloudflareConfig\(\)/);
+  assert.doesNotMatch(config, /functions\s*:/);
   for (const name of ["web-core", "web-admin", "web-community", "web-planning"]) {
-    const entry = `workers/${name}/index.ts`;
-    const config = `workers/${name}/wrangler.jsonc`;
+    assert.equal(existsSync(join(root, "workers", name)), false, `${name} should not be a deployment unit`);
+  }
+});
+
+test("consolidated web Worker owns normal OpenNext requests without a route-forwarding ingress layer", () => {
+  const worker = read("custom-worker.ts");
+  const web = read("wrangler.web.jsonc");
+  assert.match(worker, /\.open-next\/worker\.js/);
+  assert.match(worker, /openNextWorker\.fetch\(request, env, ctx\)/);
+  assert.doesNotMatch(worker, /middleware\/handler\.mjs|routeService|x-ca-progress-next-internal/);
+  for (const binding of ["CORE_WEB_SERVICE", "ADMIN_WEB_SERVICE", "COMMUNITY_WEB_SERVICE", "PLANNING_WEB_SERVICE"]) {
+    assert.doesNotMatch(web, new RegExp(binding));
+  }
+});
+
+test("only heavy or privileged specialist Workers remain private service-binding targets", () => {
+  const web = read("wrangler.web.jsonc");
+  const services = [
+    ["icai-sync", "ICAI_SYNC_SERVICE", "ca-progress-v2-icai-sync"],
+    ["billing", "BILLING_SERVICE", "ca-progress-v2-billing"],
+    ["admin-ops", "ADMIN_OPS_SERVICE", "ca-progress-v2-admin-ops"],
+  ];
+  for (const [directory, binding, service] of services) {
+    const entry = `workers/${directory}/index.ts`;
+    const config = `workers/${directory}/wrangler.jsonc`;
     assert.equal(existsSync(join(root, entry)), true, entry);
     assert.equal(existsSync(join(root, config)), true, config);
     assert.match(read(config), /"workers_dev"\s*:\s*false/);
-    assert.match(read(entry), /runNextServer/);
+    assert.match(web, new RegExp(`"binding"\\s*:\\s*"${binding}"`));
+    assert.match(web, new RegExp(`"service"\\s*:\\s*"${service}"`));
   }
 });
 
-test("each Next domain has its own compressed-size budget and router is kept small", () => {
+test("consolidated web and specialist services retain independent compressed-size safety gates", () => {
   const pkg = read("package.json");
-  for (const name of ["web-core", "web-admin", "web-community", "web-planning"]) {
-    assert.match(pkg, new RegExp(`cf:check:${name}`));
-    assert.match(pkg, new RegExp(`workers/${name}/wrangler\\.jsonc --budget-mib 2\\.70`));
-  }
-  assert.match(pkg, /cf:check:web-router/);
-  assert.match(pkg, /wrangler\.web\.jsonc --budget-mib 0\.90/);
+  assert.match(pkg, /cf:check:web/);
+  assert.match(pkg, /wrangler\.web\.jsonc --budget-mib 2\.80/);
+  assert.match(pkg, /workers\/icai-sync\/wrangler\.jsonc --budget-mib 1\.50/);
+  assert.match(pkg, /workers\/billing\/wrangler\.jsonc --budget-mib 0\.75/);
+  assert.match(pkg, /workers\/admin-ops\/wrangler\.jsonc --budget-mib 1\.00/);
+  assert.doesNotMatch(pkg, /cf:check:web-(?:core|admin|community|planning|router)/);
 });
 
-test("split web deployment publishes private servers before the public router", () => {
-  const deploy = read("scripts/deploy-split-web.mjs");
-  const core = deploy.indexOf("workers/web-core/wrangler.jsonc");
-  const admin = deploy.indexOf("workers/web-admin/wrangler.jsonc");
-  const community = deploy.indexOf("workers/web-community/wrangler.jsonc");
-  const planning = deploy.indexOf("workers/web-planning/wrangler.jsonc");
-  const router = deploy.indexOf("wrangler.web.jsonc");
-  assert.ok(core >= 0 && admin > core && community > admin && planning > community && router > planning);
+test("normal deployment publishes one web Worker while specialist services have an explicit maintenance path", () => {
+  const pkg = JSON.parse(read("package.json"));
+  assert.equal(pkg.scripts["cf:deploy"], "npm run cf:build && npm run cf:deploy:web");
+  assert.equal(pkg.scripts["cf:deploy:web"], "opennextjs-cloudflare deploy --config=wrangler.web.jsonc");
+  assert.match(pkg.scripts["cf:deploy:services"], /cf:deploy:icai[\s\S]*cf:deploy:billing[\s\S]*cf:deploy:admin/);
+  assert.equal(existsSync(join(root, "scripts/deploy-split-web.mjs")), false);
 });
 
-test("local Cloudflare smoke exercises every split route family", () => {
+test("local Cloudflare smoke exercises representative product route families through the consolidated web Worker", () => {
   const smoke = read("scripts/smoke-cloudflare-runtime.mjs");
-  for (const route of ["/settings", "/admin", "/community", "/planner"]) assert.match(smoke, new RegExp(route.replace("/", "\\/")));
-  for (const name of ["web-core", "web-admin", "web-community", "web-planning"]) assert.match(smoke, new RegExp(`workers/${name}/wrangler\\.jsonc`));
+  for (const route of ["/settings", "/tests", "/admin", "/community", "/planner"]) {
+    assert.match(smoke, new RegExp(route.replace("/", "\\/")));
+  }
+  assert.match(smoke, /wrangler\.web\.jsonc/);
+  for (const name of ["icai-sync", "billing", "admin-ops"]) assert.match(smoke, new RegExp(`workers/${name}/wrangler\\.jsonc`));
+  for (const name of ["web-core", "web-admin", "web-community", "web-planning"]) assert.doesNotMatch(smoke, new RegExp(name));
 });

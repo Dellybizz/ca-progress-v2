@@ -4,19 +4,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname; const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("Phase 7 files use a private Cloudflare R2 binding behind the Community Next worker", () => {
-  const router = read("wrangler.web.jsonc");
-  const communityWorker = read("workers/web-community/wrangler.jsonc");
+test("Phase 7 files use the consolidated web Worker's private Cloudflare R2 binding", () => {
+  const web = read("wrangler.web.jsonc");
   const r2 = read("lib/resources/r2.ts");
   const access = read("app/api/resources/[id]/access/route.ts");
   const migration = read("supabase/migrations/20260830153000_phase7_cloudflare_r2_resource_storage.sql");
-  assert.match(router, /"binding": "COMMUNITY_WEB_SERVICE"/);
-  assert.match(router, /"service": "ca-progress-v2-web-community"/);
-  assert.doesNotMatch(router, /"binding": "USER_RESOURCES_R2"/);
-  assert.match(communityWorker, /"binding": "USER_RESOURCES_R2"/);
-  assert.match(communityWorker, /"bucket_name": "ca-progress-v2-staging-user-resources"/);
-  assert.match(communityWorker, /"workers_dev"\s*:\s*false/);
-  assert.match(router, /"required": \["SUPABASE_SERVICE_ROLE_KEY"\]/);
+  assert.match(web, /"binding": "USER_RESOURCES_R2"/);
+  assert.match(web, /"bucket_name": "ca-progress-v2-staging-user-resources"/);
+  assert.doesNotMatch(web, /COMMUNITY_WEB_SERVICE|ca-progress-v2-web-community/);
+  assert.match(web, /"required": \["SUPABASE_SERVICE_ROLE_KEY"\]/);
   assert.match(r2, /getCloudflareContext/);
   assert.match(r2, /RESOURCE_R2_STORAGE_BUCKET/);
   assert.match(access, /row\.owner_user_id === identity\.id \|\| \(row\.visibility === "shared" && row\.moderation_status === "approved"\)/);
@@ -52,15 +48,17 @@ test("Phase 7 resource metadata mutations stay server-service-role-only after Ph
   assert.doesNotMatch(resourceRoute, /admin\.storage|\.storage\.from\(/);
 });
 
-test("server-only Supabase credentials resolve from Cloudflare runtime bindings", () => {
+test("server-only Supabase credentials resolve directly from consolidated Cloudflare runtime bindings", () => {
   const runtimeEnv = read("lib/cloudflare/runtime-env.ts");
-  const splitRuntime = read("workers/next-runtime.ts");
+  const web = read("wrangler.web.jsonc");
+  const worker = read("custom-worker.ts");
   const admin = read("lib/supabase/admin.ts");
   const upload = read("app/api/resources/upload/route.ts");
   assert.match(runtimeEnv, /getCloudflareContext/);
   assert.match(runtimeEnv, /process\.env\[name\]/);
-  assert.match(splitRuntime, /SUPABASE_SERVICE_ROLE_KEY/);
-  assert.match(splitRuntime, /x-ca-progress-service-role/);
+  assert.match(web, /"required": \["SUPABASE_SERVICE_ROLE_KEY"\]/);
+  assert.match(worker, /\.open-next\/worker\.js/);
+  assert.doesNotMatch(worker, /x-ca-progress-service-role/);
   assert.match(admin, /getServerRuntimeValue\("SUPABASE_SERVICE_ROLE_KEY"\)/);
   assert.match(admin, /getSupabaseAdminRuntimeConfig/);
   assert.match(upload, /getSupabaseAdminRuntimeConfig\(\)/);

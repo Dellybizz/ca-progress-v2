@@ -6,11 +6,7 @@ const base = `http://${host}:${port}`;
 const routes = ["/settings", "/tests", "/admin", "/community", "/planner"];
 
 const configs = [
-  "wrangler.jsonc",
-  "workers/web-core/wrangler.jsonc",
-  "workers/web-admin/wrangler.jsonc",
-  "workers/web-community/wrangler.jsonc",
-  "workers/web-planning/wrangler.jsonc",
+  "wrangler.web.jsonc",
   "workers/icai-sync/wrangler.jsonc",
   "workers/billing/wrangler.jsonc",
   "workers/admin-ops/wrangler.jsonc",
@@ -71,7 +67,7 @@ try {
     }
     console.log(`[cloudflare-smoke] ${route} -> ${response.status}`);
   }
-  console.log("[cloudflare-smoke] PASS: split Core/Admin/Community/Planning routes avoid Worker-level 5xx responses.");
+  console.log("[cloudflare-smoke] PASS: consolidated web routes avoid Worker-level 5xx responses while specialist service bindings are available.");
 } finally {
   stop();
 }
