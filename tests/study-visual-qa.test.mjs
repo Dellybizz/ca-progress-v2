@@ -27,12 +27,19 @@ test("Pomodoro presets show focus and break together", () => {
   assert.match(timer, /Start focus session/);
 });
 
-test("desktop Study cards use a single shared-width vertical flow", () => {
+test("desktop Study uses a right rail with metrics stacked above recent study", () => {
+  const page = read("components/study/study-page.tsx");
+  const timer = read("components/study/study-timer.tsx");
   const globals = read("app/globals.css");
   const css = read("app/styles/study-layout-refine.css");
+  assert.doesNotMatch(page, /study-page__summary/);
+  assert.match(timer, /function StudySideRail/);
+  assert.match(timer, /study-side-stat--today/);
+  assert.match(timer, /study-side-stat--week/);
+  assert.match(timer, /study-side-stat--streak/);
+  assert.match(timer, /study-recent-card/);
   assert.match(globals, /study-layout-refine\.css/);
-  assert.match(css, /max-width: 960px/);
-  assert.match(css, /grid-template-columns: minmax\(0, 1fr\)/);
-  assert.match(css, /study-builder-card,[\s\S]*study-recent-card/);
-  assert.match(css, /position: static/);
+  assert.match(css, /study-session-grid--idle/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1\.55fr\) minmax\(280px, \.62fr\)/);
+  assert.match(css, /study-side-rail/);
 });
