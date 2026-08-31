@@ -8,6 +8,10 @@ import type { Database } from "@/lib/supabase/database.types";
 export const dynamic = "force-dynamic";
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
+function hasDraftValue(value: unknown) {
+  return value !== null && value !== undefined && value !== "";
+}
+
 export async function POST(request: NextRequest) {
   const user = await optionalUser();
   if (!user) return NextResponse.json({ ok: false, error: "Sign in to save onboarding." }, { status: 401 });
@@ -29,24 +33,26 @@ export async function POST(request: NextRequest) {
     update.onboarding_step = 5;
     update.onboarding_completed_at = new Date().toISOString();
   } else {
-    if (body.level !== null && body.level !== undefined) {
+    // Draft saves are intentionally partial. Auto-advance sends the choices already made
+    // plus empty placeholders for later steps, so blank future fields must be ignored.
+    if (hasDraftValue(body.level)) {
       if (!isCALevel(body.level)) return NextResponse.json({ ok: false, error: "Choose a valid CA level." }, { status: 400 });
       update.ca_level = body.level;
       if (body.level === "foundation") update.group_choice = "not_applicable";
     }
-    if (body.group !== null && body.group !== undefined && body.level !== "foundation") {
+    if (hasDraftValue(body.group) && body.level !== "foundation") {
       if (!isGroupChoice(body.group) || body.group === "not_applicable") return NextResponse.json({ ok: false, error: "Choose a valid group." }, { status: 400 });
       update.group_choice = body.group;
     }
-    if (body.attemptKey !== null && body.attemptKey !== undefined) {
+    if (hasDraftValue(body.attemptKey)) {
       if (typeof body.attemptKey !== "string" || !attempts.some((option) => option.key === body.attemptKey)) return NextResponse.json({ ok: false, error: "Choose an available attempt." }, { status: 400 });
       update.attempt_key = body.attemptKey;
     }
-    if (body.primaryUse !== null && body.primaryUse !== undefined) {
+    if (hasDraftValue(body.primaryUse)) {
       if (!isPrimaryUse(body.primaryUse)) return NextResponse.json({ ok: false, error: "Choose a valid onboarding focus." }, { status: 400 });
       update.primary_use = body.primaryUse;
     }
-    if (body.dailyTargetMinutes !== null && body.dailyTargetMinutes !== undefined) {
+    if (hasDraftValue(body.dailyTargetMinutes)) {
       const target = normalizeDailyTarget(body.dailyTargetMinutes);
       if (target === null) return NextResponse.json({ ok: false, error: "Daily target must be between 15 and 720 minutes." }, { status: 400 });
       update.daily_target_minutes = target;
