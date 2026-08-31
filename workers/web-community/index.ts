@@ -6,8 +6,10 @@ import { runNextServer } from "../next-runtime";
 
 type WorkerContext = { waitUntil(promise: Promise<unknown>): void };
 
-export default {
+const communityWebWorker = {
   fetch(request: Request, env: Record<string, unknown>, ctx: WorkerContext) {
     return runWithCloudflareRequestContext(request, env, ctx, () => runNextServer(request, env, ctx, handler));
   },
 };
+
+export default communityWebWorker;
