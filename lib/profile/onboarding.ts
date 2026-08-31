@@ -12,3 +12,15 @@ export type PrimaryUse = (typeof primaryUseOptions)[number]["key"];
 export function isPrimaryUse(value: unknown): value is PrimaryUse {
   return typeof value === "string" && primaryUseOptions.some((option) => option.key === value);
 }
+
+export function isPrimaryUsePriority(value: unknown): value is PrimaryUse[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > primaryUseOptions.length) return false;
+  if (!value.every(isPrimaryUse)) return false;
+  return new Set(value).size === value.length;
+}
+
+export function normalizePrimaryUsePriority(value: unknown, fallback?: unknown): PrimaryUse[] {
+  if (isPrimaryUsePriority(value)) return value;
+  if (isPrimaryUse(fallback)) return [fallback];
+  return [];
+}
