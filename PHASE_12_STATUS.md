@@ -76,9 +76,35 @@ Parent Owner safeguards remain authoritative, including hierarchy checks and pro
 
 Phase 11 payment authority remains unchanged: browser data does not determine paid amount or subscription authority; Razorpay order/payment state and signatures continue to be verified server-side through the private Billing Worker and Phase 11 reconciliation path.
 
+## Hybrid Cloudflare architecture
+
+Phase 12 now uses an optimized hybrid deployment model rather than splitting ordinary Next.js route families into separate Core/Admin/Community/Planning Workers.
+
+```text
+Browser
+  -> ca-progress-v2 (single OpenNext / Next.js web Worker)
+       -> USER_RESOURCES_R2
+       -> ICAI_SYNC_SERVICE -> ca-progress-v2-icai-sync
+       -> BILLING_SERVICE -> ca-progress-v2-billing
+       -> ADMIN_OPS_SERVICE -> ca-progress-v2-admin-ops
+```
+
+The web application remains one deployment unit so normal Cloudflare Connected Builds stay simple. Source code remains modular by product/domain; a single deployment unit does not collapse those source boundaries.
+
+The following temporary split deployment units are removed:
+
+- `ca-progress-v2-web-core`
+- `ca-progress-v2-web-admin`
+- `ca-progress-v2-web-community`
+- `ca-progress-v2-web-planning`
+
+Heavy/background/security-sensitive work remains outside the Next bundle. Future Workers should be added only when a feature has a clear processing, security or bundle-size reason rather than creating a Worker for every route family.
+
+The consolidated web Worker has a repository compressed-size gate of **2.80 MiB**, below the Cloudflare Free hard limit, with a preferred optimization target of **2.50 MiB or lower** where practical. ICAI, Billing and Admin Ops retain their independent tighter budgets.
+
 ## Private Admin Operations Worker
 
-Architecture hardening is now part of the integrated Phase 12 branch.
+Architecture hardening remains part of the integrated Phase 12 branch.
 
 Admin operations use:
 
@@ -96,9 +122,9 @@ The private Admin Worker:
 - enforces minimum role levels before privileged work;
 - handles member, platform, plan, notification, audit, content and health operations;
 - calls the private Billing Worker for billing health where required;
-- participates in Cloudflare deploy, local multi-worker preview and size-budget checks.
+- participates in local multi-worker preview and independent size-budget checks.
 
-`wrangler.web.jsonc` contains the `ADMIN_OPS_SERVICE` binding and Phase 12 Worker version metadata.
+`wrangler.web.jsonc` contains the `ADMIN_OPS_SERVICE`, `BILLING_SERVICE`, `ICAI_SYNC_SERVICE` and `USER_RESOURCES_R2` bindings plus Phase 12 Worker version metadata.
 
 ## Phase 12 migrations
 
@@ -124,6 +150,6 @@ npm run cf:check
 npm run cf:smoke
 ```
 
-The verification must also include the existing Phase 11 payment/security regressions, Phase 12 admin/security regressions, and Phase 2 onboarding/feature-guide regressions that are part of `npm test`.
+The verification must also include the existing Phase 11 payment/security regressions, Phase 12 admin/security regressions, Phase 2 onboarding/feature-guide regressions and hybrid Cloudflare architecture regressions that are part of `npm test`.
 
 The Phase 12 migration must also be applied to the isolated V2 Supabase project before production acceptance. The legacy repository, legacy deployment and any unrelated Supabase project remain out of scope.

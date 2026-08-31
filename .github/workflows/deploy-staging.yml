@@ -28,13 +28,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
-      - name: Validate all Cloudflare Worker bundles and size budgets
+      - name: Validate hybrid Cloudflare Worker bundles and size budgets
         run: npm run cf:check
-      - name: Deploy validated multi-Worker build
-        run: npm run cf:deploy:built
+      - name: Deploy specialist services and consolidated web Worker
+        run: npm run cf:deploy:services && npm run cf:deploy:web
 
-# Staging deployment is intentionally orchestrated from GitHub Actions rather than
-# Cloudflare Connected Builds. Connected Builds enforce the one connected Worker
-# name, while this application deploys multiple independently named private Workers.
+# This workflow is an optional manual fallback. The normal web deployment remains a
+# single Cloudflare Connected Build for ca-progress-v2. ICAI, Billing and Admin Ops
+# remain independently deployable private services and are not split Next.js domains.
 # Runtime secrets remain dashboard-managed and are preserved with keep_vars=true.
 # Razorpay secrets remain only on ca-progress-v2-billing.

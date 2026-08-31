@@ -8,12 +8,11 @@
   "keep_vars": true,
   "secrets": { "required": ["SUPABASE_SERVICE_ROLE_KEY"] },
   "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
+  "r2_buckets": [{ "binding": "USER_RESOURCES_R2", "bucket_name": "ca-progress-v2-staging-user-resources" }],
   "services": [
-    { "binding": "CORE_WEB_SERVICE", "service": "ca-progress-v2-web-core" },
-    { "binding": "ADMIN_WEB_SERVICE", "service": "ca-progress-v2-web-admin" },
-    { "binding": "COMMUNITY_WEB_SERVICE", "service": "ca-progress-v2-web-community" },
-    { "binding": "PLANNING_WEB_SERVICE", "service": "ca-progress-v2-web-planning" },
-    { "binding": "ICAI_SYNC_SERVICE", "service": "ca-progress-v2-icai-sync" }
+    { "binding": "ICAI_SYNC_SERVICE", "service": "ca-progress-v2-icai-sync" },
+    { "binding": "BILLING_SERVICE", "service": "ca-progress-v2-billing" },
+    { "binding": "ADMIN_OPS_SERVICE", "service": "ca-progress-v2-admin-ops" }
   ],
   "triggers": { "crons": ["30 0 * * *"] },
   "vars": {

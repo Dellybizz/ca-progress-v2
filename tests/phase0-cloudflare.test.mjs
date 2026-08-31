@@ -7,14 +7,15 @@ const root = new URL("../", import.meta.url).pathname;
 
 test("Cloudflare Workers is the configured deployment path", () => {
   assert.equal(existsSync(join(root, "wrangler.jsonc")), true);
+  assert.equal(existsSync(join(root, "wrangler.web.jsonc")), true);
   assert.equal(existsSync(join(root, "open-next.config.ts")), true);
-  assert.equal(existsSync(join(root, "scripts/deploy-split-web.mjs")), true);
+  assert.equal(existsSync(join(root, "scripts/deploy-split-web.mjs")), false);
+  assert.equal(existsSync(join(root, "workers/next-runtime.ts")), false);
   assert.equal(existsSync(join(root, "vercel.json")), false);
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   assert.match(pkg.scripts["cf:build"], /opennextjs-cloudflare build/);
-  assert.match(pkg.scripts["cf:deploy"], /cf:deploy:web/);
-  assert.equal(pkg.scripts["cf:deploy:web"], "node scripts/deploy-split-web.mjs");
-  assert.match(readFileSync(join(root, "scripts/deploy-split-web.mjs"), "utf8"), /wrangler[\s\S]*deploy/);
+  assert.equal(pkg.scripts["cf:deploy"], "npm run cf:build && npm run cf:deploy:web");
+  assert.equal(pkg.scripts["cf:deploy:web"], "opennextjs-cloudflare deploy --config=wrangler.web.jsonc");
 });
 
 test("staging Worker cannot be mistaken for the legacy project", () => {
