@@ -131,80 +131,76 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
   return (
     <>
       <div className="phase6-planner-layout planner-layout">
-        <div className="phase6-planner-main planner-main">
-          <section className="phase6-metric-strip phase6-metric-strip--planner planner-summary" aria-label="Today's plan summary">
-            <Card><CardBody><Icon name="calendar"/><span><strong>{todayTasks.length}</strong><small>Tasks today</small></span></CardBody></Card>
-            <Card><CardBody><Icon name="clock"/><span><strong>{todayMinutes}m</strong><small>Planned time</small></span></CardBody></Card>
-            <Card><CardBody><Icon name="check"/><span><strong>{completedCount}</strong><small>Completed</small></span></CardBody></Card>
-          </section>
+        <section className="phase6-metric-strip phase6-metric-strip--planner planner-summary" aria-label="Today's plan summary">
+          <Card><CardBody><Icon name="calendar"/><span><strong>{todayTasks.length}</strong><small>Tasks today</small></span></CardBody></Card>
+          <Card><CardBody><Icon name="clock"/><span><strong>{todayMinutes}m</strong><small>Planned time</small></span></CardBody></Card>
+          <Card><CardBody><Icon name="check"/><span><strong>{completedCount}</strong><small>Completed</small></span></CardBody></Card>
+        </section>
 
-          <Card className="planner-tasks-card">
-            <CardHeader title="Today’s tasks" action={<Link href="/calendar" className="ui-text-link">Calendar</Link>}/>
-            <CardBody>
-              {model.tasks.length ? (
-                <div className="phase6-task-list">
-                  {model.tasks.map((task) => (
-                    <article key={task.id} className={`phase6-task planner-task phase6-task--${task.status}`}>
-                      <div className="planner-task__content">
-                        <div className="phase6-task-title"><strong>{task.title}</strong><span className={`phase6-kind phase6-kind--${task.taskKind}`}>{task.taskKind}</span></div>
-                        <p>{task.chapterTitle ?? task.subjectTitle ?? "General"} · {task.estimatedMinutes} min · {formatTaskSchedule(task.dueAt)}</p>
-                        {task.notes ? <small>{task.notes}</small> : null}
-                      </div>
-                      <div className="planner-task__actions" aria-label={`Actions for ${task.title}`}>
-                        <button className="planner-task-action planner-task-action--complete" type="button" disabled={busy} onClick={() => void request({ action: "toggle", id: task.id, done: task.status !== "done" })}>{task.status === "done" ? "Reopen" : "Complete"}</button>
-                        <button className="planner-task-action" type="button" disabled={busy} onClick={() => editTask(task)}>Edit</button>
-                        <button className="planner-task-action planner-task-action--delete" type="button" disabled={busy} onClick={() => setDeleteTarget({ id: task.id, title: task.title })}>Delete</button>
-                      </div>
-                    </article>
-                  ))}
+        <Card className="planner-add-card">
+          <CardHeader
+            title={editingId ? "Edit task" : "Add task"}
+            action={editingId ? <button className="planner-edit-cancel" type="button" disabled={busy} onClick={resetForm}>Cancel</button> : undefined}
+          />
+          <CardBody>
+            <form className="phase6-form planner-form" onSubmit={saveTask}>
+              <label className="planner-form__full"><span>Task</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Revise AS 10"/></label>
+
+              <div className="planner-form__grid">
+                <label><span>Type</span><select value={kind} onChange={(event) => setKind(event.target.value as TaskKind)}><option value="study">Study</option><option value="revision">Revision</option><option value="test">Test</option><option value="other">Other</option></select></label>
+                <label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">General</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
+                <label><span>Chapter</span><select disabled={!selectedSubject} value={chapterId} onChange={(event) => setChapterId(event.target.value)}><option value="">No chapter</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
+                <label><span>Minutes</span><input type="number" min="1" max="720" value={estimated} onChange={(event) => setEstimated(Number(event.target.value))}/></label>
+              </div>
+
+              <div className="planner-schedule">
+                <div className="planner-schedule__grid">
+                  <label><span>Scheduled for date</span><input type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)}/></label>
+                  <label><span>Time</span><input type="time" required value={scheduledTime} onChange={(event) => setScheduledTime(event.target.value)}/></label>
                 </div>
-              ) : (
-                <div className="phase6-empty planner-empty">
-                  <span className="planner-empty__icon"><Icon name="calendar" size={22}/></span>
-                  <strong>Your day is clear</strong>
-                  <p>Add a task to start building today’s study plan.</p>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </div>
+              </div>
 
-        <aside className="planner-side">
-          <Card className="planner-add-card">
-            <CardHeader
-              title={editingId ? "Edit task" : "Add task"}
-              action={editingId ? <button className="planner-edit-cancel" type="button" disabled={busy} onClick={resetForm}>Cancel</button> : undefined}
-            />
-            <CardBody>
-              <form className="phase6-form planner-form" onSubmit={saveTask}>
-                <label className="planner-form__full"><span>Task</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Revise AS 10"/></label>
+              <label><span>Notes <em>optional</em></span><textarea maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)} rows={2}/></label>
+              {error ? <div className="phase6-inline-error">{error}</div> : null}
+              <button disabled={busy} className="ui-button ui-button--primary planner-add-button" type="submit">{busy ? "Saving…" : editingId ? "Save changes" : "Add task"}</button>
+            </form>
+          </CardBody>
+        </Card>
 
-                <div className="planner-form__grid">
-                  <label><span>Type</span><select value={kind} onChange={(event) => setKind(event.target.value as TaskKind)}><option value="study">Study</option><option value="revision">Revision</option><option value="test">Test</option><option value="other">Other</option></select></label>
-                  <label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">General</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
-                  <label><span>Chapter</span><select disabled={!selectedSubject} value={chapterId} onChange={(event) => setChapterId(event.target.value)}><option value="">No chapter</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
-                  <label><span>Minutes</span><input type="number" min="1" max="720" value={estimated} onChange={(event) => setEstimated(Number(event.target.value))}/></label>
-                </div>
+        <Card className="planner-tasks-card">
+          <CardHeader title="Today’s tasks" action={<Link href="/calendar" className="ui-text-link">Calendar</Link>}/>
+          <CardBody>
+            {model.tasks.length ? (
+              <div className="phase6-task-list">
+                {model.tasks.map((task) => (
+                  <article key={task.id} className={`phase6-task planner-task phase6-task--${task.status}`}>
+                    <div className="planner-task__content">
+                      <div className="phase6-task-title"><strong>{task.title}</strong><span className={`phase6-kind phase6-kind--${task.taskKind}`}>{task.taskKind}</span></div>
+                      <p>{task.chapterTitle ?? task.subjectTitle ?? "General"} · {task.estimatedMinutes} min · {formatTaskSchedule(task.dueAt)}</p>
+                      {task.notes ? <small>{task.notes}</small> : null}
+                    </div>
+                    <div className="planner-task__actions" aria-label={`Actions for ${task.title}`}>
+                      <button className="planner-task-action planner-task-action--complete" type="button" disabled={busy} onClick={() => void request({ action: "toggle", id: task.id, done: task.status !== "done" })}>{task.status === "done" ? "Reopen" : "Complete"}</button>
+                      <button className="planner-task-action" type="button" disabled={busy} onClick={() => editTask(task)}>Edit</button>
+                      <button className="planner-task-action planner-task-action--delete" type="button" disabled={busy} onClick={() => setDeleteTarget({ id: task.id, title: task.title })}>Delete</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="phase6-empty planner-empty">
+                <span className="planner-empty__icon"><Icon name="calendar" size={22}/></span>
+                <strong>Your day is clear</strong>
+                <p>Add a task to start building today’s study plan.</p>
+              </div>
+            )}
+          </CardBody>
+        </Card>
 
-                <div className="planner-schedule">
-                  <div className="planner-schedule__grid">
-                    <label><span>Scheduled for date</span><input type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)}/></label>
-                    <label><span>Time</span><input type="time" required value={scheduledTime} onChange={(event) => setScheduledTime(event.target.value)}/></label>
-                  </div>
-                </div>
-
-                <label><span>Notes <em>optional</em></span><textarea maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)} rows={2}/></label>
-                {error ? <div className="phase6-inline-error">{error}</div> : null}
-                <button disabled={busy} className="ui-button ui-button--primary planner-add-button" type="submit">{busy ? "Saving…" : editingId ? "Save changes" : "Add task"}</button>
-              </form>
-            </CardBody>
-          </Card>
-
-          <nav className="planner-mobile-links" aria-label="Planner pages">
-            <Link href="/planner/today"><Icon name="sparkles" size={18}/><span><strong>Today Plan</strong><small>See today’s study plan</small></span><Icon name="chevron" size={16}/></Link>
-            <Link href="/calendar"><Icon name="calendar" size={18}/><span><strong>Calendar</strong><small>See tasks by date</small></span><Icon name="chevron" size={16}/></Link>
-          </nav>
-        </aside>
+        <nav className="planner-mobile-links" aria-label="Planner pages">
+          <Link href="/planner/today"><Icon name="sparkles" size={18}/><span><strong>Today Plan</strong><small>See today’s study plan</small></span><Icon name="chevron" size={16}/></Link>
+          <Link href="/calendar"><Icon name="calendar" size={18}/><span><strong>Calendar</strong><small>See tasks by date</small></span><Icon name="chevron" size={16}/></Link>
+        </nav>
       </div>
 
       {deleteTarget ? (
