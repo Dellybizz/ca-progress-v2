@@ -67,6 +67,25 @@
   background: var(--color-surface-muted);
   color: var(--color-brand);
 }
+.primary-use-grid__rank {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+.priority-selection-summary {
+  margin-top: 12px;
+  color: var(--color-text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
 .onboarding-na--button { text-align: left; }
 
 .feature-guide {
