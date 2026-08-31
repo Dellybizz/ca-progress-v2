@@ -14,7 +14,7 @@ export default async function LogoutPage({ searchParams }: { searchParams: Promi
   const user = await optionalUser();
   if (!user) redirect("/login");
   const profile = await getProfileForUser(user.id);
-  const label = profile?.display_name?.trim() || user.email || user.phone || "Student";
+  const label = profile?.display_name?.trim() || user.email || "Student";
 
   return <div className="logout-v2">
     <Card className="logout-v2__card"><CardBody>
