@@ -25,7 +25,7 @@ export default async function Page() {
         preview={false}
         eyebrow="Planner"
         title="Plan your study day."
-        actions={<div className="phase6-header-links planner-header-links"><Link href="/planner/today">Today Plan</Link><Link href="/calendar">Calendar</Link><Link href="/goals">Goals</Link></div>}
+        actions={<div className="phase6-header-links planner-header-links"><Link href="/planner/today">Today Plan</Link><Link href="/calendar">Calendar</Link></div>}
       />
       <PlannerClient model={model}/>
     </div>
