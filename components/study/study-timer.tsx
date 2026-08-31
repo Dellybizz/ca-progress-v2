@@ -83,14 +83,14 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
   }
 
   if (timer) return (
-    <div className="phase6-study-grid">
-      <Card className="phase6-focus-card">
+    <div className="phase6-study-grid study-session-grid">
+      <Card className="phase6-focus-card study-live-card">
         <CardBody>
-          <div className="phase6-focus-top"><span className="phase6-kicker"><Icon name="timer" size={16}/> Study Focus</span><span className={`phase6-status phase6-status--${timer.status}`}>{timer.abandoned ? "Needs review" : timer.status}</span></div>
+          <div className="phase6-focus-top"><span className="phase6-kicker"><Icon name="timer" size={16}/> Focus session</span><span className={`phase6-status phase6-status--${timer.status}`}>{timer.abandoned ? "Needs review" : timer.status}</span></div>
           <div className="phase6-clock" aria-live="polite">{duration(timer.mode === "pomodoro" && remaining !== null ? remaining : elapsed)}</div>
-          <p className="phase6-clock-label">{timer.mode === "pomodoro" ? remaining === 0 ? "Focus target reached — finish now or keep studying." : `Focus countdown · ${minutesLabel(timer.focusTargetSeconds ?? 0)} target` : "Elapsed focused study time"}</p>
+          <p className="phase6-clock-label">{timer.mode === "pomodoro" ? remaining === 0 ? "Focus target reached — finish now or keep studying." : `${minutesLabel(timer.focusTargetSeconds ?? 0)} focus target` : "Focused time elapsed"}</p>
           <div className="phase6-focus-context"><strong>{timer.chapterTitle ?? timer.subjectTitle ?? "General study"}</strong><span>{timer.mode === "pomodoro" ? `Pomodoro · ${Math.round((timer.focusTargetSeconds ?? 0) / 60)}/${Math.round((timer.breakTargetSeconds ?? 0) / 60)}` : "Stopwatch"}</span></div>
-          {timer.abandoned ? <div className="phase6-warning"><Icon name="clock"/><div><strong>This timer appears abandoned.</strong><p>For safety, CA Progress will not turn an unattended 16+ hour timer into study analytics. Discard it and start a fresh session.</p></div></div> : null}
+          {timer.abandoned ? <div className="phase6-warning"><Icon name="clock"/><div><strong>This timer looks inactive.</strong><p>Discard it and start a fresh session so only real study time is saved.</p></div></div> : null}
           {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
           <div className="phase6-timer-actions">
             {!timer.abandoned && timer.status === "running" ? <button className="ui-button ui-button--secondary" disabled={busy} onClick={() => void mutate({ action: "pause" })}>Pause</button> : null}
@@ -100,31 +100,49 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
           </div>
         </CardBody>
       </Card>
-      <Card>
-        <CardHeader title="Session persistence" description="The active timer lives in your private database row, not in page memory."/>
-        <CardBody><div className="phase6-detail-list"><div><span>Started</span><strong>{new Date(timer.startedAt).toLocaleString()}</strong></div><div><span>Timezone</span><strong>{timer.timezone}</strong></div><div><span>Saved elapsed</span><strong>{duration(timer.elapsedSeconds)}</strong></div><div><span>Route changes</span><strong>Safe to navigate away</strong></div></div></CardBody>
+      <Card className="study-session-details">
+        <CardHeader title="Session details" description="Your current timer is saved automatically."/>
+        <CardBody><div className="phase6-detail-list"><div><span>Started</span><strong>{new Date(timer.startedAt).toLocaleString()}</strong></div><div><span>Timezone</span><strong>{timer.timezone}</strong></div><div><span>Saved time</span><strong>{duration(timer.elapsedSeconds)}</strong></div><div><span>Navigation</span><strong>You can move around safely</strong></div></div></CardBody>
       </Card>
     </div>
   );
 
   return (
-    <div className="phase6-study-grid">
-      <Card className="phase6-focus-card phase6-focus-card--setup">
-        <CardHeader title="Start a focus session" description="Choose what you are studying. The timer continues safely across reloads and route changes."/>
+    <div className="phase6-study-grid study-session-grid">
+      <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card">
+        <CardHeader title="Start a focus session" description="Pick what you’re studying, choose a timer, then begin."/>
         <CardBody>
-          <form className="phase6-form" onSubmit={start}>
-            <label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">General study</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
-            <label><span>Chapter</span><select value={chapterId} onChange={(event) => setChapterId(event.target.value)} disabled={!selectedSubject}><option value="">No chapter selected</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
-            <fieldset className="phase6-mode"><legend>Timer mode</legend><button type="button" className={mode === "pomodoro" ? "is-active" : ""} onClick={() => setMode("pomodoro")}>Pomodoro</button><button type="button" className={mode === "stopwatch" ? "is-active" : ""} onClick={() => setMode("stopwatch")}>Stopwatch</button></fieldset>
-            {mode === "pomodoro" ? <><div className="phase6-presets"><button type="button" className={focusMinutes === 25 && breakMinutes === 5 ? "is-active" : ""} onClick={() => { setFocusMinutes(25); setBreakMinutes(5); }}>25 / 5</button><button type="button" className={focusMinutes === 50 && breakMinutes === 10 ? "is-active" : ""} onClick={() => { setFocusMinutes(50); setBreakMinutes(10); }}>50 / 10</button><span>or custom</span></div><div className="phase6-form-row"><label><span>Focus minutes</span><input type="number" min="1" max="720" value={focusMinutes} onChange={(event) => setFocusMinutes(Number(event.target.value))}/></label><label><span>Break minutes</span><input type="number" min="0" max="120" value={breakMinutes} onChange={(event) => setBreakMinutes(Number(event.target.value))}/></label></div></> : <div className="phase6-note"><Icon name="clock"/><span>Stopwatch mode records the exact focused duration you finish.</span></div>}
+          <form className="phase6-form study-builder" onSubmit={start}>
+            <section className="study-builder-section">
+              <div className="study-builder-section__title"><span>1</span><div><strong>What are you studying?</strong><small>Choose a subject, then a chapter if you want detailed tracking.</small></div></div>
+              <div className="study-builder-fields">
+                <label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">General study</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
+                <label><span>Chapter</span><select value={chapterId} onChange={(event) => setChapterId(event.target.value)} disabled={!selectedSubject}><option value="">No chapter selected</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
+              </div>
+            </section>
+
+            <section className="study-builder-section">
+              <div className="study-builder-section__title"><span>2</span><div><strong>How do you want to focus?</strong><small>Use Pomodoro for timed blocks or Stopwatch for an open-ended session.</small></div></div>
+              <fieldset className="phase6-mode study-mode-picker"><legend>Timer mode</legend>
+                <button type="button" className={mode === "pomodoro" ? "is-active" : ""} onClick={() => setMode("pomodoro")}><Icon name="timer" size={18}/><span><strong>Pomodoro</strong><small>Focus + break cycles</small></span></button>
+                <button type="button" className={mode === "stopwatch" ? "is-active" : ""} onClick={() => setMode("stopwatch")}><Icon name="clock" size={18}/><span><strong>Stopwatch</strong><small>Study without a fixed end</small></span></button>
+              </fieldset>
+
+              {mode === "pomodoro" ? <div className="study-duration-panel">
+                <div className="phase6-presets study-presets"><button type="button" className={focusMinutes === 25 && breakMinutes === 5 ? "is-active" : ""} onClick={() => { setFocusMinutes(25); setBreakMinutes(5); }}><strong>25</strong><span>focus</span><small>5 min break</small></button><button type="button" className={focusMinutes === 50 && breakMinutes === 10 ? "is-active" : ""} onClick={() => { setFocusMinutes(50); setBreakMinutes(10); }}><strong>50</strong><span>focus</span><small>10 min break</small></button><span>or set your own</span></div>
+                <div className="phase6-form-row study-custom-time"><label><span>Focus minutes</span><input type="number" min="1" max="720" value={focusMinutes} onChange={(event) => setFocusMinutes(Number(event.target.value))}/></label><label><span>Break minutes</span><input type="number" min="0" max="120" value={breakMinutes} onChange={(event) => setBreakMinutes(Number(event.target.value))}/></label></div>
+              </div> : <div className="phase6-note"><Icon name="clock"/><span>Stopwatch records the exact focused time when you finish the session.</span></div>}
+            </section>
+
             {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
-            <button className="ui-button ui-button--primary phase6-start-button" disabled={busy} type="submit">{busy ? "Starting…" : "Start study timer"}</button>
+            <button className="ui-button ui-button--primary phase6-start-button study-start-button" disabled={busy} type="submit"><Icon name="timer" size={17}/>{busy ? "Starting…" : "Start focus session"}</button>
           </form>
         </CardBody>
       </Card>
-      <Card>
-        <CardHeader title="Recent study" description="Completed sessions immediately become the study analytics source."/>
-        <CardBody>{model.analytics.recentSessions.length ? <div className="phase6-session-list">{model.analytics.recentSessions.slice(0, 5).map((session) => <div key={session.id}><span><strong>{session.chapterTitle ?? session.subjectTitle ?? "General study"}</strong><small>{new Date(session.endedAt).toLocaleString()}</small></span><b>{minutesLabel(session.durationSeconds)}</b></div>)}</div> : <div className="phase6-empty"><Icon name="timer"/><strong>No completed study sessions yet</strong><p>Finish your first timer and it will appear here and in Analytics.</p></div>}</CardBody>
+
+      <Card className="study-recent-card">
+        <CardHeader title="Recent study" description="Your latest completed sessions."/>
+        <CardBody>{model.analytics.recentSessions.length ? <div className="phase6-session-list">{model.analytics.recentSessions.slice(0, 5).map((session) => <div key={session.id}><span><strong>{session.chapterTitle ?? session.subjectTitle ?? "General study"}</strong><small>{new Date(session.endedAt).toLocaleString()}</small></span><b>{minutesLabel(session.durationSeconds)}</b></div>)}</div> : <div className="phase6-empty study-empty"><span className="study-empty__icon"><Icon name="timer" size={22}/></span><strong>Your study history starts here</strong><p>Complete your first focus session and it’ll appear here automatically.</p></div>}</CardBody>
       </Card>
     </div>
   );
