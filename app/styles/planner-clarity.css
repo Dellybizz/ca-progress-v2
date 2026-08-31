@@ -199,10 +199,12 @@
 
 .planner-form label {
   gap: 5px;
+  min-width: 0;
   font-size: 11px;
 }
 
 .planner-form label > span {
+  color: var(--color-text-soft);
   font-size: 11px;
 }
 
@@ -216,8 +218,12 @@
 .planner-form input,
 .planner-form select,
 .planner-form textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 42px;
   padding: 9px 11px;
+  box-sizing: border-box;
   border-radius: 10px;
   font-size: 12px;
 }
@@ -229,31 +235,24 @@
 .planner-schedule {
   display: grid;
   gap: 7px;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
-.planner-schedule legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 1px;
-  padding: 0;
-  color: var(--color-text);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.planner-schedule legend svg {
-  color: var(--color-text-soft);
-}
-
 .planner-schedule__grid {
   display: grid;
-  grid-template-columns: 1.15fr .85fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  min-width: 0;
+}
+
+.planner-schedule__grid label,
+.planner-schedule__grid input {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .planner-schedule__grid label > span {
@@ -262,6 +261,8 @@
 }
 
 .planner-schedule__grid input {
+  width: 100%;
+  box-sizing: border-box;
   background: var(--color-surface);
 }
 
@@ -383,8 +384,35 @@
     display: none;
   }
 
+  .planner-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .planner-main,
+  .planner-side {
+    display: contents;
+  }
+
+  .planner-add-card {
+    order: 1;
+  }
+
+  .planner-tasks-card {
+    order: 2;
+  }
+
   .planner-summary {
+    order: 3;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .planner-mobile-links {
+    order: 4;
+    display: grid;
+    gap: 8px;
+    margin-top: 0;
   }
 
   .planner-summary .ui-card__body {
@@ -417,15 +445,28 @@
     padding: 0 8px;
   }
 
-  .planner-form__grid,
-  .planner-schedule__grid {
-    grid-template-columns: 1fr;
+  .planner-form__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .planner-mobile-links {
-    display: grid;
-    gap: 8px;
-    margin-top: 0;
+  .planner-schedule__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planner-schedule,
+  .planner-schedule__grid,
+  .planner-schedule__grid label,
+  .planner-schedule__grid input {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .planner-schedule__grid input[type="date"],
+  .planner-schedule__grid input[type="time"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .planner-mobile-links a {
