@@ -1,70 +1,135 @@
-# CA Progress V2 — Cloudflare Worker Architecture
+# CA Progress V2 — Scalable Cloudflare Worker Architecture
 
 ## Goal
 
-Keep the user-facing Next.js/OpenNext Worker comfortably below Cloudflare bundle limits as later V2 phases are added, without weakening RLS, server authorization, R2 privacy or existing feature behavior.
+Keep CA Progress on the Cloudflare Workers Free plan while allowing the product to keep growing without deleting features or repeatedly shaving bytes from unrelated code.
 
-## Current topology
+Cloudflare currently allows **3 MiB compressed per Worker** on the Free plan. The old single OpenNext server Worker had reached roughly 2.70 MiB compressed, so adding more features to one server bundle was no longer a sustainable architecture.
+
+The solution is route-level server-function splitting plus private Service Bindings.
+
+## Runtime topology
 
 ```text
 Browser
   |
   v
-ca-progress-v2 (Next.js/OpenNext web Worker)
-  |-- Supabase V2 / RLS
-  |-- USER_RESOURCES_R2 (private Phase 7 files)
-  |
-  `-- ICAI_SYNC_SERVICE (Cloudflare Service Binding)
-          |
-          v
-      ca-progress-v2-icai-sync
-      private, workers_dev=false
-          |
-          v
-      Supabase V2 operational ICAI tables/RPCs
+ca-progress-v2                     public ingress / OpenNext middleware
+  |-- CORE_WEB_SERVICE ----------> ca-progress-v2-web-core
+  |-- ADMIN_WEB_SERVICE ---------> ca-progress-v2-web-admin
+  |-- COMMUNITY_WEB_SERVICE -----> ca-progress-v2-web-community
+  |-- PLANNING_WEB_SERVICE ------> ca-progress-v2-web-planning
+  |-- ICAI_SYNC_SERVICE ---------> ca-progress-v2-icai-sync
+
+private Next server Workers
+  |-- BILLING_SERVICE -----------> ca-progress-v2-billing
+  |-- ADMIN_OPS_SERVICE ---------> ca-progress-v2-admin-ops
+  |-- ICAI_SYNC_SERVICE ---------> ca-progress-v2-icai-sync
+  `-- USER_RESOURCES_R2 ---------> private user-resource bucket
 ```
 
-The web Worker owns product routes, SSR/RSC, authenticated UI actions and thin API/BFF endpoints. Heavy background processing belongs in domain Workers when it would otherwise make every web request carry unnecessary code.
+The browser still sees one application and one URL space. Only `ca-progress-v2` is the public web ingress. The split Next server Workers use `workers_dev: false` and are reachable through Service Bindings rather than public routes.
 
-## Phase 8 extraction
+## Why this scales better
 
-The Phase 8 parser/synchronization engine is in `workers/icai-sync/`. The public/admin application keeps the existing `runIcaiSync()` contract in `lib/icai/sync.ts`, but that module is now a thin client for the `ICAI_SYNC_SERVICE` binding.
+The public Worker no longer imports the complete OpenNext default server bundle. It owns only routing/middleware, assets and small cross-cutting edge concerns.
 
-The scheduled handler in `custom-worker.ts` also calls the service directly. This preserves the existing daily schedule while keeping parser/backoff/source-processing code out of the OpenNext server bundle.
+OpenNext compiles separate server functions for feature families. Each private function gets its own Cloudflare compressed-size budget, so future features increase only the Worker that owns that route family.
 
-The internal Worker has no `workers.dev` endpoint and no public routes. The target Worker is deployed before the web Worker so the service binding resolves safely.
+If one domain grows too large, that domain can be split again without changing public URLs. For example, `community` can later become separate Community and Resources functions, or Tests can become a dedicated function, while the rest of the application remains unchanged.
 
-## Bootstrap-safe configurations
+## Route ownership
 
-Cloudflare requires a Service Binding target to exist before the caller can be deployed. To make the first modular deployment reproducible rather than requiring a one-off placeholder Worker:
+### Core
 
-- `wrangler.jsonc` is the repository/bootstrap config and deliberately contains no service binding. This lets Workers Builds parse the repository before the new internal Worker exists.
-- `workers/icai-sync/wrangler.jsonc` deploys the private target Worker.
-- `wrangler.web.jsonc` is the final web deployment config and adds `ICAI_SYNC_SERVICE` only after that target has been created.
+The default OpenNext server function owns shared/public/account routes including:
 
-Both web configs preserve the same Worker name, R2 binding, required secrets, cron schedule and Phase 10 runtime variables. The only intentional difference is the final Service Binding.
+- login, logout and OAuth callbacks;
+- onboarding and the Dashboard feature guide;
+- Dashboard;
+- Settings/Profile/Account;
+- Syllabus and Tests;
+- Pricing/Billing/payment routes;
+- shared health/profile/academic endpoints.
 
-## Bundle budgets
+### Admin
 
-`npm run cf:check` builds OpenNext and enforces repository budgets using Wrangler dry-run output:
+The `admin` OpenNext function owns:
 
-- web Worker: **2.70 MiB compressed maximum**
-- ICAI sync Worker: **1.50 MiB compressed maximum**
+- `/admin` and Admin pages;
+- `/api/admin/*`.
 
-These are repository budgets, intentionally lower than platform hard limits. A phase that breaks a budget should first trim unused code or extract an appropriate backend domain instead of simply consuming all available headroom.
+Privileged operations remain delegated to the private `ca-progress-v2-admin-ops` Worker. The Next Admin function is therefore a presentation/authentication layer rather than the final privileged authority.
 
-## Deployment
+### Community / Resources
 
-`npm run cf:deploy` performs:
+The `community` OpenNext function owns:
 
-1. OpenNext web build and guarded unused-OG stripping;
-2. deployment of `ca-progress-v2-icai-sync` using its private Worker config;
-3. deployment of `ca-progress-v2` using `wrangler.web.jsonc`, which adds the now-valid Service Binding.
+- Community;
+- Notes;
+- Resources and ICAI Resources;
+- Updates;
+- matching Community/Notes/Resources APIs.
 
-`npm run deploy` is an alias for this same ordered deployment so Cloudflare Workers Builds can use the repository-defined deploy command.
+### Planning / Study
 
-For local Cloudflare multi-worker testing use `npm run cf:preview:multi`.
+The `planning` OpenNext function owns:
 
-## Future-phase rule
+- Planner and Today Plan;
+- Progress;
+- Study;
+- Goals and Calendar;
+- Analytics/Forecast;
+- Activity;
+- subject study/progress routes;
+- matching Planner/Progress/Study APIs.
 
-Do not create a Worker for every small feature. Extract only natural heavy or security-sensitive domains. Payment/webhook processing is a likely future candidate when its assigned phase is implemented; this document does not implement or start that later-phase functionality.
+## Growth rules
+
+1. **Do not add normal product feature code to the public router.** The ingress Worker should remain middleware, routing, asset delivery and small edge concerns.
+2. Add new product work to the domain Worker that owns the feature journey.
+3. Keep a separate compressed-size budget for every private Next server Worker.
+4. If a domain approaches its budget, split that domain again instead of deleting functionality or raising the budget to the platform hard limit.
+5. Heavy privileged/background workloads belong in dedicated service Workers, not Next server bundles.
+6. Shared browser JavaScript/CSS remains in Cloudflare Static Assets and does not make the ingress Worker carry the complete application server.
+7. Deploy private server Workers before the public router so the router never points to a missing backend.
+
+## Size policy
+
+Repository budgets are deliberately below Cloudflare's hard ceiling:
+
+- public ingress router: **0.90 MiB compressed**;
+- Core Next server: **2.70 MiB compressed**;
+- Admin Next server: **2.70 MiB compressed**;
+- Community/Resources Next server: **2.70 MiB compressed**;
+- Planning/Study Next server: **2.70 MiB compressed**;
+- ICAI/Billing/Admin Operations retain their existing smaller budgets.
+
+The long-term rule is to split a growing domain before it reaches its 2.70 MiB budget, not to consume the full 3 MiB platform limit.
+
+## Security model
+
+This topology does not weaken existing authorization:
+
+- requests first pass through the existing OpenNext/Next middleware path;
+- split Next server Workers reject requests without the private router marker;
+- Admin APIs still authorize the signed-in account;
+- the Admin Operations Worker independently checks fresh `admin_users` state;
+- Parent Owner safeguards remain server/database authoritative;
+- Phase 11 Razorpay amount/signature/provider reconciliation remains within the private Billing architecture;
+- Guest remains a local non-account mode;
+- account sign-in remains Google + LinkedIn only.
+
+For the first split rollout, the existing Supabase runtime values are forwarded from ingress to split Next workers over private Service Bindings. This avoids requiring duplicate dashboard-managed secrets during the migration. A later hardening pass can provision server-only secrets directly on each private domain Worker and remove the forwarding without changing routes or feature code.
+
+## Build, local runtime and deployment
+
+`open-next.config.ts` defines the named server functions. The OpenNext build therefore produces separate `default`, `admin`, `community` and `planning` server-function bundles.
+
+`scripts/deploy-split-web.mjs` deploys private Next server Workers first and the public router last.
+
+`npm run cf:preview:multi` and `npm run cf:smoke` start the router, all split Next workers and the existing ICAI/Billing/Admin Operations workers together using Wrangler multi-worker development.
+
+## Future feature example
+
+A future Mock Test engine can begin inside Planning/Study if it is small. If it becomes a large independent module, add an OpenNext `tests` function for `/tests`, `/tests/*` and `/api/tests/*`, add a private `TESTS_WEB_SERVICE` binding, and route those paths from ingress. Existing features do not need to be removed or rewritten.
