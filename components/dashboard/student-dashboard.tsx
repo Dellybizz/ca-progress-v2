@@ -77,18 +77,19 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
 
   return (
     <section className="dashboard-attempt-strip" aria-label="Current attempt">
+      <div className="dashboard-attempt-strip__accent" aria-hidden="true"><Icon name="calendar" size={20}/></div>
       <div className="dashboard-attempt-strip__primary">
         <span className="dashboard-attempt-strip__label">Attempt</span>
         <div><strong>{model.context.attemptLabel}</strong><small>{date ? `${status} · ${date}` : status}</small></div>
       </div>
       <div className="dashboard-attempt-strip__facts" aria-label="Academic selection">
-        <span>{model.context.levelName}</span>
-        <span>{model.context.groupLabel}</span>
-        <span>{model.context.subjectCount} subjects</span>
-        <span>{model.context.chapterCount} chapters</span>
+        <span><b>Level</b>{model.context.levelName}</span>
+        <span><b>Group</b>{model.context.groupLabel}</span>
+        <span><b>Subjects</b>{model.context.subjectCount}</span>
+        <span><b>Chapters</b>{model.context.chapterCount}</span>
       </div>
       <div className="dashboard-attempt-strip__source">
-        <small>{formatVerifiedAt(model.countdown.lastVerifiedAt)}</small>
+        <small><Icon name="shield" size={12}/>{formatVerifiedAt(model.countdown.lastVerifiedAt)}</small>
         {model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={12}/></a> : null}
       </div>
     </section>
