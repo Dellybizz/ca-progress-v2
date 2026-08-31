@@ -2,22 +2,46 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { BottomSheet } from "@/components/ui/overlay";
 import { Icon, type IconName } from "@/components/ui/icon";
-import { studentNavigation } from "./navigation";
 
-const primary: { label: string; href: string; icon: IconName }[] = [
-  { label: "Home", href: "/dashboard", icon: "home" },
-  { label: "Plan", href: "/planner/today", icon: "sparkles" },
-  { label: "Progress", href: "/progress", icon: "chart" },
-  { label: "Study", href: "/study", icon: "timer" },
+const studentPrimary: { label: string; href: string; icon: IconName; matches: string[] }[] = [
+  { label: "Dashboard", href: "/dashboard", icon: "home", matches: ["/dashboard"] },
+  { label: "Study", href: "/study", icon: "timer", matches: ["/study", "/planner", "/calendar"] },
+  { label: "Progress", href: "/progress", icon: "chart", matches: ["/progress", "/analytics", "/goals", "/tests"] },
+  { label: "Resources", href: "/resources", icon: "book", matches: ["/resources", "/syllabus", "/subjects", "/updates", "/notes"] },
+  { label: "Community", href: "/community", icon: "community", matches: ["/community", "/activity"] },
 ];
+
+function isActive(pathname: string, matches: string[]) {
+  return matches.some((href) => pathname === href || pathname.startsWith(`${href}/`));
+}
 
 export function MobileNavigation({ area }: { area: "student" | "admin" }) {
   const pathname = usePathname();
-  const [moreOpen, setMoreOpen] = useState(false);
-  if (area === "admin") return <nav className="mobile-bottom-nav" aria-label="Admin mobile navigation"><Link href="/admin" className={pathname === "/admin" ? "is-active" : ""}><Icon name="shield"/><span>Admin</span></Link><Link href="/admin/syllabus" className={pathname.startsWith("/admin/syllabus") ? "is-active" : ""}><Icon name="book"/><span>Syllabus</span></Link><Link href="/admin/icai-sync" className={pathname.startsWith("/admin/icai-sync") ? "is-active" : ""}><Icon name="bell"/><span>ICAI</span></Link><Link href="/admin/resources/moderation" className={pathname.startsWith("/admin/resources/moderation") ? "is-active" : ""}><Icon name="notes"/><span>Resources</span></Link><Link href="/dashboard"><Icon name="home"/><span>Student</span></Link></nav>;
-  const moreActive = ["/planner", "/analytics", "/goals", "/calendar", "/activity", "/syllabus", "/subjects", "/updates", "/tests", "/notes", "/resources", "/community", "/pricing", "/billing", "/settings"].some((href) => pathname.startsWith(href)) && !pathname.startsWith("/planner/today");
-  return <><nav className="mobile-bottom-nav" aria-label="Student mobile navigation">{primary.map((item) => { const active = pathname === item.href || pathname.startsWith(`${item.href}/`); return <Link key={item.href} href={item.href} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}><Icon name={item.icon} size={20}/><span>{item.label}</span></Link>; })}<button onClick={() => setMoreOpen(true)} className={moreActive ? "is-active" : ""} aria-label="More navigation"><Icon name="more" size={22}/><span>More</span></button></nav><BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More from CA Progress"><div className="mobile-more-grid">{studentNavigation.slice(4).map((item) => { const active = pathname === item.href || (!item.exact && pathname.startsWith(`${item.href}/`)) || (item.href === "/syllabus" && pathname.startsWith("/subjects/")); return <Link key={item.href} href={item.href} onClick={() => setMoreOpen(false)} className={active ? "is-active" : ""}><span className="mobile-more-icon"><Icon name={item.icon}/></span><span>{item.label}</span><Icon name="chevron" size={16}/></Link>; })}</div></BottomSheet></>;
+
+  if (area === "admin") {
+    return (
+      <nav className="mobile-bottom-nav" aria-label="Admin mobile navigation">
+        <Link href="/admin" className={pathname === "/admin" ? "is-active" : ""}><Icon name="shield"/><span>Admin</span></Link>
+        <Link href="/admin/syllabus" className={pathname.startsWith("/admin/syllabus") ? "is-active" : ""}><Icon name="book"/><span>Syllabus</span></Link>
+        <Link href="/admin/icai-sync" className={pathname.startsWith("/admin/icai-sync") ? "is-active" : ""}><Icon name="bell"/><span>ICAI</span></Link>
+        <Link href="/admin/resources/moderation" className={pathname.startsWith("/admin/resources/moderation") ? "is-active" : ""}><Icon name="notes"/><span>Resources</span></Link>
+        <Link href="/dashboard"><Icon name="home"/><span>Student</span></Link>
+      </nav>
+    );
+  }
+
+  return (
+    <nav className="mobile-bottom-nav" aria-label="Student mobile navigation">
+      {studentPrimary.map((item) => {
+        const active = isActive(pathname, item.matches);
+        return (
+          <Link key={item.label} href={item.href} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}>
+            <Icon name={item.icon} size={19}/>
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }
