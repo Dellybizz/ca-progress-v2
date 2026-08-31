@@ -1,16 +1,25 @@
 import { spawn } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const args = process.argv.slice(2);
 const configIndex = args.indexOf("--config");
 const budgetIndex = args.indexOf("--budget-mib");
+const reportIndex = args.indexOf("--report-top");
 const config = configIndex >= 0 ? args[configIndex + 1] : null;
 const budgetMiB = budgetIndex >= 0 ? Number(args[budgetIndex + 1]) : 2.7;
+const reportTop = reportIndex >= 0 ? Number(args[reportIndex + 1]) : 0;
 if (!Number.isFinite(budgetMiB) || budgetMiB <= 0) throw new Error("--budget-mib must be a positive number.");
+if (!Number.isInteger(reportTop) || reportTop < 0) throw new Error("--report-top must be a non-negative integer.");
 
+const reportDir = reportTop > 0 ? mkdtempSync(join(tmpdir(), "ca-progress-worker-bundle-")) : null;
+const metafile = reportDir ? join(reportDir, "bundle-meta.json") : null;
 const wranglerArgs = ["wrangler", "deploy", "--dry-run"];
 if (config) wranglerArgs.push("--config", config);
+if (reportDir && metafile) wranglerArgs.push("--outdir", reportDir, "--metafile", metafile);
 
-const child = spawn("npx", wranglerArgs, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+const child = spawn(process.platform === "win32" ? "npx.cmd" : "npx", wranglerArgs, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
 let output = "";
 for (const stream of [child.stdout, child.stderr]) {
   stream.on("data", (chunk) => {
@@ -21,7 +30,31 @@ for (const stream of [child.stdout, child.stderr]) {
 }
 
 const exitCode = await new Promise((resolve) => child.on("close", resolve));
-if (exitCode !== 0) process.exit(Number(exitCode) || 1);
+if (exitCode !== 0) {
+  if (reportDir) rmSync(reportDir, { recursive: true, force: true });
+  process.exit(Number(exitCode) || 1);
+}
+
+if (metafile) {
+  try {
+    const meta = JSON.parse(readFileSync(metafile, "utf8"));
+    const contributions = new Map();
+    for (const outputMeta of Object.values(meta.outputs ?? {})) {
+      for (const [input, details] of Object.entries(outputMeta.inputs ?? {})) {
+        contributions.set(input, (contributions.get(input) ?? 0) + Number(details.bytesInOutput ?? 0));
+      }
+    }
+    const top = [...contributions.entries()].sort((a, b) => b[1] - a[1]).slice(0, reportTop);
+    if (top.length) {
+      console.log(`[cloudflare-size] Top ${top.length} bundled inputs by emitted bytes:`);
+      for (const [input, bytes] of top) console.log(`[cloudflare-size] ${(bytes / 1024).toFixed(1)} KiB  ${input}`);
+    }
+  } catch (error) {
+    console.warn(`[cloudflare-size] Bundle attribution unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    rmSync(reportDir, { recursive: true, force: true });
+  }
+}
 
 const matches = [...output.matchAll(/(?:gzip|compressed)(?:\s+size)?\s*[:=]?\s*([\d.]+)\s*(KiB|MiB|KB|MB)/gi)];
 if (!matches.length) {
