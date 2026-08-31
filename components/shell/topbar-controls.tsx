@@ -15,60 +15,40 @@ export function TopbarControls({ viewer, area }: { viewer: Viewer; area: "studen
   const router = useRouter();
   const [commandOpen, setCommandOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const accountHref = viewer.authenticated ? "/settings/profile" : `/login?next=${encodeURIComponent(pathname || "/dashboard")}`;
+  const logoutHref = `/logout?next=${encodeURIComponent(pathname || "/dashboard")}`;
   const navigation = area === "admin" ? adminNavigation : studentNavigation;
   const results = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const matches = normalized
-      ? navigation.filter((item) => `${item.label} ${item.href}`.toLowerCase().includes(normalized))
-      : navigation;
+    const matches = normalized ? navigation.filter((item) => `${item.label} ${item.href}`.toLowerCase().includes(normalized)) : navigation;
     return matches.slice(0, 8);
   }, [navigation, query]);
 
-  function closeCommand() {
-    setCommandOpen(false);
-    setQuery("");
-    setActiveIndex(0);
-  }
+  function closeCommand() { setCommandOpen(false); setQuery(""); setActiveIndex(0); }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setCommandOpen(true);
-      }
-      if (event.key === "Escape" && commandOpen) {
-        setCommandOpen(false);
-        setQuery("");
-        setActiveIndex(0);
-      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setCommandOpen(true); }
+      if (event.key === "Escape" && commandOpen) { setCommandOpen(false); setQuery(""); setActiveIndex(0); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [commandOpen]);
 
   function onSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveIndex((index) => Math.min(index + 1, Math.max(results.length - 1, 0)));
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveIndex((index) => Math.max(index - 1, 0));
-    } else if (event.key === "Enter" && results[activeIndex]) {
-      event.preventDefault();
-      const href = results[activeIndex].href;
-      closeCommand();
-      router.push(href);
-    }
+    if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex((index) => Math.min(index + 1, Math.max(results.length - 1, 0))); }
+    else if (event.key === "ArrowUp") { event.preventDefault(); setActiveIndex((index) => Math.max(index - 1, 0)); }
+    else if (event.key === "Enter" && results[activeIndex]) { event.preventDefault(); const href = results[activeIndex].href; closeCommand(); router.push(href); }
   }
 
   return <>
     <div className="topbar-controls">
       <button className="command-trigger" onClick={() => setCommandOpen(true)} aria-label="Open workspace search"><Icon name="search" size={18}/><span>Search anything</span><kbd>⌘ K</kbd></button>
       <button className="ui-icon-button notification-button" onClick={() => setNotificationsOpen(true)} aria-label="Open notifications"><Icon name="bell" size={19}/><i aria-hidden="true"/></button>
-      <Link href={accountHref} className="profile-avatar" aria-label={viewer.authenticated ? "Open profile" : "Sign in"}>{viewer.initial}</Link>
+      {viewer.authenticated ? <button type="button" className="profile-avatar" onClick={() => setAccountOpen(true)} aria-label="Open account menu">{viewer.initial}</button> : <Link href={accountHref} className="profile-avatar" aria-label="Sign in">{viewer.initial}</Link>}
     </div>
     {commandOpen ? <div className="ui-overlay command-palette-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCommand(); }}>
       <section className="command-palette" role="dialog" aria-modal="true" aria-label="Search CA Progress">
@@ -78,5 +58,12 @@ export function TopbarControls({ viewer, area }: { viewer: Viewer; area: "studen
       </section>
     </div> : null}
     <Drawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Notifications"><EmptyState icon="bell" title="You’re all caught up" description="ICAI updates, study reminders, replies and important account alerts will appear here." action={<Button variant="secondary" onClick={() => setNotificationsOpen(false)}>Close</Button>}/></Drawer>
+    <Drawer open={accountOpen} onClose={() => setAccountOpen(false)} title="Your account">
+      <div className="account-drawer">
+        <div className="account-drawer__identity"><span className="profile-avatar account-drawer__avatar">{viewer.initial}</span><div><strong>{viewer.label}</strong><small>Signed in · private sync enabled</small></div></div>
+        <div className="account-drawer__links"><Link href="/settings/profile" onClick={() => setAccountOpen(false)}><span><Icon name="target"/><strong>Profile & study setup</strong></span><Icon name="chevron" size={16}/></Link><Link href="/settings" onClick={() => setAccountOpen(false)}><span><Icon name="settings"/><strong>Settings</strong></span><Icon name="chevron" size={16}/></Link></div>
+        <Link className="ui-button ui-button--secondary ui-button--lg account-drawer__logout" href={logoutHref} onClick={() => setAccountOpen(false)}>Sign out of this device <Icon name="arrow" size={16}/></Link>
+      </div>
+    </Drawer>
   </>;
 }
