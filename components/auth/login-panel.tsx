@@ -10,11 +10,11 @@ import { getOrCreateGuestIdentity } from "@/lib/auth/guest";
 
 type Status = { tone: "info" | "danger" | "success"; message: string } | null;
 
-export function LoginPanel({ next, initialError }: { next: string; initialError?: string | null }) {
+export function LoginPanel({ next, initialError, initialNotice }: { next: string; initialError?: string | null; initialNotice?: string | null }) {
   const router = useRouter();
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState<"guest" | null>(null);
-  const [status] = useState<Status>(initialError ? { tone: "danger", message: initialError } : null);
+  const [status] = useState<Status>(initialError ? { tone: "danger", message: initialError } : initialNotice ? { tone: "success", message: initialNotice } : null);
   const googleHref = useMemo(() => `/auth/google?next=${encodeURIComponent(next)}&remember=${remember ? "true" : "false"}`, [next, remember]);
   const linkedinHref = useMemo(() => `/auth/linkedin?next=${encodeURIComponent(next)}&remember=${remember ? "true" : "false"}`, [next, remember]);
 
