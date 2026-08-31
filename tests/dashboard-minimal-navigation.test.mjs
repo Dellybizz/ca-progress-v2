@@ -16,10 +16,18 @@ test("student sidebar restores Dashboard plus five grouped sections", () => {
   for (const route of ["/pricing", "/billing", "/settings"]) assert.match(navigation, new RegExp(route.replaceAll("/", "\\/")));
 });
 
-test("mobile navigation remains the five core student destinations", () => {
+test("mobile navigation uses Dashboard directly and opens the other four section menus", () => {
   const mobile = read("components/shell/mobile-nav-placeholder.tsx");
-  for (const label of ["Dashboard", "Study", "Progress", "Resources", "Community"]) assert.match(mobile, new RegExp(`label: "${label}"`));
-  assert.doesNotMatch(mobile, /More navigation|BottomSheet|label: "Account"/);
+  assert.match(mobile, /<Link href="\/dashboard"/);
+  for (const label of ["Study", "Progress", "Resources", "Community"]) assert.match(mobile, new RegExp(`label: "${label}"`));
+  assert.match(mobile, /BottomSheet/);
+  assert.match(mobile, /setOpenSection\(section\.key\)/);
+  assert.match(mobile, /mobile-section-menu/);
+  assert.match(mobile, /Choose where you want to go/);
+  assert.doesNotMatch(mobile, /label: "Account"/);
+  for (const route of ["/planner/today", "/planner/revision-settings", "/resources/icai", "/activity"]) {
+    assert.match(mobile, new RegExp(route.replaceAll("/", "\\/")));
+  }
 });
 
 test("account destinations also remain available from the header profile dropdown", () => {
@@ -40,6 +48,19 @@ test("dashboard overview uses instantly recognizable Today Study and Progress wi
   assert.match(dashboard, /model\.study\.streakDays/);
   assert.match(dashboard, /model\.progress\.groups\.slice\(0, 2\)/);
   assert.doesNotMatch(dashboard, /dashboard-home-stats/);
+});
+
+test("attempt strip has a recognizable visual identity without adding dashboard clutter", () => {
+  const dashboard = read("components/dashboard/student-dashboard.tsx");
+  const character = read("app/styles/dashboard-character.css");
+  const globals = read("app/globals.css");
+  assert.match(dashboard, /dashboard-attempt-strip__accent/);
+  assert.match(dashboard, /<Icon name="calendar"/);
+  for (const label of ["Level", "Group", "Subjects", "Chapters"]) assert.match(dashboard, new RegExp(`<b>${label}<\\/b>`));
+  assert.match(character, /linear-gradient/);
+  assert.match(character, /dashboard-attempt-strip__facts b/);
+  assert.match(globals, /dashboard-character\.css/);
+  assert.ok(globals.indexOf("dashboard-character.css") > globals.indexOf("dashboard-balanced.css"));
 });
 
 test("balanced visual layer restores readable type, full sidebar rows and floating mobile nav", () => {
