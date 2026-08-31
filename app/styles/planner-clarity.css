@@ -257,7 +257,7 @@
 }
 
 .planner-schedule__grid label > span {
-  color: inherit;
+  color: var(--color-text-soft);
   font-size: 11px;
 }
 
