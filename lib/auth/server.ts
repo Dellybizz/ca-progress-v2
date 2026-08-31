@@ -9,7 +9,7 @@ import type { PrimaryUse } from "@/lib/profile/onboarding";
 import { loginPathFor, sanitizeReturnPath } from "./navigation";
 
 type BaseProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
-export type ProfileRow = BaseProfileRow & { primary_use: PrimaryUse | null; feature_guide_completed_at: string | null };
+export type ProfileRow = BaseProfileRow & { primary_use: PrimaryUse | null; primary_use_priority: PrimaryUse[] | null; feature_guide_completed_at: string | null };
 export type ServerIdentity = { id: string; email: string | null; phone: string | null };
 export type Viewer = { authenticated: boolean; id?: string; label: string; initial: string };
 
