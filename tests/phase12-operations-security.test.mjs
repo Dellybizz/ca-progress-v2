@@ -70,10 +70,11 @@ test("health probes run in the isolated admin worker",()=>{
   assert.match(worker,/payment_events/);
 });
 
-test("admin backend is isolated behind a Cloudflare service binding",()=>{
+test("admin backend is isolated through the private Admin Next worker and Admin Ops service",()=>{
   const bridge=read("lib/admin/service.ts");
   const worker=read("workers/admin-ops/index.ts");
-  const web=read("wrangler.web.jsonc");
+  const router=read("wrangler.web.jsonc");
+  const adminWeb=read("workers/web-admin/wrangler.jsonc");
   const pkg=read("package.json");
   assert.match(bridge,/ADMIN_OPS_SERVICE/);
   assert.match(bridge,/admin-ops\.internal/);
@@ -81,8 +82,12 @@ test("admin backend is isolated behind a Cloudflare service binding",()=>{
   assert.match(worker,/x-ca-progress-internal/);
   assert.match(worker,/admin_users\?user_id=eq\./);
   assert.match(worker,/is_active=eq\.true/);
-  assert.match(web,/"ADMIN_OPS_SERVICE"/);
-  assert.match(web,/"ca-progress-v2-admin-ops"/);
+  assert.match(router,/"ADMIN_WEB_SERVICE"/);
+  assert.match(router,/"ca-progress-v2-web-admin"/);
+  assert.doesNotMatch(router,/"ADMIN_OPS_SERVICE"/);
+  assert.match(adminWeb,/"ADMIN_OPS_SERVICE"/);
+  assert.match(adminWeb,/"ca-progress-v2-admin-ops"/);
+  assert.match(adminWeb,/"workers_dev"\s*:\s*false/);
   assert.match(pkg,/cf:deploy:admin/);
   assert.match(pkg,/cf:check:admin/);
 });
