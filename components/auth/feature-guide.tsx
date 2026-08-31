@@ -72,7 +72,7 @@ export function FeatureGuide({ priorities, next }: { priorities: PrimaryUse[]; n
   const current = !atOtherPrompt ? features[queue[index]] : null;
 
   useEffect(() => {
-    if (!current) { setSpotlight(null); return; }
+    if (!current) return;
     let scrollTimer = 0;
     const sync = () => {
       const target = current.selectors.map(visibleElement).find(Boolean) ?? null;
