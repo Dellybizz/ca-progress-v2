@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EnvironmentBanner } from "./environment-banner";
 import { MobileNavigation } from "./mobile-nav-placeholder";
+import { MobileOverscrollGuard } from "./mobile-overscroll-guard";
 import { DesktopNavigation } from "./navigation";
 import { TopbarControls } from "./topbar-controls";
 import { Icon } from "@/components/ui/icon";
@@ -19,6 +20,7 @@ export async function AppShell({ children, area = "student" }: { children: React
 
   return (
     <>
+      <MobileOverscrollGuard/>
       <EnvironmentBanner/>
       <div className="app-shell">
         <aside className="desktop-sidebar" aria-label={`${area} workspace`}>
