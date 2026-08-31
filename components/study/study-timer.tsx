@@ -110,11 +110,11 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
   return (
     <div className="phase6-study-grid study-session-grid">
       <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card">
-        <CardHeader title="Start a focus session" description="Pick what you’re studying, choose a timer, then begin."/>
+        <CardHeader title="Start a focus session" description="Choose what to study and how long you want to focus."/>
         <CardBody>
           <form className="phase6-form study-builder" onSubmit={start}>
             <section className="study-builder-section">
-              <div className="study-builder-section__title"><span>1</span><div><strong>What are you studying?</strong><small>Choose a subject, then a chapter if you want detailed tracking.</small></div></div>
+              <div className="study-builder-section__title"><span>1</span><div><strong>Subject & chapter</strong><small>Track a specific chapter, or keep it as general study.</small></div></div>
               <div className="study-builder-fields">
                 <label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">General study</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
                 <label><span>Chapter</span><select value={chapterId} onChange={(event) => setChapterId(event.target.value)} disabled={!selectedSubject}><option value="">No chapter selected</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
@@ -122,14 +122,18 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
             </section>
 
             <section className="study-builder-section">
-              <div className="study-builder-section__title"><span>2</span><div><strong>How do you want to focus?</strong><small>Use Pomodoro for timed blocks or Stopwatch for an open-ended session.</small></div></div>
+              <div className="study-builder-section__title"><span>2</span><div><strong>Timer</strong><small>Choose a timed focus block or an open-ended stopwatch.</small></div></div>
               <fieldset className="phase6-mode study-mode-picker"><legend>Timer mode</legend>
                 <button type="button" className={mode === "pomodoro" ? "is-active" : ""} onClick={() => setMode("pomodoro")}><Icon name="timer" size={18}/><span><strong>Pomodoro</strong><small>Focus + break cycles</small></span></button>
                 <button type="button" className={mode === "stopwatch" ? "is-active" : ""} onClick={() => setMode("stopwatch")}><Icon name="clock" size={18}/><span><strong>Stopwatch</strong><small>Study without a fixed end</small></span></button>
               </fieldset>
 
               {mode === "pomodoro" ? <div className="study-duration-panel">
-                <div className="phase6-presets study-presets"><button type="button" className={focusMinutes === 25 && breakMinutes === 5 ? "is-active" : ""} onClick={() => { setFocusMinutes(25); setBreakMinutes(5); }}><strong>25</strong><span>focus</span><small>5 min break</small></button><button type="button" className={focusMinutes === 50 && breakMinutes === 10 ? "is-active" : ""} onClick={() => { setFocusMinutes(50); setBreakMinutes(10); }}><strong>50</strong><span>focus</span><small>10 min break</small></button><span>or set your own</span></div>
+                <div className="phase6-presets study-presets">
+                  <button type="button" className={focusMinutes === 25 && breakMinutes === 5 ? "is-active" : ""} onClick={() => { setFocusMinutes(25); setBreakMinutes(5); }}><strong>25 / 5</strong><small>focus / break</small></button>
+                  <button type="button" className={focusMinutes === 50 && breakMinutes === 10 ? "is-active" : ""} onClick={() => { setFocusMinutes(50); setBreakMinutes(10); }}><strong>50 / 10</strong><small>focus / break</small></button>
+                  <span>or set your own</span>
+                </div>
                 <div className="phase6-form-row study-custom-time"><label><span>Focus minutes</span><input type="number" min="1" max="720" value={focusMinutes} onChange={(event) => setFocusMinutes(Number(event.target.value))}/></label><label><span>Break minutes</span><input type="number" min="0" max="120" value={breakMinutes} onChange={(event) => setBreakMinutes(Number(event.target.value))}/></label></div>
               </div> : <div className="phase6-note"><Icon name="clock"/><span>Stopwatch records the exact focused time when you finish the session.</span></div>}
             </section>
