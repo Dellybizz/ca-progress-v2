@@ -69,28 +69,38 @@ function OnboardingDashboard({ displayName }: { displayName: string }) {
 function AttemptStrip({ model }: { model: DashboardReadyModel }) {
   const pending = model.countdown.status === "awaiting_verified_date";
   const status = pending
-    ? "Exam date pending"
+    ? "Countdown coming soon"
     : model.countdown.status === "past"
       ? "Attempt completed"
       : `${model.countdown.daysRemaining ?? "—"} days to go`;
   const date = model.countdown.targetDate ? formatDate(model.countdown.targetDate) : null;
 
   return (
-    <section className="dashboard-attempt-strip" aria-label="Current attempt">
-      <div className="dashboard-attempt-strip__accent" aria-hidden="true"><Icon name="calendar" size={20}/></div>
-      <div className="dashboard-attempt-strip__primary">
-        <span className="dashboard-attempt-strip__label">Attempt</span>
-        <div><strong>{model.context.attemptLabel}</strong><small>{date ? `${status} · ${date}` : status}</small></div>
+    <section className="dashboard-attempt-strip dashboard-attempt-card" aria-label="Current attempt">
+      <div className="dashboard-attempt-card__main">
+        <div className="dashboard-attempt-card__badges">
+          <span className="dashboard-attempt-card__verified"><Icon name="shield" size={13}/> Verified attempt</span>
+          <span>{model.context.levelName} · {model.context.groupLabel}</span>
+        </div>
+        <span className="dashboard-attempt-card__eyebrow">{model.context.attemptLabel}</span>
+        <h2>{status}</h2>
+        <p>
+          {pending
+            ? `Your ${model.context.attemptLabel} attempt is selected. The countdown will begin as soon as the official exam date is confirmed.`
+            : date
+              ? `${date} · Keep your study plan aligned with your selected attempt.`
+              : "Keep your study plan aligned with your selected attempt."}
+        </p>
+        <div className="dashboard-attempt-card__meta">
+          <span><Icon name="clock" size={13}/>{formatVerifiedAt(model.countdown.lastVerifiedAt)}</span>
+          {model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={13}/></a> : null}
+        </div>
       </div>
-      <div className="dashboard-attempt-strip__facts" aria-label="Academic selection">
-        <span><b>Level</b>{model.context.levelName}</span>
-        <span><b>Group</b>{model.context.groupLabel}</span>
-        <span><b>Subjects</b>{model.context.subjectCount}</span>
-        <span><b>Chapters</b>{model.context.chapterCount}</span>
-      </div>
-      <div className="dashboard-attempt-strip__source">
-        <small><Icon name="shield" size={12}/>{formatVerifiedAt(model.countdown.lastVerifiedAt)}</small>
-        {model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={12}/></a> : null}
+
+      <div className="dashboard-attempt-card__summary" aria-label="Academic selection">
+        <div><strong>{model.context.subjectCount}</strong><span>Subjects</span></div>
+        <div><strong>{model.context.chapterCount}</strong><span>Chapters</span></div>
+        <div><strong>{model.context.groupLabel}</strong><span>Selection</span></div>
       </div>
     </section>
   );
