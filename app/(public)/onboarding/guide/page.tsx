@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { FeatureGuide } from "@/components/auth/feature-guide";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { loginPathFor, sanitizeReturnPath } from "@/lib/auth/navigation";
-import { isPrimaryUse } from "@/lib/profile/onboarding";
+import { normalizePrimaryUsePriority } from "@/lib/profile/onboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,6 @@ export default async function OnboardingGuidePage({ searchParams }: { searchPara
   const profile = await getProfileForUser(user.id);
   if (!profile?.onboarding_completed_at) redirect(`/onboarding?next=${encodeURIComponent(next)}`);
   if (profile.feature_guide_completed_at) redirect(next);
-  const primaryUse = isPrimaryUse(profile.primary_use) ? profile.primary_use : "plan";
-  return <FeatureGuide primaryUse={primaryUse} next={next}/>;
+  const priorities = normalizePrimaryUsePriority(profile.primary_use_priority, profile.primary_use);
+  return <FeatureGuide priorities={priorities.length ? priorities : ["plan"]} next={next}/>;
 }
