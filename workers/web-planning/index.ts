@@ -8,7 +8,9 @@ type WorkerContext = { waitUntil(promise: Promise<unknown>): void };
 
 const planningWebWorker = {
   fetch(request: Request, env: Record<string, unknown>, ctx: WorkerContext) {
-    return runWithCloudflareRequestContext(request, env, ctx, () => runNextServer(request, env, ctx, handler));
+    return runNextServer(request, env, ctx, (runtimeEnv) =>
+      runWithCloudflareRequestContext(request, runtimeEnv, ctx, () => handler(request, runtimeEnv, ctx, request.signal)),
+    );
   },
 };
 
