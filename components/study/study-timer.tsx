@@ -141,11 +141,11 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
   return (
     <div className="phase6-study-grid study-session-grid study-session-grid--idle">
       <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card">
-        <CardHeader title="Start a focus session" description="Choose what to study and how long you want to focus."/>
+        <CardHeader title="Start a focus session"/>
         <CardBody>
           <form className="phase6-form study-builder" onSubmit={start}>
             <section className="study-builder-section">
-              <div className="study-builder-section__title"><span>1</span><div><strong>Subject & chapter</strong><small>Track a specific chapter, or keep it as general study.</small></div></div>
+              <div className="study-builder-section__title"><span>1</span><div><strong>Subject & chapter</strong></div></div>
               <div className="study-builder-fields">
                 <label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">General study</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
                 <label><span>Chapter</span><select value={chapterId} onChange={(event) => setChapterId(event.target.value)} disabled={!selectedSubject}><option value="">No chapter selected</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
@@ -153,7 +153,7 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
             </section>
 
             <section className="study-builder-section">
-              <div className="study-builder-section__title"><span>2</span><div><strong>Timer</strong><small>Choose a timed focus block or an open-ended stopwatch.</small></div></div>
+              <div className="study-builder-section__title"><span>2</span><div><strong>Timer</strong></div></div>
               <fieldset className="phase6-mode study-mode-picker"><legend>Timer mode</legend>
                 <button type="button" className={mode === "pomodoro" ? "is-active" : ""} onClick={() => setMode("pomodoro")}><Icon name="timer" size={18}/><span><strong>Pomodoro</strong><small>Focus + break cycles</small></span></button>
                 <button type="button" className={mode === "stopwatch" ? "is-active" : ""} onClick={() => setMode("stopwatch")}><Icon name="clock" size={18}/><span><strong>Stopwatch</strong><small>Study without a fixed end</small></span></button>
