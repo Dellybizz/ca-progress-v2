@@ -14,6 +14,8 @@ test("onboarding draft saves ignore blank values from later auto-advance steps",
   assert.match(route, /if \(hasDraftValue\(body\.primaryUse\)/);
 });
 
-test("complete onboarding still requires a real primary focus", () => {
-  assert.match(route, /if \(!isPrimaryUse\(body\.primaryUse\)\).*Choose what you want CA Progress to help with most/);
+test("complete onboarding requires at least one valid ranked priority", () => {
+  assert.match(route, /if \(!isPrimaryUsePriority\(body\.primaryUsePriority\)\).*Choose at least one valid onboarding priority/);
+  assert.match(route, /update\.primary_use = body\.primaryUsePriority\[0\]/);
+  assert.match(route, /update\.primary_use_priority = body\.primaryUsePriority/);
 });
