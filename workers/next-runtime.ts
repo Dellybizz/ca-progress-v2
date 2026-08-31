@@ -1,10 +1,7 @@
 type WorkerContext = { waitUntil(promise: Promise<unknown>): void };
 
-type NextHandler = (
-  request: Request,
-  env: Record<string, unknown>,
-  ctx: WorkerContext,
-  signal?: AbortSignal,
+type NextRuntime = (
+  runtimeEnv: Record<string, unknown>,
 ) => Promise<Response> | Response;
 
 const forwardedRuntimeKeys = {
@@ -35,11 +32,11 @@ function runtimeEnvFor(request: Request, env: Record<string, unknown>) {
 export async function runNextServer(
   request: Request,
   env: Record<string, unknown>,
-  ctx: WorkerContext,
-  handler: NextHandler,
+  _ctx: WorkerContext,
+  run: NextRuntime,
 ) {
   if (request.headers.get("x-ca-progress-next-internal") !== "ca-progress-v2-router") {
     return new Response("Not found", { status: 404 });
   }
-  return handler(request, runtimeEnvFor(request, env), ctx, request.signal);
+  return run(runtimeEnvFor(request, env));
 }
