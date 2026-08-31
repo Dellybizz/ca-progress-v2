@@ -1,0 +1,63 @@
+/* Study refinement: one clear vertical flow on desktop. */
+
+@media (min-width: 1051px) {
+  .study-page__intro,
+  .study-session-grid {
+    width: 100%;
+    max-width: 960px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .study-session-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .study-builder-card,
+  .study-recent-card,
+  .study-live-card,
+  .study-session-details {
+    width: 100%;
+  }
+
+  .study-recent-card,
+  .study-session-details {
+    position: static;
+    top: auto;
+  }
+
+  .study-empty {
+    min-height: 170px;
+  }
+}
+
+.study-presets button {
+  min-width: 112px;
+  min-height: 60px;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  align-content: center;
+  justify-items: start;
+  gap: 4px;
+  padding: 9px 12px;
+}
+
+.study-presets button strong {
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+
+.study-presets button small {
+  grid-column: auto;
+  margin-top: 0;
+  font-size: 9px;
+}
+
+@media (max-width: 720px) {
+  .study-presets button {
+    min-width: 0;
+    width: 100%;
+  }
+}
