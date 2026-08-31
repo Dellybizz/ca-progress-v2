@@ -37,6 +37,18 @@ test("Planner uses clear separate date and time scheduling controls", () => {
   assert.doesNotMatch(client, /datetime-local/);
 });
 
+test("Planner tasks use explicit complete edit and delete actions", () => {
+  const client = read("components/planner/planner-client.tsx");
+  const route = read("app/api/planner/tasks/route.ts");
+  assert.match(client, />Complete<|"Complete"/);
+  assert.match(client, />Edit<|"Edit"/);
+  assert.match(client, />Delete<|"Delete"/);
+  assert.match(client, /editingId/);
+  assert.match(client, /Save changes/);
+  assert.match(route, /action: "update"/);
+  assert.match(route, /body\.action === "update"/);
+});
+
 test("Planner task deletion uses an in-app confirmation instead of window.confirm", () => {
   const client = read("components/planner/planner-client.tsx");
   const css = read("app/styles/planner-clarity.css");
@@ -49,6 +61,19 @@ test("Planner task deletion uses an in-app confirmation instead of window.confir
   assert.match(css, /planner-delete-confirm/);
 });
 
+test("Planner removes goals card and moves compact page links below the mobile composer", () => {
+  const page = read("app/(student)/planner/page.tsx");
+  const client = read("components/planner/planner-client.tsx");
+  const css = read("app/styles/planner-clarity.css");
+  assert.doesNotMatch(page, /href="\/goals"/);
+  assert.doesNotMatch(client, /planner-goals-card|Manage goals/);
+  assert.match(client, /planner-mobile-links/);
+  assert.match(client, /Today Plan/);
+  assert.match(client, /Calendar/);
+  assert.match(css, /planner-header-links\s*\{\s*display:\s*none;/s);
+  assert.match(css, /planner-mobile-links/);
+});
+
 test("Planner clarity styles are loaded", () => {
   const globals = read("app/globals.css");
   const css = read("app/styles/planner-clarity.css");
@@ -58,4 +83,5 @@ test("Planner clarity styles are loaded", () => {
   assert.match(css, /planner-form__grid/);
   assert.match(css, /planner-empty/);
   assert.match(css, /planner-schedule/);
+  assert.match(css, /planner-task__actions/);
 });
