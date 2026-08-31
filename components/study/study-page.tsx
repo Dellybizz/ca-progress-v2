@@ -12,6 +12,15 @@ function hours(seconds: number) {
   return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}h`;
 }
 
+function formatAttempt(value: string) {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) return value;
+  return new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
 export function StudyPage({ model }: { model: StudyPageModel }) {
   if (model.mode === "guest") {
     return <div className="phase6-page study-page"><LoginRequired next="/study" title="Sign in to start and save study sessions"/></div>;
@@ -37,9 +46,9 @@ export function StudyPage({ model }: { model: StudyPageModel }) {
     <div className="phase6-page study-page">
       <header className="study-page__intro">
         <div className="study-page__intro-copy">
-          <span className="study-page__eyebrow"><Icon name="timer" size={15}/> Study focus</span>
-          <h1>{model.timer ? "Stay with the session." : "What are you studying now?"}</h1>
-          <p>{model.levelName} · {model.groupLabel} · {model.attemptKey}</p>
+          <span className="study-page__eyebrow"><Icon name="timer" size={15}/> Focus</span>
+          <h1>{model.timer ? "Focus session" : "Study"}</h1>
+          <p>{model.levelName} · {model.groupLabel} · {formatAttempt(model.attemptKey)}</p>
         </div>
         <div className="study-page__summary" aria-label="Study summary">
           <span><i><Icon name="clock" size={15}/></i><b>{hours(model.analytics.todaySeconds)}</b><small>Today</small></span>
