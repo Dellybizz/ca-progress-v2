@@ -38,11 +38,12 @@ test("governance prevents deleting parent owner or the only active owner", () =>
   assert.match(service, /role=in\.\(owner,parent_owner\)/);
 });
 
-test("requested email is bootstrapped as audited active owner in the Phase 12 source of truth", () => {
+test("requested existing V2 auth account is bootstrapped once as an audited active owner", () => {
   const sql = read("supabase/migrations/20260831121000_requested_owner.sql");
   assert.match(sql, /habeebaasif622@gmail\.com/);
-  assert.match(sql, /values\(p_user_id, 'owner', true, null\)/);
+  assert.match(sql, /values\(v_user_id, 'owner', true, null\)/);
   assert.match(sql, /admin\.role_changed/);
-  assert.match(sql, /phase12_requested_owner_after_auth_user/);
-  assert.match(sql, /revoke all on function public\.phase12_set_requested_owner/);
+  assert.match(sql, /requested_owner_bootstrap/);
+  assert.match(sql, /does not exist in the V2 auth project yet/);
+  assert.doesNotMatch(sql, /create trigger/i);
 });
