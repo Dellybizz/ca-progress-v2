@@ -63,6 +63,7 @@ export function TopbarControls({ viewer, area }: { viewer: Viewer; area: "studen
         <div className="account-drawer__identity"><span className="profile-avatar account-drawer__avatar">{viewer.initial}</span><div><strong>{viewer.label}</strong><small>Signed in · private sync enabled</small></div></div>
         <div className="account-drawer__links"><Link href="/settings/profile" onClick={() => setAccountOpen(false)}><span><Icon name="target"/><strong>Profile & study setup</strong></span><Icon name="chevron" size={16}/></Link><Link href="/settings" onClick={() => setAccountOpen(false)}><span><Icon name="settings"/><strong>Settings</strong></span><Icon name="chevron" size={16}/></Link></div>
         <Link className="ui-button ui-button--secondary ui-button--lg account-drawer__logout" href={logoutHref} onClick={() => setAccountOpen(false)}>Sign out of this device <Icon name="arrow" size={16}/></Link>
+        <Link className="account-drawer__delete" href="/account/delete" onClick={() => setAccountOpen(false)}>Delete account</Link>
       </div>
     </Drawer>
   </>;
