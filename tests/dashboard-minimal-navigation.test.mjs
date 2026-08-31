@@ -42,12 +42,15 @@ test("dashboard overview uses instantly recognizable Today Study and Progress wi
   assert.doesNotMatch(dashboard, /dashboard-home-stats/);
 });
 
-test("clarity layer restores comfortable sidebar width after compact base styles", () => {
+test("balanced visual layer restores readable type, full sidebar rows and floating mobile nav", () => {
   const globals = read("app/globals.css");
-  const clarity = read("app/styles/dashboard-clarity.css");
-  assert.match(globals, /dashboard-clarity\.css/);
-  assert.ok(globals.indexOf("dashboard-clarity.css") > globals.indexOf("dashboard-clean.css"));
-  assert.match(clarity, /--sidebar-width: 248px/);
-  assert.match(clarity, /grid-template-columns: 248px minmax\(0, 1fr\)/);
-  assert.match(clarity, /dashboard-overview-progress/);
+  const balanced = read("app/styles/dashboard-balanced.css");
+  assert.match(globals, /dashboard-balanced\.css/);
+  assert.ok(globals.indexOf("dashboard-balanced.css") > globals.indexOf("dashboard-clarity.css"));
+  assert.match(balanced, /--sidebar-width: 248px/);
+  assert.match(balanced, /sidebar-nav-group__trigger[\s\S]*width: 100%/);
+  assert.match(balanced, /font-size: 13px/);
+  assert.match(balanced, /dashboard-overview-card__header strong \{ font-size: 14px/);
+  assert.match(balanced, /mobile-bottom-nav[\s\S]*border-radius: 20px/);
+  assert.match(balanced, /box-shadow: 0 18px 48px/);
 });
