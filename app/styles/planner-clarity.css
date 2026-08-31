@@ -38,6 +38,38 @@
   gap: 16px;
 }
 
+/* Desktop keeps the left Planner column continuous. The Add task card spans
+   both rows so its height never pushes Today's tasks down. */
+@media (min-width: 1051px) {
+  .planner-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(330px, .7fr);
+    grid-template-rows: max-content auto;
+    grid-template-areas:
+      "summary add"
+      "tasks add";
+    align-items: start;
+    column-gap: 16px;
+    row-gap: 12px;
+  }
+
+  .planner-summary {
+    grid-area: summary;
+    align-self: start;
+  }
+
+  .planner-add-card {
+    grid-area: add;
+    align-self: start;
+  }
+
+  .planner-tasks-card {
+    grid-area: tasks;
+    align-self: start;
+    width: 100%;
+  }
+}
+
 .planner-main {
   gap: 12px;
 }
