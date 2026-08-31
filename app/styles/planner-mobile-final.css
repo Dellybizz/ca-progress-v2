@@ -6,11 +6,7 @@
     flex-direction: column;
     gap: 12px;
     min-width: 0;
-  }
-
-  .planner-main,
-  .planner-side {
-    display: contents;
+    width: 100%;
   }
 
   /* Mobile reading order: analytics -> composer -> tasks -> page links. */
@@ -20,6 +16,11 @@
 
   .planner-add-card {
     order: 2;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
   }
 
   .planner-tasks-card {
@@ -30,21 +31,27 @@
     order: 4;
   }
 
-  /* Keep Date and Time equal, contained and tappable on iOS Safari. */
+  .planner-add-card > .ui-card__body,
+  .planner-form,
+  .planner-form__grid,
   .planner-schedule,
   .planner-schedule__grid {
     width: 100%;
     min-width: 0;
     max-width: 100%;
+    box-sizing: border-box;
   }
 
+  /* Match the schedule fields to the other 50/50 Planner fields. */
   .planner-schedule__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 10px;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .planner-schedule__grid label {
+    display: grid;
+    gap: 5px;
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -54,19 +61,44 @@
   .planner-schedule__grid input[type="date"],
   .planner-schedule__grid input[type="time"] {
     display: block;
+    -webkit-appearance: none;
+    appearance: none;
     inline-size: 100% !important;
     width: 100% !important;
     min-inline-size: 0 !important;
     min-width: 0 !important;
     max-inline-size: 100% !important;
     max-width: 100% !important;
+    height: 42px;
+    min-height: 42px;
+    padding: 9px 11px;
     box-sizing: border-box;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.2;
+    text-align: left;
     overflow: hidden;
   }
 
   .planner-schedule__grid input::-webkit-date-and-time-value,
-  .planner-schedule__grid input::-webkit-datetime-edit {
+  .planner-schedule__grid input::-webkit-datetime-edit,
+  .planner-schedule__grid input::-webkit-datetime-edit-fields-wrapper {
+    display: block;
+    width: 100%;
     min-width: 0;
     max-width: 100%;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+  }
+
+  .planner-schedule__grid input::-webkit-calendar-picker-indicator {
+    margin: 0;
+    padding: 0;
+    flex: 0 0 auto;
   }
 }
