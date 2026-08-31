@@ -1,0 +1,30 @@
+/* Account deletion is deliberately isolated from onboarding/profile styles. */
+.delete-account-v2 { width: min(680px, 100%); margin: 0 auto; }
+.delete-account-v2__card .ui-card__body { display: grid; gap: 20px; padding: clamp(24px, 4vw, 38px); }
+.delete-account-v2__icon { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 18px; background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface)); color: var(--color-danger); }
+.delete-account-v2__heading { display: grid; gap: 8px; }
+.delete-account-v2__heading > span { color: var(--color-danger); font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.delete-account-v2__heading h1 { margin: 0; font-size: clamp(30px, 4vw, 44px); line-height: 1.06; letter-spacing: -.04em; }
+.delete-account-v2__heading p { margin: 0; color: var(--color-text-soft); line-height: 1.65; }
+.delete-account-v2__identity { padding: 14px 16px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-muted); }
+.delete-account-v2__identity strong,
+.delete-account-v2__identity small { display: block; }
+.delete-account-v2__identity small { margin-top: 4px; color: var(--color-text-faint); }
+.delete-account-v2__warning { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; padding: 15px; border: 1px solid color-mix(in srgb, var(--color-danger) 24%, var(--color-border)); border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-danger) 5%, var(--color-surface)); color: var(--color-danger); }
+.delete-account-v2__warning p { margin: 4px 0 0; color: var(--color-text-soft); line-height: 1.55; }
+.delete-account-v2__actions { display: flex; gap: 10px; justify-content: flex-end; }
+.delete-account-v2__actions .ui-button { justify-content: center; }
+.account-drawer__delete,
+.profile-delete-link { color: var(--color-danger); font-size: 13px; font-weight: 700; text-decoration: none; }
+.account-drawer__delete { justify-self: center; padding: 6px 8px; }
+.account-drawer__delete:hover,
+.profile-delete-link:hover { text-decoration: underline; }
+.profile-account-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+
+@media (max-width: 619px) {
+  .delete-account-v2__actions { flex-direction: column-reverse; }
+  .delete-account-v2__actions .ui-button { width: 100%; }
+  .profile-account-actions { align-items: stretch; flex-direction: column; }
+  .profile-account-actions .ui-button { justify-content: center; }
+  .profile-delete-link { text-align: center; padding: 10px; }
+}
