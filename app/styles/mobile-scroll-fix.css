@@ -1,52 +1,81 @@
 /* Global mobile scroll normalization.
-   Keep document height content-driven and reserve bottom-nav space exactly once. */
+   On mobile the document height must be driven only by real page content.
+   Do not stack viewport-sized shells or create a second root scroll container. */
 
 @media (max-width: 899px) {
   html,
   body {
-    min-height: 100%;
-    overflow-x: clip;
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0;
+  }
+
+  /* Keep the viewport itself as the only vertical scroller. Avoid overflow on
+     html/body because iOS Safari can turn either root into an additional
+     scroll container and leave scrollable space after the content has ended. */
+  html {
+    overflow-y: visible !important;
   }
 
   body {
-    min-height: 100dvh;
+    position: static !important;
+    overflow-y: visible !important;
   }
 
-  /* The body already owns the viewport minimum. Do not stack another viewport
-     minimum on the app shell or its content column on mobile Safari. */
+  /* Remove every shared viewport-height contract on mobile. The background is
+     supplied by html/body, so short pages do not need a 100vh/100dvh wrapper. */
   .app-shell,
   .app-main,
   .content-wrap {
+    width: 100%;
     height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
+    box-sizing: border-box;
   }
 
-  .app-shell,
+  .app-shell {
+    display: block !important;
+    overflow: visible !important;
+  }
+
   .app-main {
-    overflow: visible;
+    display: block !important;
+    overflow: visible !important;
   }
 
-  /* Reserve the floating mobile navigation once at shell level. */
+  /* Clip horizontal mistakes inside the app rather than making html/body a
+     scrolling container. */
+  .app-main,
   .content-wrap {
-    padding-bottom: calc(var(--bottom-nav-height) + 20px + env(safe-area-inset-bottom)) !important;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
-  /* Older phase page wrappers also reserved bottom-nav height. Remove that
-     duplicate reserve while preserving their top and horizontal spacing. */
-  .content-wrap > [class*="-page"] {
-    min-height: 0 !important;
-    padding-bottom: 16px !important;
+  /* Reserve the fixed mobile navigation exactly once. */
+  .content-wrap {
+    margin: 0 auto;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
   }
 
+  /* Older phase wrappers also reserve mobile-nav space. Remove that duplicate
+     reserve while leaving their own top/horizontal spacing intact. */
+  .content-wrap > [class*="-page"],
   .content-wrap > .student-dashboard--home,
   .content-wrap > .student-dashboard--simple-state {
+    height: auto !important;
     min-height: 0 !important;
+    max-height: none !important;
     padding-bottom: 16px !important;
   }
 
-  /* Keep navigation anchored to the visual viewport even after later page CSS. */
+  /* Navigation belongs to the visual viewport and must never participate in
+     normal document height. */
   .mobile-bottom-nav {
     position: fixed !important;
+    z-index: 60 !important;
     left: 8px !important;
     right: 8px !important;
     bottom: 8px !important;
