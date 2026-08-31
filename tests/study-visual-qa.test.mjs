@@ -6,38 +6,33 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("Study page is focus-first and student-facing", () => {
+test("Study page uses one clear hierarchy instead of repeated questions", () => {
   const page = read("components/study/study-page.tsx");
   const timer = read("components/study/study-timer.tsx");
-  assert.match(page, /What are you studying now\?/);
-  assert.match(page, /Study focus/);
-  assert.match(page, /Today/);
-  assert.match(page, /Last 7 days/);
-  assert.match(page, /Day streak/);
+  assert.match(page, /model\.timer \? "Focus session" : "Study"/);
+  assert.match(page, /formatAttempt\(model\.attemptKey\)/);
+  assert.match(timer, /title="Start a focus session"/);
+  assert.match(timer, /<strong>Subject & chapter<\/strong>/);
+  assert.match(timer, /<strong>Timer<\/strong>/);
+  assert.doesNotMatch(timer, /What are you studying\?/);
   assert.doesNotMatch(page, /server-side|become your analytics|analytics source/i);
   assert.doesNotMatch(timer, /private database row|page memory|route changes/i);
 });
 
-test("Study setup presents a clear two-step focus flow", () => {
+test("Pomodoro presets show focus and break together", () => {
   const timer = read("components/study/study-timer.tsx");
-  assert.match(timer, /What are you studying\?/);
-  assert.match(timer, /How do you want to focus\?/);
-  assert.match(timer, /Focus \+ break cycles/);
-  assert.match(timer, /Study without a fixed end/);
-  assert.match(timer, /25/);
-  assert.match(timer, /50/);
+  assert.match(timer, /<strong>25 \/ 5<\/strong>/);
+  assert.match(timer, /<strong>50 \/ 10<\/strong>/);
+  assert.match(timer, /focus \/ break/);
   assert.match(timer, /Start focus session/);
 });
 
-test("Study clarity layer uses one readable visual system", () => {
+test("desktop Study cards use a single shared-width vertical flow", () => {
   const globals = read("app/globals.css");
-  const css = read("app/styles/study-clarity.css");
-  assert.match(globals, /study-clarity\.css/);
-  assert.doesNotMatch(globals, /study-focus\.css/);
-  assert.match(css, /study-page__summary/);
-  assert.match(css, /study-builder-section__title/);
-  assert.match(css, /study-mode-picker/);
-  assert.match(css, /study-presets/);
-  assert.match(css, /font-size: 14px/);
-  assert.match(css, /font-size: 13px/);
+  const css = read("app/styles/study-layout-refine.css");
+  assert.match(globals, /study-layout-refine\.css/);
+  assert.match(css, /max-width: 960px/);
+  assert.match(css, /grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(css, /study-builder-card,[\s\S]*study-recent-card/);
+  assert.match(css, /position: static/);
 });
