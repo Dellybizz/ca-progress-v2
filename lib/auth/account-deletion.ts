@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { getAdminRoleForUser, type AdminRole } from "@/lib/admin/authorization";
+import { getActiveOwnerCount, getAdminRoleForUser, type AdminRole } from "@/lib/admin/authorization";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { RESOURCE_R2_BINDING } from "@/lib/resources/r2";
 
@@ -13,17 +13,10 @@ export type AccountDeletionStatus = {
 
 type R2DeleteBucket = { delete(key: string): Promise<void> };
 
-async function activeOwnerCount() {
-  const admin = createAdminSupabaseClient();
-  const { data, error } = await admin.from("admin_users").select("user_id").eq("is_active", true).in("role", ["owner", "parent_owner"]);
-  if (error) throw new Error("OWNER_GOVERNANCE_LOOKUP_FAILED");
-  return data?.length ?? 0;
-}
-
 export async function getAccountDeletionStatus(userId: string): Promise<AccountDeletionStatus> {
   const role = await getAdminRoleForUser(userId);
   if (role === "parent_owner") return { blocked: true, reason: "parent_owner", role };
-  if (role === "owner" && await activeOwnerCount() <= 1) return { blocked: true, reason: "sole_owner", role };
+  if (role === "owner" && await getActiveOwnerCount() <= 1) return { blocked: true, reason: "sole_owner", role };
   return { blocked: false, reason: null, role };
 }
 
