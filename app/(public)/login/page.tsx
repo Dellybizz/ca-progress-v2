@@ -18,5 +18,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const user = await optionalUser();
   if (user) redirect(await resolvePostAuthDestination(next));
   const errorKey = typeof params.error === "string" ? params.error : "";
-  return <LoginPanel next={next} initialError={errors[errorKey] ?? null}/>;
+  const deletedNotice = params.deleted === "1" ? "Your CA Progress account has been deleted." : null;
+  return <LoginPanel next={next} initialError={errors[errorKey] ?? null} initialNotice={deletedNotice}/>;
 }
