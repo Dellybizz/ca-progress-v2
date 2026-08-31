@@ -31,13 +31,15 @@ test("account deletion cleans private file bytes and deletes the Supabase auth u
   assert.match(service, /auth\.admin\.deleteUser/);
 });
 
-test("governance prevents deleting parent owner or the only active owner", () => {
+test("governance prevents deleting parent owner or the only active owner and fails closed", () => {
   const service = read("lib/auth/account-deletion.ts");
+  const authorization = read("lib/admin/authorization.ts");
   assert.match(service, /PARENT_OWNER_DELETE_BLOCKED/);
   assert.match(service, /SOLE_OWNER_DELETE_BLOCKED/);
   assert.match(service, /getAdminRoleForUser/);
-  assert.match(service, /\.in\("role", \["owner", "parent_owner"\]\)/);
-  assert.match(service, /OWNER_GOVERNANCE_LOOKUP_FAILED/);
+  assert.match(service, /getActiveOwnerCount/);
+  assert.match(authorization, /role=in\.\(owner,parent_owner\)/);
+  assert.match(authorization, /OWNER_GOVERNANCE_LOOKUP_FAILED/);
 });
 
 test("requested existing V2 auth account is bootstrapped once as an audited active owner", () => {
