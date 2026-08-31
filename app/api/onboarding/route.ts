@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { optionalUser, loadAttemptOptions } from "@/lib/auth/server";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isCALevel, isGroupChoice, normalizeDailyTarget, validateAcademicSelection } from "@/lib/profile/validation";
-import { isPrimaryUse } from "@/lib/profile/onboarding";
+import { isPrimaryUse, isPrimaryUsePriority } from "@/lib/profile/onboarding";
 import type { Database } from "@/lib/supabase/database.types";
 
 export const dynamic = "force-dynamic";
@@ -24,12 +24,13 @@ export async function POST(request: NextRequest) {
   if (body.action === "complete") {
     const selection = validateAcademicSelection({ level: body.level, group: body.group, attemptKey: body.attemptKey, dailyTargetMinutes: body.dailyTargetMinutes }, attempts);
     if (!selection.ok) return NextResponse.json({ ok: false, error: selection.error }, { status: 400 });
-    if (!isPrimaryUse(body.primaryUse)) return NextResponse.json({ ok: false, error: "Choose what you want CA Progress to help with most." }, { status: 400 });
+    if (!isPrimaryUsePriority(body.primaryUsePriority)) return NextResponse.json({ ok: false, error: "Choose at least one valid onboarding priority." }, { status: 400 });
     update.ca_level = selection.value.level;
     update.group_choice = selection.value.group;
     update.attempt_key = selection.value.attemptKey;
     update.daily_target_minutes = selection.value.dailyTargetMinutes;
-    update.primary_use = body.primaryUse;
+    update.primary_use = body.primaryUsePriority[0];
+    update.primary_use_priority = body.primaryUsePriority;
     update.onboarding_step = 5;
     update.onboarding_completed_at = new Date().toISOString();
   } else {
@@ -48,9 +49,19 @@ export async function POST(request: NextRequest) {
       if (typeof body.attemptKey !== "string" || !attempts.some((option) => option.key === body.attemptKey)) return NextResponse.json({ ok: false, error: "Choose an available attempt." }, { status: 400 });
       update.attempt_key = body.attemptKey;
     }
-    if (hasDraftValue(body.primaryUse)) {
+    if (Array.isArray(body.primaryUsePriority)) {
+      if (body.primaryUsePriority.length === 0) {
+        update.primary_use_priority = null;
+        update.primary_use = null;
+      } else {
+        if (!isPrimaryUsePriority(body.primaryUsePriority)) return NextResponse.json({ ok: false, error: "Choose a valid priority order." }, { status: 400 });
+        update.primary_use_priority = body.primaryUsePriority;
+        update.primary_use = body.primaryUsePriority[0];
+      }
+    } else if (hasDraftValue(body.primaryUse)) {
       if (!isPrimaryUse(body.primaryUse)) return NextResponse.json({ ok: false, error: "Choose a valid onboarding focus." }, { status: 400 });
       update.primary_use = body.primaryUse;
+      update.primary_use_priority = [body.primaryUse];
     }
     if (hasDraftValue(body.dailyTargetMinutes)) {
       const target = normalizeDailyTarget(body.dailyTargetMinutes);
