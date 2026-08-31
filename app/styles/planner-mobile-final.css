@@ -1,0 +1,72 @@
+/* Final mobile Planner flow and iOS-safe schedule controls. */
+
+@media (max-width: 720px) {
+  .planner-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .planner-main,
+  .planner-side {
+    display: contents;
+  }
+
+  /* Mobile reading order: analytics -> composer -> tasks -> page links. */
+  .planner-summary {
+    order: 1;
+  }
+
+  .planner-add-card {
+    order: 2;
+  }
+
+  .planner-tasks-card {
+    order: 3;
+  }
+
+  .planner-mobile-links {
+    order: 4;
+  }
+
+  /* Keep Date and Time equal, contained and tappable on iOS Safari. */
+  .planner-schedule,
+  .planner-schedule__grid {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .planner-schedule__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  .planner-schedule__grid label {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .planner-schedule__grid input[type="date"],
+  .planner-schedule__grid input[type="time"] {
+    display: block;
+    inline-size: 100% !important;
+    width: 100% !important;
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    max-inline-size: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .planner-schedule__grid input::-webkit-date-and-time-value,
+  .planner-schedule__grid input::-webkit-datetime-edit {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
