@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Drawer } from "@/components/ui/overlay";
@@ -39,13 +39,17 @@ export function TopbarControls({ viewer, area }: { viewer: Viewer; area: "studen
         event.preventDefault();
         setCommandOpen(true);
       }
-      if (event.key === "Escape" && commandOpen) closeCommand();
+      if (event.key === "Escape" && commandOpen) {
+        setCommandOpen(false);
+        setQuery("");
+        setActiveIndex(0);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [commandOpen]);
 
-  function onSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  function onSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
       setActiveIndex((index) => Math.min(index + 1, Math.max(results.length - 1, 0)));
