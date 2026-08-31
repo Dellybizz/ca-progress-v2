@@ -12,7 +12,7 @@ test("daily ICAI sync remains a Cloudflare scheduled job independent of user tra
   const worker = read("custom-worker.ts");
   const syncWorker = read("workers/icai-sync/wrangler.jsonc");
   assert.match(bootstrap, /"main"\s*:\s*"\.\/custom-worker\.ts"/);
-  assert.doesNotMatch(bootstrap, /"services"\s*:/);
+  assert.match(bootstrap, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(wrangler, /"crons"\s*:\s*\["30 0 \* \* \*"\]/);
   assert.match(wrangler, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(wrangler, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);
@@ -20,6 +20,7 @@ test("daily ICAI sync remains a Cloudflare scheduled job independent of user tra
   assert.match(worker, /ICAI_SYNC_SERVICE\.fetch/);
   assert.match(worker, /trigger:\s*"cron"/);
   assert.match(syncWorker, /"workers_dev"\s*:\s*false/);
+  assert.doesNotMatch(syncWorker, /"routes"\s*:/);
 });
 
 test("sync engine supports conditional fetch, backoff, pacing and last-verified failure isolation", () => {
