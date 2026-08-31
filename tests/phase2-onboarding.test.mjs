@@ -3,9 +3,106 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const root = new URL("../", import.meta.url).pathname; const read = (p) => readFileSync(join(root,p), "utf8");
-test("four-step onboarding wizard and profile surface exist", () => { for (const file of ["components/auth/onboarding-wizard.tsx","app/(public)/onboarding/page.tsx","app/api/onboarding/route.ts","app/(student)/settings/profile/page.tsx","components/auth/profile-form.tsx","app/api/profile/route.ts","app/api/profile/avatar/route.ts"]) assert.equal(existsSync(join(root,file)), true, file); const wizard = read("components/auth/onboarding-wizard.tsx"); assert.match(wizard, /Step \{step\} of 4/); assert.match(wizard, /Choose your CA level/); assert.match(wizard, /Choose your group/); assert.match(wizard, /Choose your attempt/); assert.match(wizard, /daily target and confirm/i); });
-test("onboarding saves drafts and completion separately", () => { const api = read("app/api/onboarding/route.ts"); assert.match(api, /body\.action === "complete"/); assert.match(api, /onboarding_completed_at/); assert.match(api, /onboarding_step/); assert.match(api, /loadAttemptOptions/); });
-test("first-run routing skips completed onboarding but resumes incomplete profiles", () => { const page = read("app/(public)/onboarding/page.tsx"); const server = read("lib/auth/server.ts"); assert.match(page, /onboarding_completed_at/); assert.match(server, /!profile\?\.onboarding_completed_at/); assert.match(server, /\/onboarding\?next=/); });
-test("restricted profile surface preserves its intended destination", () => { const page = read("app/(student)/settings/profile/page.tsx"); const prompt = read("components/auth/login-required.tsx"); assert.match(page, /next="\/settings\/profile"/); assert.match(prompt, /loginPathFor\(next\)/); });
-test("onboarding uses student-facing copy and a simple Continue action", () => { const wizard = read("components/auth/onboarding-wizard.tsx"); assert.doesNotMatch(wizard, /V2 workspace|Phase 3 academic catalog|Save & continue/); assert.match(wizard, />Continue <Icon name="arrow"/); assert.match(wizard, /Only attempts available for your selected CA level are shown/); assert.match(wizard, /Choose the group you want to study and track/); });
+const root = new URL("../", import.meta.url).pathname;
+const read = (p) => readFileSync(join(root, p), "utf8");
+
+test("five-step onboarding and profile surface exist", () => {
+  for (const file of ["components/auth/onboarding-wizard.tsx","app/(public)/onboarding/page.tsx","app/api/onboarding/route.ts","app/(student)/settings/profile/page.tsx","components/auth/profile-form.tsx","app/api/profile/route.ts","app/api/profile/avatar/route.ts"]) assert.equal(existsSync(join(root,file)), true, file);
+  const wizard = read("components/auth/onboarding-wizard.tsx");
+  assert.match(wizard, /Step \{step\} of 5/);
+  assert.match(wizard, /Choose your CA level/);
+  assert.match(wizard, /Choose your group/);
+  assert.match(wizard, /Choose your attempt/);
+  assert.match(wizard, /What will you use CA Progress most for\?/);
+  assert.match(wizard, /daily target and confirm/i);
+});
+
+test("single-choice cards auto-save while priorities use an explicit ranked Continue action", () => {
+  const wizard = read("components/auth/onboarding-wizard.tsx");
+  assert.match(wizard, /chooseLevel/);
+  assert.match(wizard, /chooseGroup/);
+  assert.match(wizard, /chooseAttempt/);
+  assert.match(wizard, /togglePrimaryUse/);
+  assert.match(wizard, /continueFromPriorities/);
+  assert.match(wizard, /primary-use-grid__rank/);
+  assert.match(wizard, /Continue <Icon name="arrow"/);
+  assert.doesNotMatch(wizard, /Save & continue/);
+});
+
+test("attempt choice uses cards instead of a dropdown", () => {
+  const wizard = read("components/auth/onboarding-wizard.tsx");
+  assert.match(wizard, /attempt-choice-grid/);
+  assert.match(wizard, /applicableAttempts\.map/);
+  assert.doesNotMatch(wizard, /<Select label="Attempt"/);
+});
+
+test("onboarding saves ranked priorities and completion separately", () => {
+  const api = read("app/api/onboarding/route.ts");
+  assert.match(api, /body\.action === "complete"/);
+  assert.match(api, /onboarding_completed_at/);
+  assert.match(api, /onboarding_step/);
+  assert.match(api, /primary_use_priority/);
+  assert.match(api, /isPrimaryUsePriority/);
+  assert.match(api, /loadAttemptOptions/);
+});
+
+test("ranked priority migration backfills the previous primary focus", () => {
+  const migration = read("supabase/migrations/20260831123000_phase2_onboarding_priority_list.sql");
+  assert.match(migration, /add column if not exists primary_use_priority text\[\]/);
+  assert.match(migration, /set primary_use_priority = array\[primary_use\]/);
+  assert.match(migration, /cardinality\(primary_use_priority\) between 1 and 6/);
+});
+
+test("post-auth routing requires the guide until it is finished or skipped", () => {
+  const page = read("app/(public)/onboarding/page.tsx");
+  const server = read("lib/auth/server.ts");
+  assert.match(page, /onboarding_completed_at/);
+  assert.match(server, /!profile\?\.onboarding_completed_at/);
+  assert.match(server, /feature_guide_completed_at/);
+  assert.match(server, /\/onboarding\/guide\?next=/);
+});
+
+test("personalized guide is a realtime dashboard overlay and offers unselected features afterward", () => {
+  for (const file of ["components/auth/feature-guide.tsx","app/(public)/onboarding/guide/page.tsx","app/(student)/dashboard/page.tsx","app/api/onboarding/guide/route.ts"]) assert.equal(existsSync(join(root,file)), true, file);
+  const guide = read("components/auth/feature-guide.tsx");
+  const guidePage = read("app/(public)/onboarding/guide/page.tsx");
+  const dashboard = read("app/(student)/dashboard/page.tsx");
+  assert.match(guide, /priorities\.flatMap/);
+  assert.match(guide, /unselected\.flatMap/);
+  assert.match(guide, /dashboard-tour__spotlight/);
+  assert.match(guide, /scrollIntoView/);
+  assert.match(guide, /real dashboard or navigation control/);
+  assert.match(guide, /Want a tour of other useful features too\?/);
+  assert.match(guide, /Tour other features/);
+  assert.match(guide, /finish\("skip"\)/);
+  assert.match(guidePage, /\/dashboard\?guide=1&next=/);
+  assert.match(dashboard, /<StudentDashboard model=\{model\}/);
+  assert.match(dashboard, /<FeatureGuide priorities=/);
+  assert.match(dashboard, /!profile\?\.feature_guide_completed_at/);
+});
+
+test("step one offers Change account with a refined logout confirmation", () => {
+  const wizard = read("components/auth/onboarding-wizard.tsx");
+  const logout = read("app/(public)/logout/page.tsx");
+  assert.match(wizard, /Change account/);
+  assert.match(wizard, /\/logout\?next=/);
+  assert.match(wizard, /step === 1/);
+  assert.match(logout, /Sign out of CA Progress\?/);
+  assert.match(logout, /Stay signed in/);
+  assert.match(logout, /\/auth\/signout/);
+});
+
+test("restricted profile surface preserves its intended destination", () => {
+  const page = read("app/(student)/settings/profile/page.tsx");
+  const prompt = read("components/auth/login-required.tsx");
+  assert.match(page, /next="\/settings\/profile"/);
+  assert.match(prompt, /loginPathFor\(next\)/);
+});
+
+test("onboarding copy is product-facing", () => {
+  const wizard = read("components/auth/onboarding-wizard.tsx");
+  assert.doesNotMatch(wizard, /V2 workspace|Phase 3 academic catalog|Save & continue/);
+  assert.match(wizard, /Choose the group you want to study and track/);
+  assert.match(wizard, /Choose the exam attempt you are currently preparing for/);
+  assert.match(wizard, /Select one or more in priority order/);
+});
