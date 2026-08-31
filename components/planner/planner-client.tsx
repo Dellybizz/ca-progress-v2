@@ -186,13 +186,12 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
                   <label><span>Minutes</span><input type="number" min="1" max="720" value={estimated} onChange={(event) => setEstimated(Number(event.target.value))}/></label>
                 </div>
 
-                <fieldset className="planner-schedule">
-                  <legend><Icon name="calendar" size={14}/> Scheduled for</legend>
+                <div className="planner-schedule">
                   <div className="planner-schedule__grid">
-                    <label><span>Date</span><input type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)}/></label>
+                    <label><span>Scheduled for date</span><input type="date" required value={scheduledDate} onChange={(event) => setScheduledDate(event.target.value)}/></label>
                     <label><span>Time</span><input type="time" required value={scheduledTime} onChange={(event) => setScheduledTime(event.target.value)}/></label>
                   </div>
-                </fieldset>
+                </div>
 
                 <label><span>Notes <em>optional</em></span><textarea maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)} rows={2}/></label>
                 {error ? <div className="phase6-inline-error">{error}</div> : null}
