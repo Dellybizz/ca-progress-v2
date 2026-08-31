@@ -13,7 +13,38 @@ function duration(seconds: number) {
   const secs = safe % 60;
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 }
-function minutesLabel(seconds: number) { const minutes = Math.round(seconds / 60); return minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(minutes % 60 ? 1 : 0)}h`; }
+
+function minutesLabel(seconds: number) {
+  const minutes = Math.round(seconds / 60);
+  return minutes < 60 ? `${minutes} min` : `${(minutes / 60).toFixed(minutes % 60 ? 1 : 0)}h`;
+}
+
+function compactStudyTime(seconds: number) {
+  if (!seconds) return "0m";
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  const value = seconds / 3600;
+  return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}h`;
+}
+
+function StudySideRail({ model }: { model: StudyReadyModel }) {
+  return (
+    <aside className="study-side-rail" aria-label="Study summary and recent activity">
+      <Card className="study-side-stat study-side-stat--today">
+        <CardBody><span className="study-side-stat__icon"><Icon name="clock" size={18}/></span><div><strong>{compactStudyTime(model.analytics.todaySeconds)}</strong><small>Today</small></div></CardBody>
+      </Card>
+      <Card className="study-side-stat study-side-stat--week">
+        <CardBody><span className="study-side-stat__icon"><Icon name="chart" size={18}/></span><div><strong>{compactStudyTime(model.analytics.last7DaysSeconds)}</strong><small>Last 7 days</small></div></CardBody>
+      </Card>
+      <Card className="study-side-stat study-side-stat--streak">
+        <CardBody><span className="study-side-stat__icon"><Icon name="sparkles" size={18}/></span><div><strong>{model.analytics.streakDays}</strong><small>Day streak</small></div></CardBody>
+      </Card>
+      <Card className="study-recent-card">
+        <CardHeader title="Recent study" description="Your latest completed sessions."/>
+        <CardBody>{model.analytics.recentSessions.length ? <div className="phase6-session-list">{model.analytics.recentSessions.slice(0, 5).map((session) => <div key={session.id}><span><strong>{session.chapterTitle ?? session.subjectTitle ?? "General study"}</strong><small>{new Date(session.endedAt).toLocaleString()}</small></span><b>{minutesLabel(session.durationSeconds)}</b></div>)}</div> : <div className="phase6-empty study-empty"><span className="study-empty__icon"><Icon name="timer" size={22}/></span><strong>Your study history starts here</strong><p>Complete your first focus session and it’ll appear here automatically.</p></div>}</CardBody>
+      </Card>
+    </aside>
+  );
+}
 
 export function StudyTimer({ model }: { model: StudyReadyModel }) {
   const router = useRouter();
@@ -83,7 +114,7 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
   }
 
   if (timer) return (
-    <div className="phase6-study-grid study-session-grid">
+    <div className="phase6-study-grid study-session-grid study-session-grid--live">
       <Card className="phase6-focus-card study-live-card">
         <CardBody>
           <div className="phase6-focus-top"><span className="phase6-kicker"><Icon name="timer" size={16}/> Focus session</span><span className={`phase6-status phase6-status--${timer.status}`}>{timer.abandoned ? "Needs review" : timer.status}</span></div>
@@ -108,7 +139,7 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
   );
 
   return (
-    <div className="phase6-study-grid study-session-grid">
+    <div className="phase6-study-grid study-session-grid study-session-grid--idle">
       <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card">
         <CardHeader title="Start a focus session" description="Choose what to study and how long you want to focus."/>
         <CardBody>
@@ -144,10 +175,7 @@ export function StudyTimer({ model }: { model: StudyReadyModel }) {
         </CardBody>
       </Card>
 
-      <Card className="study-recent-card">
-        <CardHeader title="Recent study" description="Your latest completed sessions."/>
-        <CardBody>{model.analytics.recentSessions.length ? <div className="phase6-session-list">{model.analytics.recentSessions.slice(0, 5).map((session) => <div key={session.id}><span><strong>{session.chapterTitle ?? session.subjectTitle ?? "General study"}</strong><small>{new Date(session.endedAt).toLocaleString()}</small></span><b>{minutesLabel(session.durationSeconds)}</b></div>)}</div> : <div className="phase6-empty study-empty"><span className="study-empty__icon"><Icon name="timer" size={22}/></span><strong>Your study history starts here</strong><p>Complete your first focus session and it’ll appear here automatically.</p></div>}</CardBody>
-      </Card>
+      <StudySideRail model={model}/>
     </div>
   );
 }
