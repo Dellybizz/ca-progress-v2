@@ -1,49 +1,29 @@
 import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { createAdminSupabaseClient, getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
+import { getAdminRoleForUser, type AdminRole } from "@/lib/admin/authorization";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { RESOURCE_R2_BINDING } from "@/lib/resources/r2";
 
 export type AccountDeletionStatus = {
   blocked: boolean;
   reason: "parent_owner" | "sole_owner" | null;
-  role: "moderator" | "admin" | "owner" | "parent_owner" | null;
+  role: AdminRole | null;
 };
 
 type R2DeleteBucket = { delete(key: string): Promise<void> };
 
-async function readAdminRole(userId: string) {
-  const db = getSupabaseAdminRuntimeConfig();
-  if (!db.configured) return null;
-  const response = await fetch(`${db.url}/rest/v1/admin_users?user_id=eq.${encodeURIComponent(userId)}&is_active=eq.true&select=role&limit=1`, {
-    headers: { apikey: db.serviceRoleKey, authorization: `Bearer ${db.serviceRoleKey}`, accept: "application/json" },
-    cache: "no-store",
-  }).catch(() => null);
-  if (!response?.ok) return null;
-  const rows = await response.json().catch(() => []) as Array<{ role?: string }>;
-  const role = rows[0]?.role;
-  return role === "moderator" || role === "admin" || role === "owner" || role === "parent_owner" ? role : null;
-}
-
 async function activeOwnerCount() {
-  const db = getSupabaseAdminRuntimeConfig();
-  if (!db.configured) return null;
-  const response = await fetch(`${db.url}/rest/v1/admin_users?is_active=eq.true&role=in.(owner,parent_owner)&select=user_id`, {
-    headers: { apikey: db.serviceRoleKey, authorization: `Bearer ${db.serviceRoleKey}`, accept: "application/json" },
-    cache: "no-store",
-  }).catch(() => null);
-  if (!response?.ok) return null;
-  const rows = await response.json().catch(() => []) as Array<{ user_id?: string }>;
-  return rows.length;
+  const admin = createAdminSupabaseClient();
+  const { data, error } = await admin.from("admin_users").select("user_id").eq("is_active", true).in("role", ["owner", "parent_owner"]);
+  if (error) throw new Error("OWNER_GOVERNANCE_LOOKUP_FAILED");
+  return data?.length ?? 0;
 }
 
 export async function getAccountDeletionStatus(userId: string): Promise<AccountDeletionStatus> {
-  const role = await readAdminRole(userId);
+  const role = await getAdminRoleForUser(userId);
   if (role === "parent_owner") return { blocked: true, reason: "parent_owner", role };
-  if (role === "owner") {
-    const ownerCount = await activeOwnerCount();
-    if (ownerCount !== null && ownerCount <= 1) return { blocked: true, reason: "sole_owner", role };
-  }
+  if (role === "owner" && await activeOwnerCount() <= 1) return { blocked: true, reason: "sole_owner", role };
   return { blocked: false, reason: null, role };
 }
 
