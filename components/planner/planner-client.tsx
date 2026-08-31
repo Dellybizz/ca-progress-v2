@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
-import type { PlannerReadyModel, TaskKind } from "@/lib/planner/types";
+import type { PlannerReadyModel, PlannerTask, TaskKind } from "@/lib/planner/types";
 
 function localInput(date = new Date(Date.now() + 60 * 60 * 1000)) {
   const offset = date.getTimezoneOffset() * 60_000;
@@ -36,6 +36,7 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
   const [scheduledDate, setScheduledDate] = useState(defaultWhen.slice(0, 10));
   const [scheduledTime, setScheduledTime] = useState(defaultWhen.slice(11, 16));
   const [estimated, setEstimated] = useState(30);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
@@ -68,7 +69,35 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
     }
   }
 
-  async function create(event: FormEvent) {
+  function resetForm() {
+    setEditingId(null);
+    setTitle("");
+    setNotes("");
+    setKind("study");
+    setSubjectId("");
+    setChapterId("");
+    setScheduledDate(defaultWhen.slice(0, 10));
+    setScheduledTime(defaultWhen.slice(11, 16));
+    setEstimated(30);
+    setError(null);
+  }
+
+  function editTask(task: PlannerTask) {
+    const scheduled = localInput(new Date(task.dueAt));
+    setEditingId(task.id);
+    setTitle(task.title);
+    setNotes(task.notes ?? "");
+    setKind(task.taskKind);
+    setSubjectId(task.subjectId ?? "");
+    setChapterId(task.chapterId ?? "");
+    setScheduledDate(scheduled.slice(0, 10));
+    setScheduledTime(scheduled.slice(11, 16));
+    setEstimated(task.estimatedMinutes);
+    setError(null);
+    window.requestAnimationFrame(() => document.querySelector(".planner-add-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+
+  async function saveTask(event: FormEvent) {
     event.preventDefault();
     const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`);
     if (Number.isNaN(scheduledAt.getTime())) {
@@ -77,7 +106,8 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
     }
 
     const ok = await request({
-      action: "create",
+      action: editingId ? "update" : "create",
+      ...(editingId ? { id: editingId } : {}),
       title,
       notes,
       taskKind: kind,
@@ -86,16 +116,16 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
       dueAt: scheduledAt.toISOString(),
       estimatedMinutes: estimated,
     });
-    if (ok) {
-      setTitle("");
-      setNotes("");
-    }
+    if (ok) resetForm();
   }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
     const ok = await request({ action: "delete", id: deleteTarget.id });
-    if (ok) setDeleteTarget(null);
+    if (ok) {
+      if (editingId === deleteTarget.id) resetForm();
+      setDeleteTarget(null);
+    }
   }
 
   return (
@@ -114,14 +144,17 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
               {model.tasks.length ? (
                 <div className="phase6-task-list">
                   {model.tasks.map((task) => (
-                    <article key={task.id} className={`phase6-task phase6-task--${task.status}`}>
-                      <button aria-label={task.status === "done" ? "Mark task incomplete" : "Complete task"} disabled={busy} onClick={() => void request({ action: "toggle", id: task.id, done: task.status !== "done" })}><Icon name="check" size={16}/></button>
-                      <div>
+                    <article key={task.id} className={`phase6-task planner-task phase6-task--${task.status}`}>
+                      <div className="planner-task__content">
                         <div className="phase6-task-title"><strong>{task.title}</strong><span className={`phase6-kind phase6-kind--${task.taskKind}`}>{task.taskKind}</span></div>
                         <p>{task.chapterTitle ?? task.subjectTitle ?? "General"} · {task.estimatedMinutes} min · {formatTaskSchedule(task.dueAt)}</p>
                         {task.notes ? <small>{task.notes}</small> : null}
                       </div>
-                      <button className="phase6-icon-button" aria-label={`Delete ${task.title}`} disabled={busy} onClick={() => setDeleteTarget({ id: task.id, title: task.title })}><Icon name="close" size={17}/></button>
+                      <div className="planner-task__actions" aria-label={`Actions for ${task.title}`}>
+                        <button className="planner-task-action planner-task-action--complete" type="button" disabled={busy} onClick={() => void request({ action: "toggle", id: task.id, done: task.status !== "done" })}>{task.status === "done" ? "Reopen" : "Complete"}</button>
+                        <button className="planner-task-action" type="button" disabled={busy} onClick={() => editTask(task)}>Edit</button>
+                        <button className="planner-task-action planner-task-action--delete" type="button" disabled={busy} onClick={() => setDeleteTarget({ id: task.id, title: task.title })}>Delete</button>
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -138,9 +171,12 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
 
         <aside className="planner-side">
           <Card className="planner-add-card">
-            <CardHeader title="Add task"/>
+            <CardHeader
+              title={editingId ? "Edit task" : "Add task"}
+              action={editingId ? <button className="planner-edit-cancel" type="button" disabled={busy} onClick={resetForm}>Cancel</button> : undefined}
+            />
             <CardBody>
-              <form className="phase6-form planner-form" onSubmit={create}>
+              <form className="phase6-form planner-form" onSubmit={saveTask}>
                 <label className="planner-form__full"><span>Task</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Revise AS 10"/></label>
 
                 <div className="planner-form__grid">
@@ -160,21 +196,15 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
 
                 <label><span>Notes <em>optional</em></span><textarea maxLength={4000} value={notes} onChange={(event) => setNotes(event.target.value)} rows={2}/></label>
                 {error ? <div className="phase6-inline-error">{error}</div> : null}
-                <button disabled={busy} className="ui-button ui-button--primary planner-add-button" type="submit">{busy ? "Saving…" : "Add task"}</button>
+                <button disabled={busy} className="ui-button ui-button--primary planner-add-button" type="submit">{busy ? "Saving…" : editingId ? "Save changes" : "Add task"}</button>
               </form>
             </CardBody>
           </Card>
 
-          <Card className="planner-goals-card">
-            <CardHeader title="Goals"/>
-            <CardBody>
-              <div className="phase6-side-goals">
-                {model.goals.slice(0, 4).map((goal) => <div key={goal.id}><span>{goal.title}</span><small>{goal.dueDate}</small></div>)}
-                {!model.goals.length ? <p>No active goals yet.</p> : null}
-                <Link href="/goals" className="ui-text-link">Manage goals →</Link>
-              </div>
-            </CardBody>
-          </Card>
+          <nav className="planner-mobile-links" aria-label="Planner pages">
+            <Link href="/planner/today"><Icon name="sparkles" size={18}/><span><strong>Today Plan</strong><small>See today’s study plan</small></span><Icon name="chevron" size={16}/></Link>
+            <Link href="/calendar"><Icon name="calendar" size={18}/><span><strong>Calendar</strong><small>See tasks by date</small></span><Icon name="chevron" size={16}/></Link>
+          </nav>
         </aside>
       </div>
 
