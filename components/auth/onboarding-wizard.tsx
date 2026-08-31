@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { primaryUseOptions, type PrimaryUse } from "@/lib/profile/onboarding";
+import { normalizePrimaryUsePriority, primaryUseOptions, type PrimaryUse } from "@/lib/profile/onboarding";
 import { attemptAppliesToLevel, type AttemptOption, type CALevel, type GroupChoice } from "@/lib/profile/validation";
 
 type InitialProfile = {
@@ -18,6 +19,7 @@ type InitialProfile = {
   daily_target_minutes: number | null;
   onboarding_step: number;
   primary_use: PrimaryUse | null;
+  primary_use_priority: PrimaryUse[] | null;
 };
 
 type DraftValues = {
@@ -25,6 +27,7 @@ type DraftValues = {
   group: GroupChoice | "";
   attemptKey: string;
   primaryUse: PrimaryUse | "";
+  primaryUsePriority: PrimaryUse[];
   dailyTargetMinutes: number;
 };
 
@@ -43,7 +46,7 @@ export function OnboardingWizard({ initialProfile, attempts, next }: { initialPr
   const [level, setLevel] = useState<CALevel | "">((initialProfile.ca_level as CALevel | null) ?? "");
   const [group, setGroup] = useState<GroupChoice | "">((initialProfile.group_choice as GroupChoice | null) ?? "");
   const [attemptKey, setAttemptKey] = useState(initialProfile.attempt_key ?? "");
-  const [primaryUse, setPrimaryUse] = useState<PrimaryUse | "">(initialProfile.primary_use ?? "");
+  const [primaryUsePriority, setPrimaryUsePriority] = useState<PrimaryUse[]>(normalizePrimaryUsePriority(initialProfile.primary_use_priority, initialProfile.primary_use));
   const [target, setTarget] = useState(String(initialProfile.daily_target_minutes ?? 120));
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -52,20 +55,22 @@ export function OnboardingWizard({ initialProfile, attempts, next }: { initialPr
   const applicableAttempts = useMemo(() => level ? attempts.filter((option) => attemptAppliesToLevel(option, level)) : attempts, [attempts, level]);
   const selectedAttemptKey = applicableAttempts.some((option) => option.key === attemptKey) ? attemptKey : applicableAttempts[0]?.key ?? "";
   const attemptLabel = useMemo(() => applicableAttempts.find((option) => option.key === selectedAttemptKey)?.label ?? "Not selected", [selectedAttemptKey, applicableAttempts]);
-  const primaryUseLabel = primaryUseOptions.find((option) => option.key === primaryUse)?.label ?? "Not selected";
+  const priorityLabels = primaryUsePriority.map((key) => primaryUseOptions.find((option) => option.key === key)?.label ?? key);
+  const changeAccountHref = `/logout?next=${encodeURIComponent(`/onboarding?next=${encodeURIComponent(next)}`)}`;
 
   function currentValues(overrides: Partial<DraftValues> = {}): DraftValues {
     return {
       level,
       group: effectiveGroup,
       attemptKey: selectedAttemptKey,
-      primaryUse,
+      primaryUse: primaryUsePriority[0] ?? "",
+      primaryUsePriority,
       dailyTargetMinutes: Number(target || 120),
       ...overrides,
     };
   }
 
-  async function saveDraft(nextStep: number, values: DraftValues) {
+  async function saveDraft(nextStep: number, values: DraftValues, advance = true) {
     setSaving(true);
     setError(null);
     const response = await fetch("/api/onboarding", {
@@ -79,7 +84,7 @@ export function OnboardingWizard({ initialProfile, attempts, next }: { initialPr
       setError(result.error || "Could not save your onboarding progress.");
       return false;
     }
-    setStep(nextStep);
+    if (advance) setStep(nextStep);
     return true;
   }
 
@@ -106,23 +111,31 @@ export function OnboardingWizard({ initialProfile, attempts, next }: { initialPr
     await saveDraft(4, currentValues({ attemptKey: nextAttempt }));
   }
 
-  async function choosePrimaryUse(nextUse: PrimaryUse) {
+  async function togglePrimaryUse(nextUse: PrimaryUse) {
     if (saving) return;
-    setPrimaryUse(nextUse);
-    await saveDraft(5, currentValues({ primaryUse: nextUse }));
+    const nextPriority = primaryUsePriority.includes(nextUse)
+      ? primaryUsePriority.filter((key) => key !== nextUse)
+      : [...primaryUsePriority, nextUse];
+    setPrimaryUsePriority(nextPriority);
+    await saveDraft(4, currentValues({ primaryUse: nextPriority[0] ?? "", primaryUsePriority: nextPriority }), false);
+  }
+
+  async function continueFromPriorities() {
+    if (!primaryUsePriority.length) return setError("Choose at least one priority to continue.");
+    await saveDraft(5, currentValues());
   }
 
   async function complete() {
     if (!level) return setError("Choose your CA level first.");
     if (level !== "foundation" && !effectiveGroup) return setError("Choose your group first.");
     if (!selectedAttemptKey) return setError("Choose your attempt first.");
-    if (!primaryUse) return setError("Choose what you want CA Progress to help with most.");
+    if (!primaryUsePriority.length) return setError("Choose at least one priority for CA Progress.");
     setSaving(true);
     setError(null);
     const response = await fetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "complete", level, group: effectiveGroup, attemptKey: selectedAttemptKey, primaryUse, dailyTargetMinutes: Number(target), step: 5 }),
+      body: JSON.stringify({ action: "complete", level, group: effectiveGroup, attemptKey: selectedAttemptKey, primaryUse: primaryUsePriority[0], primaryUsePriority, dailyTargetMinutes: Number(target), step: 5 }),
     });
     const result = await response.json() as { ok?: boolean; error?: string };
     setSaving(false);
@@ -165,8 +178,9 @@ export function OnboardingWizard({ initialProfile, attempts, next }: { initialPr
         {step === 4 ? <section>
           <span className="onboarding-icon"><Icon name="sparkles"/></span>
           <h2>What will you use CA Progress most for?</h2>
-          <p>Pick the closest match. We will put those features first in your quick guide.</p>
-          <div className="primary-use-grid">{primaryUseOptions.map((option) => <button type="button" disabled={saving} key={option.key} className={primaryUse === option.key ? "is-selected" : ""} onClick={() => choosePrimaryUse(option.key)}><span className="primary-use-grid__icon"><Icon name={primaryUseIcons[option.key]} size={19}/></span><span><strong>{option.label}</strong><small>{option.description}</small></span>{primaryUse === option.key ? <Icon name="check" size={16}/> : null}</button>)}</div>
+          <p>Select one or more in priority order. Your first choice is Priority 1, your next choice is Priority 2, and so on.</p>
+          <div className="primary-use-grid">{primaryUseOptions.map((option) => { const priority = primaryUsePriority.indexOf(option.key) + 1; return <button type="button" disabled={saving} key={option.key} className={priority ? "is-selected" : ""} onClick={() => togglePrimaryUse(option.key)}><span className="primary-use-grid__icon"><Icon name={primaryUseIcons[option.key]} size={19}/></span><span><strong>{option.label}</strong><small>{option.description}</small></span>{priority ? <span className="primary-use-grid__rank" aria-label={`Priority ${priority}`}>{priority}</span> : null}</button>; })}</div>
+          <div className="priority-selection-summary" aria-live="polite">{primaryUsePriority.length ? `${primaryUsePriority.length} ${primaryUsePriority.length === 1 ? "priority" : "priorities"} selected. Tap a selected card to remove it.` : "Choose at least one. You can rank all six if you want."}</div>
         </section> : null}
 
         {step === 5 ? <section>
@@ -174,10 +188,13 @@ export function OnboardingWizard({ initialProfile, attempts, next }: { initialPr
           <h2>Set a daily target and confirm</h2>
           <p>Choose a realistic daily focus target. You can change it later from Profile settings.</p>
           <Input label="Daily target (minutes)" type="number" inputMode="numeric" min={15} max={720} step={15} value={target} onChange={(event) => setTarget(event.target.value)}/>
-          <div className="onboarding-summary"><div><span>Level</span><strong>{level || "—"}</strong></div><div><span>Group</span><strong>{effectiveGroup || "—"}</strong></div><div><span>Attempt</span><strong>{attemptLabel}</strong></div><div><span>Main focus</span><strong>{primaryUseLabel}</strong></div><div><span>Daily target</span><strong>{target || "—"} min</strong></div></div>
+          <div className="onboarding-summary"><div><span>Level</span><strong>{level || "—"}</strong></div><div><span>Group</span><strong>{effectiveGroup || "—"}</strong></div><div><span>Attempt</span><strong>{attemptLabel}</strong></div><div><span>Priorities</span><strong>{priorityLabels.length ? priorityLabels.join(" → ") : "—"}</strong></div><div><span>Daily target</span><strong>{target || "—"} min</strong></div></div>
         </section> : null}
       </div>
-      <div className="button-row onboarding-actions">{step > 1 ? <Button variant="secondary" disabled={saving} onClick={() => setStep(step - 1)}>Back</Button> : <span/>}{step === 5 ? <Button isLoading={saving} onClick={complete}>Finish setup <Icon name="check" size={16}/></Button> : <span className="onboarding-autosave">{saving ? "Saving your choice…" : "Choose an option to continue"}</span>}</div>
+      <div className="button-row onboarding-actions">
+        {step === 1 ? <Link className="ui-button ui-button--secondary ui-button--md" href={changeAccountHref}>Change account</Link> : <Button variant="secondary" disabled={saving} onClick={() => setStep(step - 1)}>Back</Button>}
+        {step === 4 ? <Button disabled={saving || !primaryUsePriority.length} isLoading={saving} onClick={continueFromPriorities}>Continue <Icon name="arrow" size={16}/></Button> : step === 5 ? <Button isLoading={saving} onClick={complete}>Finish setup <Icon name="check" size={16}/></Button> : <span className="onboarding-autosave">{saving ? "Saving your choice…" : "Choose an option to continue"}</span>}
+      </div>
     </CardBody></Card>
   </div>;
 }
