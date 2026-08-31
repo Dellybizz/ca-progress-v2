@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ca-progress-v2-web-core",
+  "main": "./index.ts",
+  "minify": true,
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "keep_vars": true,
+  "r2_buckets": [{ "binding": "USER_RESOURCES_R2", "bucket_name": "ca-progress-v2-staging-user-resources" }],
+  "services": [
+    { "binding": "ICAI_SYNC_SERVICE", "service": "ca-progress-v2-icai-sync" },
+    { "binding": "BILLING_SERVICE", "service": "ca-progress-v2-billing" },
+    { "binding": "ADMIN_OPS_SERVICE", "service": "ca-progress-v2-admin-ops" }
+  ],
+  "vars": {
+    "NEXT_PUBLIC_APP_NAME": "CA Progress",
+    "NEXT_PUBLIC_APP_ENV": "staging",
+    "NEXT_PUBLIC_APP_VERSION": "phase-12"
+  },
+  "observability": { "enabled": true }
+}
