@@ -5,13 +5,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import type { StudyPageModel } from "@/lib/study/types";
 import { StudyTimer } from "./study-timer";
 
-function hours(seconds: number) {
-  if (!seconds) return "0m";
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  const value = seconds / 3600;
-  return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}h`;
-}
-
 function formatAttempt(value: string) {
   const match = /^(\d{4})-(\d{2})$/.exec(value);
   if (!match) return value;
@@ -44,16 +37,11 @@ export function StudyPage({ model }: { model: StudyPageModel }) {
 
   return (
     <div className="phase6-page study-page">
-      <header className="study-page__intro">
+      <header className="study-page__intro study-page__intro--simple">
         <div className="study-page__intro-copy">
           <span className="study-page__eyebrow"><Icon name="timer" size={15}/> Focus</span>
           <h1>{model.timer ? "Focus session" : "Study"}</h1>
           <p>{model.levelName} · {model.groupLabel} · {formatAttempt(model.attemptKey)}</p>
-        </div>
-        <div className="study-page__summary" aria-label="Study summary">
-          <span><i><Icon name="clock" size={15}/></i><b>{hours(model.analytics.todaySeconds)}</b><small>Today</small></span>
-          <span><i><Icon name="chart" size={15}/></i><b>{hours(model.analytics.last7DaysSeconds)}</b><small>Last 7 days</small></span>
-          <span><i><Icon name="sparkles" size={15}/></i><b>{model.analytics.streakDays}</b><small>Day streak</small></span>
         </div>
       </header>
 
