@@ -77,6 +77,20 @@
   box-shadow: none;
 }
 
+.planner-add-card {
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.planner-add-card:has(.planner-edit-cancel) {
+  border-color: color-mix(in srgb, var(--color-brand) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-brand-soft) 38%, var(--color-surface));
+  box-shadow: 0 12px 34px rgb(79 70 229 / 10%);
+}
+
+.planner-add-card:has(.planner-edit-cancel) > .ui-card__header {
+  border-bottom-color: color-mix(in srgb, var(--color-brand) 16%, var(--color-border));
+}
+
 .planner-tasks-card > .ui-card__header,
 .planner-add-card > .ui-card__header {
   padding: 15px 16px 8px;
@@ -216,38 +230,45 @@
   display: grid;
   gap: 7px;
   margin: 0;
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-bg-subtle);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .planner-schedule legend {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 5px;
+  margin: 0 0 1px;
+  padding: 0;
   color: var(--color-text);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .planner-schedule legend svg {
-  color: var(--color-brand-strong);
+  color: var(--color-text-soft);
 }
 
 .planner-schedule__grid {
   display: grid;
   grid-template-columns: 1.15fr .85fr;
-  gap: 8px;
+  gap: 10px;
 }
 
 .planner-schedule__grid label > span {
-  color: var(--color-text-soft);
-  font-size: 10px;
+  color: inherit;
+  font-size: 11px;
 }
 
 .planner-schedule__grid input {
+  background: var(--color-surface);
+}
+
+.planner-add-card:has(.planner-edit-cancel) .planner-schedule__grid input,
+.planner-add-card:has(.planner-edit-cancel) .planner-form input,
+.planner-add-card:has(.planner-edit-cancel) .planner-form select,
+.planner-add-card:has(.planner-edit-cancel) .planner-form textarea {
   background: var(--color-surface);
 }
 
