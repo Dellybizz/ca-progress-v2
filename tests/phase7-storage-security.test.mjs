@@ -58,7 +58,9 @@ test("server-only Supabase credentials resolve directly from consolidated Cloudf
   assert.match(runtimeEnv, /process\.env\[name\]/);
   assert.match(web, /"required": \["SUPABASE_SERVICE_ROLE_KEY"\]/);
   assert.match(worker, /\.open-next\/worker\.js/);
-  assert.doesNotMatch(worker, /x-ca-progress-service-role/);
+  assert.match(worker, /scheduled\(controller/);
+  assert.match(worker, /x-ca-progress-service-role/);
+  assert.match(worker, /ICAI_SYNC_SERVICE\.fetch/);
   assert.match(admin, /getServerRuntimeValue\("SUPABASE_SERVICE_ROLE_KEY"\)/);
   assert.match(admin, /getSupabaseAdminRuntimeConfig/);
   assert.match(upload, /getSupabaseAdminRuntimeConfig\(\)/);
