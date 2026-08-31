@@ -7,7 +7,7 @@ import { defineCloudflareConfig } from "@opennextjs/cloudflare";
 // This keeps future feature growth out of a single 3 MiB Free-plan Worker.
 const cloudflare = defineCloudflareConfig();
 
-export default {
+const openNextConfig = {
   ...cloudflare,
   functions: {
     admin: {
@@ -85,3 +85,5 @@ export default {
     },
   },
 };
+
+export default openNextConfig;
