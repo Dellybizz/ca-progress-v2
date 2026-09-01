@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
-import { getSupabaseAdminConfig } from "@/lib/env";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { cleanText, nullableId } from "@/lib/resources/validation";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createAdminSupabaseClient, getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +15,7 @@ function metadataUnavailable() {
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (!getSupabaseAdminConfig().configured) return metadataUnavailable();
+  if (!getSupabaseAdminRuntimeConfig().configured) return metadataUnavailable();
 
   const { id } = await params;
   let body: Record<string, unknown>;
@@ -50,7 +49,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  if (!getSupabaseAdminConfig().configured) return metadataUnavailable();
+  if (!getSupabaseAdminRuntimeConfig().configured) return metadataUnavailable();
 
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
