@@ -30,6 +30,14 @@ function chapterDisplay(chapter: AcademicChapter | undefined) {
   return `${prefix} · ${title}`;
 }
 
+function itemDisplayTitle(item: TodayPlanItem, chapterDisplayTitle: string | null) {
+  if (!chapterDisplayTitle) return item.title;
+  if (item.itemKind === "revision") return `Revision ${item.revisionNumber ?? ""}: ${chapterDisplayTitle}`.replace("Revision :", "Revision:");
+  if (item.itemKind === "new_chapter") return `Study: ${chapterDisplayTitle}`;
+  if (item.itemKind === "test") return `Test ${item.testNumber ?? ""}: ${chapterDisplayTitle}`.replace("Test :", "Test:");
+  return item.title;
+}
+
 function durationMs(item: TodayPlanItem) {
   return Math.max(1, item.estimatedMinutes) * 60_000;
 }
@@ -38,7 +46,7 @@ function scheduleItems(items: TodayPlanItem[]) {
   const now = Date.now();
   const active = items.filter((item) => item.status === "planned");
   const inactive = items.filter((item) => item.status !== "planned");
-  const lapsed = active
+  const overdue = active
     .filter((item) => item.scheduledAt && new Date(item.scheduledAt).getTime() <= now)
     .sort((a, b) => new Date(a.scheduledAt!).getTime() - new Date(b.scheduledAt!).getTime());
   const fixed = active
@@ -51,10 +59,15 @@ function scheduleItems(items: TodayPlanItem[]) {
   const scheduled: TodayPlanItem[] = [];
   let cursor = now;
 
-  for (const item of lapsed) {
+  for (const item of overdue) {
     const start = cursor;
     const end = start + durationMs(item);
-    scheduled.push({ ...item, scheduleState: "lapsed", plannedStartAt: new Date(start).toISOString(), plannedEndAt: new Date(end).toISOString() });
+    scheduled.push({
+      ...item,
+      scheduleState: "overdue",
+      plannedStartAt: new Date(start).toISOString(),
+      plannedEndAt: new Date(end).toISOString(),
+    });
     cursor = end;
   }
 
@@ -65,20 +78,35 @@ function scheduleItems(items: TodayPlanItem[]) {
       const candidate = flexible[flexIndex];
       const end = cursor + durationMs(candidate);
       if (end > fixedStart) break;
-      scheduled.push({ ...candidate, scheduleState: "flexible", plannedStartAt: new Date(cursor).toISOString(), plannedEndAt: new Date(end).toISOString() });
+      scheduled.push({
+        ...candidate,
+        scheduleState: "planned",
+        plannedStartAt: new Date(cursor).toISOString(),
+        plannedEndAt: new Date(end).toISOString(),
+      });
       cursor = end;
       flexible.splice(flexIndex, 1);
     }
 
     const fixedEnd = fixedStart + durationMs(fixedItem);
-    scheduled.push({ ...fixedItem, scheduleState: "scheduled", plannedStartAt: new Date(fixedStart).toISOString(), plannedEndAt: new Date(fixedEnd).toISOString() });
+    scheduled.push({
+      ...fixedItem,
+      scheduleState: "fixed",
+      plannedStartAt: new Date(fixedStart).toISOString(),
+      plannedEndAt: new Date(fixedEnd).toISOString(),
+    });
     cursor = Math.max(cursor, fixedEnd);
   }
 
   for (const item of flexible) {
     const start = cursor;
     const end = start + durationMs(item);
-    scheduled.push({ ...item, scheduleState: "flexible", plannedStartAt: new Date(start).toISOString(), plannedEndAt: new Date(end).toISOString() });
+    scheduled.push({
+      ...item,
+      scheduleState: "planned",
+      plannedStartAt: new Date(start).toISOString(),
+      plannedEndAt: new Date(end).toISOString(),
+    });
     cursor = end;
   }
 
@@ -117,10 +145,12 @@ export async function presentTodayPlan(model: TodayPlanReadyModel, userId: strin
   const enriched = model.items.map((item) => {
     const sourceTask = item.sourceType === "task" && item.sourceId ? taskMap.get(item.sourceId) : undefined;
     const scheduledAt = sourceTask?.due_at ?? item.scheduledAt;
+    const chapterDisplayTitle = item.chapterId ? chapterDisplay(chapterMap.get(item.chapterId)) : null;
     return {
       ...item,
       scheduledAt,
-      chapterDisplayTitle: item.chapterId ? chapterDisplay(chapterMap.get(item.chapterId)) : null,
+      chapterDisplayTitle,
+      displayTitle: itemDisplayTitle(item, chapterDisplayTitle),
     };
   });
 
