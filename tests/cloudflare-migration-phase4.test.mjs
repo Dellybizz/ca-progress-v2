@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { hashRows, normalizeRow, splitSqlStatements } from "../scripts/phase4/core.mjs";
 const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),"utf8");
 const migration=read("d1/migrations/0005_phase4_migration_shadow.sql");
+const attemptCompatibility=read("d1/migrations/0006_phase4_attempt_scope.sql");
 const manifest=read("scripts/phase4/manifest.mjs");
 const pipeline=read("scripts/phase4/production-shadow.mjs");
 const shadow=read("lib/data/phase4-shadow-read.ts");
@@ -40,6 +41,15 @@ test("pipeline records every row failure and refuses source columns missing from
   assert.match(pipeline,/phase4_migration_failures/);
   assert.match(pipeline,/Source columns absent from D1 target/);
   assert.match(pipeline,/throw new Error\(`Required source table/);
+});
+
+test("Phase 4 repairs exam-attempt uniqueness to match level-scoped PostgreSQL semantics",()=>{
+  assert.match(attemptCompatibility,/UNIQUE\(level_id, attempt_key\)/);
+  assert.match(attemptCompatibility,/FOREIGN KEY\(level_id, attempt_key\) REFERENCES exam_attempts\(level_id, attempt_key\)/);
+  assert.match(attemptCompatibility,/FOREIGN KEY\(subject_id, syllabus_version_id\) REFERENCES syllabus_versions\(subject_id, id\)/);
+  assert.match(attemptCompatibility,/UNIQUE\(attempt_key, syllabus_version_id\)/);
+  assert.match(attemptCompatibility,/WHERE source_table IN \('exam_attempts','attempt_syllabus_map'\)/);
+  assert.doesNotMatch(attemptCompatibility,/DELETE FROM phase4_migration_failures/);
 });
 
 test("deterministic hashes are order stable and value normalization is explicit",()=>{
