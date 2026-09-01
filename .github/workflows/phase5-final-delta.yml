@@ -1,5 +1,6 @@
 name: Cloudflare Migration Phase 5 Final Delta
 
+# Evidence gate revision: hardened-runtime-v1
 on:
   push:
     branches: [phase-12-operations-admin-platform]
