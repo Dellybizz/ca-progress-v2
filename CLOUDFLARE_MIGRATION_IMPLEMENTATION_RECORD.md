@@ -134,3 +134,60 @@ Final branch CI evidence from run `33514140805`, job `99876783030`:
 ## Phase 2 completion decision
 
 **Phase 2 is Complete.** The Cloudflare D1 data and authorization platform is implemented and all Phase 2-specific Definition-of-Done checks pass. Supabase remains the active production persistence/auth platform until later migration phases explicitly change that state.
+
+---
+
+# Phase 3 — Authentication, R2, Jobs and Realtime Migration
+
+Status: **IMPLEMENTED — VALIDATION PENDING**
+
+Phase 3 start commit: `737617e0612f7e0353078d06a138bcefc3ea966e`.
+
+## Authentication architecture / user-ID mapping
+
+- `app_users.user_id` remains the permanent application ownership key.
+- D1 adds conceptual `users`, explicit `auth_identities` and opaque `sessions`.
+- Existing Supabase Auth users deterministically retain their exact current `auth.users.id` as `application_user_id`; progress, planner, study, resources, community, subscription/billing and Mentor ownership therefore does not change.
+- Google/LinkedIn provider subjects map through `auth_identities`; provider IDs and email never replace the application ownership key.
+- Automatic email-based account linking is prohibited.
+- Current repository login intent remains Google + LinkedIn OIDC; phone OTP is not reintroduced because the repository explicitly removed it before this migration.
+- Worker auth target implements state + PKCE, signed one-time OAuth transaction cookies, opaque HttpOnly sessions, SHA-256 token hashes in D1, expiry/absolute expiry, rotation/revocation, same-origin mutation protection and server-loaded role/subscription entitlements.
+- Production auth remains Supabase-backed until later cutover; `CA_AUTH_RUNTIME=cloudflare` is the target selector.
+
+## R2 status
+
+- Existing user-resource bytes remain R2-backed.
+- New avatar bytes move from Supabase Storage to private R2 keys under `avatars/<application_user_id>/...`.
+- Avatar read/delete validates stable-user ownership and MIME/cache metadata is preserved.
+- Failed metadata attachment cleans up the new R2 object.
+- Legacy Supabase avatar reads remain a pre-cutover fallback only; Cloudflare-auth mode does not require Supabase Storage.
+- No legacy source object is irreversibly deleted in Phase 3.
+
+## Jobs architecture
+
+- Existing daily ICAI schedule is preserved as Cron → `BACKGROUND_JOBS` Queue → D1 idempotency ledger → `ICAI_SYNC_SERVICE`.
+- Deterministic schedule keys and payload hashes prevent duplicate successful execution/different-payload key reuse.
+- Failed Queue deliveries remain retryable.
+- Existing direct ICAI service execution remains a transitional production fallback until Queue activation.
+- Billing stays on the existing signed/idempotent Billing Worker path; no asynchronous payment mutation is introduced.
+- No Mentor Phase 3 job type/source ingestion exists.
+
+## Realtime architecture
+
+- The only browser Supabase Realtime dependency used message/reaction/pin changes as UI invalidation signals.
+- It is replaced by provider-neutral visibility-aware polling.
+- Durable community ordering, room access, moderation, blocks, announcements/pins, deletes, reactions and unread/read state remain server/database behavior.
+- No Durable Object/WebSocket layer is added because no retained presence/typing/room coordination requires stateful realtime coordination.
+- D1 remains the target durable community history store.
+
+## Service adapter / activation state
+
+- `lib/data/phase3-service-adapter.ts` records active and target auth, R2, jobs and realtime providers.
+- `wrangler.phase3.jsonc` is validation-only with D1, R2, Queue, ICAI/Billing service bindings and Cron.
+- Production data is not migrated; production D1/Queue/auth cutover is not activated.
+- Migration Phase 4 is not started.
+- CA Mentor Phase 3 is not started.
+
+## Validation pending
+
+The implementation commit will run the Phase 3 auth/security/identity, R2, jobs and realtime tests, clean D1 Phase 3 bootstrap, typecheck, lint, Next/OpenNext build, standard Worker dry-runs, the Phase 3 D1/R2/Queue dry-run and Cloudflare SSR smoke test. Repository-wide failures will be compared with the known pre-existing baseline before final status is set.

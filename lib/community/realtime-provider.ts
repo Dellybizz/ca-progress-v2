@@ -1,28 +1,43 @@
 "use client";
 
-import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
-
 type CommunityRealtimeSubscription = {
   channelId: string;
   onDataChanged: () => void;
   onPinnedChanged: () => void;
 };
 
+const DATA_REFRESH_MS = 2500;
+const PIN_REFRESH_MS = 10000;
+
 /**
- * Provider-neutral realtime boundary for Community UI. The Phase 1 adapter is
- * still Supabase Realtime; callers no longer know how the subscription is made.
+ * Community durable state already lives in the database and the UI only needs an
+ * invalidation signal. Phase 3 therefore replaces Supabase Realtime with a small
+ * provider-neutral polling adapter rather than adding a Durable Object/WebSocket
+ * coordinator that the product does not need. Ordering, moderation, blocks,
+ * unread state, reactions and pins remain enforced by existing server APIs.
  */
 export function subscribeToCommunityRealtime({ channelId, onDataChanged, onPinnedChanged }: CommunityRealtimeSubscription) {
-  const client = createBrowserSupabaseClient();
-  const filter = `channel_id=eq.${channelId}`;
-  const channel = client
-    .channel(`community:${channelId}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "community_messages", filter }, onDataChanged)
-    .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions", filter }, onDataChanged)
-    .on("postgres_changes", { event: "*", schema: "public", table: "pinned_messages", filter }, onPinnedChanged)
-    .subscribe();
+  if (!channelId || typeof window === "undefined") return () => undefined;
+
+  const refreshData = () => {
+    if (document.visibilityState === "visible") onDataChanged();
+  };
+  const refreshPins = () => {
+    if (document.visibilityState === "visible") onPinnedChanged();
+  };
+  const onVisibility = () => {
+    if (document.visibilityState !== "visible") return;
+    onDataChanged();
+    onPinnedChanged();
+  };
+
+  const dataTimer = window.setInterval(refreshData, DATA_REFRESH_MS);
+  const pinTimer = window.setInterval(refreshPins, PIN_REFRESH_MS);
+  document.addEventListener("visibilitychange", onVisibility);
 
   return () => {
-    void client.removeChannel(channel);
+    window.clearInterval(dataTimer);
+    window.clearInterval(pinTimer);
+    document.removeEventListener("visibilitychange", onVisibility);
   };
 }

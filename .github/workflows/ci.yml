@@ -11,7 +11,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,10 +24,16 @@ jobs:
         run: npm run test:cloudflare-phase2
       - name: Cloudflare migration Phase 2 clean D1 bootstrap
         run: npm run d1:phase2:validate
+      - name: Cloudflare migration Phase 3 auth/R2/jobs/realtime tests
+        run: npm run test:cloudflare-phase3
+      - name: Cloudflare migration Phase 3 clean D1 auth/job bootstrap
+        run: npm run d1:phase3:validate
       - name: Next.js production build
         run: npm run build
-      - name: OpenNext Worker build and Wrangler dry-runs
+      - name: OpenNext Worker build and existing Wrangler dry-runs
         run: npm run cf:check
+      - name: Phase 3 D1/R2/Queue Worker dry-run
+        run: npm run cf:check:phase3
       - name: Smoke Cloudflare SSR routes
         run: npm run cf:smoke
       - name: Repository-wide tests

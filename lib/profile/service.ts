@@ -2,6 +2,9 @@ import "server-only";
 
 import type { Database } from "@/lib/supabase/database.types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { isCloudflareAuthRuntime } from "@/lib/auth/provider";
+import { setCloudflareProfileAvatar } from "@/lib/auth/cloudflare-profile";
+import { deleteOwnedAvatarObject, isOwnedAvatarObjectKey, putAvatarObject } from "@/lib/resources/r2";
 
 type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
@@ -39,10 +42,27 @@ function toDatabasePatch(patch: ProfilePatch): ProfileUpdate {
 }
 
 export async function saveProfilePatch(userId: string, patch: ProfilePatch) {
+  // General profile persistence remains on the active database provider until the
+  // Phase 4 data cutover. Phase 3 only removes Supabase Storage from new writes.
   const client = await createServerSupabaseClient();
   const { data, error } = await client.from("profiles").update(toDatabasePatch(patch)).eq("user_id", userId).select("*").single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Provider-neutral avatar access. New Phase 3 objects are private R2 keys and are
+ * served through an authenticated application route. While Supabase is still the
+ * production source, legacy avatar objects keep their temporary signed-read path;
+ * the Cloudflare target runtime never requires that fallback.
+ */
+export async function getProfileAvatarAccessUrl(userId: string, path: string | null | undefined) {
+  if (!path) return null;
+  if (isOwnedAvatarObjectKey(userId, path)) return `/api/profile/avatar?path=${encodeURIComponent(path)}`;
+  if (isCloudflareAuthRuntime()) return null;
+  const client = await createServerSupabaseClient();
+  const signed = await client.storage.from("avatars").createSignedUrl(path, 60 * 60);
+  return signed.data?.signedUrl ?? null;
 }
 
 export async function replaceUserAvatar(input: {
@@ -52,25 +72,36 @@ export async function replaceUserAvatar(input: {
   contentType: string;
   extension: string;
 }) {
-  const client = await createServerSupabaseClient();
-  const path = `${input.userId}/avatar-${Date.now()}.${input.extension}`;
-  const uploaded = await client.storage.from("avatars").upload(path, input.payload, {
-    contentType: input.contentType,
-    upsert: false,
-    cacheControl: "3600",
-  });
-  if (uploaded.error) throw new AvatarPersistenceError("upload");
+  let path: string;
+  try {
+    path = await putAvatarObject({
+      applicationUserId: input.userId,
+      payload: input.payload,
+      contentType: input.contentType,
+      extension: input.extension,
+    });
+  } catch {
+    throw new AvatarPersistenceError("upload");
+  }
 
-  const updated = await client.from("profiles").update({ avatar_url: path }).eq("user_id", input.userId);
-  if (updated.error) {
-    await client.storage.from("avatars").remove([path]);
+  try {
+    if (isCloudflareAuthRuntime()) {
+      await setCloudflareProfileAvatar(input.userId, path);
+    } else {
+      const client = await createServerSupabaseClient();
+      const updated = await client.from("profiles").update({ avatar_url: path }).eq("user_id", input.userId);
+      if (updated.error) throw updated.error;
+    }
+  } catch {
+    await deleteOwnedAvatarObject(input.userId, path).catch(() => undefined);
     throw new AvatarPersistenceError("attach");
   }
 
-  if (input.previousPath?.startsWith(`${input.userId}/`) && input.previousPath !== path) {
-    await client.storage.from("avatars").remove([input.previousPath]);
+  if (input.previousPath && input.previousPath !== path) {
+    // Only R2-owned keys are deleted here. Legacy Supabase Storage objects are left
+    // untouched until the Phase 4 production storage migration/reconciliation.
+    await deleteOwnedAvatarObject(input.userId, input.previousPath).catch(() => undefined);
   }
 
-  const signed = await client.storage.from("avatars").createSignedUrl(path, 60 * 60);
-  return { path, signedUrl: signed.data?.signedUrl ?? null };
+  return { path, signedUrl: `/api/profile/avatar?path=${encodeURIComponent(path)}` };
 }

@@ -88,10 +88,9 @@ test("major user, academic, community, billing, ICAI and Mentor access paths are
   for (const index of ["progress_user_updated_idx","daily_plan_items_schedule_idx","revision_due_user_due_idx","community_messages_channel_sequence_idx","icai_review_status_idx","user_subscriptions_current_idx","mentor_personalization_state_idx","academic_catalog_alias_lookup_idx","academic_catalog_lineage_predecessor_idx"]) assert.match(m2,new RegExp(index));
 });
 
-test("Phase 2 remains non-cutover and does not start either Phase 3", () => {
+test("Phase 2 baseline remains non-cutover while later migration phases may advance", () => {
   assert.match(migrationContract,/activePersistence: "supabase"/);
   assert.match(migrationContract,/d1ProductionActivated: false/);
   assert.match(migrationContract,/productionDataMigrated: false/);
   assert.match(migrationContract,/mentorPhase3Started: false/);
-  assert.match(migrationContract,/migrationPhase3Started: false/);
 });
