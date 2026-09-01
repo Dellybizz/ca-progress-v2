@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ca-progress-v2-smoke",
+  "main": "./custom-worker.ts",
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
+  "r2_buckets": [
+    { "binding": "USER_RESOURCES_R2", "bucket_name": "ca-progress-v2-staging-user-resources" }
+  ],
+  "vars": {
+    "NEXT_PUBLIC_APP_NAME": "CA Progress",
+    "NEXT_PUBLIC_APP_ENV": "staging",
+    "NEXT_PUBLIC_APP_VERSION": "phase-11"
+  }
+}
