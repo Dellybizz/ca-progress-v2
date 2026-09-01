@@ -4,6 +4,7 @@ import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getTodayPlanPageModel } from "./service";
+import { getTodayPlanStartedTimes, getTodayPlanUndoState } from "./today-interactions";
 import type { TodayPlanItem, TodayPlanPageModel, TodayPlanReadyModel } from "./types";
 
 export type TodayPlanScheduleState = "overdue" | "fixed" | "planned" | null;
@@ -14,10 +15,12 @@ export type TodayPlanDisplayItem = TodayPlanItem & {
   plannedStartAt: string | null;
   plannedEndAt: string | null;
   scheduleState: TodayPlanScheduleState;
+  startedAt: string | null;
 };
 
 export type TodayPlanDisplayModel = Omit<TodayPlanReadyModel, "items"> & {
   items: TodayPlanDisplayItem[];
+  canUndo: boolean;
 };
 
 type TaskScheduleRow = { id: string; due_at: string };
@@ -144,6 +147,11 @@ export async function getTodayPlanDisplayModel(): Promise<TodayPlanPageModel | T
     }
   }
 
+  const [startedTimes, canUndo] = await Promise.all([
+    getTodayPlanStartedTimes(identity.id, base.items.map((item) => item.id)),
+    getTodayPlanUndoState(identity.id),
+  ]);
+
   const displayItems: TodayPlanDisplayItem[] = base.items.map((item) => {
     const chapter = item.chapterId ? chapterLabels.get(item.chapterId) ?? null : null;
     const taskScheduledAt = item.sourceType === "task" && item.sourceId ? taskTimes.get(item.sourceId) ?? null : null;
@@ -155,8 +163,9 @@ export async function getTodayPlanDisplayModel(): Promise<TodayPlanPageModel | T
       plannedStartAt: null,
       plannedEndAt: null,
       scheduleState: null,
+      startedAt: startedTimes.get(item.id) ?? null,
     };
   });
 
-  return { ...base, items: organiseToday(displayItems) };
+  return { ...base, items: organiseToday(displayItems), canUndo };
 }
