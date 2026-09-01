@@ -1,13 +1,36 @@
-import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
 
 const host = "127.0.0.1";
 const port = 8787;
 const base = `http://${host}:${port}`;
 const routes = ["/settings", "/tests", "/admin", "/community"];
 
+if (!existsSync(".open-next/worker.js")) {
+  const build = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "cf:build"], {
+    env: { ...process.env, NO_COLOR: "1" },
+    stdio: "inherit",
+  });
+  if (build.status !== 0) {
+    throw new Error(`Cloudflare smoke prebuild failed with exit code ${build.status ?? "unknown"}.`);
+  }
+}
+
 const child = spawn(
   process.platform === "win32" ? "npx.cmd" : "npx",
-  ["wrangler", "dev", "--local", "--config", "wrangler.jsonc", "--ip", host, "--port", String(port), "--var", "SUPABASE_SERVICE_ROLE_KEY:ci-smoke-only"],
+  [
+    "wrangler",
+    "dev",
+    "--local",
+    "--config",
+    "wrangler.smoke.jsonc",
+    "--ip",
+    host,
+    "--port",
+    String(port),
+    "--var",
+    "SUPABASE_SERVICE_ROLE_KEY:ci-smoke-only",
+  ],
   {
     env: { ...process.env, NO_COLOR: "1" },
     stdio: ["ignore", "pipe", "pipe"],
@@ -30,7 +53,7 @@ function stop() {
 }
 
 async function waitForWorker() {
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Wrangler exited before startup (code ${child.exitCode}).\n${output}`);
     try {
