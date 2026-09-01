@@ -228,3 +228,152 @@ The only failing CI gate is the repository-wide test step. This does not represe
 ## Phase 3 completion decision
 
 **Phase 3 is Complete.** Authentication, R2 avatar handling, background jobs and realtime migration targets are implemented, and all Phase 3-specific Definition-of-Done gates pass. The remaining repository-wide test failure is demonstrably pre-existing on the direct Phase 3 baseline and is not a Phase 3 regression. Production remains pre-cutover until a later migration phase explicitly changes that state.
+
+---
+
+# Phase 4 — Production Data Migration, Reconciliation and Shadow Verification
+
+Status: **COMPLETE — PHASE 4 DEFINITION OF DONE PASSED; REPOSITORY-WIDE TEST BLOCKER REMAINS PRE-EXISTING**
+
+Phase 4 implementation commit: `8b4d7b5e064ee51988084379305fc7bc843aea18` (`Implement Cloudflare migration Phase 4 shadow pipeline`).
+Lint follow-up commit: `e181073cf93531094b4a0ffa87a24dfb644c04cc` (`Fix Phase 4 shadow runner lint`).
+Wrangler validation follow-up commit: `71968e00466ab647b9dbb4265a90b59f266a8de6` (`Use Wrangler dry-run for Phase 4 validation`).
+Attempt-scope repair commits: `3f98f98f7b1c477d06e3c61385539add192e37f`, `fd2046892a92726866906cac30cf6a2e9d377357`, `09f57bc229bff747dc943573e00580179e677d00`.
+Final live shadow migration/reconciliation: GitHub Actions `33549953518`, job `99996662917`.
+Final Phase 4 branch CI: GitHub Actions `33549953512`, quality job `99996662349`.
+
+## Migration pipeline and safety properties
+
+- `scripts/phase4/manifest.mjs` defines dependency-safe import order from identity/settings through academic history, progress, planner, study, resources, community, billing, ICAI and the frozen Mentor Phase 1/2 + Academic Catalog domains.
+- Source primary IDs, stable `auth.users.id` application-user IDs, timestamps, relationships and source ownership are preserved. Supabase Auth password/token/session internals are intentionally excluded.
+- Historical syllabus versions, attempt applicability, `supersedes_version_id`, progress events, chapter progress and planner/revision/study history remain separate source-derived rows. No historical syllabus is rewritten to the current syllabus and no historical progress is collapsed.
+- Canonical Academic Catalog IDs are treated as source data and are never regenerated from display titles, slugs or names.
+- Deterministic row normalization/hashing, target checkpoints and source primary-key upserts make the migration repeatable and resumable.
+- A row that cannot migrate is recorded in `phase4_migration_failures` with deterministic source row key/hash and error. A current row/storage failure makes the run fail; no failed source row is silently dropped.
+- Self-references are deferred until their base rows exist, then restored.
+- `executePhase4ShadowRead` is comparison-only: it can query Supabase and D1 for the same logical request, records hashes/metadata, always returns the Supabase result and has `dualWriteEnabled: false`.
+- The isolated target is `ca-progress-v2-phase4-shadow`; it is not the production web D1 binding.
+
+## Migrated/reconciled totals
+
+The final report status is `reconciled` with **1,105 source records = 1,105 target records across 76 migration/report entries**, **0 current row/storage failures**, **0 reconciliation discrepancies** and **0 D1 foreign-key violations**.
+
+Per-domain source/target totals:
+
+- Identity: 7 / 7.
+- Settings: 16 / 16.
+- Operations/admin: 7 / 7.
+- Profiles/preferences: 14 / 14.
+- Academic/syllabus/attempts/catalog base: 411 / 411.
+- Progress/history: 63 / 63.
+- Planner/Today Plan/revision/goals/calendar/forecast: 502 / 502.
+- Study: 3 / 3.
+- Notes/resources: 1 / 1.
+- Community/moderation: 39 / 39.
+- Billing/subscriptions/payments: 35 / 35.
+- ICAI sync/source state: 7 / 7.
+- Mentor Phase 1/2 + canonical Academic Catalog source tables: 0 / 0 because those source migrations are not applied to the active Supabase project.
+
+Specific high-risk reconciliation results include `exam_attempts` **9/9**, `attempt_syllabus_map` **43/43**, `syllabus_versions` **17/17**, `chapters` **264/264**, `chapter_progress` **13/13**, `progress_events` **50/50**, `planner_events` **208/208**, Today Plan items **36/36**, `revision_due_items` **33/33**, `dashboard_events` **155/155**, `forecast_snapshots` **56/56**, `community_messages` **3/3**, subscription plans **5/5** and entitlements **30/30**.
+
+Seven Supabase Auth users reconcile to seven stable D1 application identities. Three deterministic representative users were checked and all three are equivalent across the available user-owned domains.
+
+## Source-absent Mentor / Academic Catalog state
+
+The active Supabase database does not currently contain the frozen CA Mentor Phase 1/2 / canonical Academic Catalog source tables. The pipeline therefore records explicit `source_absent` 0/0 outcomes rather than fabricating data for:
+
+- `mentor_model_versions`
+- `mentor_intelligence_sources`
+- `mentor_evidence`
+- `mentor_exam_intelligence`
+- `mentor_learning_intelligence`
+- `mentor_personalization_rules`
+- `mentor_personalization_eligibility`
+- `mentor_recommendation_explanations`
+- `academic_catalog_nodes`
+- `academic_catalog_version_items`
+- `academic_catalog_aliases`
+- `academic_catalog_lineage`
+
+This is an explicit source-state result, not a dropped migration domain. CA Mentor Phase 3 is not started.
+
+## Discrepancy discovered and fixed
+
+The first credential-enabled live run correctly failed instead of dropping data. It reported `exam_attempts` source **9** vs target **5**, four explicit failed rows and one table reconciliation discrepancy. All four failures were valid source attempts rejected by the original D1 constraint `UNIQUE(attempt_key)`.
+
+Authoritative PostgreSQL inspection proved that `exam_attempts` is unique by **`(level_id, attempt_key)`**, allowing the same exam calendar key at different CA levels. The source `attempt_syllabus_map` also carries `level_id` to preserve that distinction.
+
+`d1/migrations/0006_phase4_attempt_scope.sql` repairs the shadow D1 schema to match PostgreSQL semantics without changing any source attempt ID. It recreates the level-scoped uniqueness/reference, preserves the source mapping uniqueness, retains the original failed-row audit ledger, clears only the two partially copied shadow target tables and resets only their Phase 4 checkpoints for idempotent retry. The repaired final run reconciled `exam_attempts` 9/9 and `attempt_syllabus_map` 43/43 with matching per-table hashes and no remaining discrepancy.
+
+## R2 / Storage result
+
+- Supabase Storage source objects: **0**.
+- Phase 4 objects copied to R2: **0**.
+- Phase 4 R2 objects checksum-verified: **0**.
+- Storage failures: **0**.
+- Pre-existing R2-backed `uploaded_resources` references preserved: **1**.
+
+When source Storage objects exist, the pipeline copies them only below `phase4-shadow/supabase/<bucket>/<object>`, records owner/MIME/size/source identifiers and SHA-256, then downloads and re-hashes the R2 copy. The zero-copy result here is therefore a verified source condition, not an omitted storage migration.
+
+## Intentional PostgreSQL → SQLite/D1 differences
+
+- PostgreSQL UUID values are D1 `TEXT`; imported values are preserved verbatim.
+- PostgreSQL `timestamptz`/date/time values are canonical ISO/date/time `TEXT` in D1.
+- PostgreSQL booleans are D1 `INTEGER` 0/1.
+- PostgreSQL JSON/JSONB/arrays are canonical JSON `TEXT`, with `json_valid` checks where applicable.
+- Fractional score/limit numeric values map to D1 `REAL`; integer money/reference/count values remain `INTEGER`.
+- PostgreSQL RLS, `auth.uid()` and `auth.jwt()` are replaced by trusted Worker authorization; browser identity is never migration authority.
+- PostgreSQL RPC/trigger/locking behavior is replaced by explicit Worker transaction/batch/idempotency behavior rather than D1 security triggers.
+- Supabase Auth password/token/session internals are intentionally not copied; stable application/provider identity metadata is the migration contract.
+
+The original global `exam_attempts.attempt_key` uniqueness was **not** accepted as an intentional difference; it was a target-schema defect and was corrected to PostgreSQL's `(level_id, attempt_key)` semantics.
+
+## Rollback state
+
+`npm run d1:phase4:validate` proves a clean D1 can be built from zero, interrupted progress can resume from checkpoints, explicit failures remain inspectable, historical syllabus/progress survives intact, foreign keys remain valid, and a partially populated target can be deleted and rebuilt while the source fixture remains unchanged.
+
+The live rollback command is target-only: it deletes only R2 objects tracked beneath the Phase 4 prefix and then deletes the isolated shadow D1. Supabase is never modified by rollback. The successful live shadow database is intentionally **retained** after reconciliation for shadow verification; rollback was rehearsed and proven but was not executed against the successful final shadow because there was no failure requiring it.
+
+## Phase 4 Definition-of-Done validation
+
+Final live shadow run `33549953518` / job `99996662917`:
+
+- Typecheck: **PASS**.
+- Lint: **PASS**.
+- Phase 4 migration/reconciliation/shadow tests: **PASS** (11/11 after the attempt-scope regression test was added).
+- Clean D1 bootstrap: **PASS**.
+- Historical syllabus/progress preservation: **PASS**.
+- Resumable checkpoint/interruption rehearsal: **PASS**.
+- Explicit failed-row ledger validation: **PASS**.
+- Level-scoped attempt-key compatibility: **PASS**.
+- Foreign-key integrity: **PASS**.
+- Rollback/delete/rebuild rehearsal: **PASS**.
+- OpenNext Cloudflare Worker build: **PASS**.
+- Phase 4 Wrangler D1/R2 shadow Worker dry-run: **PASS**.
+- Live production-source → isolated D1/R2 migration and reconciliation: **PASS**.
+- Reconciliation artifact upload: **PASS**.
+
+Final branch CI `33549953512` / job `99996662349` additionally passed Phase 2 and Phase 3 migration gates, Next.js production build, existing OpenNext/Wrangler dry-runs, Phase 3 D1/R2/Queue dry-run, Phase 4 D1/R2 shadow dry-run and Cloudflare SSR route smoke tests. Its only failing step is the repository-wide `npm test` suite.
+
+That broad repository-wide failure is pre-existing migration-external debt: the direct pre-Phase-3 baseline commit `737617e0612f7e0353078d06a138bcefc3ea966e` already failed the same `Repository-wide tests` gate in run `33518211187` / job `99890522279`, while the broad command remains `node --test tests/*.test.mjs`. Every Phase-4-specific Definition-of-Done gate passes independently.
+
+## Blockers / residual risk
+
+- The pre-existing repository-wide test failure remains separate baseline debt and is not a Phase 4 migration/reconciliation failure.
+- The isolated D1 shadow is a point-in-time migration result while Supabase remains write-authoritative. A later cutover phase must account for writes after the shadow snapshot before exclusive D1 activation.
+- Twelve Mentor/Academic Catalog source tables are absent from the active Supabase project. Phase 4 records this explicitly and does not fabricate data; no CA Mentor Phase 3 work is performed.
+
+## Explicitly not done
+
+- No production web persistence switched exclusively to D1.
+- No production Supabase retirement or deletion.
+- No production Supabase Auth shutdown.
+- No irreversible source Storage deletion.
+- No indefinite dual-write architecture.
+- No Phase 5 work.
+- No CA Mentor Phase 3 work.
+- No merge to `main`.
+
+## Phase 4 completion decision
+
+**Phase 4 is Complete.** The production-source data migration pipeline is repeatable, resumable and failure-safe; the live shadow migration reconciles cleanly with 1,105/1,105 records, zero current failures/discrepancies/FK violations, representative-user equivalence and verified storage state. The discovered attempt-key schema mismatch was surfaced by the failure ledger, corrected to authoritative PostgreSQL semantics and successfully re-run without rewriting historical data or source IDs. Supabase remains production-authoritative and the isolated D1 shadow remains pre-cutover only. Phase 5 and CA Mentor Phase 3 have not been started.
