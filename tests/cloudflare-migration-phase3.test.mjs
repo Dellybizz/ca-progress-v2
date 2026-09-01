@@ -26,136 +26,16 @@ const contract = read("lib/data/migration-contract.ts");
 const serviceAdapter = read("lib/data/phase3-service-adapter.ts");
 const socialLoginMigration = read("supabase/migrations/20260830020300_phase2_social_login_only.sql");
 
-test("Phase 3 separates application users, auth identities and sessions", () => {
-  assert.match(migration,/CREATE VIEW IF NOT EXISTS users/);
-  assert.match(migration,/CREATE TABLE IF NOT EXISTS auth_identities/);
-  assert.match(migration,/provider_user_id TEXT NOT NULL/);
-  assert.match(migration,/application_user_id TEXT NOT NULL REFERENCES app_users\(user_id\)/);
-  assert.match(migration,/UNIQUE\(provider, provider_user_id\)/);
-  assert.match(migration,/CREATE TABLE IF NOT EXISTS sessions/);
-  assert.match(migration,/token_hash TEXT NOT NULL UNIQUE/);
-  assert.doesNotMatch(migration,/raw_token|access_token TEXT|refresh_token TEXT/);
-});
-
-test("existing Supabase user ids are deterministic application ownership ids", () => {
-  assert.match(identity,/applicationUserIdForExistingSupabaseUser/);
-  assert.match(identity,/return value;/);
-  assert.match(identity,/applicationUserId: applicationUserIdForExistingSupabaseUser\(input\.supabaseAuthUserId\)/);
-  assert.match(identity,/No email-based linking is allowed/);
-  assert.doesNotMatch(identity,/applicationUserId\s*=.*email|email.*applicationUserId\s*=/i);
-});
-
-test("Worker OAuth validates state and PKCE and uses signed one-time transaction cookies", () => {
-  assert.match(cloudflareAuth,/code_challenge_method", "S256"/);
-  assert.match(cloudflareAuth,/OAUTH_TRANSACTION_COOKIE/);
-  assert.match(cloudflareAuth,/httpOnly: true/);
-  assert.match(cloudflareAuth,/sameSite: "lax"/);
-  assert.match(cloudflareAuth,/verifySignedValue/);
-  assert.match(cloudflareAuth,/transaction\.state !== expectedState/);
-  assert.match(cloudflareAuth,/code_verifier: transaction\.verifier/);
-  assert.match(callback,/searchParams\.get\("state"\)/);
-});
-
-test("Worker sessions are opaque, expiring, rotatable and server authorized", () => {
-  assert.match(cloudflareAuth,/sha256Base64Url\(rawToken\)/);
-  assert.match(cloudflareAuth,/revoked_at IS NULL/);
-  assert.match(cloudflareAuth,/absolute_expires_at/);
-  assert.match(cloudflareAuth,/rotateCloudflareSession/);
-  assert.match(cloudflareAuth,/UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP/);
-  assert.match(cloudflareAuth,/JOIN app_users u ON u\.user_id=s\.application_user_id/);
-  assert.match(cloudflareAuth,/JOIN plan_entitlements/);
-  assert.match(authorization,/isCloudflareAuthRuntime/);
-  assert.match(authServer,/getCurrentApplicationIdentity/);
-  assert.match(rotate,/assertSameOriginMutation/);
-  assert.match(signout,/assertSameOriginMutation/);
-});
-
-test("unsafe cookie-authenticated requests have same-origin CSRF protection", () => {
-  assert.match(csrf,/sec-fetch-site/);
-  assert.match(csrf,/Cross-site mutation rejected/);
-  assert.match(csrf,/origin !== expected/);
-  assert.match(authProxy,/rejectCrossSiteUnsafeRequest/);
-  assert.match(authProxy,/updateSupabaseSession/);
-});
-
-test("current intended login methods remain Google plus LinkedIn OIDC and phone is not reintroduced", () => {
-  assert.match(provider,/"google" \| "linkedin_oidc"/);
-  assert.match(cloudflareAuth,/accounts\.google\.com\/o\/oauth2\/v2\/auth/);
-  assert.match(cloudflareAuth,/linkedin\.com\/oauth\/v2\/authorization/);
-  assert.match(socialLoginMigration,/Phone OTP was removed/i);
-  assert.doesNotMatch(provider,/phone.*signIn|otp/i);
-});
-
-test("avatar target storage is private R2 with stable-user ownership enforcement", () => {
-  assert.match(r2,/avatars\/\$\{applicationUserId\}\//);
-  assert.match(r2,/customMetadata: \{ owner: input\.applicationUserId, kind: "avatar" \}/);
-  assert.match(r2,/isOwnedAvatarObjectKey/);
-  assert.match(profile,/putAvatarObject/);
-  assert.match(profile,/deleteOwnedAvatarObject/);
-  assert.match(profile,/if \(isCloudflareAuthRuntime\(\)\) return null;/);
-  assert.match(avatarRoute,/getOwnedAvatarObject\(user\.id, path\)/);
-  assert.match(avatarRoute,/assertSameOriginMutation/);
-  assert.doesNotMatch(profilePage,/createServerSupabaseClient|storage\.from/);
-});
-
-test("ICAI scheduled work uses Queue plus D1 idempotency without Mentor Phase 3 jobs", () => {
-  assert.match(migration,/CREATE TABLE IF NOT EXISTS background_job_executions/);
-  assert.match(migration,/job_type TEXT NOT NULL CHECK\(job_type IN \('icai-sync'\)\)/);
-  assert.match(worker,/BACKGROUND_JOBS/);
-  assert.match(worker,/idempotencyKey: `icai-sync:/);
-  assert.match(worker,/existing\?\.status === "succeeded"/);
-  assert.match(worker,/payload mismatch/);
-  assert.match(worker,/message\.retry\(\)/);
-  assert.match(worker,/ICAI_SYNC_SERVICE/);
-  assert.doesNotMatch(worker,/mentor/i);
-  assert.match(config,/"BACKGROUND_JOBS"/);
-  assert.match(config,/"max_retries": 5/);
-});
-
-test("billing safety remains on the explicit billing service path", () => {
-  assert.match(config,/"BILLING_SERVICE"/);
-  assert.match(serviceAdapter,/scheduledJobs: "cloudflare-queues"/);
-  assert.match(serviceAdapter,/queueJobTypes: \["icai-sync"\]/);
-  assert.doesNotMatch(serviceAdapter,/queueJobTypes:[^\n]*billing/i);
-});
-
-test("Community removes Supabase Realtime implementation and preserves durable server behavior", () => {
-  assert.doesNotMatch(realtime,/createBrowserSupabaseClient|postgres_changes|\.channel\(/i);
-  assert.match(realtime,/DATA_REFRESH_MS = 2500/);
-  assert.match(realtime,/PIN_REFRESH_MS = 10000/);
-  assert.match(realtime,/visibilitychange/);
-  assert.doesNotMatch(realtime,/new\s+WebSocket|DurableObjectNamespace|DurableObjectState/);
-  for (const behavior of ["pinned_messages","message_reactions","phase10_mark_read","chat_blocks","moderation_actions"]) {
-    assert.match(community,new RegExp(behavior));
-  }
-  assert.match(contract,/durableObjectsRequired: false/);
-});
-
-test("Phase 3 Cloudflare validation config binds D1, R2, Queue and existing services", () => {
-  for (const binding of ["DB","USER_RESOURCES_R2","BACKGROUND_JOBS","ICAI_SYNC_SERVICE","BILLING_SERVICE"]) {
-    assert.match(config,new RegExp(`\\"${binding}\\"`));
-  }
-  assert.match(config,/"CA_AUTH_RUNTIME": "cloudflare"/);
-  assert.match(config,/"30 0 \* \* \*"/);
-});
-
-test("provider-neutral Phase 3 service adapter keeps production pre-cutover", () => {
-  assert.match(serviceAdapter,/auth: "supabase-auth"/);
-  assert.match(serviceAdapter,/auth: "worker-auth"/);
-  assert.match(serviceAdapter,/resourceBytes: "cloudflare-r2"/);
-  assert.match(serviceAdapter,/communityInvalidation: "polling"/);
-  assert.match(serviceAdapter,/productionActivated: false/);
-  assert.match(serviceAdapter,/mentorPhase3Started: false/);
-});
-
-test("Phase 3 stays pre-cutover and does not start Phase 4 or Mentor Phase 3", () => {
-  assert.match(contract,/phase: 3 as const/);
-  assert.match(contract,/activePersistence: "supabase"/);
-  assert.match(contract,/activeAuthentication: "supabase-auth"/);
-  assert.match(contract,/productionDataMigrated: false/);
-  assert.match(contract,/authenticationReplaced: false/);
-  assert.match(contract,/d1ProductionActivated: false/);
-  assert.match(contract,/phase3ProductionActivated: false/);
-  assert.match(contract,/migrationPhase4Started: false/);
-  assert.match(contract,/mentorPhase3Started: false/);
-});
+test("Phase 3 separates application users, auth identities and sessions", () => {assert.match(migration,/CREATE VIEW IF NOT EXISTS users/);assert.match(migration,/CREATE TABLE IF NOT EXISTS auth_identities/);assert.match(migration,/provider_user_id TEXT NOT NULL/);assert.match(migration,/application_user_id TEXT NOT NULL REFERENCES app_users\(user_id\)/);assert.match(migration,/UNIQUE\(provider, provider_user_id\)/);assert.match(migration,/CREATE TABLE IF NOT EXISTS sessions/);assert.match(migration,/token_hash TEXT NOT NULL UNIQUE/);assert.doesNotMatch(migration,/raw_token|access_token TEXT|refresh_token TEXT/);});
+test("existing Supabase user ids are deterministic application ownership ids", () => {assert.match(identity,/applicationUserIdForExistingSupabaseUser/);assert.match(identity,/return value;/);assert.match(identity,/applicationUserId: applicationUserIdForExistingSupabaseUser\(input\.supabaseAuthUserId\)/);assert.match(identity,/No email-based linking is allowed/);assert.doesNotMatch(identity,/applicationUserId\s*=.*email|email.*applicationUserId\s*=/i);});
+test("Worker OAuth validates state and PKCE and uses signed one-time transaction cookies", () => {assert.match(cloudflareAuth,/code_challenge_method", "S256"/);assert.match(cloudflareAuth,/OAUTH_TRANSACTION_COOKIE/);assert.match(cloudflareAuth,/httpOnly: true/);assert.match(cloudflareAuth,/sameSite: "lax"/);assert.match(cloudflareAuth,/verifySignedValue/);assert.match(cloudflareAuth,/transaction\.state !== expectedState/);assert.match(cloudflareAuth,/code_verifier: transaction\.verifier/);assert.match(callback,/searchParams\.get\("state"\)/);});
+test("Worker sessions are opaque, expiring, rotatable and server authorized", () => {assert.match(cloudflareAuth,/sha256Base64Url\(rawToken\)/);assert.match(cloudflareAuth,/revoked_at IS NULL/);assert.match(cloudflareAuth,/absolute_expires_at/);assert.match(cloudflareAuth,/rotateCloudflareSession/);assert.match(cloudflareAuth,/UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP/);assert.match(cloudflareAuth,/JOIN app_users u ON u\.user_id=s\.application_user_id/);assert.match(cloudflareAuth,/JOIN plan_entitlements/);assert.match(authorization,/isCloudflareAuthRuntime/);assert.match(authServer,/getCurrentApplicationIdentity/);assert.match(rotate,/assertSameOriginMutation/);assert.match(signout,/assertSameOriginMutation/);});
+test("unsafe cookie-authenticated requests have same-origin CSRF protection", () => {assert.match(csrf,/sec-fetch-site/);assert.match(csrf,/Cross-site mutation rejected/);assert.match(csrf,/origin !== expected/);assert.match(authProxy,/rejectCrossSiteUnsafeRequest/);assert.match(authProxy,/updateSupabaseSession/);});
+test("current intended login methods remain Google plus LinkedIn OIDC and phone is not reintroduced", () => {assert.match(provider,/"google" \| "linkedin_oidc"/);assert.match(cloudflareAuth,/accounts\.google\.com\/o\/oauth2\/v2\/auth/);assert.match(cloudflareAuth,/linkedin\.com\/oauth\/v2\/authorization/);assert.match(socialLoginMigration,/Phone OTP was removed/i);assert.doesNotMatch(provider,/phone.*signIn|otp/i);});
+test("avatar target storage is private R2 with stable-user ownership enforcement", () => {assert.match(r2,/avatars\/\$\{applicationUserId\}\//);assert.match(r2,/customMetadata: \{ owner: input\.applicationUserId, kind: "avatar" \}/);assert.match(r2,/isOwnedAvatarObjectKey/);assert.match(profile,/putAvatarObject/);assert.match(profile,/deleteOwnedAvatarObject/);assert.match(profile,/if \(isCloudflareAuthRuntime\(\)\) return null;/);assert.match(avatarRoute,/getOwnedAvatarObject\(user\.id, path\)/);assert.match(avatarRoute,/assertSameOriginMutation/);assert.doesNotMatch(profilePage,/createServerSupabaseClient|storage\.from/);});
+test("ICAI scheduled work uses Queue plus D1 idempotency without Mentor Phase 3 jobs", () => {assert.match(migration,/CREATE TABLE IF NOT EXISTS background_job_executions/);assert.match(migration,/job_type TEXT NOT NULL CHECK\(job_type IN \('icai-sync'\)\)/);assert.match(worker,/BACKGROUND_JOBS/);assert.match(worker,/idempotencyKey: `icai-sync:/);assert.match(worker,/existing\?\.status === "succeeded"/);assert.match(worker,/payload mismatch/);assert.match(worker,/message\.retry\(\)/);assert.match(worker,/ICAI_SYNC_SERVICE/);assert.doesNotMatch(worker,/mentor/i);assert.match(config,/"BACKGROUND_JOBS"/);assert.match(config,/"max_retries": 5/);});
+test("billing safety remains on the explicit billing service path", () => {assert.match(config,/"BILLING_SERVICE"/);assert.match(serviceAdapter,/scheduledJobs: "cloudflare-queues"/);assert.match(serviceAdapter,/queueJobTypes: \["icai-sync"\]/);assert.doesNotMatch(serviceAdapter,/queueJobTypes:[^\n]*billing/i);});
+test("Community removes Supabase Realtime implementation and preserves durable server behavior", () => {assert.doesNotMatch(realtime,/createBrowserSupabaseClient|postgres_changes|\.channel\(/i);assert.match(realtime,/DATA_REFRESH_MS = 2500/);assert.match(realtime,/PIN_REFRESH_MS = 10000/);assert.match(realtime,/visibilitychange/);assert.doesNotMatch(realtime,/new\s+WebSocket|DurableObjectNamespace|DurableObjectState/);for(const behavior of ["pinned_messages","message_reactions","phase10_mark_read","chat_blocks","moderation_actions"])assert.match(community,new RegExp(behavior));assert.match(contract,/durableObjectsRequired:false/);});
+test("Phase 3 Cloudflare validation config binds D1, R2, Queue and existing services", () => {for(const binding of ["DB","USER_RESOURCES_R2","BACKGROUND_JOBS","ICAI_SYNC_SERVICE","BILLING_SERVICE"])assert.match(config,new RegExp(`\\"${binding}\\"`));assert.match(config,/"CA_AUTH_RUNTIME": "cloudflare"/);assert.match(config,/"30 0 \* \* \*"/);});
+test("provider-neutral Phase 3 service adapter keeps production pre-cutover", () => {assert.match(serviceAdapter,/auth: "supabase-auth"/);assert.match(serviceAdapter,/auth: "worker-auth"/);assert.match(serviceAdapter,/resourceBytes: "cloudflare-r2"/);assert.match(serviceAdapter,/communityInvalidation: "polling"/);assert.match(serviceAdapter,/productionActivated: false/);assert.match(serviceAdapter,/mentorPhase3Started: false/);});
+test("Phase 3 safety guarantees remain while Phase 4 shadow migration starts", () => {assert.match(contract,/phase: 4 as const/);assert.match(contract,/activePersistence: "supabase"/);assert.match(contract,/activeAuthentication: "supabase-auth"/);assert.match(contract,/authenticationReplaced: false/);assert.match(contract,/d1ProductionActivated: false/);assert.match(contract,/phase3ProductionActivated: false/);assert.match(contract,/migrationPhase4Started: true/);assert.match(contract,/phase4ProductionCutover: false/);assert.match(contract,/migrationPhase5Started: false/);assert.match(contract,/mentorPhase3Started: false/);});
