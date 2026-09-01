@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { PHASE4_TABLES, REPRESENTATIVE_USER_TABLES, INTENTIONAL_SQLITE_DIFFERENCES } from "./manifest.mjs";
 import { buildUpsert, hashRows, normalizeRow, quoteIdentifier, rowKey, sha256, splitSqlStatements, stableStringify } from "./core.mjs";
 
