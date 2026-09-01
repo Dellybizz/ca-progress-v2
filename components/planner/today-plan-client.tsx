@@ -102,21 +102,20 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   const [orderHistory, setOrderHistory] = useState<string[][]>([]);
 
   useEffect(() => {
-    setOrderIds(model.items.filter((item) => item.status !== "skipped" && item.status !== "rescheduled").map((item) => item.id));
-    setOrderHistory([]);
-    setHiddenIds(new Set());
-  }, [model.items]);
-
-  useEffect(() => {
+    let frame: number | null = null;
     try {
       const raw = window.localStorage.getItem(RUNNING_KEY);
-      if (!raw) return;
+      if (!raw) return undefined;
       const stored = JSON.parse(raw) as RunningTask;
-      if (stored?.itemId && model.items.some((item) => item.id === stored.itemId && item.status === "planned")) setRunningTask(stored);
-      else window.localStorage.removeItem(RUNNING_KEY);
+      if (stored?.itemId && model.items.some((item) => item.id === stored.itemId && item.status === "planned")) {
+        frame = window.requestAnimationFrame(() => setRunningTask(stored));
+      } else {
+        window.localStorage.removeItem(RUNNING_KEY);
+      }
     } catch {
       window.localStorage.removeItem(RUNNING_KEY);
     }
+    return () => { if (frame !== null) window.cancelAnimationFrame(frame); };
   }, [model.items]);
 
   useEffect(() => {
