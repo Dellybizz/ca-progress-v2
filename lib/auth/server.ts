@@ -2,7 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import { getSupabasePublicConfig } from "@/lib/env";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { AttemptOption, CALevel } from "@/lib/profile/validation";
 import type { AppRole } from "@/lib/authorization/roles";
@@ -86,7 +86,9 @@ export async function ensureUserBootstrap() {
 }
 
 export async function loadAttemptOptions(): Promise<AttemptOption[]> {
-  if (!getSupabasePublicConfig().configured) return [{ key: "undecided", label: "Not decided yet", kind: "build_fallback" }];
+  if (!isCloudflareDataRuntime() && !getSupabasePublicConfig().configured) {
+    return [{ key: "undecided", label: "Not decided yet", kind: "build_fallback" }];
+  }
   const supabase = await createServerSupabaseClient();
   const [attempts, levels] = await Promise.all([
     supabase.from("exam_attempts").select("attempt_key, label, level_id").eq("verification_status", "verified"),
