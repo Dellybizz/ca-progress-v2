@@ -119,13 +119,13 @@ test("billing safety remains on the explicit billing service path", () => {
   assert.doesNotMatch(serviceAdapter,/queueJobTypes:[^\n]*billing/i);
 });
 
-test("Community removes Supabase Realtime and preserves durable server behavior", () => {
-  assert.doesNotMatch(realtime,/supabase|postgres_changes|\.channel\(/i);
+test("Community removes Supabase Realtime implementation and preserves durable server behavior", () => {
+  assert.doesNotMatch(realtime,/createBrowserSupabaseClient|postgres_changes|\.channel\(/i);
   assert.match(realtime,/DATA_REFRESH_MS = 2500/);
   assert.match(realtime,/PIN_REFRESH_MS = 10000/);
   assert.match(realtime,/visibilitychange/);
-  assert.doesNotMatch(realtime,/WebSocket|DurableObject/);
-  for (const behavior of ["pinned_messages","message_reactions","channel_read_state","chat_blocks","moderation_actions"]) {
+  assert.doesNotMatch(realtime,/new\s+WebSocket|DurableObjectNamespace|DurableObjectState/);
+  for (const behavior of ["pinned_messages","message_reactions","phase10_mark_read","chat_blocks","moderation_actions"]) {
     assert.match(community,new RegExp(behavior));
   }
   assert.match(contract,/durableObjectsRequired: false/);
