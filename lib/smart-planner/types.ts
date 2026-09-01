@@ -73,6 +73,10 @@ export type TodayPlanItem = {
   subjectTitle: string | null;
   chapterTitle: string | null;
   overdueDays: number;
+  chapterDisplayTitle?: string | null;
+  plannedStartAt?: string | null;
+  plannedEndAt?: string | null;
+  scheduleState?: "flexible" | "scheduled" | "lapsed";
 };
 
 export type TodayPlanReadyModel = {
