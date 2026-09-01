@@ -11,7 +11,7 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,6 +20,10 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
       - run: npm run lint
+      - name: Cloudflare migration Phase 2 contract tests
+        run: npm run test:cloudflare-phase2
+      - name: Cloudflare migration Phase 2 clean D1 bootstrap
+        run: npm run d1:phase2:validate
       - run: npm test
       - run: npm run build
       - run: npm run cf:check

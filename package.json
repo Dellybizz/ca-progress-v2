@@ -11,6 +11,8 @@
     "lint": "eslint . --max-warnings=0",
     "test": "node --test tests/*.test.mjs",
     "test:smoke": "node --test tests/phase0-*.test.mjs",
+    "test:cloudflare-phase2": "node --test tests/cloudflare-migration-phase2.test.mjs",
+    "d1:phase2:validate": "node scripts/validate-d1-phase2.mjs",
     "ci": "npm run typecheck && npm run lint && npm run test && npm run build",
     "cf:build": "opennextjs-cloudflare build && node scripts/patch-opennext-vercel-og.mjs",
     "cf:preview": "npm run cf:build && opennextjs-cloudflare preview",
