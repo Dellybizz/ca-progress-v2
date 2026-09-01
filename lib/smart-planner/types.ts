@@ -141,10 +141,13 @@ export type PlannerCandidate = {
 
 export type TodayPlanAction =
   | { action: "refresh" }
-  | { action: "start"; itemId: string }
   | { action: "complete"; itemId: string }
   | { action: "skip"; itemId: string }
   | { action: "snooze"; itemId: string; minutes: number }
-  | { action: "reschedule"; itemId: string; date: string }
+  | { action: "reschedule"; itemId: string; date: string };
+
+export type TodayPlanInteractionAction =
+  | TodayPlanAction
+  | { action: "start"; itemId: string }
   | { action: "reorder"; itemIds: string[] }
   | { action: "undo" };
