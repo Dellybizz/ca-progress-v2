@@ -1,0 +1,217 @@
+/* Today Plan interaction layer: schedule awareness, active task state and organiser. */
+.today-plan-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.today-plan-time-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.today-plan-schedule,
+.today-plan-urgency {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.today-plan-schedule {
+  color: var(--color-text-soft);
+  background: var(--color-bg-subtle);
+}
+
+.today-plan-schedule--fixed {
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+}
+
+.today-plan-schedule--urgent,
+.today-plan-urgency {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.today-plan-timeline .phase9-plan-item.is-time-overdue .today-plan-item {
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+}
+
+.today-plan-timeline .phase9-plan-item.is-running .today-plan-item {
+  border-color: color-mix(in srgb, var(--color-brand) 46%, var(--color-border));
+  background: color-mix(in srgb, var(--color-brand-soft) 25%, var(--color-surface));
+  box-shadow: 0 8px 24px rgb(79 70 229 / 8%);
+}
+
+.today-plan-start-action {
+  border-color: color-mix(in srgb, var(--color-brand) 26%, var(--color-border)) !important;
+  color: var(--color-brand-strong) !important;
+  background: var(--color-brand-soft) !important;
+}
+
+.today-plan-start-action.is-running {
+  color: #fff !important;
+  background: var(--color-brand) !important;
+  border-color: var(--color-brand) !important;
+}
+
+.today-plan-running {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 9px;
+  border-radius: 9px;
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+}
+
+.today-plan-running > svg { flex: 0 0 auto; }
+.today-plan-running strong,
+.today-plan-running span { display: block; }
+.today-plan-running strong { font-size: 10px; }
+.today-plan-running span { margin-top: 2px; font-size: 9px; color: var(--color-text-soft); }
+
+.today-plan-organiser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 2px 0 10px 39px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-brand) 18%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-brand-soft) 40%, var(--color-surface));
+}
+
+.today-plan-organiser > div:first-child {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.today-plan-organiser > div:first-child > svg { color: var(--color-brand); flex: none; }
+.today-plan-organiser strong,
+.today-plan-organiser small { display: block; }
+.today-plan-organiser strong { font-size: 10px; }
+.today-plan-organiser small { margin-top: 2px; color: var(--color-text-soft); font-size: 9px; line-height: 1.35; }
+.today-plan-organiser > div:last-child { display: flex; gap: 6px; flex: none; }
+
+.today-plan-organiser button,
+.today-plan-order-controls button,
+.today-plan-confirm__actions button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 9.5px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.today-plan-organiser button.is-primary,
+.today-plan-confirm__actions button.is-primary {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.today-plan-organiser button:disabled,
+.today-plan-order-controls button:disabled,
+.today-plan-confirm__actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.today-plan-order-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.today-plan-order-controls > span {
+  color: var(--color-text-faint);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.today-plan-order-controls > div { display: flex; gap: 5px; }
+.today-plan-order-controls button { width: 32px; padding: 0; font-size: 14px; }
+
+.today-plan-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 34%);
+  backdrop-filter: blur(4px);
+}
+
+.today-plan-confirm {
+  width: min(430px, 100%);
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 15px;
+  background: var(--color-surface);
+  box-shadow: 0 24px 64px rgb(15 23 42 / 18%);
+}
+
+.today-plan-confirm__icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+}
+
+.today-plan-confirm h2 { margin: 1px 0 5px; font-size: 17px; line-height: 1.2; }
+.today-plan-confirm p { margin: 0; color: var(--color-text-soft); font-size: 12px; line-height: 1.5; }
+.today-plan-confirm__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 3px;
+}
+
+@media (max-width: 720px) {
+  .today-plan-header-actions { gap: 5px; }
+  .today-plan-header-actions .today-plan-refresh { padding-inline: 8px; }
+  .today-plan-organiser {
+    margin-left: 0;
+    display: grid;
+    gap: 9px;
+  }
+  .today-plan-organiser > div:last-child { justify-content: stretch; }
+  .today-plan-organiser > div:last-child button { flex: 1; }
+  .today-plan-time-row { margin-top: 6px; }
+  .today-plan-schedule,
+  .today-plan-urgency { font-size: 8.5px; }
+  .today-plan-running { align-items: flex-start; }
+  .today-plan-running span { line-height: 1.4; }
+  .today-plan-confirm { padding: 16px; }
+  .today-plan-confirm__actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .today-plan-confirm__actions button { min-height: 38px; }
+}
