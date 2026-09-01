@@ -41,7 +41,12 @@ On the Phase 1 commit, typecheck and lint passed. Repository-wide `npm test` fai
 
 # Phase 2 — Build the Cloudflare D1 Data and Authorization Platform
 
-Status: **IMPLEMENTED — VALIDATION PENDING**
+Status: **COMPLETE — PHASE 2 DEFINITION OF DONE PASSED; REPOSITORY-WIDE TEST BLOCKER REMAINS PRE-EXISTING**
+
+Phase 2 implementation commit: `713784bd91343b827d43774f19fef8752cb277b0` (`Cloudflare migration Phase 2: build D1 data platform`).
+Validation-order commit: `ded282c97074b7343ad6291a230d9e7b8e56939a`.
+Worker smoke-test stabilization commit: `125f89ccb3fc15c39b5f706f93df007894afc504` (`Cloudflare migration Phase 2: stabilize Worker smoke test`).
+Final validation run: GitHub Actions `33514140805`, quality job `99876783030`.
 
 ## Schema coverage
 
@@ -92,11 +97,28 @@ D1 migrations under `d1/migrations/` cover:
 - Wrangler `d1_migrations` remains the D1 migration authority; `_ca_schema_migrations` records source-freeze provenance.
 - Rebuild/rollback is documented. Because Phase 2 has no production D1 data, rollback is source revert + clean local rebuild, not destructive reverse SQL.
 
-## Tests introduced
+## Phase 2 Definition-of-Done validation
 
-- `tests/cloudflare-migration-phase2.test.mjs` — full table/domain coverage, canonical ID guard, historical syllabus/progress preservation, authorization guard, Supabase/D1 contract parity, operation replacement coverage, major indexes and no-cutover/Phase-3 guards.
-- `npm run d1:phase2:validate` — clean local Wrangler D1 migration bootstrap, FK check, migration reapply.
-- CI orders Phase 2 targeted tests/bootstrap before repository-wide `npm test`, allowing Phase 2 failures to be distinguished from the pre-existing global test blocker.
+Final branch CI evidence from run `33514140805`, job `99876783030`:
+
+- Typecheck: **PASS**.
+- Lint: **PASS**.
+- Phase 2 contract tests: **PASS**.
+- Clean D1 bootstrap from zero: **PASS**.
+- D1 schema/foreign-key validation and migration re-application: **PASS**.
+- Stable-ID/canonical Academic Catalog invariant checks: **PASS**.
+- Historical syllabus/progress preservation tests: **PASS**.
+- Explicit authorization tests: **PASS**.
+- Supabase/D1 logical repository contract tests: **PASS**.
+- Next.js production build: **PASS**.
+- OpenNext Worker build and Wrangler dry-runs: **PASS**.
+- Local Cloudflare SSR smoke test: **PASS**.
+- Repository-wide `npm test`: **FAIL**, matching the known pre-existing global test-stage blocker observed before Cloudflare Migration Phase 2. This failure is not a Phase 2 D1/platform regression and does not invalidate the Phase 2 Definition of Done because every Phase-2-specific gate and Cloudflare build/runtime gate passed independently.
+
+## Blockers / residual risk
+
+- The repository-wide test suite still contains a pre-existing failure outside the Phase 2 migration scope. It should be tracked separately and must not be represented as a D1 migration failure.
+- Production remains Supabase-backed; Phase 2 intentionally does not prove production data reconciliation or cutover. Those belong to later migration phases.
 
 ## Explicitly not done
 
@@ -109,6 +131,6 @@ D1 migrations under `d1/migrations/` cover:
 - No Migration Phase 3.
 - No CA Mentor Phase 3.
 
-## Validation
+## Phase 2 completion decision
 
-Pending execution against the Phase 2 commit. Final results and any blockers will be recorded after branch CI/build evidence is available.
+**Phase 2 is Complete.** The Cloudflare D1 data and authorization platform is implemented and all Phase 2-specific Definition-of-Done checks pass. Supabase remains the active production persistence/auth platform until later migration phases explicitly change that state.
