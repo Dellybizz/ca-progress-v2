@@ -1,7 +1,11 @@
-name: Deploy V2 Staging to Cloudflare
+name: Cloudflare Migration Phase 5 Cutover Deploy
 
 on:
   workflow_dispatch:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/deploy-staging.yml
 
 permissions:
   contents: read
@@ -10,28 +14,178 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: v2-staging
-    timeout-minutes: 25
+    timeout-minutes: 55
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-      NEXT_PUBLIC_APP_ENV: staging
+      CA_AUTH_SESSION_SECRET: ${{ secrets.CA_AUTH_SESSION_SECRET }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      LINKEDIN_OIDC_CLIENT_ID: ${{ secrets.LINKEDIN_OIDC_CLIENT_ID }}
+      LINKEDIN_OIDC_CLIENT_SECRET: ${{ secrets.LINKEDIN_OIDC_CLIENT_SECRET }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+      NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_APP_NAME: CA Progress
-      NEXT_PUBLIC_APP_VERSION: phase-11
+      NEXT_PUBLIC_APP_VERSION: cloudflare-migration-phase-5
+      CUTOVER_BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - run: npm run cf:deploy
 
-# Runtime secrets remain dashboard-managed and are preserved with keep_vars=true.
-# Phase 11 deploy order creates/updates private ICAI and Billing Workers before the web Worker.
-# Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET as secrets on
-# ca-progress-v2-billing. Until configured, paid checkout fails closed without changing plans.
-# Phase 7 resource bytes remain private in USER_RESOURCES_R2.
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Cloudflare migration Phase 2 contract tests
+        run: npm run test:cloudflare-phase2
+      - name: Cloudflare migration Phase 2 clean D1 bootstrap
+        run: npm run d1:phase2:validate
+      - name: Cloudflare migration Phase 3 auth/R2/jobs/realtime tests
+        run: npm run test:cloudflare-phase3
+      - name: Cloudflare migration Phase 3 clean D1 auth/job bootstrap
+        run: npm run d1:phase3:validate
+      - name: Cloudflare migration Phase 4 migration/reconciliation/shadow tests
+        run: npm run test:cloudflare-phase4
+      - name: Cloudflare migration Phase 4 clean D1/resume/rollback validation
+        run: npm run d1:phase4:validate
+      - name: Next.js production build
+        run: npm run build
+      - name: OpenNext Worker build and Wrangler dry-runs
+        run: npm run cf:check
+      - name: Phase 3 D1/R2/Queue Worker dry-run
+        run: npm run cf:check:phase3
+      - name: Phase 4 D1/R2 shadow Worker dry-run
+        run: npm run cf:check:phase4
+      - name: Smoke generated Cloudflare SSR routes
+        run: npm run cf:smoke
+      - name: Repository-wide tests
+        run: npm test
+
+      - name: Capture pre-cutover deployment evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p phase5-cutover
+          npx wrangler deployments list --name ca-progress-v2 --json > phase5-cutover/web-deployments-before.json
+          npx wrangler secret list --name ca-progress-v2 > phase5-cutover/web-secrets-before.json
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > phase5-cutover/d1-before.txt
+
+      - name: Prepare ephemeral Worker secret files
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          node - <<'NODE'
+          const fs = require('fs');
+          const required = (name) => {
+            const value = process.env[name];
+            if (!value) throw new Error(`${name} is required for cutover.`);
+            return value;
+          };
+          fs.writeFileSync('/tmp/ca-billing-secrets.json', JSON.stringify({
+            RAZORPAY_KEY_ID: required('RAZORPAY_KEY_ID'),
+            RAZORPAY_KEY_SECRET: required('RAZORPAY_KEY_SECRET'),
+            RAZORPAY_WEBHOOK_SECRET: required('RAZORPAY_WEBHOOK_SECRET'),
+          }));
+          fs.writeFileSync('/tmp/ca-web-secrets.json', JSON.stringify({
+            CA_AUTH_SESSION_SECRET: required('CA_AUTH_SESSION_SECRET'),
+            GOOGLE_OAUTH_CLIENT_ID: required('GOOGLE_OAUTH_CLIENT_ID'),
+            GOOGLE_OAUTH_CLIENT_SECRET: required('GOOGLE_OAUTH_CLIENT_SECRET'),
+            LINKEDIN_OIDC_CLIENT_ID: required('LINKEDIN_OIDC_CLIENT_ID'),
+            LINKEDIN_OIDC_CLIENT_SECRET: required('LINKEDIN_OIDC_CLIENT_SECRET'),
+          }));
+          NODE
+
+      - name: Deploy private ICAI service
+        run: npm run cf:deploy:icai
+
+      - name: Deploy private Billing service with Razorpay secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler deploy -c workers/billing/wrangler.jsonc --secrets-file /tmp/ca-billing-secrets.json
+          npx wrangler secret list --name ca-progress-v2-billing > phase5-cutover/billing-secrets-after.json
+          for name in RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET; do
+            grep -q "\"name\": \"$name\"" phase5-cutover/billing-secrets-after.json || { echo "::error::$name was not installed on Billing Worker"; exit 1; }
+          done
+
+      - name: Stage direct OAuth secrets on existing web Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler secret bulk /tmp/ca-web-secrets.json --name ca-progress-v2
+          npx wrangler secret list --name ca-progress-v2 > phase5-cutover/web-secrets-staged.json
+          for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET; do
+            grep -q "\"name\": \"$name\"" phase5-cutover/web-secrets-staged.json || { echo "::error::$name was not installed on web Worker"; exit 1; }
+          done
+
+      - name: Deploy Cloudflare-auth and D1 web runtime
+        run: npm run cf:deploy:web
+
+      - name: Verify cutover and automatically rollback web runtime on failure
+        shell: bash
+        run: |
+          set +e
+          failed=0
+          base="$CUTOVER_BASE_URL"
+
+          health=""
+          for attempt in $(seq 1 12); do
+            health="$(curl --max-time 20 -fsS "$base/api/health" 2>/dev/null)" && break
+            sleep 5
+          done
+          if [ -z "$health" ]; then
+            echo "::error::Production health endpoint did not become reachable."
+            failed=1
+          else
+            HEALTH_JSON="$health" node -e 'const x=JSON.parse(process.env.HEALTH_JSON); if(x.status!=="ok" || x.checks?.database!=="ok") process.exit(1)' || { echo "::error::D1-backed health check is not ok."; failed=1; }
+          fi
+
+          curl --max-time 20 -fsS "$base/login" >/dev/null || { echo "::error::Login page smoke failed."; failed=1; }
+
+          curl --max-time 20 -sS -D /tmp/google.headers -o /dev/null "$base/auth/google?next=%2Fdashboard" || failed=1
+          grep -Eqi '^location: https://accounts\.google\.com/' /tmp/google.headers || { echo "::error::Google direct OAuth redirect smoke failed."; failed=1; }
+
+          curl --max-time 20 -sS -D /tmp/linkedin.headers -o /dev/null "$base/auth/linkedin?next=%2Fdashboard" || failed=1
+          grep -Eqi '^location: https://www\.linkedin\.com/' /tmp/linkedin.headers || { echo "::error::LinkedIn direct OIDC redirect smoke failed."; failed=1; }
+
+          webhook_code="$(curl --max-time 20 -sS -o /tmp/webhook.json -w '%{http_code}' -X POST "$base/api/payments/webhook")"
+          if [ "$webhook_code" != "400" ]; then
+            echo "::error::Razorpay webhook boundary smoke expected HTTP 400 without signature, got $webhook_code."
+            failed=1
+          fi
+
+          checkout_code="$(curl --max-time 20 -sS -o /tmp/checkout.json -w '%{http_code}' -H 'content-type: application/json' -d '{}' "$base/api/payments/create-order")"
+          if [ "$checkout_code" != "401" ]; then
+            echo "::error::Unauthenticated billing boundary smoke expected HTTP 401, got $checkout_code."
+            failed=1
+          fi
+
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > phase5-cutover/d1-after.txt || failed=1
+          npx wrangler deployments list --name ca-progress-v2 --json > phase5-cutover/web-deployments-after.json || failed=1
+
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::Phase 5 smoke failed; rolling the web Worker back to the version uploaded before the cutover deployment."
+            npx wrangler rollback --name ca-progress-v2 --message "Phase 5 automated rollback after failed cutover smoke" || echo "::error::Automatic rollback command also failed; use captured deployment evidence for manual rollback."
+            exit 1
+          fi
+
+          echo "Phase 5 automated cutover smoke PASS."
+
+      - name: Remove ephemeral secret files
+        if: always()
+        shell: bash
+        run: rm -f /tmp/ca-billing-secrets.json /tmp/ca-web-secrets.json
+
+      - name: Upload cutover evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase5-cutover-${{ github.run_id }}
+          retention-days: 30
+          path: phase5-cutover/
