@@ -13,7 +13,11 @@ export function isCloudflareDataRuntime() {
 export function getSupabaseAdminRuntimeConfig() {
   const publicConfig = getSupabasePublicConfig();
   const serviceRoleKey = getServerRuntimeValue("SUPABASE_SERVICE_ROLE_KEY");
-  return { ...publicConfig, serviceRoleKey, configured: Boolean(publicConfig.url && serviceRoleKey) } as const;
+  return {
+    ...publicConfig,
+    serviceRoleKey,
+    configured: isCloudflareDataRuntime() || Boolean(publicConfig.url && serviceRoleKey),
+  } as const;
 }
 
 export function createAdminSupabaseClient(): SupabaseClient<Database> {
