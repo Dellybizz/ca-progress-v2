@@ -12,6 +12,7 @@ export type TodayPlanDisplayItem = TodayPlanItem & {
   displayTitle: string;
   chapterDisplayTitle: string | null;
   plannedStartAt: string | null;
+  plannedEndAt: string | null;
   scheduleState: TodayPlanScheduleState;
 };
 
@@ -38,43 +39,35 @@ function chapterDisplayLabel(chapter: { number: string; title: string; kind: str
   const prefix = chapterPrefix(chapter.kind, chapter.sectionKey, rawNumber);
   const normalizedNumber = rawNumber.replace(/^(chapter|unit|as)\s*/i, "").trim();
   const numbered = normalizedNumber ? `${prefix} ${normalizedNumber}` : prefix;
-  return { label: `${numbered} · ${chapter.title}`, title: chapter.title };
+  const title = chapter.title.trim();
+  return { label: title.toLowerCase().startsWith(numbered.toLowerCase()) ? title : `${numbered} · ${title}`, title };
 }
 
 function displayTitle(item: TodayPlanItem, chapter: ChapterDisplay | null) {
   if (!chapter) return item.title;
   if (item.itemKind === "revision") return `Revision ${item.revisionNumber ?? ""}: ${chapter.label}`.replace("Revision :", "Revision:");
   if (item.itemKind === "test") return `Test ${item.testNumber ?? ""}: ${chapter.label}`.replace("Test :", "Test:");
-  if (item.itemKind === "new_chapter") return `Study: ${chapter.label}`;
+  if (item.itemKind === "new_chapter") return chapter.label;
   return item.title;
 }
 
 function addMinutes(date: Date, minutes: number) {
-  return new Date(date.getTime() + Math.max(0, minutes) * 60_000);
+  return new Date(date.getTime() + Math.max(1, minutes) * 60_000);
 }
 
-function fixedTimeFor(item: TodayPlanItem, taskTimes: Map<string, string>) {
-  if (item.scheduledAt) {
-    const scheduled = new Date(item.scheduledAt);
-    if (Number.isFinite(scheduled.getTime())) return scheduled;
-  }
-  if (item.sourceType === "task" && item.sourceId) {
-    const raw = taskTimes.get(item.sourceId);
-    if (raw) {
-      const scheduled = new Date(raw);
-      if (Number.isFinite(scheduled.getTime())) return scheduled;
-    }
-  }
-  return null;
+function fixedTimeFor(item: TodayPlanItem) {
+  if (!item.scheduledAt) return null;
+  const scheduled = new Date(item.scheduledAt);
+  return Number.isFinite(scheduled.getTime()) ? scheduled : null;
 }
 
-function organiseToday(items: TodayPlanDisplayItem[], taskTimes: Map<string, string>) {
+function organiseToday(items: TodayPlanDisplayItem[]) {
   const now = new Date();
   const planned = items.filter((item) => item.status === "planned");
   const inactive = items.filter((item) => item.status !== "planned");
 
   const fixed = planned
-    .map((item) => ({ item, at: fixedTimeFor(item, taskTimes) }))
+    .map((item) => ({ item, at: fixedTimeFor(item) }))
     .filter((entry): entry is { item: TodayPlanDisplayItem; at: Date } => Boolean(entry.at))
     .sort((a, b) => a.at.getTime() - b.at.getTime());
   const fixedIds = new Set(fixed.map((entry) => entry.item.id));
@@ -86,8 +79,10 @@ function organiseToday(items: TodayPlanDisplayItem[], taskTimes: Map<string, str
   let cursor = new Date(now);
 
   for (const entry of overdueFixed) {
-    result.push({ ...entry.item, plannedStartAt: entry.at.toISOString(), scheduleState: "overdue" });
-    cursor = addMinutes(cursor, entry.item.estimatedMinutes);
+    const start = new Date(cursor);
+    const end = addMinutes(start, entry.item.estimatedMinutes);
+    result.push({ ...entry.item, plannedStartAt: start.toISOString(), plannedEndAt: end.toISOString(), scheduleState: "overdue" });
+    cursor = end;
   }
 
   for (const anchor of futureFixed) {
@@ -96,21 +91,25 @@ function organiseToday(items: TodayPlanDisplayItem[], taskTimes: Map<string, str
       const fittingIndex = flexible.findIndex((item) => item.estimatedMinutes <= availableMinutes);
       if (fittingIndex < 0) break;
       const [next] = flexible.splice(fittingIndex, 1);
-      result.push({ ...next, plannedStartAt: cursor.toISOString(), scheduleState: "planned" });
-      cursor = addMinutes(cursor, next.estimatedMinutes);
+      const start = new Date(cursor);
+      const end = addMinutes(start, next.estimatedMinutes);
+      result.push({ ...next, plannedStartAt: start.toISOString(), plannedEndAt: end.toISOString(), scheduleState: "planned" });
+      cursor = end;
     }
 
-    result.push({ ...anchor.item, plannedStartAt: anchor.at.toISOString(), scheduleState: "fixed" });
-    const anchorEnd = addMinutes(anchor.at, anchor.item.estimatedMinutes);
-    if (anchorEnd > cursor) cursor = anchorEnd;
+    const end = addMinutes(anchor.at, anchor.item.estimatedMinutes);
+    result.push({ ...anchor.item, plannedStartAt: anchor.at.toISOString(), plannedEndAt: end.toISOString(), scheduleState: "fixed" });
+    if (end > cursor) cursor = end;
   }
 
   for (const item of flexible) {
-    result.push({ ...item, plannedStartAt: cursor.toISOString(), scheduleState: "planned" });
-    cursor = addMinutes(cursor, item.estimatedMinutes);
+    const start = new Date(cursor);
+    const end = addMinutes(start, item.estimatedMinutes);
+    result.push({ ...item, plannedStartAt: start.toISOString(), plannedEndAt: end.toISOString(), scheduleState: "planned" });
+    cursor = end;
   }
 
-  return [...result, ...inactive.map((item) => ({ ...item, plannedStartAt: fixedTimeFor(item, taskTimes)?.toISOString() ?? null, scheduleState: null }))];
+  return [...result, ...inactive.map((item) => ({ ...item, plannedStartAt: fixedTimeFor(item)?.toISOString() ?? null, plannedEndAt: null, scheduleState: null }))];
 }
 
 export async function getTodayPlanDisplayModel(): Promise<TodayPlanPageModel | TodayPlanDisplayModel> {
@@ -147,14 +146,17 @@ export async function getTodayPlanDisplayModel(): Promise<TodayPlanPageModel | T
 
   const displayItems: TodayPlanDisplayItem[] = base.items.map((item) => {
     const chapter = item.chapterId ? chapterLabels.get(item.chapterId) ?? null : null;
+    const taskScheduledAt = item.sourceType === "task" && item.sourceId ? taskTimes.get(item.sourceId) ?? null : null;
     return {
       ...item,
+      scheduledAt: taskScheduledAt ?? item.scheduledAt,
       displayTitle: displayTitle(item, chapter),
       chapterDisplayTitle: chapter?.label ?? null,
       plannedStartAt: null,
+      plannedEndAt: null,
       scheduleState: null,
     };
   });
 
-  return { ...base, items: organiseToday(displayItems, taskTimes) };
+  return { ...base, items: organiseToday(displayItems) };
 }
