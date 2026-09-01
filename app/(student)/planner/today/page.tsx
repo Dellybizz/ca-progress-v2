@@ -6,7 +6,7 @@ import { TodayPlanClient } from "@/components/planner/today-plan-client";
 import { PageHeader } from "@/components/ui/page-header";
 import { optionalUser } from "@/lib/auth/server";
 import { getEntitlementForUser } from "@/lib/billing/service";
-import { getTodayPlanPageModel } from "@/lib/smart-planner/service";
+import { getTodayPlanDisplayModel } from "@/lib/smart-planner/today-display";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Today Plan | CA Progress" };
@@ -29,7 +29,7 @@ export default async function TodayPlanPage() {
     const access = await getEntitlementForUser(identity.id, "planner.smart");
     if (!access.allowed) return <div className="phase9-page"><PageHeader preview={false} eyebrow="Smart Planner" title="Smart planning is not included in your current plan." description="Your existing progress and manual planner data remain available."/><FeatureLock planName={access.planName} title="Unlock Smart Planner" description={access.upgradeMessage || "Compare plans to enable explainable daily recommendations."}/></div>;
   }
-  const model = await getTodayPlanPageModel();
+  const model = await getTodayPlanDisplayModel();
   if (model.mode === "guest") return <div className="phase9-page"><LoginRequired next="/planner/today" title="Sign in to generate your Today Plan"/></div>;
   if (model.mode === "setup") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Today" title="Complete your academic profile first." description="Add your CA level, group, attempt and daily study target to build your daily plan."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
   return <div className="phase9-page today-plan-page"><PageHeader preview={false} eyebrow="Today" title="Today’s study plan" description={formatPlanDate(model.planDate)}/><TodayPlanClient model={model}/></div>;
