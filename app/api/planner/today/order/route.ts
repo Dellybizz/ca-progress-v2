@@ -15,7 +15,8 @@ export async function POST(request: Request) {
   if (!entitlement.allowed) return NextResponse.json({ error: entitlement.upgradeMessage, code: "ENTITLEMENT_REQUIRED" }, { status: 403 });
 
   const body = await request.json().catch(() => null) as Body | null;
-  const itemIds = Array.isArray(body?.itemIds) ? body!.itemIds.filter((value): value is string => typeof value === "string" && Boolean(value)) : [];
+  const rawItemIds = body?.itemIds;
+  const itemIds = Array.isArray(rawItemIds) ? rawItemIds.filter((value): value is string => typeof value === "string" && Boolean(value)) : [];
   if (!itemIds.length || itemIds.length > 100 || new Set(itemIds).size !== itemIds.length) {
     return NextResponse.json({ error: "Choose a valid Today Plan order." }, { status: 400 });
   }
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "One or more plan items could not be organised." }, { status: 409 });
   }
 
+  const planId = rows.data[0]?.plan_id;
   const planIds = new Set(rows.data.map((row) => row.plan_id));
-  if (planIds.size !== 1) return NextResponse.json({ error: "Plan items must belong to the same day." }, { status: 400 });
+  if (!planId || planIds.size !== 1) return NextResponse.json({ error: "Plan items must belong to the same day." }, { status: 400 });
 
   for (let position = 0; position < itemIds.length; position += 1) {
     const updated = await admin
@@ -38,13 +40,14 @@ export async function POST(request: Request) {
     if (updated.error) return NextResponse.json({ error: "Today Plan order could not be saved." }, { status: 409 });
   }
 
-  await admin.from("planner_events").insert({
+  const event = await admin.from("planner_events").insert({
     user_id: identity.id,
     event_type: "manual_plan_change",
     entity_type: "daily_plan",
-    entity_id: [...planIds][0],
+    entity_id: planId,
     payload: { action: "reorder", itemIds },
   });
+  if (event.error) return NextResponse.json({ error: "Study order was saved, but planner history could not be recorded." }, { status: 409 });
 
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "private, no-store" } });
 }
