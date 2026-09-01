@@ -1,0 +1,78 @@
+name: Cloudflare Migration Phase 5 Cutover Preflight
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/phase5-cutover-preflight.yml
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  HAS_CA_AUTH_SESSION_SECRET: ${{ secrets.CA_AUTH_SESSION_SECRET != '' }}
+  HAS_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID != '' || secrets.GOOGLE_CLIENT_ID != '' }}
+  HAS_GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET != '' || secrets.GOOGLE_CLIENT_SECRET != '' }}
+  HAS_LINKEDIN_OIDC_CLIENT_ID: ${{ secrets.LINKEDIN_OIDC_CLIENT_ID != '' || secrets.LINKEDIN_CLIENT_ID != '' }}
+  HAS_LINKEDIN_OIDC_CLIENT_SECRET: ${{ secrets.LINKEDIN_OIDC_CLIENT_SECRET != '' || secrets.LINKEDIN_CLIENT_SECRET != '' }}
+  HAS_RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID != '' }}
+  HAS_RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET != '' }}
+  HAS_RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET != '' }}
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Probe Cloudflare capabilities without changing production
+        shell: bash
+        run: |
+          set +e
+          mkdir -p phase5-preflight
+          report=phase5-preflight/report.txt
+          : > "$report"
+          probe() {
+            name="$1"; shift
+            echo "== $name ==" >> "$report"
+            "$@" >phase5-preflight/stdout.txt 2>phase5-preflight/stderr.txt
+            code=$?
+            echo "exit=$code" >> "$report"
+            if [ $code -eq 0 ]; then echo "status=PASS" >> "$report"; else echo "status=FAIL" >> "$report"; fi
+            sed -E 's/(token|secret|password|authorization)[=: ][^ ,]*/\1=[REDACTED]/Ig' phase5-preflight/stderr.txt | tail -n 12 >> "$report"
+            echo >> "$report"
+            return 0
+          }
+          probe d1_remote npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users;"
+          probe r2_account npx wrangler r2 bucket list
+          probe workers_read npx wrangler deployments list --name ca-progress-v2
+          probe queues_read npx wrangler queues list
+          echo "== github_environment_secret_presence ==" >> "$report"
+          for name in HAS_CA_AUTH_SESSION_SECRET HAS_GOOGLE_OAUTH_CLIENT_ID HAS_GOOGLE_OAUTH_CLIENT_SECRET HAS_LINKEDIN_OIDC_CLIENT_ID HAS_LINKEDIN_OIDC_CLIENT_SECRET HAS_RAZORPAY_KEY_ID HAS_RAZORPAY_KEY_SECRET HAS_RAZORPAY_WEBHOOK_SECRET; do
+            printf '%s=%s\n' "$name" "${!name}" >> "$report"
+          done
+          echo >> "$report"
+          echo "== existing_web_worker_secret_names ==" >> "$report"
+          npx wrangler secret list --name ca-progress-v2 > phase5-preflight/worker-secrets.txt 2> phase5-preflight/worker-secrets-error.txt
+          code=$?
+          echo "exit=$code" >> "$report"
+          if [ $code -eq 0 ]; then
+            cat phase5-preflight/worker-secrets.txt | sed -E 's/(text|value|secret)[=: ][^ ,]*/\1=[REDACTED]/Ig' >> "$report"
+          else
+            sed -E 's/(token|secret|password|authorization)[=: ][^ ,]*/\1=[REDACTED]/Ig' phase5-preflight/worker-secrets-error.txt | tail -n 12 >> "$report"
+          fi
+          rm -f phase5-preflight/stdout.txt phase5-preflight/stderr.txt phase5-preflight/worker-secrets.txt phase5-preflight/worker-secrets-error.txt
+          cat "$report"
+      - name: Upload preflight report
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase5-cutover-preflight-${{ github.run_id }}
+          retention-days: 14
+          path: phase5-preflight/report.txt
