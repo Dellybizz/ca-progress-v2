@@ -6,7 +6,7 @@ type SyncRequest = { trigger?: unknown; requestedBy?: unknown };
 const INTERNAL_MARKER = "ca-progress-v2-web";
 function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"private, no-store"}});}
 
-export default {
+const icaiSyncWorker = {
   async fetch(request:Request,env:Env){
     const url=new URL(request.url);
     if(request.method==="GET"&&url.pathname==="/health"){
@@ -26,3 +26,5 @@ export default {
     catch(error){return json({ok:false,error:error instanceof Error?error.message:"ICAI synchronization failed."},500);}
   },
 };
+
+export default icaiSyncWorker;

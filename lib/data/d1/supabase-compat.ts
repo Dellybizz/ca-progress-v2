@@ -513,7 +513,7 @@ class D1QueryBuilder {
   private async execute():Promise<QueryResult>{try{
     if(this.operation==="select"){
       const where=this.where();const order=this.orders.length?` ORDER BY ${this.orders.map(v=>`${ident(v.column)} ${v.ascending?"ASC":"DESC"}`).join(",")}`:"";let limit="";if(this.fromRow!==null&&this.toRow!==null)limit=` LIMIT ${this.toRow-this.fromRow+1} OFFSET ${this.fromRow}`;else if(this.maxRows!==null)limit=` LIMIT ${this.maxRows}`;
-      const result=await this.db.prepare(`SELECT ${selectList(this.columns)} FROM ${ident(this.table)}${where.sql}${order}${limit}`).bind(...where.values).all<Record<string,unknown>>();let data=(result.results??[]).map(decodeRow);
+      const result=await this.db.prepare(`SELECT ${selectList(this.columns)} FROM ${ident(this.table)}${where.sql}${order}${limit}`).bind(...where.values).all<Record<string,unknown>>();const data=(result.results??[]).map(decodeRow);
       if(this.cardinality==="single"){if(data.length!==1)return{data:null,error:{message:`Expected one ${this.table} row, found ${data.length}.`,code:"PGRST116"}};return{data:data[0],error:null};}
       if(this.cardinality==="maybe"){if(data.length>1)return{data:null,error:{message:`Expected at most one ${this.table} row, found ${data.length}.`,code:"PGRST116"}};return{data:data[0]??null,error:null};}
       return{data,error:null};
