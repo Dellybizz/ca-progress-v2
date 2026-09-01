@@ -1,9 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { updateSession as updateSupabaseSession } from "@/lib/supabase/proxy";
-
-function cloudflareAuthRuntime() {
-  return (process.env.CA_AUTH_RUNTIME || "").trim().toLowerCase() === "cloudflare";
-}
 
 function rejectCrossSiteUnsafeRequest(request: NextRequest) {
   const method = request.method.toUpperCase();
@@ -22,11 +17,11 @@ function rejectCrossSiteUnsafeRequest(request: NextRequest) {
 }
 
 /**
- * Authentication-runtime-aware request boundary. Supabase cookie refresh remains
- * active in production until cutover; Cloudflare target mode does not call
- * Supabase Auth and applies a same-origin guard to browser unsafe requests.
+ * Phase 5 production request boundary. Authentication is handled by the
+ * Cloudflare session runtime; middleware only enforces same-origin protection
+ * for unsafe browser requests. The pre-cutover Worker version remains the
+ * rollback path while Supabase is retained during verification.
  */
 export async function updateAuthSession(request: NextRequest) {
-  if (!cloudflareAuthRuntime()) return updateSupabaseSession(request);
   return rejectCrossSiteUnsafeRequest(request) ?? NextResponse.next({ request });
 }
