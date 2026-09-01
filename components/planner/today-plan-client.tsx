@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
-import type { TodayPlanAction, TodayPlanItem, TodayPlanReadyModel } from "@/lib/smart-planner/types";
+import type { TodayPlanInteractionAction, TodayPlanItem, TodayPlanReadyModel } from "@/lib/smart-planner/types";
 
 type TodayPlanDisplayItem = TodayPlanItem & {
   displayTitle?: string;
@@ -18,7 +18,7 @@ type TodayPlanDisplayItem = TodayPlanItem & {
 
 type TodayPlanDisplayModel = Omit<TodayPlanReadyModel, "items"> & { items: TodayPlanDisplayItem[]; canUndo?: boolean };
 type RunningTask = { itemId: string; startedAt: string; expectedEndAt: string };
-type Confirmation = { item: TodayPlanDisplayItem; title: string; description: string; action?: TodayPlanAction; kind: "planner" | "finish"; hideAfter?: boolean };
+type Confirmation = { item: TodayPlanDisplayItem; title: string; description: string; action?: TodayPlanInteractionAction; kind: "planner" | "finish"; hideAfter?: boolean };
 
 const RUNNING_KEY = "ca-progress-today-running-task";
 
@@ -87,7 +87,7 @@ function scheduleCopy(item: TodayPlanDisplayItem, timezone: string) {
   return null;
 }
 
-function plannerActionCopy(action: TodayPlanAction, item: TodayPlanDisplayItem) {
+function plannerActionCopy(action: TodayPlanInteractionAction, item: TodayPlanDisplayItem) {
   const title = item.displayTitle ?? item.title;
   if (action.action === "complete") return { title: "Mark this task complete?", description: `Complete “${title}” and update the remaining plan.` };
   if (action.action === "snooze") return { title: "Snooze this task?", description: `Move “${title}” one hour later and adjust flexible work around it.` };
@@ -145,7 +145,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
 
   const activeItems = visibleItems.filter((item) => item.status === "planned").length;
 
-  async function requestPlanner(action: TodayPlanAction) {
+  async function requestPlanner(action: TodayPlanInteractionAction) {
     const response = await fetch("/api/planner/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action) });
     const text = await response.text();
     let payload: { error?: string; startedAt?: string } = {};
@@ -154,7 +154,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
     return payload;
   }
 
-  async function postPlanner(action: TodayPlanAction, busyKey = "refresh", hideAfter = false) {
+  async function postPlanner(action: TodayPlanInteractionAction, busyKey = "refresh", hideAfter = false) {
     setBusyId(busyKey);
     setError(null);
     try {
@@ -205,7 +205,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
     }
   }
 
-  function askPlanner(action: TodayPlanAction, item: TodayPlanDisplayItem, hideAfter = false) {
+  function askPlanner(action: TodayPlanInteractionAction, item: TodayPlanDisplayItem, hideAfter = false) {
     setConfirmation({ item, action, kind: "planner", hideAfter, ...plannerActionCopy(action, item) });
   }
 
