@@ -4,7 +4,7 @@ import { optionalUser } from "@/lib/auth/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { getTodayPlanPageModel, performTodayPlanAction } from "./service";
-import type { TodayPlanAction } from "./types";
+import type { TodayPlanInteractionAction } from "./types";
 
 type PlanItemRow = Database["public"]["Tables"]["daily_plan_items"]["Row"];
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
@@ -238,8 +238,11 @@ async function startItem(userId: string, itemId: string) {
   const item = await ownedItem(userId, itemId);
   if (item.status !== "planned") throw new Error("Only a planned item can be started.");
   const admin = createAdminSupabaseClient();
-  const previous = await admin.from("planner_events").select("id").eq("user_id", userId).eq("event_type", "today_plan_started").eq("entity_id", itemId).order("created_at", { ascending: false }).limit(1).maybeSingle();
-  if (previous.data) return { ok: true };
+  const previous = await admin.from("planner_events").select("id,payload").eq("user_id", userId).eq("event_type", "today_plan_started").eq("entity_id", itemId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (previous.data) {
+    const payload = parsePayload(previous.data.payload as Json);
+    return { ok: true, startedAt: typeof payload.startedAt === "string" ? payload.startedAt : undefined };
+  }
   const startedAt = new Date().toISOString();
   const inserted = await admin.from("planner_events").insert({
     user_id: userId,
@@ -275,7 +278,7 @@ async function reorderItems(userId: string, itemIds: string[]) {
   return { ok: true };
 }
 
-export async function performTodayPlanInteraction(action: TodayPlanAction) {
+export async function performTodayPlanInteraction(action: TodayPlanInteractionAction) {
   const identity = await optionalUser();
   if (!identity) throw new Error("Sign in to update your plan.");
   const userId = identity.id;
