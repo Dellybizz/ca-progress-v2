@@ -139,9 +139,13 @@ Final branch CI evidence from run `33514140805`, job `99876783030`:
 
 # Phase 3 — Authentication, R2, Jobs and Realtime Migration
 
-Status: **IMPLEMENTED — VALIDATION PENDING**
+Status: **COMPLETE — PHASE 3 DEFINITION OF DONE PASSED; REPOSITORY-WIDE TEST BLOCKER REMAINS PRE-EXISTING**
 
-Phase 3 start commit: `737617e0612f7e0353078d06a138bcefc3ea966e`.
+Phase 3 start/baseline commit: `737617e0612f7e0353078d06a138bcefc3ea966e`.
+Phase 3 implementation commit: `9d603efea8953d4d3161414eaaed24c054f1f8bd` (`Cloudflare migration Phase 3: auth R2 jobs and realtime`).
+Phase 3 validation follow-up commit: `6ccda81703fa43b0bfc9b5e363e6a4747820219c` (`Phase 3: tighten realtime validation`).
+Final Phase 3 validation run: GitHub Actions `33529091761`, quality job `99927350468`.
+Direct pre-Phase-3 baseline run: GitHub Actions `33518211187`, quality job `99890522279`.
 
 ## Authentication architecture / user-ID mapping
 
@@ -188,6 +192,39 @@ Phase 3 start commit: `737617e0612f7e0353078d06a138bcefc3ea966e`.
 - Migration Phase 4 is not started.
 - CA Mentor Phase 3 is not started.
 
-## Validation pending
+## Phase 3 Definition-of-Done validation
 
-The implementation commit will run the Phase 3 auth/security/identity, R2, jobs and realtime tests, clean D1 Phase 3 bootstrap, typecheck, lint, Next/OpenNext build, standard Worker dry-runs, the Phase 3 D1/R2/Queue dry-run and Cloudflare SSR smoke test. Repository-wide failures will be compared with the known pre-existing baseline before final status is set.
+Final branch CI evidence from run `33529091761`, job `99927350468`:
+
+- Typecheck: **PASS**.
+- Lint: **PASS**.
+- Cloudflare Migration Phase 2 contract tests: **PASS**.
+- Cloudflare Migration Phase 2 clean D1 bootstrap: **PASS**.
+- Phase 3 auth/R2/jobs/realtime tests: **PASS**.
+- Phase 3 clean D1 auth/job bootstrap: **PASS**.
+- Next.js production build: **PASS**.
+- OpenNext Worker build and existing Wrangler dry-runs: **PASS**.
+- Phase 3 D1/R2/Queue Worker dry-run: **PASS**.
+- Cloudflare SSR route smoke test: **PASS**.
+- Repository-wide tests: **FAIL**.
+
+The only failing CI gate is the repository-wide test step. This does not represent a Phase 3 regression: on the direct pre-Phase-3 baseline commit `737617e0612f7e0353078d06a138bcefc3ea966e`, CI run `33518211187` / job `99890522279` already failed the same `Repository-wide tests` step after typecheck, lint, Phase 2 contract/bootstrap, Next.js build, OpenNext/Wrangler dry-runs and Cloudflare SSR smoke had passed. The repository-wide command is unchanged across the baseline and Phase 3 heads: `npm test` still resolves to `node --test tests/*.test.mjs`. Phase 3 therefore adds no new failure to the global suite, while every Phase-3-specific gate passes.
+
+## Blockers / residual risk
+
+- The repository-wide test suite retains a pre-existing failure outside Phase 3 scope. It remains separate baseline debt and must not be represented as an auth, R2, jobs or realtime migration failure.
+- Production remains on the pre-cutover providers. Phase 3 proves the target architecture and validation path but intentionally does not perform production data/auth/realtime cutover.
+
+## Explicitly not done
+
+- No production data migration or reconciliation.
+- No production D1 activation/cutover.
+- No production Cloudflare auth activation.
+- No production Queue activation/cutover.
+- No irreversible Supabase Storage deletion.
+- No Migration Phase 4.
+- No CA Mentor Phase 3.
+
+## Phase 3 completion decision
+
+**Phase 3 is Complete.** Authentication, R2 avatar handling, background jobs and realtime migration targets are implemented, and all Phase 3-specific Definition-of-Done gates pass. The remaining repository-wide test failure is demonstrably pre-existing on the direct Phase 3 baseline and is not a Phase 3 regression. Production remains pre-cutover until a later migration phase explicitly changes that state.
