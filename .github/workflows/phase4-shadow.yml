@@ -1,8 +1,6 @@
 name: Cloudflare Migration Phase 4 Shadow
 
 on:
-  push:
-    branches: [phase-12-operations-admin-platform]
   workflow_dispatch:
 
 permissions:
@@ -44,5 +42,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-# This workflow creates/uses only ca-progress-v2-phase4-shadow.
-# It does not bind D1 to the production web Worker, retire Supabase, or start Phase 5/Mentor Phase 3.
+# Phase 4 is closed. This workflow is manual-only during Phase 5 and must not run
+# automatically against production-cutover pushes. It still targets only the retained
+# ca-progress-v2-phase4-shadow database and never performs a production cutover.

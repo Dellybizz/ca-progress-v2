@@ -1,0 +1,19 @@
+name: Cloudflare Migration Phase 5 Runtime Inventory
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inventory active Supabase and RPC runtime surface
+        run: node scripts/phase5/inventory-runtime.mjs
+
+# Temporary Phase 5 branch-only audit. Remove once runtime retirement is verified.
