@@ -5,15 +5,57 @@ on:
     branches: [phase-12-operations-admin-platform]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   inventory:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: phase-12-operations-admin-platform
+          fetch-depth: 0
+      - name: Apply narrow Phase 5 type fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          billing = Path("lib/billing/service.ts")
+          text = billing.read_text()
+          old = 'import { createAdminSupabaseClient } from "@/lib/supabase/admin";'
+          new = 'import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("billing import patch target not found")
+          old = 'function db() { return createAdminSupabaseClient(); }'
+          new = 'function db() { return createD1AdminCompatClient(); }'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("billing db patch target not found")
+          billing.write_text(text)
+
+          compat = Path("lib/data/d1/supabase-compat.ts")
+          text = compat.read_text()
+          old = 'const row={...(this.payload??{})};const info=await tableInfo(this.db,this.table);'
+          new = 'const row:Record<string,unknown>={...(Array.isArray(this.payload)?{}:(this.payload??{}))};const info=await tableInfo(this.db,this.table);'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("D1 update narrowing patch target not found")
+          compat.write_text(text)
+      - name: Commit source fixes when needed
+        run: |
+          if git diff --quiet -- lib/billing/service.ts lib/data/d1/supabase-compat.ts; then
+            echo "Phase 5 type-boundary fixes already committed."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add lib/billing/service.ts lib/data/d1/supabase-compat.ts
+            git commit -m "Fix Phase 5 D1 cutover type boundaries"
+            git push origin HEAD:phase-12-operations-admin-platform
+          fi
       - name: Inventory active Supabase and RPC runtime surface
         run: node scripts/phase5/inventory-runtime.mjs
-
-# Temporary Phase 5 branch-only audit. Remove once runtime retirement is verified.
