@@ -1,6 +1,7 @@
 name: Cloudflare Migration Phase 5 Cutover Preflight
 
 on:
+  workflow_dispatch:
   push:
     branches: [phase-12-operations-admin-platform]
     paths:
@@ -66,11 +67,32 @@ jobs:
           if [ $code -eq 0 ]; then
             cat phase5-preflight/worker-secrets.txt | sed -E 's/(text|value|secret)[=: ][^ ,]*/\1=[REDACTED]/Ig' >> "$report"
           else
+            echo "status=FAIL" >> "$report"
             sed -E 's/(token|secret|password|authorization)[=: ][^ ,]*/\1=[REDACTED]/Ig' phase5-preflight/worker-secrets-error.txt | tail -n 12 >> "$report"
           fi
           rm -f phase5-preflight/stdout.txt phase5-preflight/stderr.txt phase5-preflight/worker-secrets.txt phase5-preflight/worker-secrets-error.txt
           cat "$report"
+      - name: Enforce Phase 5 cutover gates
+        shell: bash
+        run: |
+          report=phase5-preflight/report.txt
+          failed=0
+          if grep -q '^status=FAIL$' "$report"; then
+            echo "::error::One or more Cloudflare capability checks failed."
+            failed=1
+          fi
+          for name in HAS_CA_AUTH_SESSION_SECRET HAS_GOOGLE_OAUTH_CLIENT_ID HAS_GOOGLE_OAUTH_CLIENT_SECRET HAS_LINKEDIN_OIDC_CLIENT_ID HAS_LINKEDIN_OIDC_CLIENT_SECRET HAS_RAZORPAY_KEY_ID HAS_RAZORPAY_KEY_SECRET HAS_RAZORPAY_WEBHOOK_SECRET; do
+            if [ "${!name}" != "true" ]; then
+              echo "::error::$name is missing from the v2-staging environment."
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            exit 1
+          fi
+          echo "All Phase 5 Cloudflare capability and required-secret gates passed."
       - name: Upload preflight report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: phase5-cutover-preflight-${{ github.run_id }}
