@@ -1,7 +1,7 @@
 import "server-only";
 
 import { optionalUser } from "@/lib/auth/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
 
 export type BillingCycle = "free" | "monthly" | "annual";
 export type PlanTier = "free" | "basic" | "pro";
@@ -10,7 +10,7 @@ export type PlanEntitlement = { plan_id: string; feature_key: string; enabled: b
 export type Entitlement = { planId: string; tier: PlanTier; planName: string; featureKey: string; allowed: boolean; limitValue: number | null; limitUnit: string; resetPeriod: string; upgradeMessage: string };
 export type BillingModel = { mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: { id: string; status: string; starts_at: string; ends_at: string | null; source: string } | null; payments?: Array<{ id: string; plan_id: string; provider_order_id: string; provider_payment_id: string | null; amount_subunits: number; currency: string; status: string; created_at: string; paid_at: string | null }>; events?: Array<{ id: string; plan_id: string; event_type: string; source: string; starts_at: string | null; ends_at: string | null; created_at: string }>; plans?: SubscriptionPlan[] };
 
-function db() { return createAdminSupabaseClient(); }
+function db() { return createD1AdminCompatClient(); }
 
 export async function listPlans(): Promise<SubscriptionPlan[]> {
   const result = await db().from("subscription_plans").select("id,tier_key,billing_cycle,name,tagline,rank,price_subunits,currency,duration_value,duration_unit,active,checkout_enabled,sort_order").eq("active", true).order("sort_order");
