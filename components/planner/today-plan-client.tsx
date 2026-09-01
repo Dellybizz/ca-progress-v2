@@ -7,6 +7,17 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import type { TodayPlanAction, TodayPlanItem, TodayPlanReadyModel } from "@/lib/smart-planner/types";
 
+type TodayPlanDisplayItem = TodayPlanItem & {
+  displayTitle?: string;
+  chapterDisplayTitle?: string | null;
+  plannedStartAt?: string | null;
+  scheduleState?: "overdue" | "fixed" | "planned" | null;
+};
+
+type TodayPlanDisplayModel = Omit<TodayPlanReadyModel, "items"> & {
+  items: TodayPlanDisplayItem[];
+};
+
 function tomorrow() {
   const date = new Date();
   date.setDate(date.getDate() + 1);
@@ -27,13 +38,14 @@ function statusLabel(status: TodayPlanReadyModel["forecast"]["status"]) {
 function reasonLabel(reasonCode: string) {
   const known: Record<string, string> = {
     revision_due: "Revision due",
+    revision_overdue: "Revision overdue",
     task_due_today: "Scheduled today",
+    task_overdue: "Task overdue",
     manual_reschedule: "Moved by you",
-    unfinished_syllabus: "Syllabus remaining",
-    test_due: "Test due",
-    test_due_today: "Test due",
-    overdue_task: "Overdue",
-    overdue_revision: "Revision overdue",
+    remaining_syllabus: "Syllabus remaining",
+    weak_subject_new_work: "Needs attention",
+    completed_chapter_test: "Test due",
+    followup_test: "Follow-up test",
   };
   if (known[reasonCode]) return known[reasonCode];
   return reasonCode.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -50,18 +62,32 @@ function formatDate(value: string | null | undefined) {
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(parsed);
 }
 
-function formatSchedule(value: string) {
+function formatSchedule(value: string, timezone?: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return new Intl.DateTimeFormat("en-IN", {
-    day: "numeric",
-    month: "short",
     hour: "numeric",
     minute: "2-digit",
+    ...(timezone ? { timeZone: timezone } : {}),
   }).format(parsed);
 }
 
-export function TodayPlanClient({ model }: { model: TodayPlanReadyModel }) {
+function scheduleChip(item: TodayPlanDisplayItem, timezone: string) {
+  if (!item.plannedStartAt || item.status !== "planned") return null;
+  const time = formatSchedule(item.plannedStartAt, timezone);
+  if (item.scheduleState === "overdue") {
+    return <span className="today-plan-schedule-chip today-plan-schedule-chip--urgent"><Icon name="clock" size={12}/>Urgent · {time} time passed</span>;
+  }
+  if (item.scheduleState === "fixed") {
+    return <span className="today-plan-schedule-chip today-plan-schedule-chip--fixed"><Icon name="calendar" size={12}/>Scheduled {time}</span>;
+  }
+  if (item.scheduleState === "planned") {
+    return <span className="today-plan-schedule-chip"><Icon name="clock" size={12}/>Planned {time}</span>;
+  }
+  return null;
+}
+
+export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +116,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanReadyModel }) {
     }
   }
 
-  function actions(item: TodayPlanItem) {
+  function actions(item: TodayPlanDisplayItem) {
     if (item.status !== "planned") return <span className={`phase9-state phase9-state--${item.status}`}>{stateLabel(item.status)}</span>;
     const customDate = customDates[item.id] || tomorrow();
     return <div className="phase9-item-actions today-plan-actions">
@@ -118,12 +144,12 @@ export function TodayPlanClient({ model }: { model: TodayPlanReadyModel }) {
       <Card className="today-plan-list-card">
         <CardHeader title="Study order" action={<button className="ui-button ui-button--secondary today-plan-refresh" disabled={Boolean(busyId)} onClick={() => void run({ action: "refresh" })}>{busyId === "refresh" ? "Refreshing…" : "Refresh plan"}</button>}/>
         <CardBody>
-          {model.items.length ? <div className="phase9-timeline today-plan-timeline">{model.items.map((item, index) => <article key={item.id} className={`phase9-plan-item phase9-plan-item--${item.status} ${item.manualOverride ? "is-manual" : ""}`}>
+          {model.items.length ? <div className="phase9-timeline today-plan-timeline">{model.items.map((item, index) => <article key={item.id} className={`phase9-plan-item phase9-plan-item--${item.status} ${item.manualOverride ? "is-manual" : ""} ${item.scheduleState === "overdue" ? "is-time-overdue" : ""}`}>
             <div className="phase9-timeline-marker"><span>{index + 1}</span></div>
             <div className="phase9-plan-content today-plan-item">
-              <div className="phase9-plan-heading"><div><span className={`phase9-kind phase9-kind--${item.itemKind}`}>{item.itemKind.replace("_", " ")}</span><h3>{item.title}</h3></div><strong>{item.estimatedMinutes}m</strong></div>
-              <div className="phase9-item-meta today-plan-item-meta"><span>{item.subjectTitle ?? "General"}</span>{item.chapterTitle ? <span>· {item.chapterTitle}</span> : null}{item.scheduledAt ? <span>· {formatSchedule(item.scheduledAt)}</span> : null}</div>
-              <div className="phase9-chip-row today-plan-chip-row"><span className={`phase9-priority phase9-priority--${priorityLabel(item.priorityScore).toLowerCase()}`}>{priorityLabel(item.priorityScore)}</span><span className="phase9-reason-chip">{reasonLabel(item.reasonCode)}</span>{item.manualOverride ? <span className="phase9-manual-chip">Adjusted</span> : null}</div>
+              <div className="phase9-plan-heading"><div><span className={`phase9-kind phase9-kind--${item.itemKind}`}>{item.itemKind.replace("_", " ")}</span><h3>{item.displayTitle ?? item.title}</h3></div><strong>{item.estimatedMinutes}m</strong></div>
+              <div className="phase9-item-meta today-plan-item-meta"><span>{item.subjectTitle ?? "General"}</span></div>
+              <div className="phase9-chip-row today-plan-chip-row"><span className={`phase9-priority phase9-priority--${priorityLabel(item.priorityScore).toLowerCase()}`}>{priorityLabel(item.priorityScore)}</span><span className="phase9-reason-chip">{reasonLabel(item.reasonCode)}</span>{scheduleChip(item, model.timezone)}{item.manualOverride ? <span className="phase9-manual-chip">Adjusted</span> : null}</div>
               {item.manualNote ? <div className="phase9-manual-note">{item.manualNote}</div> : null}
               {actions(item)}
             </div>
