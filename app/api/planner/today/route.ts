@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getEntitlementForUser } from "@/lib/billing/service";
 import { performTodayPlanInteraction } from "@/lib/smart-planner/today-interactions";
-import type { TodayPlanAction } from "@/lib/smart-planner/types";
+import type { TodayPlanInteractionAction } from "@/lib/smart-planner/types";
 
 export const dynamic = "force-dynamic";
 
-function validAction(value: unknown): value is TodayPlanAction {
+function validAction(value: unknown): value is TodayPlanInteractionAction {
   if (!value || typeof value !== "object") return false;
   const body = value as Record<string, unknown>;
   if (body.action === "refresh" || body.action === "undo") return true;
-  if (body.action === "reorder") return Array.isArray(body.itemIds) && body.itemIds.length > 0 && body.itemIds.every((id) => typeof id === "string" && id);
+  if (body.action === "reorder") return Array.isArray(body.itemIds) && body.itemIds.length > 0 && body.itemIds.every((id) => typeof id === "string" && Boolean(id));
   if (typeof body.itemId !== "string" || !body.itemId) return false;
   if (body.action === "start" || body.action === "complete" || body.action === "skip") return true;
   if (body.action === "snooze") return typeof body.minutes === "number" && Number.isFinite(body.minutes);
