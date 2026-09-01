@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
-import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { subscribeToCommunityRealtime } from "@/lib/community/realtime-provider";
 import type { CommunityChannelModel, CommunityMessage, CommunityMessagePage, CommunityReactionEmoji } from "@/lib/community/types";
 import { CommunityChannelList } from "./channel-list";
 
@@ -68,25 +68,22 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
   }, [latestSequence, markRead]);
 
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
-    const filter = `channel_id=eq.${model.channel.id}`;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const scheduleRefresh = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => void refreshMessages().catch(() => undefined), 120);
     };
-    const channel = supabase
-      .channel(`community:${model.channel.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_messages", filter }, scheduleRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions", filter }, scheduleRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "pinned_messages", filter }, () => {
+    const unsubscribe = subscribeToCommunityRealtime({
+      channelId: model.channel.id,
+      onDataChanged: scheduleRefresh,
+      onPinnedChanged: () => {
         scheduleRefresh();
         router.refresh();
-      })
-      .subscribe();
+      },
+    });
     return () => {
       if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
+      unsubscribe();
     };
   }, [model.channel.id, refreshMessages, router]);
 

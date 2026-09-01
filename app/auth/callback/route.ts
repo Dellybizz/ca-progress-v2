@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { sanitizeReturnPath } from "@/lib/auth/navigation";
+import { exchangeOAuthCodeForSession } from "@/lib/auth/provider";
 import { applyRememberDevicePreference } from "@/lib/auth/session-cookies";
 import { ensureUserBootstrap, resolvePostAuthDestination } from "@/lib/auth/server";
-import { sanitizeReturnPath } from "@/lib/auth/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +13,7 @@ export async function GET(request: NextRequest) {
   if (!code) return NextResponse.redirect(new URL(`/login?error=missing_auth_code&next=${encodeURIComponent(next)}`, request.nextUrl.origin));
 
   try {
-    const supabase = await createServerSupabaseClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) throw error;
+    await exchangeOAuthCodeForSession(code);
     await applyRememberDevicePreference(remember);
     await ensureUserBootstrap();
     const destination = await resolvePostAuthDestination(next);
