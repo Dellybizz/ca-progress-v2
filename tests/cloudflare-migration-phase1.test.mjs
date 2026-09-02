@@ -56,7 +56,7 @@ test("current Cloudflare bindings remain documented through the rollback-safe Ph
   }
 });
 
-test("feature routes and Community UI use provider-neutral Phase 1 boundaries", () => {
+test("feature routes and Community UI use provider-neutral migration boundaries", () => {
   const featureFiles = [
     "app/auth/google/route.ts",
     "app/auth/linkedin/route.ts",
@@ -70,5 +70,8 @@ test("feature routes and Community UI use provider-neutral Phase 1 boundaries", 
   for (const path of featureFiles) assert.doesNotMatch(read(path), /@\/lib\/supabase\//, `${path} still creates a Supabase dependency directly`);
   assert.match(read("lib/auth/provider.ts"), /createServerSupabaseClient/);
   assert.match(read("lib/profile/service.ts"), /createServerSupabaseClient/);
-  assert.match(read("lib/community/realtime-provider.ts"), /createBrowserSupabaseClient/);
+  const realtime = read("lib/community/realtime-provider.ts");
+  assert.match(realtime, /subscribeToCommunityRealtime/);
+  assert.match(realtime, /window\.setInterval/);
+  assert.doesNotMatch(realtime, /createBrowserSupabaseClient|@\/lib\/supabase\//);
 });

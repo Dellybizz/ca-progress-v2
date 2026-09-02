@@ -76,7 +76,8 @@ test("desktop and mobile navigation expose the syllabus explorer", () => {
   assert.match(desktop, /label: \"Syllabus\"/);
   assert.match(desktop, /href: \"\/syllabus\"/);
   assert.match(mobile, /\/subjects/);
-  assert.match(mobile, /studentNavigation\.slice\(4\)/);
+  assert.match(mobile, /studentSections/);
+  assert.match(mobile, /href: "\/syllabus"/);
 });
 
 test("Phase 3 applicability mapping remains intact after Phase 8 promotes exam_attempts to the picker", () => {

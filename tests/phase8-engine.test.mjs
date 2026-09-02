@@ -17,7 +17,8 @@ test("daily ICAI sync remains a Cloudflare scheduled job independent of user tra
   assert.match(wrangler, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(wrangler, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);
   assert.match(worker, /scheduled\(/);
-  assert.match(worker, /ICAI_SYNC_SERVICE\.fetch/);
+  assert.match(worker, /BACKGROUND_JOBS\.send\(scheduledJob\(controller\)\)/);
+  assert.match(worker, /service\.fetch\(new Request\("https:\/\/icai-sync\.internal\/run"/);
   assert.match(worker, /trigger:\s*"cron"/);
   assert.match(syncWorker, /"workers_dev"\s*:\s*false/);
 });

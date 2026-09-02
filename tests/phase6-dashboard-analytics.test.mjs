@@ -32,6 +32,7 @@ test("finishing a timer immediately feeds analytics from study_sessions", () => 
 test("Phase 9 smart recommendation boundary remains intact", () => {
   const dashboard = read("lib/dashboard/service.ts");
   const migration = read("supabase/migrations/20260830130000_phase6_study_planner_calendar.sql");
-  assert.match(dashboard, /Phase 9 can replace this slot with explainable smart ranking/);
+  assert.match(dashboard, /status: "contextual_fallback"/);
+  assert.match(dashboard, /phase9Ready: true/);
   assert.doesNotMatch(migration, /create table public\.(revision_schedule|planner_recommendations|recommendations)/);
 });

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname; const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("Today Plan recommendations store and show explainable reasons", () => {
+test("Today Plan recommendations store explanations and show human-readable reason labels", () => {
   const service = read("lib/smart-planner/service.ts");
   const ui = read("components/planner/today-plan-client.tsx");
   const sql = read("supabase/migrations/20260830170000_phase9_smart_revision_planner.sql");
@@ -12,8 +12,8 @@ test("Today Plan recommendations store and show explainable reasons", () => {
   assert.match(sql, /reason_text text not null/);
   assert.match(service, /reasonCode:/);
   assert.match(service, /reasonText:/);
-  assert.match(ui, /Why:/);
-  assert.match(ui, /item\.reasonText/);
+  assert.match(ui, /reasonLabel\(item\.reasonCode\)/);
+  assert.match(ui, /phase9-reason-chip/);
 });
 
 test("manual changes override generated suggestions and survive recomputation", () => {

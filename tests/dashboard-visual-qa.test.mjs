@@ -13,10 +13,10 @@ test("dashboard copy is student-facing rather than implementation-facing", () =>
 
   assert.doesNotMatch(visibleCopy, /Phase [0-9]/);
   assert.doesNotMatch(visibleCopy, /server-side|normalized .* rows|deterministic fallback|future owner|data-backed/i);
-  assert.match(dashboard, /Here’s your study snapshot for today/);
+  assert.match(dashboard, /Welcome back/);
   assert.match(dashboard, /Countdown coming soon/);
-  assert.match(dashboard, /Study status/);
-  assert.match(dashboard, /Suggested/);
+  assert.match(dashboard, /Next up/);
+  assert.match(dashboard, /Quick actions/);
 });
 
 test("dashboard visual CSS keeps secondary content readable", () => {
@@ -33,6 +33,6 @@ test("dashboard progress and status cards no longer render phase badges", () => 
 
   assert.doesNotMatch(dashboard, /Phase 9 ready/);
   assert.doesNotMatch(dashboard, /Phase \{alert\.phase\}/);
-  assert.match(dashboard, /Overall progress/);
-  assert.match(dashboard, /Latest ICAI changes/);
+  assert.match(dashboard, /model\.progress\.overallPercent/);
+  assert.match(dashboard, /ICAI updates/);
 });

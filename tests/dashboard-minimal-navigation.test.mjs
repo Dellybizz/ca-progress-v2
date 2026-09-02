@@ -54,11 +54,11 @@ test("attempt strip has a recognizable visual identity without adding dashboard 
   const dashboard = read("components/dashboard/student-dashboard.tsx");
   const character = read("app/styles/dashboard-character.css");
   const globals = read("app/globals.css");
-  assert.match(dashboard, /dashboard-attempt-strip__accent/);
-  assert.match(dashboard, /<Icon name="calendar"/);
-  for (const label of ["Level", "Group", "Subjects", "Chapters"]) assert.match(dashboard, new RegExp(`<b>${label}<\\/b>`));
+  assert.match(dashboard, /dashboard-attempt-strip dashboard-attempt-card/);
+  assert.match(dashboard, /<Icon name="shield"/);
+  for (const label of ["Subjects", "Chapters", "Selection"]) assert.match(dashboard, new RegExp(`<span>${label}<\\/span>`));
   assert.match(character, /linear-gradient/);
-  assert.match(character, /dashboard-attempt-strip__facts b/);
+  assert.match(character, /dashboard-attempt-card__summary strong/);
   assert.match(globals, /dashboard-character\.css/);
   assert.ok(globals.indexOf("dashboard-character.css") > globals.indexOf("dashboard-balanced.css"));
 });
