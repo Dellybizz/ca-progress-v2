@@ -1,4 +1,4 @@
-# Phase 5 final cutover trigger — manually staged OAuth secrets verified
+# Phase 5 LinkedIn OIDC verified — final cutover trigger
 # Phase 5 cutover trigger marker — runtime logic unchanged
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
