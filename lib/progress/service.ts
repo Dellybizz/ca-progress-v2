@@ -196,3 +196,65 @@ export async function getProgressAnalyticsForDashboard(userId: string, chapterId
   const byChapter = new Map(rows.map((row) => [row.chapter_id, stateFromRow(row)]));
   return { overallPercent: overallPercent(chapterIds.map((id) => byChapter.get(id) ?? { ...EMPTY_STATE })), byChapter };
 }
+
+
+type DashboardSummarySubject = {
+  id: string;
+  title: string;
+  slug: string;
+  groupCode: string;
+  groupName: string;
+  chapterCount: number;
+  chapterIds: string[];
+};
+
+export async function getProgressDashboardSummary(userId: string, subjects: DashboardSummarySubject[]) {
+  const chapterIds = [...new Set(subjects.flatMap((subject) => subject.chapterIds))];
+  const supabase = await createServerSupabaseClient();
+  const response = chapterIds.length
+    ? await supabase.from("chapter_progress").select("*").eq("user_id", userId).in("chapter_id", chapterIds)
+    : { data: [], error: null };
+  if (response.error) throw new Error(`Dashboard progress could not be loaded: ${response.error.message}`);
+
+  const rows = (response.data ?? []) as ProgressRow[];
+  const statesByChapter = new Map(rows.map((row) => [row.chapter_id, stateFromRow(row)]));
+  const states = chapterIds.map((chapterId) => statesByChapter.get(chapterId) ?? { ...EMPTY_STATE });
+  const count = (key: keyof ProgressState) => states.filter((state) => state[key]).length;
+
+  const subjectSummaries = subjects.map((subject) => {
+    const subjectStates = subject.chapterIds.map((chapterId) => statesByChapter.get(chapterId) ?? { ...EMPTY_STATE });
+    return {
+      id: subject.id,
+      title: subject.title,
+      slug: subject.slug,
+      groupCode: subject.groupCode,
+      groupName: subject.groupName,
+      chapterCount: subject.chapterCount,
+      completedCount: subjectStates.filter((state) => state.completed_at).length,
+      completionPercent: percent(countStates(subjectStates, "completed_at"), subjectStates.length),
+      revisionPercent: percent(countStates(subjectStates, "revision_1_at") + countStates(subjectStates, "revision_2_at"), subjectStates.length * 2),
+      testPercent: percent(countStates(subjectStates, "test_1_at") + countStates(subjectStates, "test_2_at"), subjectStates.length * 2),
+      overallPercent: overallPercent(subjectStates),
+    };
+  });
+
+  const groupSummaries = [...new Map(subjects.map((subject) => [subject.groupCode, { code: subject.groupCode, name: subject.groupName }])).values()].map((group) => {
+    const groupIds = subjects.filter((subject) => subject.groupCode === group.code).flatMap((subject) => subject.chapterIds);
+    const groupStates = groupIds.map((chapterId) => statesByChapter.get(chapterId) ?? { ...EMPTY_STATE });
+    return { code: group.code, name: group.name, chapterCount: groupStates.length, completedCount: countStates(groupStates, "completed_at"), overallPercent: overallPercent(groupStates) };
+  });
+
+  return {
+    overallPercent: overallPercent(states),
+    revision1Count: count("revision_1_at"),
+    revision2Count: count("revision_2_at"),
+    test1Count: count("test_1_at"),
+    test2Count: count("test_2_at"),
+    subjects: subjectSummaries,
+    groups: groupSummaries,
+  };
+}
+
+function countStates(states: ProgressState[], key: keyof ProgressState) {
+  return states.filter((state) => state[key]).length;
+}
