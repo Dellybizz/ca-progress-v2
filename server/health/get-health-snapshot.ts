@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPublicRuntimeConfig, getSupabasePublicConfig } from "@/lib/env";
+import { getD1RuntimeDatabase } from "@/lib/data/d1/supabase-compat";
 import { logEvent } from "@/lib/logging/logger";
 import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 
@@ -14,10 +15,14 @@ export async function getHealthSnapshot(correlationId: string) {
 
   if (cloudflareDataRuntime || supabaseConfig.configured) {
     try {
-      const dataClient = await createServerSupabaseClient();
-      const { error } = await dataClient.from("app_settings").select("key").limit(1);
-      database = error ? "degraded" : "ok";
-      if (error) logEvent("warn", "health.database.degraded", { correlationId, code: error.code });
+      if (cloudflareDataRuntime) {
+        await getD1RuntimeDatabase().prepare("SELECT key FROM app_settings LIMIT 1").first();
+      } else {
+        const dataClient = await createServerSupabaseClient();
+        const { error } = await dataClient.from("app_settings").select("key").limit(1);
+        if (error) throw Object.assign(new Error(error.message), { code: error.code });
+      }
+      database = "ok";
     } catch (error) {
       database = "degraded";
       logEvent("error", "health.database.exception", { correlationId, error: error instanceof Error ? error.message : "unknown" });
