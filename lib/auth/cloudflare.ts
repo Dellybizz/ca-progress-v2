@@ -314,11 +314,19 @@ async function resolveApplicationIdentity(profile: ProviderProfile) {
   const existing = await db.prepare(
     "SELECT identity_id,application_user_id,email,phone,display_name,avatar_url FROM auth_identities WHERE provider=?1 AND provider_user_id=?2 LIMIT 1",
   ).bind(profile.provider, profile.providerUserId).first<IdentityRow>();
+  const migrated = profile.email
+    ? await db.prepare(
+      "SELECT identity_id,application_user_id,email,phone,display_name,avatar_url FROM auth_identities WHERE provider='supabase_auth' AND lower(email)=lower(?1) LIMIT 2",
+    ).bind(profile.email).all<IdentityRow>()
+    : { results: [] };
+  const migratedUsers = migrated.results || [];
+  const canonicalUser = migratedUsers.length === 1 ? migratedUsers[0] : null;
   if (existing) {
+    const applicationUserId = canonicalUser?.application_user_id || existing.application_user_id;
     await db.prepare(
-      "UPDATE auth_identities SET email=?1,phone=?2,display_name=?3,avatar_url=?4,email_verified=?5,last_seen_at=CURRENT_TIMESTAMP WHERE identity_id=?6",
-    ).bind(profile.email, profile.phone, profile.displayName, profile.avatarUrl, profile.emailVerified ? 1 : 0, existing.identity_id).run();
-    return { identityId: existing.identity_id, applicationUserId: existing.application_user_id, profile };
+      "UPDATE auth_identities SET application_user_id=?1,email=?2,phone=?3,display_name=?4,avatar_url=?5,email_verified=?6,last_seen_at=CURRENT_TIMESTAMP WHERE identity_id=?7",
+    ).bind(applicationUserId, profile.email, profile.phone, profile.displayName, profile.avatarUrl, profile.emailVerified ? 1 : 0, existing.identity_id).run();
+    return { identityId: existing.identity_id, applicationUserId, profile };
   }
 
   // One-time migration bridge: Phase 4 imported the stable Supabase identity
