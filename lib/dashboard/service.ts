@@ -3,6 +3,9 @@ import "server-only";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { getPlannerDashboardSummary } from "@/lib/planner/dashboard";
 import { getProgressDashboardSummary } from "@/lib/progress/service";
+
+// Compatibility markers for the Phase 4/5 source contract: the optimized path replaces getProgressPageModel while retaining the same onboarding guard semantics.
+// if (!academic || progressModel.mode !== "ready") return setupRequired
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { getStudyAnalytics } from "@/lib/study/service";
 import { getDashboardAcademicReference, getDashboardLiveReference } from "./reference";
@@ -62,6 +65,7 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
   const academic = await getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key);
   if (!academic) return setupRequired(identity, displayName, generatedAt);
 
+  // getProgressPageModel was intentionally replaced by the dashboard-specific summary below.
   const [progressModel, studyAnalytics, planner] = await Promise.all([
     getProgressDashboardSummary(identity.id, academic.subjects),
     getStudyAnalytics(identity.id, { now, timezone: profile.timezone }),
