@@ -331,8 +331,9 @@ async function resolveApplicationIdentity(profile: ProviderProfile) {
       "SELECT identity_id,application_user_id,email,phone,display_name,avatar_url FROM auth_identities WHERE provider='supabase_auth' AND lower(email)=lower(?1) LIMIT 2",
     ).bind(profile.email).all<IdentityRow>()
     : { results: [] };
-  if ((migrated.results || []).length === 1) {
-    const existingUser = migrated.results[0];
+  const migratedUsers = migrated.results || [];
+  if (migratedUsers.length === 1) {
+    const existingUser = migratedUsers[0];
     const identityId = crypto.randomUUID();
     await db.prepare(
       "INSERT INTO auth_identities(identity_id,provider,provider_user_id,application_user_id,email,phone,display_name,avatar_url,email_verified) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
