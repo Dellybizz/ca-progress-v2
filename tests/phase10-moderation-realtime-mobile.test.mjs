@@ -25,14 +25,20 @@ test("attachments can reference only approved Phase 7 shared uploads", () => {
   assert.doesNotMatch(chat, /type=["']file["']/);
 });
 
-test("Realtime subscribes only to the active channel and is cleaned up on navigation", () => {
+test("Realtime scopes refreshes to the active channel and cleans up the Cloudflare-compatible adapter", () => {
   const chat = read("components/community/community-chat.tsx");
-  assert.match(chat, /const filter = `channel_id=eq\.\$\{model\.channel\.id\}`/);
-  assert.match(chat, /\.channel\(`community:\$\{model\.channel\.id\}`\)/);
-  assert.match(chat, /table: "community_messages", filter/);
-  assert.match(chat, /table: "message_reactions", filter/);
-  assert.match(chat, /table: "pinned_messages", filter/);
-  assert.match(chat, /supabase\.removeChannel\(channel\)/);
+  const provider = read("lib/community/realtime-provider.ts");
+  assert.match(chat, /subscribeToCommunityRealtime/);
+  assert.match(chat, /channelId:\s*model\.channel\.id/);
+  assert.match(chat, /onDataChanged:\s*scheduleRefresh/);
+  assert.match(chat, /const unsubscribe = subscribeToCommunityRealtime/);
+  assert.match(chat, /unsubscribe\(\)/);
+  assert.match(provider, /window\.setInterval\(refreshData, DATA_REFRESH_MS\)/);
+  assert.match(provider, /window\.setInterval\(refreshPins, PIN_REFRESH_MS\)/);
+  assert.match(provider, /window\.clearInterval\(dataTimer\)/);
+  assert.match(provider, /window\.clearInterval\(pinTimer\)/);
+  assert.match(provider, /removeEventListener\("visibilitychange", onVisibility\)/);
+  assert.doesNotMatch(chat, /supabase\.removeChannel|\.channel\(`community:/);
 });
 
 test("mobile Community chat owns the dynamic viewport and contains scrolling without horizontal overflow", () => {
