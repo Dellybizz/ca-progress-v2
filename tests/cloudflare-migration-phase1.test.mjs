@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -8,15 +8,15 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 const audit = read("docs/cloudflare-migration/PHASE_1_AUDIT_AND_FREEZE.md");
 const contract = read("lib/data/migration-contract.ts");
 
-test("Cloudflare migration Phase 1 keeps Supabase active and does not activate D1", () => {
-  assert.match(contract, /activePersistence: "supabase"/);
+test("Cloudflare migration Phase 1 freeze records Supabase active and D1 not activated at the Phase 1 baseline", () => {
+  assert.match(audit, /Production persistence:\s*Supabase/);
+  assert.match(audit, /Production authentication:\s*Supabase Auth/);
+  assert.match(audit, /Target persistence:\s*Cloudflare D1/);
+  assert.match(audit, /### Not activated in Phase 1/);
+  assert.match(audit, /No D1 database binding/);
+  assert.match(audit, /No D1 migrations/);
   assert.match(contract, /targetPersistence: "cloudflare-d1"/);
-  assert.match(contract, /productionDataMigrated: false/);
-  assert.match(contract, /authenticationReplaced: false/);
-  assert.match(contract, /d1ProductionActivated: false/);
   assert.match(contract, /mentorPhase3Started: false/);
-  assert.equal(existsSync(join(root, "d1", "migrations")), false);
-  assert.doesNotMatch(read("wrangler.web.jsonc"), /"d1_databases"/);
 });
 
 test("Phase 1 inventory names every Supabase migration present at the freeze point", () => {
@@ -50,8 +50,8 @@ test("authorization matrix includes users, privileged roles, subscriptions and s
   }
 });
 
-test("current Cloudflare bindings are documented without inventing optional infrastructure", () => {
-  for (const binding of ["USER_RESOURCES_R2", "ICAI_SYNC_SERVICE", "BILLING_SERVICE", "30 0 * * *", "phase_2_not_activated", "optional_transition_only_not_final_data_layer"]) {
+test("current Cloudflare bindings remain documented through the rollback-safe Phase 4 contract", () => {
+  for (const binding of ["USER_RESOURCES_R2", "ICAI_SYNC_SERVICE", "BILLING_SERVICE", "30 0 * * *", "phase_4_shadow_migration_not_production_cutover", "phase_3_ready_not_production_activated", "optional_transition_only_not_final_data_layer"]) {
     assert.ok(contract.includes(binding), `runtime contract missing: ${binding}`);
   }
 });
