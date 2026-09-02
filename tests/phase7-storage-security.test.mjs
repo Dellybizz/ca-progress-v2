@@ -23,7 +23,7 @@ test("Phase 7 files use a private Cloudflare R2 Worker binding", () => {
   assert.doesNotMatch(access, /getPublicUrl|createSignedUrl/);
 });
 
-test("Phase 7 resource metadata mutations stay server-service-role-only after Phase 11 quota integration", () => {
+test("Phase 7 resource metadata stays server-only with D1 quota enforcement and rollback SQL hardening", () => {
   const rpcMigration = read("supabase/migrations/20260830153000_phase7_cloudflare_r2_resource_storage.sql");
   const hardening = read("supabase/migrations/20260830154500_phase7_r2_rpc_privilege_hardening.sql");
   const upload = read("app/api/resources/upload/route.ts");
@@ -37,8 +37,9 @@ test("Phase 7 resource metadata mutations stay server-service-role-only after Ph
   assert.match(hardening, /metadata_mutations\":\"server_service_role_only/);
   assert.match(upload, /createResourceMetadataWithinQuota/);
   assert.match(billingService, /import "server-only"/);
-  assert.match(billingService, /getSupabaseAdminRuntimeConfig\(\)/);
-  assert.match(billingService, /rpc\/phase11_create_uploaded_resource/);
+  assert.match(billingService, /createD1AdminCompatClient/);
+  assert.match(billingService, /client\.from\("uploaded_resources"\)/);
+  assert.doesNotMatch(billingService, /getSupabaseAdminRuntimeConfig|rpc\/phase11_create_uploaded_resource/);
   assert.match(quotaMigration, /revoke all on function public\.phase11_create_uploaded_resource[\s\S]*from public,anon,authenticated/);
   assert.match(quotaMigration, /grant execute on function public\.phase11_create_uploaded_resource[\s\S]*to service_role/);
   assert.match(resourceRoute, /createAdminSupabaseClient\(\)/);
