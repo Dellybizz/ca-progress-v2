@@ -19,19 +19,35 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - id: tests
-        name: Run repository tests individually
+        name: Run known failing tests with assertion output
         shell: bash
         run: |
           set +e
           failed=""
-          for file in tests/*.test.mjs; do
-            if ! node --test "$file" >/tmp/repo-test-output.txt 2>&1; then
+          for file in \
+            tests/cloudflare-migration-phase1.test.mjs \
+            tests/dashboard-minimal-navigation.test.mjs \
+            tests/dashboard-visual-qa.test.mjs \
+            tests/phase2-onboarding.test.mjs \
+            tests/phase3-academic.test.mjs \
+            tests/phase4-dashboard.test.mjs \
+            tests/phase5-dashboard.test.mjs \
+            tests/phase6-dashboard-analytics.test.mjs \
+            tests/phase6-routes-responsive.test.mjs \
+            tests/phase8-engine.test.mjs \
+            tests/phase9-planner-engine.test.mjs \
+            tests/phase9-routes-responsive.test.mjs; do
+            echo "===== $file ====="
+            node --test "$file"
+            status=$?
+            if [ "$status" -ne 0 ]; then
               name="$(basename "$file")"
               if [ -n "$failed" ]; then failed="$failed,$name"; else failed="$name"; fi
             fi
           done
           if [ -z "$failed" ]; then failed="none"; fi
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
+          exit 0
 
   result:
     needs: scan
