@@ -2,7 +2,7 @@ import "server-only";
 
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { getPlannerDashboardSummary } from "@/lib/planner/dashboard";
-import { getProgressPageModel } from "@/lib/progress/service";
+import { getProgressDashboardSummary } from "@/lib/progress/service";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { getStudyAnalytics } from "@/lib/study/service";
 import { getDashboardAcademicReference, getDashboardLiveReference } from "./reference";
@@ -59,14 +59,14 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
   }
 
   const today = dateKey(now);
-  const [academic, progressModel, studyAnalytics, planner] = await Promise.all([
-    getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key),
-    getProgressPageModel(),
+  const academic = await getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key);
+  if (!academic) return setupRequired(identity, displayName, generatedAt);
+
+  const [progressModel, studyAnalytics, planner] = await Promise.all([
+    getProgressDashboardSummary(identity.id, academic.subjects),
     getStudyAnalytics(identity.id, { now, timezone: profile.timezone }),
     getPlannerDashboardSummary(identity.id, profile.timezone, now),
   ]);
-
-  if (!academic || progressModel.mode !== "ready") return setupRequired(identity, displayName, generatedAt);
 
   const live = await getDashboardLiveReference({
     levelId: academic.level.id,
@@ -99,8 +99,8 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
         sourceKind: upcomingExam ? "exam_event" : "attempt",
       };
 
-  const progressGroup = new Map(progressModel.analytics.groups.map((group) => [group.code, group]));
-  const progressSubject = new Map(progressModel.analytics.subjects.map((subject) => [subject.id, subject]));
+  const progressGroup = new Map(progressModel.groups.map((group) => [group.code, group]));
+  const progressSubject = new Map(progressModel.subjects.map((subject) => [subject.id, subject]));
   const groups = academic.groups.map((group) => {
     const subjects = academic.subjects.filter((subject) => subject.groupCode === group.code);
     return {
@@ -137,7 +137,7 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
     },
     progress: {
       status: "tracked",
-      overallPercent: progressModel.analytics.overallPercent,
+      overallPercent: progressModel.overallPercent,
       groups,
       subjects: academic.subjects.map((subject) => ({
         ...subject,
@@ -158,13 +158,13 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
       {
         kind: "revision",
         title: "Revision progress",
-        description: `${progressModel.analytics.revision1Count} first revisions and ${progressModel.analytics.revision2Count} second revisions completed. ${planner.revisionTaskCount} revision task${planner.revisionTaskCount === 1 ? " is" : "s are"} planned for today.`,
+        description: `${progressModel.revision1Count} first revisions and ${progressModel.revision2Count} second revisions completed. ${planner.revisionTaskCount} revision task${planner.revisionTaskCount === 1 ? " is" : "s are"} planned for today.`,
         phase: 9,
       },
       {
         kind: "test",
         title: "Test progress",
-        description: `${progressModel.analytics.test1Count} Test 1 and ${progressModel.analytics.test2Count} Test 2 stages completed. ${planner.testTaskCount} test task${planner.testTaskCount === 1 ? " is" : "s are"} planned for today.`,
+        description: `${progressModel.test1Count} Test 1 and ${progressModel.test2Count} Test 2 stages completed. ${planner.testTaskCount} test task${planner.testTaskCount === 1 ? " is" : "s are"} planned for today.`,
         phase: 6,
       },
       {
