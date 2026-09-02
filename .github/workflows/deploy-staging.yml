@@ -127,21 +127,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          put_secret() {
-            local name="$1"
-            local value="$2"
-            printf '%s' "$value" | npx wrangler secret put "$name" --config wrangler.web.jsonc
-          }
-          put_secret CA_AUTH_SESSION_SECRET "$CA_AUTH_SESSION_SECRET"
-          put_secret GOOGLE_OAUTH_CLIENT_ID "$GOOGLE_OAUTH_CLIENT_ID"
-          put_secret GOOGLE_OAUTH_CLIENT_SECRET "$GOOGLE_OAUTH_CLIENT_SECRET"
-          put_secret LINKEDIN_OIDC_CLIENT_ID "$LINKEDIN_OIDC_CLIENT_ID"
-          put_secret LINKEDIN_OIDC_CLIENT_SECRET "$LINKEDIN_OIDC_CLIENT_SECRET"
+          npx wrangler secret bulk /tmp/ca-web-secrets.json --config wrangler.web.jsonc
           npx wrangler secret list --config wrangler.web.jsonc > phase5-cutover/web-secrets-staged.json
           for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET; do
             grep -q "\"name\": \"$name\"" phase5-cutover/web-secrets-staged.json || { echo "::error::$name was not installed on web Worker"; exit 1; }
           done
-
       - name: Deploy Cloudflare-auth and D1 web runtime
         run: npm run cf:deploy:web
 
