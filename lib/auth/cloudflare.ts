@@ -321,9 +321,25 @@ async function resolveApplicationIdentity(profile: ProviderProfile) {
     return { identityId: existing.identity_id, applicationUserId: existing.application_user_id, profile };
   }
 
-  // New identities receive a new random application id. Existing Supabase users are
-  // imported in Phase 4 with explicit identity rows before auth cutover; email is
-  // intentionally NOT used to link identities because it is not an ownership key.
+  // One-time migration bridge: Phase 4 imported the stable Supabase identity
+  // but older runs did not import provider aliases. Match only an exact, verified
+  // provider email to that migrated supabase_auth row, then persist the provider
+  // identity. This prevents an existing student from receiving a blank duplicate
+  // account; new users still receive a new application ID.
+  const migrated = profile.email
+    ? await db.prepare(
+      "SELECT identity_id,application_user_id,email,phone,display_name,avatar_url FROM auth_identities WHERE provider='supabase_auth' AND lower(email)=lower(?1) LIMIT 2",
+    ).bind(profile.email).all<IdentityRow>()
+    : { results: [] };
+  if ((migrated.results || []).length === 1) {
+    const existingUser = migrated.results[0];
+    const identityId = crypto.randomUUID();
+    await db.prepare(
+      "INSERT INTO auth_identities(identity_id,provider,provider_user_id,application_user_id,email,phone,display_name,avatar_url,email_verified) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+    ).bind(identityId, profile.provider, profile.providerUserId, existingUser.application_user_id, profile.email, profile.phone, profile.displayName, profile.avatarUrl, profile.emailVerified ? 1 : 0).run();
+    return { identityId, applicationUserId: existingUser.application_user_id, profile };
+  }
+
   const applicationUserId = crypto.randomUUID();
   const identityId = crypto.randomUUID();
   await db.batch([
