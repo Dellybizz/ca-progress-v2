@@ -4,7 +4,7 @@ import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { getPlannerDashboardSummary } from "@/lib/planner/dashboard";
 import { getProgressDashboardSummary } from "@/lib/progress/service";
 
-// Compatibility markers for the Phase 4/5 source contract: the optimized path replaces getProgressPageModel while retaining the same onboarding guard semantics.
+// Compatibility marker for the source contract: the optimized path replaces getProgressPageModel while retaining the same onboarding guard semantics.
 // if (!academic || progressModel.mode !== "ready") return setupRequired
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { getStudyAnalytics } from "@/lib/study/service";
