@@ -1,7 +1,7 @@
 export type DashboardActionKey = "start_study" | "add_task" | "add_note" | "open_progress";
 export type DashboardAnalyticsEventType = "dashboard_view" | "quick_action";
 export type DashboardQuickAction = { key: DashboardActionKey; label: string; description: string; href: string };
-export type DashboardAcademicSubject = { id: string; title: string; slug: string; groupCode: string; groupName: string; chapterCount: number };
+export type DashboardAcademicSubject = { id: string; title: string; slug: string; groupCode: string; groupName: string; chapterCount: number; chapterIds: string[] };
 export type DashboardAcademicReference = { level: { id: string; code: string; name: string }; groups: Array<{ id: string; code: string; name: string }>; subjects: DashboardAcademicSubject[]; totalChapters: number };
 export type DashboardAttemptReference = { id: string; key: string; label: string; startDate: string | null; endDate: string | null; sourceUrl: string; lastVerifiedAt: string };
 export type DashboardExamEvent = { id: string; title: string; eventType: string; eventDate: string; sourceUrl: string; lastVerifiedAt: string };
