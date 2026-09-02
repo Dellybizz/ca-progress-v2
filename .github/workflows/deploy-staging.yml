@@ -103,7 +103,14 @@ jobs:
           NODE
 
       - name: Deploy private ICAI service
-        run: npm run cf:deploy:icai
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f workers/icai-sync/wrangler.jsonc
+          test -f workers/icai-sync/index.ts
+          npx wrangler deploy \
+            --config=workers/icai-sync/wrangler.jsonc \
+            --name=ca-progress-v2-icai-sync
 
       - name: Deploy private Billing service with Razorpay secrets
         shell: bash
