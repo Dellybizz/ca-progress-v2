@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           mkdir -p phase5-cutover
           npx wrangler deployments list --name ca-progress-v2 --json > phase5-cutover/web-deployments-before.json
-          npx wrangler secret list --name ca-progress-v2 > phase5-cutover/web-secrets-before.json
+          npx wrangler secret list --config wrangler.web.jsonc > phase5-cutover/web-secrets-before.json
           npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > phase5-cutover/d1-before.txt
 
       - name: Prepare ephemeral Worker secret files
@@ -110,7 +110,7 @@ jobs:
         run: |
           set -euo pipefail
           npx wrangler deploy -c workers/billing/wrangler.jsonc --secrets-file /tmp/ca-billing-secrets.json
-          npx wrangler secret list --name ca-progress-v2-billing > phase5-cutover/billing-secrets-after.json
+          npx wrangler secret list --config wrangler.web.jsonc-billing > phase5-cutover/billing-secrets-after.json
           for name in RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET; do
             grep -q "\"name\": \"$name\"" phase5-cutover/billing-secrets-after.json || { echo "::error::$name was not installed on Billing Worker"; exit 1; }
           done
@@ -122,14 +122,14 @@ jobs:
           put_secret() {
             local name="$1"
             local value="$2"
-            printf '%s' "$value" | npx wrangler secret put "$name" --name ca-progress-v2
+            printf '%s' "$value" | npx wrangler secret put "$name" --config wrangler.web.jsonc
           }
           put_secret CA_AUTH_SESSION_SECRET "$CA_AUTH_SESSION_SECRET"
           put_secret GOOGLE_OAUTH_CLIENT_ID "$GOOGLE_OAUTH_CLIENT_ID"
           put_secret GOOGLE_OAUTH_CLIENT_SECRET "$GOOGLE_OAUTH_CLIENT_SECRET"
           put_secret LINKEDIN_OIDC_CLIENT_ID "$LINKEDIN_OIDC_CLIENT_ID"
           put_secret LINKEDIN_OIDC_CLIENT_SECRET "$LINKEDIN_OIDC_CLIENT_SECRET"
-          npx wrangler secret list --name ca-progress-v2 > phase5-cutover/web-secrets-staged.json
+          npx wrangler secret list --config wrangler.web.jsonc > phase5-cutover/web-secrets-staged.json
           for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET; do
             grep -q "\"name\": \"$name\"" phase5-cutover/web-secrets-staged.json || { echo "::error::$name was not installed on web Worker"; exit 1; }
           done
