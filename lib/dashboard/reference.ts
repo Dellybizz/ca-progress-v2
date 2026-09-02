@@ -58,7 +58,7 @@ async function loadAcademicReference(levelCode: string, groupChoice: string, att
   const versionBySubject = new Map(applicableMaps.map((row) => [row.subject_id, row.syllabus_version_id]));
   const academicSubjects: DashboardAcademicSubject[] = subjects.filter((subject) => allowedGroups.has(subject.group_id) && subjectIds.has(subject.id)).map((subject) => {
     const versionId = versionBySubject.get(subject.id); const group = groupById.get(subject.group_id);
-    return { id: subject.id, title: subject.title, slug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All Papers", chapterCount: versionId ? chapters.filter((chapter) => chapter.syllabus_version_id === versionId).length : 0 };
+    const subjectChapters = versionId ? chapters.filter((chapter) => chapter.syllabus_version_id === versionId) : []; return { id: subject.id, title: subject.title, slug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All Papers", chapterCount: subjectChapters.length, chapterIds: subjectChapters.map((chapter) => chapter.id) };
   });
   return { level: { id: level.id, code: level.code, name: level.name }, groups: groups.filter((group) => aggregateGroups || allowedGroups.has(group.id)).map((group) => ({ id: group.id, code: group.code, name: group.name })), subjects: academicSubjects, totalChapters: academicSubjects.reduce((sum, subject) => sum + subject.chapterCount, 0) };
 }
