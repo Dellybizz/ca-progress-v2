@@ -1,0 +1,41 @@
+name: Repository Test Diagnostic
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    outputs:
+      failed: ${{ steps.tests.outputs.failed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - id: tests
+        name: Run repository tests individually
+        shell: bash
+        run: |
+          set +e
+          failed=""
+          for file in tests/*.test.mjs; do
+            if ! node --test "$file" >/tmp/repo-test-output.txt 2>&1; then
+              name="$(basename "$file")"
+              if [ -n "$failed" ]; then failed="$failed,$name"; else failed="$name"; fi
+            fi
+          done
+          if [ -z "$failed" ]; then failed="none"; fi
+          echo "failed=$failed" >> "$GITHUB_OUTPUT"
+
+  result:
+    needs: scan
+    name: "Failing tests - ${{ needs.scan.outputs.failed }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Repository test diagnostic complete."
