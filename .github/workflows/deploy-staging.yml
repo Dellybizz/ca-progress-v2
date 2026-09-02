@@ -118,18 +118,10 @@ jobs:
           set -euo pipefail
           npx wrangler deploy \
             --config=workers/billing/wrangler.jsonc \
-            --name=ca-progress-v2-billing
-          put_secret() {
-            local name="$1"
-            local value="$2"
-            printf '%s' "$value" | npx wrangler secret put "$name" --config workers/billing/wrangler.jsonc
-          }
-          put_secret RAZORPAY_KEY_ID "$RAZORPAY_KEY_ID"
-          put_secret RAZORPAY_KEY_SECRET "$RAZORPAY_KEY_SECRET"
-          put_secret RAZORPAY_WEBHOOK_SECRET "$RAZORPAY_WEBHOOK_SECRET"
-          npx wrangler secret list --config workers/billing/wrangler.jsonc > phase5-cutover/billing-secrets-after.json
+            --secrets-file /tmp/ca-billing-secrets.json
+          npx wrangler secret list --name ca-progress-v2-billing > phase5-cutover/billing-secrets-after.json
           for name in RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET; do
-            grep -q ""name": "$name"" phase5-cutover/billing-secrets-after.json || { echo "::error::$name was not installed on Billing Worker"; exit 1; }
+            grep -q "\"name\": \"$name\"" phase5-cutover/billing-secrets-after.json || { echo "::error::$name was not installed on Billing Worker"; exit 1; }
           done
       - name: Stage direct OAuth secrets on existing web Worker
         shell: bash
