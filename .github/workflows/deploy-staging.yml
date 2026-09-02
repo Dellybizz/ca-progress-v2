@@ -119,7 +119,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler secret bulk /tmp/ca-web-secrets.json --name ca-progress-v2
+          put_secret() {
+            local name="$1"
+            local value="$2"
+            printf '%s' "$value" | npx wrangler secret put "$name" --name ca-progress-v2
+          }
+          put_secret CA_AUTH_SESSION_SECRET "$CA_AUTH_SESSION_SECRET"
+          put_secret GOOGLE_OAUTH_CLIENT_ID "$GOOGLE_OAUTH_CLIENT_ID"
+          put_secret GOOGLE_OAUTH_CLIENT_SECRET "$GOOGLE_OAUTH_CLIENT_SECRET"
+          put_secret LINKEDIN_OIDC_CLIENT_ID "$LINKEDIN_OIDC_CLIENT_ID"
+          put_secret LINKEDIN_OIDC_CLIENT_SECRET "$LINKEDIN_OIDC_CLIENT_SECRET"
           npx wrangler secret list --name ca-progress-v2 > phase5-cutover/web-secrets-staged.json
           for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET; do
             grep -q "\"name\": \"$name\"" phase5-cutover/web-secrets-staged.json || { echo "::error::$name was not installed on web Worker"; exit 1; }
