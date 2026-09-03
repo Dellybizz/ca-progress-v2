@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
+import Loading from "./loading";
 import { LoginRequired } from "@/components/auth/login-required";
 import { CommunityChat } from "@/components/community/community-chat";
 import { PageHeader } from "@/components/ui/page-header";
@@ -10,6 +12,10 @@ export const metadata: Metadata = { title: "Community Channel | CA Progress" };
 
 export default async function CommunityChannelPage({ params }: { params: Promise<{ channel: string }> }) {
   const { channel } = await params;
+  return <Suspense fallback={<Loading />}><CommunityChannelContent channel={channel} /></Suspense>;
+}
+
+async function CommunityChannelContent({ channel }: { channel: string }) {
   const model = await getCommunityChannelModel(channel);
   if (model.mode === "guest") return <div className="phase10-page"><LoginRequired next={`/community/${encodeURIComponent(channel)}`} title="Sign in to open this Community channel"/></div>;
   if (model.mode === "setup") return <div className="phase10-page"><PageHeader preview={false} eyebrow="Community" title="Complete your academic profile first." description="Your level and group determine access to level and subject channels."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
