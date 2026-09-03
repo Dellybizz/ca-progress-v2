@@ -111,8 +111,10 @@ async function loadActivityRows(userId: string) {
     ]);
     return { sessions: sessions.data ?? [], progress: progress.data ?? [], error: sessions.error || progress.error };
   }
-  const hot = await getHotActivityRows(userId, 40);
-  return { sessions: hot.sessions, progress: hot.progress, error: null };
+  if (isCloudflareDataRuntime()) {
+    const hot = await getHotActivityRows(userId, 40);
+    return { sessions: hot.sessions, progress: hot.progress, error: null };
+  }
   const db = getD1RuntimeDatabase();
   const [sessions, progress] = await Promise.all([
     db.prepare("SELECT id,subject_id,chapter_id,ended_at,duration_seconds FROM study_sessions WHERE user_id=?1 ORDER BY ended_at DESC LIMIT 40").bind(userId).all<Pick<SessionRow, "id"|"subject_id"|"chapter_id"|"ended_at"|"duration_seconds">>(),
