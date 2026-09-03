@@ -145,6 +145,23 @@ export async function getCommunityChannelAccess(channelSlug: string): Promise<{ 
   return { allowed: true, status: 101, reason: "" };
 }
 
+export async function getCommunityComposerOptions(channelSlug: string) {
+  const context = await baseCommunityContext();
+  if (context.mode !== "ready") throw new Error("Community composer options are unavailable.");
+  const channel = context.channels.find((item) => item.slug === channelSlug);
+  if (!channel) throw new Error("Community channel not found.");
+  const [memberResult, resourceResult] = await Promise.all([
+    context.supabase.rpc("phase10_list_channel_members", { p_channel_key: channel.key, p_limit: 120 }),
+    context.supabase.from("uploaded_resources").select("id,title,extension,owner_label").eq("visibility", "shared").eq("moderation_status", "approved").order("published_at", { ascending: false }).limit(80),
+  ]);
+  const error = memberResult.error || resourceResult.error;
+  if (error) throw new Error(`Community composer data could not be loaded: ${error.message}`);
+  return {
+    members: (memberResult.data ?? []).filter((row) => row.user_id !== context.identity.id).map((row) => ({ userId: row.user_id, label: row.label })),
+    resources: ((resourceResult.data ?? []) as Pick<ResourceRow, "id" | "title" | "extension" | "owner_label">[]).map((row) => ({ id: row.id, title: row.title, extension: row.extension, ownerLabel: row.owner_label })),
+  };
+}
+
 async function mapNotifications(
   rows: NotificationRow[],
   channels: CommunityChannel[],
@@ -307,18 +324,13 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
   const channel = context.channels.find((item) => item.slug === channelSlug);
   if (!channel) return { mode: "denied", viewerName: context.viewerName };
   const page = await getCommunityMessagePage({ channelSlug });
-  const [memberResult, resourceResult, blockResult, pinned] = await Promise.all([
-    context.supabase.rpc("phase10_list_channel_members", { p_channel_key: channel.key, p_limit: 120 }),
-    context.supabase.from("uploaded_resources").select("id,title,extension,owner_label").eq("visibility", "shared").eq("moderation_status", "approved").order("published_at", { ascending: false }).limit(80),
+  const [blockResult, pinned] = await Promise.all([
     context.supabase.from("chat_blocks").select("id,user_id,channel_id,reason,ends_at").eq("user_id", context.identity.id).gt("ends_at", new Date().toISOString()).order("ends_at", { ascending: false }).limit(4),
     pinnedMessage(context.supabase, channel.id, context.identity.id),
   ]);
-  const error = memberResult.error || resourceResult.error || blockResult.error;
-  if (error) throw new Error(`Community composer data could not be loaded: ${error.message}`);
+  if (blockResult.error) throw new Error(`Community access data could not be loaded: ${blockResult.error.message}`);
   const blockRows = (blockResult.data ?? []) as BlockRow[];
   const block = blockRows.find((row) => row.channel_id === null || row.channel_id === channel.id) ?? null;
-  const members: CommunityMemberOption[] = (memberResult.data ?? []).filter((row) => row.user_id !== context.identity.id).map((row) => ({ userId: row.user_id, label: row.label }));
-  const resources: CommunityResourceOption[] = ((resourceResult.data ?? []) as Pick<ResourceRow,"id"|"title"|"extension"|"owner_label">[]).map((row) => ({ id: row.id, title: row.title, extension: row.extension, ownerLabel: row.owner_label }));
   return {
     mode: "ready",
     viewerId: context.identity.id,
