@@ -3,6 +3,7 @@ import "server-only";
 import { optionalUser } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
 import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
+import { getSharedPublicJson } from "@/lib/cache/public";
 
 export type BillingCycle = "free" | "monthly" | "annual";
 export type PlanTier = "free" | "basic" | "pro";
@@ -27,15 +28,29 @@ function asRows<T>(value: unknown): T[] { return Array.isArray(value) ? value as
 function asRow<T extends object>(value: unknown): T | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as T : null; }
 
 export async function listPlans(): Promise<SubscriptionPlan[]> {
-  const result = await db().from("subscription_plans").select("id,tier_key,billing_cycle,name,tagline,rank,price_subunits,currency,duration_value,duration_unit,active,checkout_enabled,sort_order").eq("active", true).order("sort_order");
-  if (result.error) throw new Error(result.error.message);
-  return asRows<SubscriptionPlan>(result.data);
+  return getSharedPublicJson({
+    namespace: "pricing",
+    key: "plans-v1",
+    ttlSeconds: 900,
+    load: async () => {
+      const result = await db().from("subscription_plans").select("id,tier_key,billing_cycle,name,tagline,rank,price_subunits,currency,duration_value,duration_unit,active,checkout_enabled,sort_order").eq("active", true).order("sort_order");
+      if (result.error) throw new Error(result.error.message);
+      return asRows<SubscriptionPlan>(result.data);
+    },
+  });
 }
 
 export async function listPlanEntitlements(): Promise<PlanEntitlement[]> {
-  const result = await db().from("plan_entitlements").select("plan_id,feature_key,enabled,limit_value,limit_unit,reset_period,upgrade_message");
-  if (result.error) throw new Error(result.error.message);
-  return asRows<PlanEntitlement>(result.data);
+  return getSharedPublicJson({
+    namespace: "pricing",
+    key: "entitlements-v1",
+    ttlSeconds: 900,
+    load: async () => {
+      const result = await db().from("plan_entitlements").select("plan_id,feature_key,enabled,limit_value,limit_unit,reset_period,upgrade_message");
+      if (result.error) throw new Error(result.error.message);
+      return asRows<PlanEntitlement>(result.data);
+    },
+  });
 }
 
 async function currentPlanId(userId: string) {
