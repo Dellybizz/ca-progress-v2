@@ -113,13 +113,13 @@ const USER_FEATURE_TTL_SECONDS = 60;
 function userFeatureCacheUrl(userId: string, featureKey: string, version: string) {
   const { appName } = getPublicRuntimeConfig();
   const safeApp = encodeURIComponent(appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
-  return new URL(`https://${safeApp}.private-entitlement.invalid/${encodeURIComponent(userId)}/${encodeURIComponent(version)}/${encodeURIComponent(featureKey)}`).toString();
+  return new URL(`https://${safeApp}.private-user-feature.invalid/${encodeURIComponent(userId)}/${encodeURIComponent(version)}/${encodeURIComponent(featureKey)}`).toString();
 }
 
 function userFeatureVersionUrl(userId: string) {
   const { appName } = getPublicRuntimeConfig();
   const safeApp = encodeURIComponent(appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
-  return new URL(`https://${safeApp}.private-entitlement.invalid/_version/${encodeURIComponent(userId)}`).toString();
+  return new URL(`https://${safeApp}.private-user-feature.invalid/_version/${encodeURIComponent(userId)}`).toString();
 }
 
 export async function getCachedUserFeature<T>(input: { userId: string; featureKey: string; load: () => Promise<T> }): Promise<T> {
