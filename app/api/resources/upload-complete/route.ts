@@ -5,6 +5,7 @@ import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources
 import { getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
+import { normalizeFilename } from "@/lib/resources/validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
       subjectId: typeof metadata.subjectId === "string" ? metadata.subjectId : null,
       chapterId: typeof metadata.chapterId === "string" ? metadata.chapterId : null,
       originalFilename: String(intent.filename),
-      safeFilename: String(intent.filename),
+      safeFilename: normalizeFilename(String(intent.filename)),
       storagePath: String(intent.object_key),
       mimeType: String(intent.mime_type),
       extension: String(intent.filename).split(".").pop()?.toLowerCase() || "bin",
