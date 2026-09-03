@@ -4,6 +4,7 @@ import { createResourceMetadataWithinQuota, getResourceStorageAccess } from "@/l
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { cleanText, nullableId, RESOURCE_MAX_BYTES, validateUploadFile } from "@/lib/resources/validation";
 import { getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
+import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
 
     try {
       const inserted = await createResourceMetadataWithinQuota({ userId: identity.id, title, description, subjectId, chapterId, originalFilename: file.name, safeFilename: validated.safeFilename, storagePath, mimeType: validated.mimeType, extension: validated.extension, sizeBytes: validated.sizeBytes, visibility });
-      return NextResponse.json({ id: inserted.id, status: inserted.moderationStatus, storage: RESOURCE_R2_STORAGE_BUCKET, allowance: { usedBytes: inserted.usedBytes, limitBytes: inserted.limitBytes, plan: access.tier } }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
+      void enqueueBackgroundJob({ type: "attachment-process", idempotencyKey: jobKey("attachment-process", identity.id, inserted.id), payload: { resourceId: inserted.id, userId: identity.id }, createdBy: identity.id }).catch((error) => console.error("phase12.attachment_job.enqueue_failed", error instanceof Error ? error.message : "unknown"));
+      return NextResponse.json({ id: inserted.id, status: inserted.moderationStatus, storage: RESOURCE_R2_STORAGE_BUCKET, processing: "queued", allowance: { usedBytes: inserted.usedBytes, limitBytes: inserted.limitBytes, plan: access.tier } }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
     } catch (error) {
       await bucket.delete(storagePath).catch(() => undefined);
       const message = error instanceof Error ? error.message : "Resource metadata could not be created.";
