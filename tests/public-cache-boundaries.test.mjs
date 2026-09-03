@@ -20,7 +20,7 @@ test("public catalog loaders use separate versioned cache namespaces", () => {
   assert.match(read("lib/academic/query.ts"), /namespace: "academic"/);
   assert.match(read("lib/billing/service.ts"), /namespace: "pricing"/);
   assert.match(read("lib/icai/query.ts"), /namespace: "icai"/);
-  assert.match(read("lib/icai/query.ts"), /catalog-v1/);
+  assert.match(read("lib/icai/query.ts"), /catalog-v1/);\n  assert.doesNotMatch(read("lib/academic/query.ts"), /userId|session|progress/);\n  assert.doesNotMatch(read("lib/icai/query.ts"), /userId|session|progress/);
 });
 
 test("private data paths remain outside shared cache", () => {
