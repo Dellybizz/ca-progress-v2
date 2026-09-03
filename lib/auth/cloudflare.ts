@@ -419,6 +419,9 @@ async function ensureGuestTestUser(applicationUserId: string) {
   const database = getDb();
   const existing = await database.prepare("SELECT auth_provider FROM app_users WHERE user_id=?1 LIMIT 1").bind(applicationUserId).first<{ auth_provider: string }>();
   if (existing && existing.auth_provider !== "guest-test") return false;
+  // The proxy-issued guest ID is stable per browser. Once bootstrapped, do not
+  // repeat the attempt lookup and INSERT OR IGNORE batch on every page request.
+  if (existing?.auth_provider === "guest-test") return true;
   const attempt = await database.prepare(
     "SELECT attempt_key FROM exam_attempts WHERE verification_status='verified' ORDER BY start_date DESC LIMIT 1",
   ).first<{ attempt_key: string }>();
