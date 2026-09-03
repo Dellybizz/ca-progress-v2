@@ -124,13 +124,13 @@ export async function getActivityPageModel(): Promise<ActivityPageModel> {
   const { sessions, progress, error } = await loadActivityRows(identity.id);
   if (error) throw new Error(`Activity could not be loaded: ${error.message}`);
   const items: ActivityItem[] = [];
-  for (const row of (sessions.data ?? []) as SessionRow[]) {
+  for (const row of (sessions ?? []) as SessionRow[]) {
     const subject = row.subject_id ? names.subjects.get(row.subject_id) : null;
     const chapter = row.chapter_id ? names.chapters.get(row.chapter_id) : null;
     items.push({ id: `study:${row.id}`, source: "study", occurredAt: row.ended_at, title: `Studied ${Math.max(1, Math.round(row.duration_seconds / 60))} min`, description: chapter ?? subject ?? "General study session", href: "/study" });
   }
   const stageLabel: Record<string, string> = { completed: "Completed", revision_1: "Revision 1", revision_2: "Revision 2", test_1: "Test 1", test_2: "Test 2" };
-  for (const row of (progress.data ?? []) as ProgressEventRow[]) items.push({ id: `progress:${row.id}`, source: "progress", occurredAt: row.created_at, title: `${row.action === "clear" ? "Cleared" : row.action === "undo" ? "Undid" : "Saved"} ${stageLabel[row.stage] ?? row.stage}`, description: names.chapters.get(row.chapter_id) ?? "Chapter progress", href: "/progress" });
+  for (const row of (progress ?? []) as ProgressEventRow[]) items.push({ id: `progress:${row.id}`, source: "progress", occurredAt: row.created_at, title: `${row.action === "clear" ? "Cleared" : row.action === "undo" ? "Undid" : "Saved"} ${stageLabel[row.stage] ?? row.stage}`, description: names.chapters.get(row.chapter_id) ?? "Chapter progress", href: "/progress" });
   items.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   return { mode: "ready", viewerName: name, items: items.slice(0, 60) };
 }
