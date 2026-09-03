@@ -1,5 +1,7 @@
 import "server-only";
 
+import { unstable_cache } from "next/cache";
+
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import {
@@ -49,6 +51,8 @@ async function loadRawAcademic(): Promise<RawAcademic> {
   return { levels: levels.data ?? [], groups: groups.data ?? [], subjects: subjects.data ?? [], versions: versions.data ?? [], chapters: chapters.data ?? [], topics: topics.data ?? [], attemptMap: attemptMap.data ?? [] };
 }
 
+const getCachedRawAcademic = unstable_cache(loadRawAcademic, ["phase3-academic-raw-v1"], { revalidate: 3600 });
+
 function versionForSubject(raw: RawAcademic, subjectId: string, attempt?: string | null) {
   if (attempt) {
     const mapped = raw.attemptMap.find((item) => item.attempt_key === attempt && item.subject_id === subjectId);
@@ -88,7 +92,7 @@ function allowedGroupIds(groups: GroupRow[], selectedGroup: string) {
 }
 
 export async function getAcademicCatalog(selection: AcademicSelection = {}): Promise<AcademicCatalog> {
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const normalized = normalizeSelection(raw, selection);
   const groups = normalized.groupsForLevel.map((group) => ({ id: group.id, code: group.code, name: group.name, sortOrder: group.sort_order, isDefault: group.is_default }));
   const groupIds = allowedGroupIds(normalized.groupsForLevel, normalized.selectedGroup);
@@ -109,7 +113,7 @@ export async function getAcademicCatalog(selection: AcademicSelection = {}): Pro
 }
 
 export async function getSubjectBySlug(slug: string, attempt?: string | null): Promise<AcademicSubject | null> {
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const subject = raw.subjects.find((item) => item.slug === slug);
   if (!subject) return null;
   const version = versionForSubject(raw, subject.id, attempt);
@@ -119,7 +123,7 @@ export async function getSubjectBySlug(slug: string, attempt?: string | null): P
 export async function searchAcademicCatalog(query: string, selection: AcademicSelection = {}, limit = 24): Promise<AcademicSearchResult[]> {
   const q = query.trim().toLocaleLowerCase();
   if (q.length < 2) return [];
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const normalized = normalizeSelection(raw, selection);
   const allowedGroups = allowedGroupIds(normalized.groupsForLevel, normalized.selectedGroup);
   const levelById = new Map(raw.levels.map((level) => [level.id, level]));
@@ -148,7 +152,7 @@ export async function searchAcademicCatalog(query: string, selection: AcademicSe
 }
 
 export async function getAcademicVersionPreview(): Promise<AcademicVersionPreview[]> {
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const subjectById = new Map(raw.subjects.map((subject) => [subject.id, subject]));
   const levelById = new Map(raw.levels.map((level) => [level.id, level]));
   const groupById = new Map(raw.groups.map((group) => [group.id, group]));
