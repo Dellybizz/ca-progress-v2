@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { invalidateUserEntitlementCache } from "@/lib/cache/public";
+import { invalidateUserFeatureCache } from "@/lib/cache/public";
 
 type BillingService = { fetch(request: Request): Promise<Response> };
 type BillingInvoke = { path: "/create-order" | "/verify" | "/webhook" | "/entitlement" | "/health"; method?: "GET" | "POST"; userId?: string | null; query?: string; body?: string; contentType?: string; razorpaySignature?: string | null; razorpayEventId?: string | null };
