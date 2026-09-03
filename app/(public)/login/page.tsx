@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import { LoginPanel } from "@/components/auth/login-panel";
-import { optionalUser, resolvePostAuthDestination } from "@/lib/auth/server";
 import { sanitizeReturnPath } from "@/lib/auth/navigation";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +13,6 @@ const errors: Record<string, string> = {
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const next = sanitizeReturnPath(typeof params.next === "string" ? params.next : null);
-  const user = await optionalUser();
-  if (user) redirect(await resolvePostAuthDestination(next));
   const errorKey = typeof params.error === "string" ? params.error : "";
   return <LoginPanel next={next} initialError={errors[errorKey] ?? null}/>;
 }
