@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { Drawer, Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { Viewer } from "@/lib/auth/server";
+
+type Viewer = { authenticated: boolean; label: string; initial: string };
 
 const guestViewer: Viewer = { authenticated: false, label: "Guest", initial: "G" };
 
@@ -39,7 +40,11 @@ export function TopbarControls({ viewer: initialViewer = guestViewer }: { viewer
     void fetch("/api/auth/viewer", { cache: "no-store" })
       .then((response) => response.ok ? response.json() as Promise<Viewer> : null)
       .then((nextViewer) => {
-        if (!cancelled && nextViewer) setViewer(nextViewer);
+        if (!cancelled && nextViewer) {
+          // The account controls hydrate after the persistent shell paints.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setViewer(nextViewer);
+        }
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
@@ -52,16 +57,12 @@ export function TopbarControls({ viewer: initialViewer = guestViewer }: { viewer
           <Icon name="search" size={18}/><span>Search</span><kbd>⌘ K</kbd>
         </button>
         <button className="ui-icon-button notification-button" onClick={() => setNotificationsOpen(true)} aria-label="Open notifications">
-          <Icon name="bell" size={19}/><i aria-hidden="true"/>
-        </button>
+          <Icon name="bell" size={19}/><i aria-hidden="true"/></button>
         {viewer.authenticated ? (
           <details className="profile-menu">
             <summary className="profile-avatar" aria-label="Open account menu">{viewer.initial}</summary>
             <div className="profile-menu__panel" role="menu">
-              <div className="profile-menu__identity">
-                <strong>{viewer.label}</strong>
-                <span>Account</span>
-              </div>
+              <div className="profile-menu__identity"><strong>{viewer.label}</strong><span>Account</span></div>
               <div className="profile-menu__links">
                 {accountLinks.map(([label, href]) => (
                   <Link prefetch={true} key={href} href={href} role="menuitem"><span>{label}</span><Icon name="chevron" size={14}/></Link>
