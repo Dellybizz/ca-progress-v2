@@ -16,7 +16,12 @@ function formatAttempt(value: string) {
 
 export function StudyPage({ model }: { model: StudyPageModel }) {
   if (model.mode === "guest") {
-    return <div className="phase6-page study-page"><LoginRequired next="/study" title="Sign in to start and save study sessions"/></div>;
+    return (
+      <div className="phase6-page study-page">
+        <PageHeader preview={false} eyebrow="Study" title="Focus without losing your rhythm." description="Explore Study mode as a guest. Sign in when you want to start a timer and save sessions to your account." />
+        <LoginRequired next="/study" title="Sign in to start and save study sessions"/>
+      </div>
+    );
   }
 
   if (model.mode === "setup") {
