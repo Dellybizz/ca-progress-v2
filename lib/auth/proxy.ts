@@ -23,5 +23,12 @@ function rejectCrossSiteUnsafeRequest(request: NextRequest) {
  * rollback path while Supabase is retained during verification.
  */
 export async function updateAuthSession(request: NextRequest) {
-  return rejectCrossSiteUnsafeRequest(request) ?? NextResponse.next({ request });
+  const unsafeResponse = rejectCrossSiteUnsafeRequest(request);
+  if (unsafeResponse) return unsafeResponse;
+  const response = NextResponse.next({ request });
+  // Temporary staging-only test mode: assign each browser its own isolated server identity.
+  if (process.env.CA_GUEST_TEST_MODE?.trim().toLowerCase() === "true" && !request.cookies.get("ca_guest_test_id")?.value) {
+    response.cookies.set("ca_guest_test_id", crypto.randomUUID(), { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 30 * 24 * 60 * 60 });
+  }
+  return response;
 }
