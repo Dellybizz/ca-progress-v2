@@ -1,7 +1,7 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isCloudflareAuthRuntime } from "@/lib/auth/provider";
-import { optionalUser, type ServerIdentity } from "@/lib/auth/server";
+import { getRequestAuthContext, optionalUser, type ServerIdentity } from "@/lib/auth/server";
 import { canEnterAdminArea, type AppRole } from "./roles";
 
 const VALID_ROLES = new Set<AppRole>(["student", "moderator", "admin", "owner", "parent_owner"]);
@@ -15,8 +15,8 @@ function roleFromClaims(claims: Record<string, unknown> | undefined): AppRole {
 
 export async function getServerAppRole(): Promise<AppRole> {
   if (isCloudflareAuthRuntime()) {
-    const user = await optionalUser();
-    return user?.role && VALID_ROLES.has(user.role) ? user.role : "student";
+    const auth = await getRequestAuthContext();
+    return VALID_ROLES.has(auth.role) ? auth.role : "student";
   }
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.getClaims();
@@ -27,7 +27,7 @@ export async function getServerAppRole(): Promise<AppRole> {
 export async function getAdminOperator(): Promise<{ allowed: boolean; user: ServerIdentity | null; role: AppRole }> {
   const user = await optionalUser();
   if (!user) return { allowed: false, user: null, role: "student" };
-  const role = isCloudflareAuthRuntime() && user.role ? user.role : await getServerAppRole();
+  const role = isCloudflareAuthRuntime() ? (await getRequestAuthContext()).role : await getServerAppRole();
   return { allowed: canEnterAdminArea(role), user, role };
 }
 
