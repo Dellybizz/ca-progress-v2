@@ -384,14 +384,14 @@ async function communityRpc(db: D1DatabaseLike, userId: string, role: AppRole, n
         (SELECT m.author_label FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_author,
         (SELECT m.created_at FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_at,
         MAX(0, COALESCE((SELECT m.sequence_id FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1), 0) -
-          COALESCE((SELECT r.last_read_sequence FROM channel_read_state r WHERE r.channel_id=c.id AND r.user_id=?\${visibilityValues.length + 1}), 0)) AS unread_count,
-        CASE WHEN \${visibleSql}
-          AND NOT EXISTS (SELECT 1 FROM chat_blocks b WHERE b.user_id=?\${visibilityValues.length + 2} AND b.ends_at>?\${visibilityValues.length + 3} AND (b.channel_id IS NULL OR b.channel_id=c.id))
+          COALESCE((SELECT r.last_read_sequence FROM channel_read_state r WHERE r.channel_id=c.id AND r.user_id=?${visibilityValues.length + 1}), 0)) AS unread_count,
+        CASE WHEN ${visibleSql}
+          AND NOT EXISTS (SELECT 1 FROM chat_blocks b WHERE b.user_id=?${visibilityValues.length + 2} AND b.ends_at>?${visibilityValues.length + 3} AND (b.channel_id IS NULL OR b.channel_id=c.id))
           AND ((c.write_policy NOT IN ('moderators','read_only') AND c.channel_kind<>'announcement')
-            OR (?\${visibilityValues.length + 4}=1 AND (c.write_policy='moderators' OR c.channel_kind='announcement')))
+            OR (?${visibilityValues.length + 4}=1 AND (c.write_policy='moderators' OR c.channel_kind='announcement')))
           THEN 1 ELSE 0 END AS can_write
       FROM community_channels c
-      WHERE c.is_active=1 AND \${visibleSql}
+      WHERE c.is_active=1 AND ${visibleSql}
       ORDER BY c.sort_order,c.title
     `).bind(...visibilityValues, userId, userId, nowIso(), privilegedFlag).all<Record<string, unknown>>()).results ?? [];
     return rows.map((row) => decodeRow(row));
