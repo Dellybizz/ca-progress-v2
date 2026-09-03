@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { getServerAppRole } from "@/lib/authorization/server";
 import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
@@ -119,7 +119,7 @@ async function publicCommunityContext() {
 }
 
 async function baseCommunityContext() {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return publicCommunityContext();
   const profile = await getProfileForUser(identity.id);
   const viewerName = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
@@ -233,7 +233,7 @@ async function hydrateMessages(
 }
 
 export async function getCommunityMessagePage(options: { channelSlug: string; cursor?: string | null; query?: string | null }): Promise<CommunityMessagePage> {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   const supabase = identity ? await createServerSupabaseClient() : createAdminSupabaseClient();
   const channel = await supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("slug", options.channelSlug).eq("is_active", true).maybeSingle();
   if (!identity && channel.data?.scope_type !== "global") throw new Error("Sign in to view this channel.");
@@ -328,7 +328,7 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
 }
 
 export async function createCommunityMessage(input: { channelSlug: string; body: string; replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[] }) {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to send a message.");
   const supabase = await createServerSupabaseClient();
   const channel = await supabase.from("community_channels").select("channel_key").eq("slug", input.channelSlug).eq("is_active", true).maybeSingle();
@@ -345,7 +345,7 @@ export async function createCommunityMessage(input: { channelSlug: string; body:
 }
 
 export async function markCommunityRead(channelSlug: string, sequence?: number | null) {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to update read state.");
   const supabase = await createServerSupabaseClient();
   const channel = await supabase.from("community_channels").select("channel_key").eq("slug", channelSlug).eq("is_active", true).maybeSingle();
@@ -356,7 +356,7 @@ export async function markCommunityRead(channelSlug: string, sequence?: number |
 }
 
 export async function toggleCommunityReaction(messageId: string, emoji: string) {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to react.");
   const supabase = await createServerSupabaseClient();
   const result = await supabase.rpc("phase10_toggle_reaction", { p_message_id: messageId, p_emoji: emoji });
@@ -365,7 +365,7 @@ export async function toggleCommunityReaction(messageId: string, emoji: string) 
 }
 
 export async function reportCommunityMessage(messageId: string, reason: string, details?: string | null) {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to report a message.");
   const supabase = await createServerSupabaseClient();
   const result = await supabase.rpc("phase10_report_message", { p_message_id: messageId, p_reason: reason, p_details: details ?? null });
@@ -374,7 +374,7 @@ export async function reportCommunityMessage(messageId: string, reason: string, 
 }
 
 export async function moderateCommunity(input: { action: string; messageId?: string | null; reportId?: string | null; targetUserId?: string | null; channelId?: string | null; reason?: string | null; durationMinutes?: number | null }) {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Moderator authentication required.");
   const role = await getServerAppRole();
   if (!isPrivilegedRole(role)) throw new Error("Moderator access required.");
@@ -411,7 +411,7 @@ function moderationMessage(row: MessageRow, channelTitle: string, attachment: Re
 }
 
 export async function getCommunityModerationModel(): Promise<CommunityModerationModel> {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return { mode: "denied" };
   const role = await getServerAppRole();
   if (!isPrivilegedRole(role)) return { mode: "denied" };
