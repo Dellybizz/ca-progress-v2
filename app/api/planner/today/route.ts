@@ -3,6 +3,7 @@ import { optionalUser } from "@/lib/auth/server";
 import { getEntitlementForUser } from "@/lib/billing/service";
 import { performTodayPlanInteraction } from "@/lib/smart-planner/today-interactions";
 import type { TodayPlanInteractionAction } from "@/lib/smart-planner/types";
+import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   if (!validAction(body)) return NextResponse.json({ error: "Invalid Today Plan action." }, { status: 400 });
   try {
+    if (body.action === "refresh") {
+      const planDate = new Date().toISOString().slice(0, 10);
+      const job = await enqueueBackgroundJob({ type: "ai-plan-generation", idempotencyKey: jobKey("ai-plan-generation", identity.id, planDate), payload: { userId: identity.id, planDate }, createdBy: identity.id });
+      return NextResponse.json({ ok: true, queued: true, jobId: job.id, message: "Your plan refresh was queued. The latest saved plan remains available while it runs." }, { headers: { "Cache-Control": "private, no-store" } });
+    }
     const result = await performTodayPlanInteraction(body);
     return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
