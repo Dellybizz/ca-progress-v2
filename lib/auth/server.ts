@@ -102,8 +102,8 @@ export async function ensureUserBootstrap() {
   if (isCloudflareAuthRuntime()) {
     await ensureCloudflareUserBootstrap({
       applicationUserId: identity.id,
-      displayName: identity.displayName,
-      avatarUrl: identity.avatarUrl,
+      displayName: identity.displayName ?? null,
+      avatarUrl: identity.avatarUrl ?? null,
     });
   } else {
     const supabase = await createServerSupabaseClient();
@@ -122,8 +122,8 @@ export async function ensureUserBootstrap() {
     id: identity.id,
     email: identity.email,
     phone: identity.phone,
-    displayName: identity.displayName,
-    avatarUrl: identity.avatarUrl,
+    displayName: identity.displayName ?? null,
+    avatarUrl: identity.avatarUrl ?? null,
     role: identity.role,
     entitlements: identity.entitlements,
   } satisfies ServerIdentity;
