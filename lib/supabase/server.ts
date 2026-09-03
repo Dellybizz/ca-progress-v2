@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { getServerRuntimeValue } from "@/lib/cloudflare/runtime-env";
@@ -12,9 +13,11 @@ export function isCloudflareDataRuntime() {
   return getServerRuntimeValue("CA_DATA_RUNTIME").toLowerCase() === "cloudflare";
 }
 
+const createCachedD1ServerCompatClient = cache(async () => await createD1ServerCompatClient() as unknown as SupabaseClient<Database>);
+
 export async function createServerSupabaseClient(): Promise<SupabaseClient<Database>> {
   if (isCloudflareDataRuntime()) {
-    return await createD1ServerCompatClient() as unknown as SupabaseClient<Database>;
+    return createCachedD1ServerCompatClient();
   }
 
   const cookieStore = await cookies();
