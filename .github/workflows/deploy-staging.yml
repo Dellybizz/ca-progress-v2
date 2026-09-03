@@ -1,5 +1,5 @@
 # Phase 5 Pro CPU budget and seamless navigation deployment - contract refresh
-# Phase 5 cutover trigger marker — set-based community reads interpolation fix and request-scoped auth client and indexed session lookup and F1 persistent shell
+# Phase 5 cutover trigger marker — set-based community reads interpolation fix and request-scoped auth client and indexed session lookup and F1 persistent shell lint fix
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
 on:
