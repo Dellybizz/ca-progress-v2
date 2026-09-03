@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
 import { PlannerClient } from "@/components/planner/planner-client";
+import { Card, CardBody } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPlannerPageModel } from "@/lib/planner/service";
 
