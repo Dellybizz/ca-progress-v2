@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
 import { getPlannerDashboardSummary } from "@/lib/planner/dashboard";
 import { getProgressDashboardSummary } from "@/lib/progress/service";
 
@@ -43,7 +44,7 @@ function setupRequired(identity: { id: string }, displayName: string, generatedA
   };
 }
 
-export async function getDashboardPageModel(now = new Date()): Promise<DashboardPageModel> {
+async function getDashboardPageModelUncached(now = new Date()): Promise<DashboardPageModel> {
   const generatedAt = now.toISOString();
   const identity = await optionalUser();
   if (!identity) return { mode: "guest", generatedAt, viewer: { authenticated: false, displayName: "Guest" } };
@@ -62,21 +63,21 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
   }
 
   const today = dateKey(now);
-  const academic = await getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key);
+  const academic = await measureServerPerformance("dashboard.academic", () => getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key));
   if (!academic) return setupRequired(identity, displayName, generatedAt);
 
   // getProgressPageModel was intentionally replaced by the dashboard-specific summary below.
-  const livePromise = getDashboardLiveReference({
+  const livePromise = measureServerPerformance("dashboard.live_reference", () => getDashboardLiveReference({
     levelId: academic.level.id,
     levelCode: academic.level.code,
     attemptKey: profile.attempt_key,
     subjectIds: academic.subjects.map((subject) => subject.id),
     today,
-  });
+  }));
   const [progressModel, studyAnalytics, planner] = await Promise.all([
-    getProgressDashboardSummary(identity.id, academic.subjects),
-    getStudyAnalytics(identity.id, { now, timezone: profile.timezone }),
-    getPlannerDashboardSummary(identity.id, profile.timezone, now),
+    measureServerPerformance("dashboard.progress", () => getProgressDashboardSummary(identity.id, academic.subjects)),
+    measureServerPerformance("dashboard.study", () => getStudyAnalytics(identity.id, { now, timezone: profile.timezone })),
+    measureServerPerformance("dashboard.planner", () => getPlannerDashboardSummary(identity.id, profile.timezone, now)),
   ]);
   const live = await livePromise;
 
@@ -202,4 +203,9 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
       { key: "open_progress", label: "Open Progress", description: "View tracker", href: "/progress" },
     ],
   };
+}
+
+
+export async function getDashboardPageModel(now = new Date()): Promise<DashboardPageModel> {
+  return measureServerPerformance("dashboard.total", () => getDashboardPageModelUncached(now));
 }
