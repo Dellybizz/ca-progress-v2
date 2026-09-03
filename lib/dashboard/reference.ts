@@ -3,6 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
+import { getHotAcademicReference } from "@/lib/data/d1/hot-screens";
 import { getSupabasePublicConfig } from "@/lib/env";
 import { isCloudflareDataRuntime } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -28,6 +29,29 @@ function jsonRecord(value: Json): Record<string, unknown> { return value && type
 function unique<T>(values: T[]) { return [...new Set(values)]; }
 
 async function loadAcademicReference(levelCode: string, groupChoice: string, attemptKey: string): Promise<DashboardAcademicReference | null> {
+  if (isCloudflareDataRuntime()) {
+    const direct = await getHotAcademicReference(levelCode, attemptKey);
+    if (!direct) return null;
+    const aggregateGroups = levelCode === "foundation" || groupChoice === "both" || groupChoice === "not_applicable";
+    const allowedGroups = new Set((aggregateGroups ? direct.groups : direct.groups.filter((group) => group.code === groupChoice)).map((group) => group.id));
+    const applicableMaps = direct.maps.filter((row) => allowedGroups.has(row.group_id));
+    const subjectIds = new Set(applicableMaps.map((row) => row.subject_id));
+    const versionBySubject = new Map(applicableMaps.map((row) => [row.subject_id, row.syllabus_version_id]));
+    const groupById = new Map(direct.groups.map((group) => [group.id, group]));
+    const chaptersByVersion = new Map<string, typeof direct.chapters>();
+    for (const chapter of direct.chapters) chaptersByVersion.set(chapter.syllabus_version_id, [...(chaptersByVersion.get(chapter.syllabus_version_id) ?? []), chapter]);
+    const subjects = direct.subjects.filter((subject) => allowedGroups.has(subject.group_id) && subjectIds.has(subject.id)).map((subject) => {
+      const chapters = chaptersByVersion.get(versionBySubject.get(subject.id) ?? "") ?? [];
+      const group = groupById.get(subject.group_id);
+      return { id: subject.id, title: subject.title, slug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All Papers", chapterCount: chapters.length, chapterIds: chapters.map((chapter) => chapter.id) };
+    });
+    return {
+      level: { id: direct.level.id, code: direct.level.code, name: direct.level.name },
+      groups: direct.groups.filter((group) => aggregateGroups || allowedGroups.has(group.id)).map((group) => ({ id: group.id, code: group.code, name: group.name })),
+      subjects,
+      totalChapters: subjects.reduce((sum, subject) => sum + subject.chapterCount, 0),
+    };
+  }
   const supabase = createReferenceClient();
   const levelResponse = await supabase.from("course_levels").select("id,code,name,is_active").eq("code", levelCode).eq("is_active", true).maybeSingle();
   if (levelResponse.error) throw levelResponse.error;
