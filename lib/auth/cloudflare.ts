@@ -415,11 +415,6 @@ function guestTestEnabled() {
   return getServerRuntimeValue("CA_GUEST_TEST_MODE").trim().toLowerCase() === "true";
 }
 
-function guestTestId() {
-  const value = (cookies()).then((store) => store.get(GUEST_TEST_COOKIE)?.value || "");
-  return value;
-}
-
 async function ensureGuestTestUser(applicationUserId: string) {
   const database = getDb();
   const attempt = await database.prepare(
