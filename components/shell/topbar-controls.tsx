@@ -2,16 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { Drawer, Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
-
-type Viewer = { authenticated: boolean; label: string; initial: string };
-
-const guestViewer: Viewer = { authenticated: false, label: "Guest", initial: "G" };
+import { useViewer } from "./viewer-client";
 
 const quickLinks = [
   ["Dashboard", "/dashboard"],
@@ -28,25 +25,12 @@ const accountLinks = [
   ["Billing", "/billing"],
 ];
 
-export function TopbarControls({ viewer: initialViewer = guestViewer }: { viewer?: Viewer }) {
+export function TopbarControls() {
   const pathname = usePathname();
-  const [viewer, setViewer] = useState<Viewer>(initialViewer);
+  const viewer = useViewer();
   const [commandOpen, setCommandOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const loginHref = `/login?next=${encodeURIComponent(pathname || "/dashboard")}`;
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/auth/viewer", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() as Promise<Viewer> : null)
-      .then((nextViewer) => {
-        if (!cancelled && nextViewer) {
-          setViewer(nextViewer);
-        }
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
 
   return (
     <>
