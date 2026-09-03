@@ -42,5 +42,6 @@
     "ICAI_SYNC_ENABLED": "true",
     "ICAI_SYNC_USER_AGENT": "CA Progress V2 Official ICAI Monitor/phase8"
   },
+  "limits": { "cpu_ms": 30000 },
   "observability": { "enabled": true }
 }
