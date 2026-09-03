@@ -16,8 +16,6 @@ export function ViewerStatus() {
       .then((response) => response.ok ? response.json() as Promise<Viewer> : null)
       .then((nextViewer) => {
         if (!cancelled && nextViewer) {
-          // The viewer endpoint is intentionally hydrated after the shell paints.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setViewer(nextViewer);
         }
       })
