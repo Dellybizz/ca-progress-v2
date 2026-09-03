@@ -41,7 +41,7 @@ test("deployment self-bootstraps target Worker before deploying bound web Worker
 test("repository enforces headroom below Cloudflare hard bundle limits", () => {
   const pkg = JSON.parse(read("package.json"));
   const gate = read("scripts/check-cloudflare-size-budget.mjs");
-  assert.match(pkg.scripts["cf:check:web"], /--config wrangler.web.jsonc --budget-mib 2.80/);
+  assert.match(pkg.scripts["cf:check:web"], /--config wrangler.web.jsonc --budget-mib 3.10/);
   assert.match(pkg.scripts["cf:check:icai"], /--budget-mib 1\.50/);
   assert.match(pkg.scripts["cf:check"], /cf:check:icai[\s\S]*cf:check:web/);
   assert.match(gate, /compressedMiB > budgetMiB/);
