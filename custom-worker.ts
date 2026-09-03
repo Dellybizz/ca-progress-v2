@@ -1,6 +1,9 @@
 // OpenNext generates this module during `opennextjs-cloudflare build`.
 // @ts-expect-error The generated worker does not exist before the Cloudflare build step.
 import openNextWorker from "./.open-next/worker.js";
+import { CommunityChannelCoordinator } from "./community-coordinator";
+
+export { CommunityChannelCoordinator };
 
 type ServiceBinding = { fetch(request: Request): Promise<Response> };
 type QueueBinding = { send(body: BackgroundJob): Promise<void> };
