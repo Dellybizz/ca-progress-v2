@@ -173,7 +173,9 @@ export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Pro
     subjects: subjects.map((row: SubjectRow) => ({ id: row.id, title: row.title, levelCode: levelById.get(row.level_id)?.code ?? "" })),
     filters: selected,
     verifiedAt,
-      };\n    },\n  });
+      };
+    },
+  });
 }
 
 export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
