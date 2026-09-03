@@ -83,7 +83,14 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 120;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
 
-function errorFingerprint(error: unknown) {\n  const source = error instanceof Error ? `${error.name}:${error.message}` : String(error);\n  let hash = 2166136261;\n  for (let index = 0; index < source.length; index += 1) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);\n  return `fp-${(hash >>> 0).toString(16).padStart(8, "0")}`;\n}\n\nfunction requestId(request: Request) {
+function errorFingerprint(error: unknown) {
+  const source = error instanceof Error ? `${error.name}:${error.message}` : String(error);
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
+  return `fp-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function requestId(request: Request) {
   const incoming = request.headers.get("x-request-id")?.trim();
   return incoming && /^[A-Za-z0-9._:-]{8,120}$/.test(incoming) ? incoming : crypto.randomUUID();
 }
