@@ -42,16 +42,11 @@ function normalizeJob(value: unknown): BackgroundJob | null {
   };
 }
 
-async function hashPayload(job: BackgroundJob) {
-  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(job))));
-  return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
-}
 
 async function runQueuedJob(message: QueueMessage<unknown>, env: WorkerEnv) {
   if (!env.DB) throw new Error("DB binding is required for queue idempotency.");
   const job = normalizeJob(message.body);
   if (!job) { message.ack(); return; }
-  const payloadHash = await hashPayload(job);
   const existing = await env.DB.prepare("SELECT id,status,payload_json,attempts,max_attempts FROM background_jobs WHERE idempotency_key=?1 LIMIT 1").bind(job.idempotencyKey).first<{ id:string; status:string; payload_json:string; attempts:number; max_attempts:number }>();
   if (existing?.status === "succeeded") { message.ack(); return; }
   if (existing && existing.payload_json !== JSON.stringify(job.payload)) throw new Error("Queue idempotency key payload mismatch.");
