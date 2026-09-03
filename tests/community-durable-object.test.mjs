@@ -17,7 +17,7 @@ test("Community uses a per-channel Durable Object coordinator for ephemeral stat
   assert.match(coordinator, /type: "refresh"/);
   assert.match(config, /COMMUNITY_COORDINATORS/);
   assert.match(config, /CommunityChannelCoordinator/);
-  assert.match(provider, /new WebSocket/);
+  assert.match(provider, /SocketCtor/);
   assert.match(provider, /MAX_RECONNECT_MS/);
   assert.match(provider, /socket\.addEventListener\("close"/);
 });
