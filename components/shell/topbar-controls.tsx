@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { Drawer, Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Viewer } from "@/lib/auth/server";
+
+const guestViewer: Viewer = { authenticated: false, label: "Guest", initial: "G" };
 
 const quickLinks = [
   ["Dashboard", "/dashboard"],
@@ -25,11 +27,23 @@ const accountLinks = [
   ["Billing", "/billing"],
 ];
 
-export function TopbarControls({ viewer }: { viewer: Viewer }) {
+export function TopbarControls({ viewer: initialViewer = guestViewer }: { viewer?: Viewer }) {
   const pathname = usePathname();
+  const [viewer, setViewer] = useState<Viewer>(initialViewer);
   const [commandOpen, setCommandOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const loginHref = `/login?next=${encodeURIComponent(pathname || "/dashboard")}`;
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/auth/viewer", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<Viewer> : null)
+      .then((nextViewer) => {
+        if (!cancelled && nextViewer) setViewer(nextViewer);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <>
@@ -50,20 +64,20 @@ export function TopbarControls({ viewer }: { viewer: Viewer }) {
               </div>
               <div className="profile-menu__links">
                 {accountLinks.map(([label, href]) => (
-                  <Link key={href} href={href} role="menuitem"><span>{label}</span><Icon name="chevron" size={14}/></Link>
+                  <Link prefetch={true} key={href} href={href} role="menuitem"><span>{label}</span><Icon name="chevron" size={14}/></Link>
                 ))}
               </div>
             </div>
           </details>
         ) : (
-          <Link href={loginHref} className="profile-avatar" aria-label="Sign in">{viewer.initial}</Link>
+          <Link prefetch={true} href={loginHref} className="profile-avatar" aria-label="Sign in">{viewer.initial}</Link>
         )}
       </div>
 
       <Modal open={commandOpen} onClose={() => setCommandOpen(false)} title="Search CA Progress">
         <Input autoFocus placeholder="Search pages and tools…" leading={<Icon name="search" size={17}/>} label="Search"/>
         <div className="command-links" aria-label="Quick navigation">
-          {quickLinks.map(([label, href]) => <Link key={href} href={href} onClick={() => setCommandOpen(false)}><span>{label}</span><Icon name="arrow" size={16}/></Link>)}
+          {quickLinks.map(([label, href]) => <Link prefetch={true} key={href} href={href} onClick={() => setCommandOpen(false)}><span>{label}</span><Icon name="arrow" size={16}/></Link>)}
         </div>
       </Modal>
 
