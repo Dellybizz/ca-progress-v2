@@ -55,6 +55,8 @@ jobs:
         run: npm run test:cloudflare-phase4
       - name: Cloudflare migration Phase 4 clean D1/resume/rollback validation
         run: npm run d1:phase4:validate
+      - name: D1 hot-query index and query-plan validation
+        run: npm run d1:hot-indexes:validate
       - name: Next.js production build
         run: npm run build
       - name: OpenNext Worker build and Wrangler dry-runs
@@ -108,6 +110,9 @@ jobs:
             LINKEDIN_OIDC_CLIENT_SECRET: required('LINKEDIN_OIDC_CLIENT_SECRET'),
           }));
           NODE
+
+      - name: Apply Phase 5 hot-query index completion
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0009_phase5_hot_query_indexes.sql
 
       - name: Deploy private ICAI service
         shell: bash
