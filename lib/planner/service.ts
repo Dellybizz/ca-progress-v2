@@ -114,23 +114,59 @@ async function loadActivityRows(userId: string) {
   return { sessions: sessions.results ?? [], progress: progress.results ?? [], error: null };
 }
 
+async function loadActivityNames(sessions: SessionRow[], progress: ProgressEventRow[]) {
+  const subjectIds = [...new Set(sessions.map((row) => row.subject_id).filter((id): id is string => Boolean(id)))];
+  const chapterIds = [...new Set([
+    ...sessions.map((row) => row.chapter_id),
+    ...progress.map((row) => row.chapter_id),
+  ].filter((id): id is string => Boolean(id)))];
+  if (!subjectIds.length && !chapterIds.length) return { subjects: new Map<string, string>(), chapters: new Map<string, string>() };
+
+  if (!isCloudflareDataRuntime()) {
+    const supabase = await createServerSupabaseClient();
+    const [subjects, chapters] = await Promise.all([
+      subjectIds.length ? supabase.from("subjects").select("id,title").in("id", subjectIds) : Promise.resolve({ data: [], error: null }),
+      chapterIds.length ? supabase.from("chapters").select("id,title").in("id", chapterIds) : Promise.resolve({ data: [], error: null }),
+    ]);
+    const error = subjects.error || chapters.error;
+    if (error) throw new Error(`Activity labels could not be loaded: ${error.message}`);
+    return {
+      subjects: new Map((subjects.data ?? []).map((row) => [row.id, row.title])),
+      chapters: new Map((chapters.data ?? []).map((row) => [row.id, row.title])),
+    };
+  }
+
+  const db = getD1RuntimeDatabase();
+  const subjectPlaceholders = subjectIds.map((_, index) => `?${index + 1}`).join(",");
+  const chapterPlaceholders = chapterIds.map((_, index) => `?${index + 1}`).join(",");
+  const [subjects, chapters] = await Promise.all([
+    subjectIds.length ? db.prepare(`SELECT id,title FROM subjects WHERE id IN (${subjectPlaceholders})`).bind(...subjectIds).all<{ id: string; title: string }>() : Promise.resolve({ results: [] }),
+    chapterIds.length ? db.prepare(`SELECT id,title FROM chapters WHERE id IN (${chapterPlaceholders})`).bind(...chapterIds).all<{ id: string; title: string }>() : Promise.resolve({ results: [] }),
+  ]);
+  return {
+    subjects: new Map((subjects.results ?? []).map((row) => [row.id, row.title])),
+    chapters: new Map((chapters.results ?? []).map((row) => [row.id, row.title])),
+  };
+}
+
 export async function getActivityPageModel(): Promise<ActivityPageModel> {
   const identity = await optionalUser();
   if (!identity) return { mode: "guest" };
   const profile = await getProfileForUser(identity.id);
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  const subjects = validProfile(profile) ? await academicOptions(profile!) : [];
-  const names = maps(subjects);
   const { sessions, progress, error } = await loadActivityRows(identity.id);
   if (error) throw new Error(`Activity could not be loaded: ${error.message}`);
+  const sessionRows = (sessions ?? []) as SessionRow[];
+  const progressRows = (progress ?? []) as ProgressEventRow[];
+  const names = await loadActivityNames(sessionRows, progressRows);
   const items: ActivityItem[] = [];
-  for (const row of (sessions ?? []) as SessionRow[]) {
+  for (const row of sessionRows) {
     const subject = row.subject_id ? names.subjects.get(row.subject_id) : null;
     const chapter = row.chapter_id ? names.chapters.get(row.chapter_id) : null;
     items.push({ id: `study:${row.id}`, source: "study", occurredAt: row.ended_at, title: `Studied ${Math.max(1, Math.round(row.duration_seconds / 60))} min`, description: chapter ?? subject ?? "General study session", href: "/study" });
   }
   const stageLabel: Record<string, string> = { completed: "Completed", revision_1: "Revision 1", revision_2: "Revision 2", test_1: "Test 1", test_2: "Test 2" };
-  for (const row of (progress ?? []) as ProgressEventRow[]) items.push({ id: `progress:${row.id}`, source: "progress", occurredAt: row.created_at, title: `${row.action === "clear" ? "Cleared" : row.action === "undo" ? "Undid" : "Saved"} ${stageLabel[row.stage] ?? row.stage}`, description: names.chapters.get(row.chapter_id) ?? "Chapter progress", href: "/progress" });
+  for (const row of progressRows) items.push({ id: `progress:${row.id}`, source: "progress", occurredAt: row.created_at, title: `${row.action === "clear" ? "Cleared" : row.action === "undo" ? "Undid" : "Saved"} ${stageLabel[row.stage] ?? row.stage}`, description: names.chapters.get(row.chapter_id) ?? "Chapter progress", href: "/progress" });
   items.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   return { mode: "ready", viewerName: name, items: items.slice(0, 60) };
 }
