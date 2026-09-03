@@ -80,6 +80,9 @@ jobs:
       - name: Apply Phase 2 D1 performance indexes
         run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0007_phase2_performance_indexes.sql
 
+      - name: Apply Phase 5 hot-path indexes
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0008_phase5_hot_path_indexes.sql
+
       - name: Prepare ephemeral Worker secret files
         shell: bash
         run: |
