@@ -56,6 +56,5 @@ export async function executeBackgroundJob(job: BackgroundJob) {
         .bind(crypto.randomUUID(), userId, planDate, json({ plan: generated.plan, items: generated.items, forecast: generated.forecast }), generated.plan.generated_at ?? new Date().toISOString(), job.id).run();
       return { userId, planDate, itemCount: generated.items.length };
     }
-    }
   }
 }
