@@ -4,23 +4,26 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOperator } from "@/lib/authorization/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { runIcaiSync } from "@/lib/icai/sync";
 import { invalidateSharedPublicCache } from "@/lib/cache/public";
+import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
 
 function message(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown Phase 8 operation error.";
+  return error instanceof Error ? error.message : "Unknown background job error.";
 }
 
 export async function runIcaiSyncAction() {
   let destination = "/admin/icai-sync";
   try {
     const operator = await requireAdminOperator();
-    const result = await runIcaiSync({ trigger: "manual", requestedBy: operator.user.id });
-    await invalidateSharedPublicCache(["icai"]);
+    const now = new Date().toISOString();
+    const job = await enqueueBackgroundJob({
+      type: "icai-sync",
+      idempotencyKey: jobKey("icai-sync", "manual", now.slice(0, 16)),
+      payload: { trigger: "manual", requestedBy: operator.user.id },
+      createdBy: operator.user.id,
+    });
     revalidatePath("/admin/icai-sync");
-    revalidatePath("/updates");
-    revalidatePath("/resources/icai");
-    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Sync ${result.status}: ${result.newItems} new, ${result.changedItems} changed, ${result.pendingReviews} awaiting review.`)}`;
+    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Sync queued (${job.id}). Results will appear when the worker finishes.`)}`;
   } catch (error) {
     destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`;
   }
