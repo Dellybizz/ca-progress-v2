@@ -153,6 +153,11 @@ jobs:
           failed=0
           base="$CUTOVER_BASE_URL"
 
+          if ! SMOKE_BASE_URL="$base" SMOKE_AUTH_COOKIE="${SMOKE_AUTH_COOKIE:-}" npm run cf:smoke; then
+            echo "::error::Synthetic cold/warm navigation smoke failed."
+            failed=1
+          fi
+
           health=""
           for attempt in $(seq 1 12); do
             health="$(curl --max-time 20 -fsS "$base/api/health" 2>/dev/null)" && break
