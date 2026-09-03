@@ -3,7 +3,8 @@ import "server-only";
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { getD1RuntimeDatabase } from "@/lib/data/d1/supabase-compat";
 import type { Database } from "@/lib/supabase/database.types";
 import type { StudySubjectOption } from "@/lib/study/types";
 import type { ActivityItem, ActivityPageModel, CalendarItem, CalendarPageModel, GoalsPageModel, PlannerGoal, PlannerPageModel, PlannerTask } from "./types";
@@ -96,6 +97,23 @@ export async function getCalendarPageModel(month?: string | null): Promise<Calen
   return { mode: "ready", viewerName: name, month: bounds.month, items };
 }
 
+async function loadActivityRows(userId: string) {
+  if (!isCloudflareDataRuntime()) {
+    const supabase = await createServerSupabaseClient();
+    const [sessions, progress] = await Promise.all([
+      supabase.from("study_sessions").select("id,subject_id,chapter_id,ended_at,duration_seconds").eq("user_id", userId).order("ended_at", { ascending: false }).limit(40),
+      supabase.from("progress_events").select("id,chapter_id,stage,action,created_at,undone_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(40),
+    ]);
+    return { sessions: sessions.data ?? [], progress: progress.data ?? [], error: sessions.error || progress.error };
+  }
+  const db = getD1RuntimeDatabase();
+  const [sessions, progress] = await Promise.all([
+    db.prepare("SELECT id,subject_id,chapter_id,ended_at,duration_seconds FROM study_sessions WHERE user_id=?1 ORDER BY ended_at DESC LIMIT 40").bind(userId).all<Pick<SessionRow, "id"|"subject_id"|"chapter_id"|"ended_at"|"duration_seconds">>(),
+    db.prepare("SELECT id,chapter_id,stage,action,created_at,undone_at FROM progress_events WHERE user_id=?1 ORDER BY created_at DESC LIMIT 40").bind(userId).all<Pick<ProgressEventRow, "id"|"chapter_id"|"stage"|"action"|"created_at"|"undone_at">>(),
+  ]);
+  return { sessions: sessions.results ?? [], progress: progress.results ?? [], error: null };
+}
+
 export async function getActivityPageModel(): Promise<ActivityPageModel> {
   const identity = await optionalUser();
   if (!identity) return { mode: "guest" };
@@ -103,12 +121,7 @@ export async function getActivityPageModel(): Promise<ActivityPageModel> {
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
   const subjects = validProfile(profile) ? await academicOptions(profile!) : [];
   const names = maps(subjects);
-  const supabase = await createServerSupabaseClient();
-  const [sessions, progress] = await Promise.all([
-    supabase.from("study_sessions").select("id,subject_id,chapter_id,ended_at,duration_seconds").eq("user_id", identity.id).order("ended_at", { ascending: false }).limit(40),
-    supabase.from("progress_events").select("id,chapter_id,stage,action,created_at,undone_at").eq("user_id", identity.id).order("created_at", { ascending: false }).limit(40),
-  ]);
-  const error = sessions.error || progress.error;
+  const { sessions, progress, error } = await loadActivityRows(identity.id);
   if (error) throw new Error(`Activity could not be loaded: ${error.message}`);
   const items: ActivityItem[] = [];
   for (const row of (sessions.data ?? []) as SessionRow[]) {
