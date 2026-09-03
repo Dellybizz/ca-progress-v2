@@ -1,8 +1,7 @@
 import "server-only";
 
-import { unstable_cache } from "next/cache";
-
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getSharedPublicJson } from "@/lib/cache/public";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   AcademicDataError,
@@ -51,7 +50,7 @@ async function loadRawAcademic(): Promise<RawAcademic> {
   return { levels: levels.data ?? [], groups: groups.data ?? [], subjects: subjects.data ?? [], versions: versions.data ?? [], chapters: chapters.data ?? [], topics: topics.data ?? [], attemptMap: attemptMap.data ?? [] };
 }
 
-const getCachedRawAcademic = unstable_cache(loadRawAcademic, ["phase3-academic-raw-v1"], { revalidate: 3600 });
+async function getCachedRawAcademic() {\n  return getSharedPublicJson({ namespace: "academic", key: "catalog-v1", ttlSeconds: 3600, load: loadRawAcademic });\n}
 
 function versionForSubject(raw: RawAcademic, subjectId: string, attempt?: string | null) {
   if (attempt) {
