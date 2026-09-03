@@ -79,8 +79,63 @@ async function runQueuedJob(message: QueueMessage<unknown>, env: WorkerEnv) {
   }
 }
 
+const RATE_WINDOW_MS = 60_000;
+const RATE_LIMIT = 120;
+const rateBuckets = new Map<string, { startedAt: number; count: number }>();
+
+function requestId(request: Request) {
+  const incoming = request.headers.get("x-request-id")?.trim();
+  return incoming && /^[A-Za-z0-9._:-]{8,120}$/.test(incoming) ? incoming : crypto.randomUUID();
+}
+
+function rateLimitKey(request: Request) {
+  return request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
+
+function checkRateLimit(key: string) {
+  const now = Date.now();
+  const current = rateBuckets.get(key);
+  if (!current || now - current.startedAt >= RATE_WINDOW_MS) {
+    rateBuckets.set(key, { startedAt: now, count: 1 });
+    if (rateBuckets.size > 10_000) rateBuckets.delete(rateBuckets.keys().next().value!);
+    return { allowed: true, remaining: RATE_LIMIT - 1 };
+  }
+  current.count += 1;
+  return { allowed: current.count <= RATE_LIMIT, remaining: Math.max(0, RATE_LIMIT - current.count) };
+}
+
+async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContext) {
+  const id = requestId(request);
+  const startedAt = performance.now();
+  const rate = checkRateLimit(rateLimitKey(request));
+  if (!rate.allowed && new URL(request.url).pathname !== "/api/health") {
+    return new Response(JSON.stringify({ error: "Too many requests. Please retry shortly.", requestId: id }), {
+      status: 429,
+      headers: { "content-type": "application/json", "cache-control": "no-store", "retry-after": "60", "x-request-id": id, "x-ratelimit-limit": String(RATE_LIMIT), "x-ratelimit-remaining": "0" },
+    });
+  }
+  const forwarded = new Request(request, { headers: new Headers(request.headers) });
+  forwarded.headers.set("x-request-id", id);
+  try {
+    const response = await openNextWorker.fetch(forwarded, env, ctx);
+    const headers = new Headers(response.headers);
+    headers.set("x-request-id", id);
+    headers.set("x-ratelimit-limit", String(RATE_LIMIT));
+    headers.set("x-ratelimit-remaining", String(rate.remaining));
+    headers.set("server-timing", `worker;dur=${Math.round((performance.now() - startedAt) * 100) / 100}`);
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  } catch (error) {
+    const fingerprint = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ event: "worker.request_error", requestId: id, fingerprint, path: new URL(request.url).pathname }));
+    return new Response(JSON.stringify({ error: "The service encountered a temporary error.", requestId: id }), {
+      status: 500,
+      headers: { "content-type": "application/json", "cache-control": "no-store", "x-request-id": id },
+    });
+  }
+}
+
 const worker = {
-  fetch(request: Request, env: WorkerEnv, ctx: WorkerContext) { return openNextWorker.fetch(request, env, ctx); },
+  fetch(request: Request, env: WorkerEnv, ctx: WorkerContext) { return handleRequest(request, env, ctx); },
   scheduled(controller: ScheduledController, env: WorkerEnv, ctx: WorkerContext) {
     if (!env.BACKGROUND_JOBS) throw new Error("BACKGROUND_JOBS queue binding is required in the production runtime.");
     const jobs: BackgroundJob[] = controller.cron === "0 * * * *"
