@@ -76,11 +76,11 @@ export function MobileNavigation({ area }: { area: "student" | "admin" }) {
   if (area === "admin") {
     return (
       <nav className="mobile-bottom-nav" aria-label="Admin mobile navigation">
-        <Link href="/admin" className={pathname === "/admin" ? "is-active" : ""}><Icon name="shield"/><span>Admin</span></Link>
-        <Link href="/admin/syllabus" className={pathname.startsWith("/admin/syllabus") ? "is-active" : ""}><Icon name="book"/><span>Syllabus</span></Link>
-        <Link href="/admin/icai-sync" className={pathname.startsWith("/admin/icai-sync") ? "is-active" : ""}><Icon name="bell"/><span>ICAI</span></Link>
-        <Link href="/admin/resources/moderation" className={pathname.startsWith("/admin/resources/moderation") ? "is-active" : ""}><Icon name="notes"/><span>Resources</span></Link>
-        <Link href="/dashboard"><Icon name="home"/><span>Student</span></Link>
+        <Link prefetch={true} href="/admin" className={pathname === "/admin" ? "is-active" : ""}><Icon name="shield"/><span>Admin</span></Link>
+        <Link prefetch={true} href="/admin/syllabus" className={pathname.startsWith("/admin/syllabus") ? "is-active" : ""}><Icon name="book"/><span>Syllabus</span></Link>
+        <Link prefetch={true} href="/admin/icai-sync" className={pathname.startsWith("/admin/icai-sync") ? "is-active" : ""}><Icon name="bell"/><span>ICAI</span></Link>
+        <Link prefetch={true} href="/admin/resources/moderation" className={pathname.startsWith("/admin/resources/moderation") ? "is-active" : ""}><Icon name="notes"/><span>Resources</span></Link>
+        <Link prefetch={true} href="/dashboard"><Icon name="home"/><span>Student</span></Link>
       </nav>
     );
   }
@@ -90,7 +90,7 @@ export function MobileNavigation({ area }: { area: "student" | "admin" }) {
   return (
     <>
       <nav className="mobile-bottom-nav" aria-label="Student mobile navigation">
-        <Link href="/dashboard" className={pathname === "/dashboard" ? "is-active" : ""} aria-current={pathname === "/dashboard" ? "page" : undefined}>
+        <Link prefetch={true} href="/dashboard" className={pathname === "/dashboard" ? "is-active" : ""} aria-current={pathname === "/dashboard" ? "page" : undefined}>
           <Icon name="home" size={19}/><span>Dashboard</span>
         </Link>
         {studentSections.map((section) => {
@@ -123,6 +123,7 @@ export function MobileNavigation({ area }: { area: "student" | "admin" }) {
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
+                    prefetch={true}
                     key={item.href}
                     href={item.href}
                     onClick={() => setOpenSection(null)}
