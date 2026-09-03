@@ -73,7 +73,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
     socket.addEventListener("message", (event) => {
       if (typeof event.data !== "string") return;
       try {
-        const payload = JSON.parse(event.data) as { type?: string };
+        const payload = JSON.parse(event.data) as { type?: string; reason?: string };
         if (payload.type === "refresh") {
           if (payload.reason === "pin" || payload.reason === "moderation") input.onPinnedChanged();
           input.onDataChanged();
