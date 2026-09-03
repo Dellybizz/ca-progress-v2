@@ -22,7 +22,7 @@ export async function invokeBillingService(input: BillingInvoke) {
   if ((input.path === "/verify" || input.path === "/webhook") && response.ok) {
     const payload = await response.clone().json().catch(() => null) as { userId?: unknown; reconciliation?: { userId?: unknown } } | null;
     const userId = typeof payload?.userId === "string" ? payload.userId : typeof payload?.reconciliation?.userId === "string" ? payload.reconciliation.userId : null;
-    if (userId) await invalidateUserEntitlementCache(userId);
+    if (userId) await invalidateUserFeatureCache(userId);
   }
   return response;
 }
