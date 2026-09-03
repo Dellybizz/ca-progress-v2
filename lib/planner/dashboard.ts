@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { getHotD1Database } from "@/lib/data/d1/runtime";
 import type { Database } from "@/lib/supabase/database.types";
 
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
@@ -12,7 +13,9 @@ export async function getPlannerDashboardSummary(userId: string, timezone: strin
   const supabase = await createServerSupabaseClient();
   const start = new Date(now.valueOf() - DAY_MS).toISOString();
   const end = new Date(now.valueOf() + DAY_MS).toISOString();
-  const response = await supabase.from("tasks").select("id,task_kind,due_at,estimated_minutes").eq("user_id", userId).eq("status", "todo").gte("due_at", start).lte("due_at", end).order("due_at");
+  const response = isCloudflareDataRuntime()
+    ? { data: ((await getHotD1Database().prepare("SELECT id,task_kind,due_at,estimated_minutes FROM tasks WHERE user_id=?1 AND status='todo' AND due_at>=?2 AND due_at<=?3 ORDER BY due_at ASC LIMIT 250").bind(userId, start, end).all()).results ?? []), error: null }
+    : await supabase.from("tasks").select("id,task_kind,due_at,estimated_minutes").eq("user_id", userId).eq("status", "todo").gte("due_at", start).lte("due_at", end).order("due_at");
   if (response.error) throw new Error(`Today tasks could not be loaded: ${response.error.message}`);
   const todayKey = localDateKey(now, timezone);
   const today = ((response.data ?? []) as TaskRow[]).filter((row) => localDateKey(new Date(row.due_at), timezone) === todayKey);
