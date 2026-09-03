@@ -17,6 +17,7 @@
     "d1:phase2:validate": "node scripts/validate-d1-phase2.mjs",
     "d1:phase3:validate": "node scripts/validate-d1-phase3.mjs",
     "d1:phase4:validate": "node scripts/validate-d1-phase4.mjs",
+    "d1:hot-indexes:validate": "node scripts/validate-d1-hot-indexes.mjs",
     "phase4:shadow": "node scripts/phase4/production-shadow.mjs",
     "phase4:reconcile": "node scripts/phase4/production-shadow.mjs --reconcile-only",
     "phase4:rollback": "node scripts/phase4/production-shadow.mjs --rollback",
