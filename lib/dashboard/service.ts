@@ -66,19 +66,19 @@ export async function getDashboardPageModel(now = new Date()): Promise<Dashboard
   if (!academic) return setupRequired(identity, displayName, generatedAt);
 
   // getProgressPageModel was intentionally replaced by the dashboard-specific summary below.
-  const [progressModel, studyAnalytics, planner] = await Promise.all([
-    getProgressDashboardSummary(identity.id, academic.subjects),
-    getStudyAnalytics(identity.id, { now, timezone: profile.timezone }),
-    getPlannerDashboardSummary(identity.id, profile.timezone, now),
-  ]);
-
-  const live = await getDashboardLiveReference({
+  const livePromise = getDashboardLiveReference({
     levelId: academic.level.id,
     levelCode: academic.level.code,
     attemptKey: profile.attempt_key,
     subjectIds: academic.subjects.map((subject) => subject.id),
     today,
   });
+  const [progressModel, studyAnalytics, planner] = await Promise.all([
+    getProgressDashboardSummary(identity.id, academic.subjects),
+    getStudyAnalytics(identity.id, { now, timezone: profile.timezone }),
+    getPlannerDashboardSummary(identity.id, profile.timezone, now),
+  ]);
+  const live = await livePromise;
 
   const upcomingExam = live.examEvents[0] ?? null;
   const targetDate = upcomingExam?.eventDate ?? live.attempt?.startDate ?? null;
