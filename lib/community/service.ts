@@ -7,7 +7,8 @@ import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { getHotCommunityChannel, getHotCommunityMessages } from "@/lib/data/d1/hot-screens";
 import type {
   CommunityBlock,
   CommunityChannel,
@@ -235,7 +236,7 @@ async function hydrateMessages(
 export async function getCommunityMessagePage(options: { channelSlug: string; cursor?: string | null; query?: string | null }): Promise<CommunityMessagePage> {
   const identity = (await getRequestAuthContext()).identity;
   const supabase = identity ? await createServerSupabaseClient() : createAdminSupabaseClient();
-  const channel = await supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("slug", options.channelSlug).eq("is_active", true).maybeSingle();
+  const channel = isCloudflareDataRuntime() ? { data: await getHotCommunityChannel(options.channelSlug), error: null } : await supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("slug", options.channelSlug).eq("is_active", true).maybeSingle();
   if (!identity && channel.data?.scope_type !== "global") throw new Error("Sign in to view this channel.");
   if (channel.error) throw new Error(`Community channel could not be loaded: ${channel.error.message}`);
   if (!channel.data) throw new Error("Channel not found or access denied.");
@@ -250,7 +251,7 @@ export async function getCommunityMessagePage(options: { channelSlug: string; cu
   if (Number.isSafeInteger(cursor) && cursor > 0) query = query.lt("sequence_id", cursor);
   const search = cleanSearch(options.query);
   if (search) query = query.ilike("body", `%${search}%`);
-  const result = await query;
+  const result = isCloudflareDataRuntime() ? { data: await getHotCommunityMessages(channel.data.id, Number(options.cursor), cleanSearch(options.query), PAGE_SIZE), error: null } : await query;
   if (result.error) throw new Error(`Messages could not be loaded: ${result.error.message}`);
   const raw = (result.data ?? []) as MessageRow[];
   const hasMore = raw.length > PAGE_SIZE;
