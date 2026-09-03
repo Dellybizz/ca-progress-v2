@@ -3,6 +3,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { getSupabasePublicConfig } from "@/lib/env";
+import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
 import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type { AttemptOption, CALevel } from "@/lib/profile/validation";
@@ -25,7 +26,7 @@ export type Viewer = { authenticated: boolean; id?: string; label: string; initi
 
 async function optionalUserUncached(): Promise<ServerIdentity | null> {
   if (!isCloudflareAuthRuntime() && !getSupabasePublicConfig().configured) return null;
-  const identity = await getCurrentApplicationIdentity();
+  const identity = await measureServerPerformance("auth.identity", () => getCurrentApplicationIdentity());
   if (!identity) return null;
   return {
     id: identity.id,
@@ -49,10 +50,10 @@ export async function requireUser(next = "/dashboard") {
 
 async function getProfileForUserUncached(userId: string): Promise<ProfileRow | null> {
   if (isCloudflareAuthRuntime()) {
-    return await getCloudflareProfileForUser(userId) as unknown as ProfileRow | null;
+    return await measureServerPerformance("auth.profile", () => getCloudflareProfileForUser(userId) as Promise<ProfileRow | null>);
   }
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
+  const { data } = await measureServerPerformance("auth.profile", () => supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle());
   return data ?? null;
 }
 
