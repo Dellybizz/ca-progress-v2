@@ -1,5 +1,5 @@
 # Phase 5 Pro CPU budget and seamless navigation deployment - contract refresh
-# Phase 5 cutover trigger marker — optimized Community and Activity shells
+# Phase 5 cutover trigger marker — verified D1/auth hot-path deployment
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
 on:
