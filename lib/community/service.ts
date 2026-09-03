@@ -6,6 +6,7 @@ import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type {
   CommunityBlock,
@@ -152,6 +153,7 @@ export async function getCommunityHomeModel(): Promise<CommunityHomeModel> {
   if (context.mode === "guest") {
     return { mode: "ready", viewerName: "Guest", role: "student", groups: context.groups, notifications: [], totalUnread: 0 };
   }
+  if (context.mode === "setup") return { mode: "setup", viewerName: context.viewerName };
   const notifications = await context.supabase
     .from("community_notifications")
     .select("*")
@@ -188,7 +190,7 @@ function attachmentDto(row: ResourceRow): CommunityResourceAttachment {
 }
 
 async function hydrateMessages(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  supabase: SupabaseClient<Database>,
   rows: MessageRow[],
   viewerId: string,
 ): Promise<CommunityMessage[]> {
@@ -292,6 +294,7 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
       activeBlock: null,
     };
   }
+  if (context.mode === "setup") return { mode: "setup", viewerName: context.viewerName };
   const channel = context.channels.find((item) => item.slug === channelSlug);
   if (!channel) return { mode: "denied", viewerName: context.viewerName };
   const page = await getCommunityMessagePage({ channelSlug });
