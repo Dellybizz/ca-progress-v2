@@ -63,14 +63,17 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
   }
 
   const today = dateKey(now);
-  const academic = await measureServerPerformance("dashboard.academic", () => getDashboardAcademicReference(profile.ca_level, profile.group_choice, profile.attempt_key));
+  const caLevel = profile.ca_level!;
+  const groupChoice = profile.group_choice!;
+  const attemptKey = profile.attempt_key!;
+  const academic = await measureServerPerformance("dashboard.academic", () => getDashboardAcademicReference(caLevel, groupChoice, attemptKey));
   if (!academic) return setupRequired(identity, displayName, generatedAt);
 
   // getProgressPageModel was intentionally replaced by the dashboard-specific summary below.
   const livePromise = measureServerPerformance("dashboard.live_reference", () => getDashboardLiveReference({
     levelId: academic.level.id,
     levelCode: academic.level.code,
-    attemptKey: profile.attempt_key,
+    attemptKey,
     subjectIds: academic.subjects.map((subject) => subject.id),
     today,
   }));
