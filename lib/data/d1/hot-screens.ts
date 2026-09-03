@@ -80,6 +80,18 @@ export async function getHotDashboardProgress(userId: string, chapterIds: string
   return (result.results ?? []) as HotProgressState[];
 }
 
+export type HotStudySession = { id: string; subject_id: string | null; chapter_id: string | null; started_at: string; ended_at: string; duration_seconds: number; mode: string; timezone: string };
+export type HotTimerState = { status: string; mode: string; subject_id: string | null; chapter_id: string | null; focus_target_seconds: number; break_target_seconds: number; started_at: string | null; running_since: string | null; elapsed_seconds: number; paused_at: string | null; timezone: string; last_interaction_at: string };
+
+export async function getHotStudySessions(userId: string, since: string, limit = 600, db = getHotD1Database()) {
+  const bounded = Math.max(1, Math.min(Math.floor(limit), 600));
+  return ((await db.prepare(`SELECT id,subject_id,chapter_id,started_at,ended_at,duration_seconds,mode,timezone FROM study_sessions WHERE user_id=?1 AND ended_at>=?2 ORDER BY ended_at DESC LIMIT ${bounded}`).bind(userId, since).all<HotStudySession>()).results ?? []) as HotStudySession[];
+}
+
+export async function getHotStudyTimer(userId: string, db = getHotD1Database()) {
+  return db.prepare("SELECT status,mode,subject_id,chapter_id,focus_target_seconds,break_target_seconds,started_at,running_since,elapsed_seconds,paused_at,timezone,last_interaction_at FROM study_timer_state WHERE user_id=?1 LIMIT 1").bind(userId).first<HotTimerState>();
+}
+
 export type HotCommunityChannel = { id: string; channel_key: string; slug: string; scope_type: string; channel_kind: string; title: string; description: string; level_id: string | null; subject_id: string | null; write_policy: string; sort_order: number; is_active: number };
 export type HotCommunityMessage = { id: string; sequence_id: number; channel_id: string; user_id: string; author_label: string; body: string; created_at: string; moderation_status: string; reply_to_message_id: string | null; attached_resource_id: string | null };
 
