@@ -63,7 +63,7 @@ async function loadAcademicReference(levelCode: string, groupChoice: string, att
   return { level: { id: level.id, code: level.code, name: level.name }, groups: groups.filter((group) => aggregateGroups || allowedGroups.has(group.id)).map((group) => ({ id: group.id, code: group.code, name: group.name })), subjects: academicSubjects, totalChapters: academicSubjects.reduce((sum, subject) => sum + subject.chapterCount, 0) };
 }
 
-const cachedAcademicReference = unstable_cache(loadAcademicReference,["phase4-dashboard-academic-v1"],{ revalidate: 900 });
+const cachedAcademicReference = unstable_cache(loadAcademicReference,["phase3-dashboard-academic-v2"],{ revalidate: 3600 });
 
 async function loadLiveReference(levelId: string, levelCode: string, attemptKey: string, subjectIdsKey: string, today: string): Promise<DashboardLiveReference> {
   const supabase = createReferenceClient();
@@ -97,6 +97,6 @@ async function loadLiveReference(levelId: string, levelCode: string, attemptKey:
   return { attempt: attempt ? { id:attempt.id,key:attempt.attempt_key,label:attempt.label,startDate:attempt.start_date,endDate:attempt.end_date,sourceUrl:attempt.source_url,lastVerifiedAt:attempt.last_seen_at } : null, examEvents, updates, verifiedAt:verifiedCandidates.sort().at(-1)??null };
 }
 
-const cachedLiveReference = unstable_cache(loadLiveReference,["phase4-dashboard-live-v1"],{ revalidate: 60 });
+const cachedLiveReference = unstable_cache(loadLiveReference,["phase3-dashboard-live-v2"],{ revalidate: 300 });
 export function getDashboardAcademicReference(levelCode:string,groupChoice:string,attemptKey:string){return cachedAcademicReference(levelCode,groupChoice,attemptKey);}
 export function getDashboardLiveReference(input:{levelId:string;levelCode:string;attemptKey:string;subjectIds:string[];today:string}){return cachedLiveReference(input.levelId,input.levelCode,input.attemptKey,input.subjectIds.slice().sort().join(","),input.today);}
