@@ -44,7 +44,7 @@ function db(): D1Database {
 }
 
 export async function getCloudflareProfileForUser(applicationUserId: string) {
-  return db().prepare("SELECT * FROM profiles WHERE user_id=?1 LIMIT 1").bind(applicationUserId).first<CloudflareProfileRow>();
+  return db().prepare("SELECT user_id,display_name,avatar_url,ca_level,group_choice,attempt_key,timezone,daily_target_minutes,onboarding_step,onboarding_completed_at,created_at,updated_at FROM profiles WHERE user_id=?1 LIMIT 1").bind(applicationUserId).first<CloudflareProfileRow>();
 }
 
 export async function ensureCloudflareUserBootstrap(input: {
