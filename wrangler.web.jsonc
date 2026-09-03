@@ -29,6 +29,8 @@
       "dead_letter_queue": "ca-progress-v2-phase3-background-dlq"
     }]
   },
+  "durable_objects": { "bindings": [{ "name": "COMMUNITY_COORDINATORS", "class_name": "CommunityChannelCoordinator" }] },
+  "migrations": [{ "tag": "community-coordinators-v1", "new_classes": ["CommunityChannelCoordinator"] }],
   "triggers": { "crons": ["30 0 * * *"] },
   "vars": {
     "NEXT_PUBLIC_APP_NAME": "CA Progress",
