@@ -32,6 +32,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
   const noop = (() => undefined) as CommunityRealtimeHandle;
   noop.send = () => undefined;
   if (!input.channelId || !input.channelSlug || typeof window === "undefined" || typeof WebSocket === "undefined") return noop;
+      const SocketCtor = globalThis.WebSocket;
 
   const presenceId = input.userId || `guest:${crypto.randomUUID()}`;
   let socket: WebSocket | null = null;
@@ -64,7 +65,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
   };
   const connect = () => {
     if (closed) return;
-    try { socket = new WebSocket(realtimeUrl(input.channelSlug!)); } catch { startFallback(); return; }
+    try { socket = new SocketCtor(realtimeUrl(input.channelSlug!)); } catch { startFallback(); return; }
     socket.addEventListener("open", () => {
       reconnectMs = 500;
       stopFallback();
@@ -98,7 +99,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
     if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
     stopFallback();
     document.removeEventListener("visibilitychange", onVisibility);
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "presence", userId: presenceId, state: "offline" }));
+    if (socket?.readyState === 1) socket.send(JSON.stringify({ type: "presence", userId: presenceId, state: "offline" }));
     socket?.close();
     socket = null;
   }) as CommunityRealtimeHandle;
