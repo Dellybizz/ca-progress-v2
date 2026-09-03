@@ -1,6 +1,7 @@
 import "server-only";
 
 import { optionalUser } from "@/lib/auth/server";
+import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
 import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -50,6 +51,7 @@ async function currentPlanId(userId: string) {
 }
 
 export async function getEntitlementForUser(userId: string, featureKey: string): Promise<Entitlement> {
+  if (await isCurrentGuestTestUser(userId)) return { planId: "guest-test", tier: "pro", planName: "Guest test access", featureKey, allowed: true, limitValue: null, limitUnit: "unlimited", resetPeriod: "never", upgradeMessage: "" };
   const client = db();
   const planId = await currentPlanId(userId);
   if (!planId) return { planId: "", tier: "free", planName: "Free", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "This feature is not available on your current plan." };
