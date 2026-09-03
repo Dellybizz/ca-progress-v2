@@ -1,12 +1,12 @@
 import "server-only";
 
-import { getHotD1Database } from "@/lib/data/d1/runtime";
+import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { getResourceR2Bucket } from "@/lib/resources/r2";
 import { runIcaiSync } from "@/lib/icai/sync";
 import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
 import type { BackgroundJob } from "./queue";
 
-function db() { return getHotD1Database() as any; }
+function db(): HotD1Database { return getHotD1Database(); }
 function json(value: unknown) { return JSON.stringify(value ?? {}); }
 
 export async function executeBackgroundJob(job: BackgroundJob) {
