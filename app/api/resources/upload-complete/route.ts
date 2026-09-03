@@ -3,7 +3,7 @@ import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess, createResourceMetadataWithinQuota } from "@/lib/billing/service";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
-import { getHotD1Database } from "@/lib/data/d1/runtime";
+import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
 import { normalizeFilename } from "@/lib/resources/validation";
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   const uploadId = typeof body?.uploadId === "string" ? body.uploadId : "";
   if (!uploadId) return fail("Upload id is required.", 400, "UPLOAD_ID_REQUIRED");
 
-  const database = getHotD1Database() as any;
+  const database: HotD1Database = getHotD1Database();
   const intent = await database.prepare("SELECT id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at,status FROM r2_upload_intents WHERE id=?1 LIMIT 1").bind(uploadId).first() as Record<string, unknown> | null;
   if (!intent || intent.user_id !== identity.id) return fail("Upload not found.", 404, "UPLOAD_NOT_FOUND");
   if (intent.status !== "issued") return fail("This upload has already been completed or closed.", 409, "UPLOAD_NOT_ACTIVE");
