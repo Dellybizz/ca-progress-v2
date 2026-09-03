@@ -29,14 +29,14 @@ function unique<T>(values: T[]) { return [...new Set(values)]; }
 
 async function loadAcademicReference(levelCode: string, groupChoice: string, attemptKey: string): Promise<DashboardAcademicReference | null> {
   const supabase = createReferenceClient();
-  const levelResponse = await supabase.from("course_levels").select("*").eq("code", levelCode).eq("is_active", true).maybeSingle();
+  const levelResponse = await supabase.from("course_levels").select("id,code,name,is_active").eq("code", levelCode).eq("is_active", true).maybeSingle();
   if (levelResponse.error) throw levelResponse.error;
   const level = levelResponse.data;
   if (!level) return null;
   const [groupResponse, subjectResponse, mapResponse] = await Promise.all([
-    supabase.from("course_groups").select("*").eq("level_id", level.id).eq("is_active", true).order("sort_order"),
-    supabase.from("subjects").select("*").eq("level_id", level.id).eq("is_active", true).order("sort_order"),
-    supabase.from("attempt_syllabus_map").select("*").eq("level_id", level.id).eq("attempt_key", attemptKey),
+    supabase.from("course_groups").select("id,level_id,code,name,is_active,sort_order").eq("level_id", level.id).eq("is_active", true).order("sort_order"),
+    supabase.from("subjects").select("id,level_id,group_id,title,slug,is_active,sort_order").eq("level_id", level.id).eq("is_active", true).order("sort_order"),
+    supabase.from("attempt_syllabus_map").select("level_id,attempt_key,group_id,subject_id,syllabus_version_id").eq("level_id", level.id).eq("attempt_key", attemptKey),
   ]);
   const firstError = [groupResponse.error, subjectResponse.error, mapResponse.error].find(Boolean);
   if (firstError) throw firstError;
@@ -50,7 +50,7 @@ async function loadAcademicReference(levelCode: string, groupChoice: string, att
   const versionIds = unique(applicableMaps.map((row) => row.syllabus_version_id));
   let chapters: ChapterRow[] = [];
   if (versionIds.length) {
-    const chapterResponse = await supabase.from("chapters").select("*").in("syllabus_version_id", versionIds).order("sort_order");
+    const chapterResponse = await supabase.from("chapters").select("id,syllabus_version_id,sort_order").in("syllabus_version_id", versionIds).order("sort_order");
     if (chapterResponse.error) throw chapterResponse.error;
     chapters = (chapterResponse.data ?? []) as ChapterRow[];
   }
@@ -68,15 +68,15 @@ const cachedAcademicReference = unstable_cache(loadAcademicReference,["phase4-da
 async function loadLiveReference(levelId: string, levelCode: string, attemptKey: string, subjectIdsKey: string, today: string): Promise<DashboardLiveReference> {
   const supabase = createReferenceClient();
   const subjectIds = subjectIdsKey ? subjectIdsKey.split(",").filter(Boolean) : [];
-  const attemptResponse = await supabase.from("exam_attempts").select("*").eq("level_id", levelId).eq("attempt_key", attemptKey).eq("verification_status", "verified").maybeSingle();
+  const attemptResponse = await supabase.from("exam_attempts").select("id,level_id,attempt_key,label,start_date,end_date,source_url,last_seen_at,verification_status").eq("level_id", levelId).eq("attempt_key", attemptKey).eq("verification_status", "verified").maybeSingle();
   if (attemptResponse.error) throw attemptResponse.error;
   const attempt = attemptResponse.data;
   const [eventResponse, resourceResponse, sourceResponse, attemptMapResponse, subjectMapResponse] = await Promise.all([
-    attempt ? supabase.from("exam_events").select("*").eq("attempt_id", attempt.id).eq("verification_status", "verified").gte("event_date", today).order("event_date").limit(24) : Promise.resolve({ data: [], error: null }),
-    supabase.from("icai_resources").select("*").eq("verification_status", "verified").eq("status", "active").order("last_changed_at", { ascending: false }).limit(120),
-    supabase.from("icai_sources").select("*").eq("is_active", true),
-    supabase.from("resource_attempt_map").select("*"),
-    supabase.from("resource_subject_map").select("*"),
+    attempt ? supabase.from("exam_events").select("id,attempt_id,title,event_type,event_date,source_url,last_seen_at,verification_status").eq("attempt_id", attempt.id).eq("verification_status", "verified").gte("event_date", today).order("event_date").limit(24) : Promise.resolve({ data: [], error: null }),
+    supabase.from("icai_resources").select("id,resource_type,title,summary,official_url,source_id,metadata,published_on,last_seen_at,last_changed_at,verification_status,status").eq("verification_status", "verified").eq("status", "active").order("last_changed_at", { ascending: false }).limit(120),
+    supabase.from("icai_sources").select("id,name,official_url,is_active").eq("is_active", true),
+    supabase.from("resource_attempt_map").select("resource_id,attempt_id"),
+    supabase.from("resource_subject_map").select("resource_id,subject_id"),
   ]);
   const firstError = [eventResponse.error, resourceResponse.error, sourceResponse.error, attemptMapResponse.error, subjectMapResponse.error].find(Boolean);
   if (firstError) throw firstError;
