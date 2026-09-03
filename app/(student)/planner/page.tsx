@@ -12,7 +12,11 @@ export default async function Page() {
   const model = await getPlannerPageModel();
 
   if (model.mode === "guest") {
-    return <div className="phase6-page planner-page"><LoginRequired next="/planner" title="Sign in to plan your study day"/></div>;
+    return <div className="phase6-page planner-page">
+      <PageHeader preview={false} eyebrow="Planner" title="Plan your study day." actions={<div className="phase6-header-links planner-header-links"><Link href="/planner/today">Today Plan</Link><Link href="/calendar">Calendar</Link></div>} />
+      <Card><CardBody><div className="phase6-empty"><Icon name="calendar"/><strong>Planner preview</strong><p>Browse the planner pages as a guest. Tasks and goals require sign-in because they are personal.</p></div></CardBody></Card>
+      <LoginRequired next="/planner" title="Sign in to create your study plan"/>
+    </div>;
   }
 
   if (model.mode === "setup") {
