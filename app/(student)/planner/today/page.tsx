@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
 import { FeatureLock } from "@/components/billing/feature-lock";
 import { TodayPlanClient } from "@/components/planner/today-plan-client";
+import { Card, CardBody } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { optionalUser } from "@/lib/auth/server";
 import { getEntitlementForUser } from "@/lib/billing/service";
