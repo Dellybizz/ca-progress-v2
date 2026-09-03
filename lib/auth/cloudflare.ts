@@ -7,6 +7,7 @@ import type { AppRole } from "@/lib/authorization/roles";
 import type { SupportedOAuthProvider } from "./provider";
 
 const SESSION_COOKIE = "ca_session";
+export const GUEST_TEST_COOKIE = "ca_guest_test_id";
 const OAUTH_TRANSACTION_COOKIE = "ca_oauth_tx";
 const OAUTH_TRANSACTION_MAX_AGE_SECONDS = 10 * 60;
 const NORMAL_SESSION_SECONDS = 12 * 60 * 60;
@@ -410,8 +411,44 @@ async function loadEntitlements(applicationUserId: string) {
   return (result.results || []).map((row) => row.feature_key).filter(Boolean);
 }
 
+function guestTestEnabled() {
+  return getServerRuntimeValue("CA_GUEST_TEST_MODE").trim().toLowerCase() === "true";
+}
+
+function guestTestId() {
+  const value = (cookies()).then((store) => store.get(GUEST_TEST_COOKIE)?.value || "");
+  return value;
+}
+
+async function ensureGuestTestUser(applicationUserId: string) {
+  const database = getDb();
+  const attempt = await database.prepare(
+    "SELECT attempt_key FROM exam_attempts WHERE verification_status='verified' ORDER BY start_date DESC LIMIT 1",
+  ).first<{ attempt_key: string }>();
+  const attemptKey = attempt?.attempt_key || "undecided";
+  await database.batch([
+    database.prepare("INSERT OR IGNORE INTO app_users(user_id,auth_provider,provider_subject,account_state,role) VALUES(?1,'guest-test',?1,'active','student')").bind(applicationUserId),
+    database.prepare("INSERT OR IGNORE INTO profiles(user_id,display_name,ca_level,group_choice,attempt_key,daily_target_minutes,onboarding_step,onboarding_completed_at) VALUES(?1,'Guest Tester','intermediate','both',?2,120,4,CURRENT_TIMESTAMP)").bind(applicationUserId, attemptKey),
+    database.prepare("INSERT OR IGNORE INTO user_preferences(user_id) VALUES(?1)").bind(applicationUserId),
+  ]);
+}
+
+export async function isCurrentGuestTestUser(applicationUserId: string) {
+  if (!guestTestEnabled()) return false;
+  const store = await cookies();
+  return store.get(GUEST_TEST_COOKIE)?.value === applicationUserId;
+}
+
 export async function getCloudflareApplicationSession(): Promise<CloudflareApplicationSession | null> {
-  const rawToken = (await cookies()).get(SESSION_COOKIE)?.value || "";
+  const cookieStore = await cookies();
+  const rawToken = cookieStore.get(SESSION_COOKIE)?.value || "";
+  if (!rawToken && guestTestEnabled()) {
+    const applicationUserId = cookieStore.get(GUEST_TEST_COOKIE)?.value || "";
+    if (/^[0-9a-f-]{36}$/i.test(applicationUserId)) {
+      await ensureGuestTestUser(applicationUserId);
+      return { sessionId: applicationUserId, applicationUserId, role: "student", entitlements: [], email: null, phone: null, displayName: "Guest Tester", avatarUrl: null, rememberDevice: true, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), absoluteExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() };
+    }
+  }
   if (!rawToken) return null;
   const row = await currentSessionRow(rawToken);
   if (!row || row.account_state !== "active") return null;
