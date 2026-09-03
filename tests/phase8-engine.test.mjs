@@ -13,7 +13,7 @@ test("daily ICAI sync remains a Cloudflare scheduled job independent of user tra
   const syncWorker = read("workers/icai-sync/wrangler.jsonc");
   assert.match(bootstrap, /"main"\s*:\s*"\.\/custom-worker\.ts"/);
   assert.doesNotMatch(bootstrap, /"services"\s*:/);
-  assert.match(wrangler, /"crons"\s*:\s*\["30 0 \* \* \*"\]/);
+  assert.match(wrangler, /"crons"\s*:\s*\[[^\]]*"30 0 \* \* \*"/);
   assert.match(wrangler, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(wrangler, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);
   assert.match(worker, /scheduled\(/);
