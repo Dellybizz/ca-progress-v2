@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
+import Loading from "./loading";
 import { LoginRequired } from "@/components/auth/login-required";
 import { CommunityChannelList } from "@/components/community/channel-list";
 import { Icon } from "@/components/ui/icon";
@@ -9,7 +11,11 @@ import { getCommunityHomeModel } from "@/lib/community/service";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Community | CA Progress" };
 
-export default async function CommunityPage() {
+export default function CommunityPage() {
+  return <Suspense fallback={<Loading />}><CommunityContent /></Suspense>;
+}
+
+async function CommunityContent() {
   const model = await getCommunityHomeModel();
   if (model.mode === "guest") return <div className="phase10-page"><LoginRequired next="/community" title="Sign in to join the CA Progress Community"/></div>;
   if (model.mode === "setup") return <div className="phase10-page"><PageHeader preview={false} eyebrow="Community" title="Complete your academic profile first." description="Your level and group decide which collaborative channels and subject Doubts rooms you can access."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
