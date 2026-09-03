@@ -440,7 +440,7 @@ export async function isCurrentGuestTestUser(applicationUserId: string) {
   return store.get(GUEST_TEST_COOKIE)?.value === applicationUserId;
 }
 
-export async function getCloudflareApplicationSession(): Promise<CloudflareApplicationSession | null> {
+async function readCloudflareApplicationSession(): Promise<CloudflareApplicationSession | null> {
   const cookieStore = await cookies();
   const rawToken = cookieStore.get(SESSION_COOKIE)?.value || "";
   if (!rawToken && guestTestEnabled()) {
@@ -472,6 +472,27 @@ export async function getCloudflareApplicationSession(): Promise<CloudflareAppli
     absoluteExpiresAt: row.absolute_expires_at,
   };
 }
+
+export const getCloudflareApplicationSession = cache(readCloudflareApplicationSession);
+
+export type CloudflareRequestAuth = {
+  session: CloudflareApplicationSession | null;
+  applicationUserId: string | null;
+  role: AppRole;
+  entitlements: string[];
+  authenticated: boolean;
+};
+
+export const getCloudflareRequestAuth = cache(async (): Promise<CloudflareRequestAuth> => {
+  const session = await getCloudflareApplicationSession();
+  return {
+    session,
+    applicationUserId: session?.applicationUserId ?? null,
+    role: session?.role ?? "student",
+    entitlements: session?.entitlements ?? [],
+    authenticated: Boolean(session),
+  };
+});
 
 export async function rotateCloudflareSession() {
   const cookieStore = await cookies();
