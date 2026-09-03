@@ -391,22 +391,22 @@ async function currentSessionRow(rawToken: string) {
   return getDb().prepare(
     `SELECT s.session_id,s.application_user_id,s.auth_identity_id,s.remember_device,s.expires_at,s.absolute_expires_at,s.last_seen_at,
             u.role,u.account_state,i.email,i.phone,i.display_name,i.avatar_url,
-            COALESCE(group_concat(DISTINCT CASE
-              WHEN us.status='active'
-                AND julianday(us.starts_at) <= julianday(CURRENT_TIMESTAMP)
-                AND (us.ends_at IS NULL OR julianday(us.ends_at) > julianday(CURRENT_TIMESTAMP))
-                AND pe.enabled=1
-              THEN pe.feature_key END), '') AS entitlements
+            COALESCE((
+              SELECT group_concat(pe.feature_key)
+                FROM user_subscriptions us
+                JOIN plan_entitlements pe ON pe.plan_id=us.plan_id
+               WHERE us.user_id=s.application_user_id
+                 AND us.status='active'
+                 AND us.starts_at <= CURRENT_TIMESTAMP
+                 AND (us.ends_at IS NULL OR us.ends_at > CURRENT_TIMESTAMP)
+                 AND pe.enabled=1
+            ), '') AS entitlements
        FROM sessions s
        JOIN app_users u ON u.user_id=s.application_user_id
        LEFT JOIN auth_identities i ON i.identity_id=s.auth_identity_id
-       LEFT JOIN user_subscriptions us ON us.user_id=s.application_user_id
-       LEFT JOIN plan_entitlements pe ON pe.plan_id=us.plan_id
       WHERE s.token_hash=?1 AND s.revoked_at IS NULL
-        AND julianday(s.expires_at) > julianday(CURRENT_TIMESTAMP)
-        AND julianday(s.absolute_expires_at) > julianday(CURRENT_TIMESTAMP)
-      GROUP BY s.session_id,s.application_user_id,s.auth_identity_id,s.remember_device,s.expires_at,s.absolute_expires_at,s.last_seen_at,
-               u.role,u.account_state,i.email,i.phone,i.display_name,i.avatar_url
+        AND s.expires_at > CURRENT_TIMESTAMP
+        AND s.absolute_expires_at > CURRENT_TIMESTAMP
       LIMIT 1`,
   ).bind(tokenHash).first<SessionRow>();
 }
