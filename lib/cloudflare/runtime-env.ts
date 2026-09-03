@@ -28,7 +28,7 @@ export function performanceLoggingEnabled() {
 export function logServerPerformance(name: string, startedAt: number, metadata: Record<string, string | number | boolean | null> = {}) {
   if (!performanceLoggingEnabled()) return;
   const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
-  console.info("[ca-perf]", JSON.stringify({ name, duration_ms: durationMs, ...metadata }));
+  console.info("[ca-span]", JSON.stringify({ type: "latency_span", name, duration_ms: durationMs, ...metadata }));
 }
 
 export async function measureServerPerformance<T>(name: string, operation: () => Promise<T>, metadata: Record<string, string | number | boolean | null> = {}) {
