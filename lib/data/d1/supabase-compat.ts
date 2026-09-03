@@ -2,7 +2,7 @@ import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getCloudflareApplicationSession } from "@/lib/auth/cloudflare";
-import { logServerPerformance, measureServerPerformance } from "@/lib/cloudflare/runtime-env";
+import { logServerPerformance } from "@/lib/cloudflare/runtime-env";
 import type { AppRole } from "@/lib/authorization/roles";
 
 type D1Result<T = Record<string, unknown>> = { results?: T[]; success?: boolean };
