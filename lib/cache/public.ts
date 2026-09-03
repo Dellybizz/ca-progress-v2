@@ -108,48 +108,48 @@ export async function invalidateSharedPublicCache(namespaces: readonly PublicCac
 }
 
 
-const ENTITLEMENT_TTL_SECONDS = 60;
+const USER_FEATURE_TTL_SECONDS = 60;
 
-function entitlementCacheUrl(userId: string, featureKey: string, version: string) {
+function userFeatureCacheUrl(userId: string, featureKey: string, version: string) {
   const { appName } = getPublicRuntimeConfig();
   const safeApp = encodeURIComponent(appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
   return new URL(`https://${safeApp}.private-entitlement.invalid/${encodeURIComponent(userId)}/${encodeURIComponent(version)}/${encodeURIComponent(featureKey)}`).toString();
 }
 
-function entitlementVersionUrl(userId: string) {
+function userFeatureVersionUrl(userId: string) {
   const { appName } = getPublicRuntimeConfig();
   const safeApp = encodeURIComponent(appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
   return new URL(`https://${safeApp}.private-entitlement.invalid/_version/${encodeURIComponent(userId)}`).toString();
 }
 
-export async function getCachedEntitlement<T>(input: { userId: string; featureKey: string; load: () => Promise<T> }): Promise<T> {
+export async function getCachedUserFeature<T>(input: { userId: string; featureKey: string; load: () => Promise<T> }): Promise<T> {
   const cache = edgeCache();
   if (!cache) return input.load();
-  const versionResponse = await cache.match(new Request(entitlementVersionUrl(input.userId)));
+  const versionResponse = await cache.match(new Request(userFeatureVersionUrl(input.userId)));
   const version = versionResponse ? (await versionResponse.text()).trim() || BASE_VERSION : BASE_VERSION;
-  const request = new Request(entitlementCacheUrl(input.userId, input.featureKey, version));
+  const request = new Request(userFeatureCacheUrl(input.userId, input.featureKey, version));
   const hit = await cache.match(request);
   if (hit) {
     try {
-      metric("pricing", "hit", ENTITLEMENT_TTL_SECONDS);
+      metric("pricing", "hit", USER_FEATURE_TTL_SECONDS);
       return await hit.json() as T;
     } catch {
       await cache.delete(request);
     }
   }
-  metric("pricing", "miss", ENTITLEMENT_TTL_SECONDS);
+  metric("pricing", "miss", USER_FEATURE_TTL_SECONDS);
   const value = await input.load();
   await cache.put(request, new Response(JSON.stringify(value), {
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": `private, max-age=${ENTITLEMENT_TTL_SECONDS}` },
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": `private, max-age=${USER_FEATURE_TTL_SECONDS}` },
   }));
-  metric("pricing", "write", ENTITLEMENT_TTL_SECONDS);
+  metric("pricing", "write", USER_FEATURE_TTL_SECONDS);
   return value;
 }
 
-export async function invalidateUserEntitlementCache(userId: string) {
+export async function invalidateUserFeatureCache(userId: string) {
   const cache = edgeCache();
   if (!cache || !userId) return;
-  await cache.put(new Request(entitlementVersionUrl(userId)), new Response(`${Date.now().toString(36)}-${crypto.randomUUID()}`, {
+  await cache.put(new Request(userFeatureVersionUrl(userId)), new Response(`${Date.now().toString(36)}-${crypto.randomUUID()}`, {
     headers: { "content-type": "text/plain; charset=utf-8", "cache-control": `private, max-age=${VERSION_TTL_SECONDS}` },
   }));
   metric("pricing", "invalidate");
