@@ -16,12 +16,6 @@ function bytes(value: number) { if (value < 1024 * 1024) return `${Math.max(1, M
 function statusTone(status: string) { return status === "approved" ? "success" : status === "rejected" || status === "reported" ? "danger" : status === "pending" ? "warning" : "neutral"; }
 function matches(value: string, query: string) { return value.toLowerCase().includes(query); }
 
-async function readApiPayload(response: Response): Promise<{ error?: string }> {
-  const body = await response.text();
-  if (!body.trim()) return {};
-  try { return JSON.parse(body) as { error?: string }; }
-  catch { return {}; }
-}
 
 function uploadFallbackMessage(status: number) {
   if (status === 413) return "This upload is larger than the 10 MB file limit.";
