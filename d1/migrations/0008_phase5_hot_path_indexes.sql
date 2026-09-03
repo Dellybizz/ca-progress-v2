@@ -21,3 +21,15 @@ ON plan_entitlements(plan_id, enabled, feature_key);
 
 CREATE INDEX IF NOT EXISTS idx_progress_events_user_created
 ON progress_events(user_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_community_messages_channel_status_sequence
+ON community_messages(channel_id,moderation_status,sequence_id);
+
+CREATE INDEX IF NOT EXISTS idx_channel_read_state_channel_user_sequence
+ON channel_read_state(channel_id,user_id,last_read_sequence);
+
+CREATE INDEX IF NOT EXISTS idx_chat_blocks_user_end_channel
+ON chat_blocks(user_id,ends_at,channel_id);
+
+CREATE INDEX IF NOT EXISTS idx_community_channels_active_scope_sort
+ON community_channels(is_active,scope_type,sort_order,title);
