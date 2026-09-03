@@ -21,7 +21,7 @@ test("F1 prefetches desktop and mobile navigation", () => {
 
 test("F1 provides transition feedback without replacing the shell", () => {
   const progress = read("components/shell/navigation-progress.tsx");
-  assert.match(progress, /setPending\(false\)/);
+  assert.match(progress, /<NavigationProgressState key=\\{pathname\\} \/>/);
   assert.match(progress, /app-navigation-progress/);
   assert.match(read("components/study/timezone-sync.tsx"), /\}, \[\]\);/);
   assert.doesNotMatch(read("components/study/timezone-sync.tsx"), /router\.refresh/);
