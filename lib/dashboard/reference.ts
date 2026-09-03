@@ -73,10 +73,10 @@ async function loadLiveReference(levelId: string, levelCode: string, attemptKey:
   const attempt = attemptResponse.data;
   const [eventResponse, resourceResponse, sourceResponse, attemptMapResponse, subjectMapResponse] = await Promise.all([
     attempt ? supabase.from("exam_events").select("id,attempt_id,title,event_type,event_date,source_url,last_seen_at,verification_status").eq("attempt_id", attempt.id).eq("verification_status", "verified").gte("event_date", today).order("event_date").limit(24) : Promise.resolve({ data: [], error: null }),
-    supabase.from("icai_resources").select("id,resource_type,title,summary,official_url,source_id,metadata,published_on,last_seen_at,last_changed_at,verification_status,status").eq("verification_status", "verified").eq("status", "active").order("last_changed_at", { ascending: false }).limit(120),
+    supabase.from("icai_resources").select("id,resource_type,title,summary,official_url,source_id,metadata,published_on,last_seen_at,last_changed_at,verification_status,status").eq("verification_status", "verified").eq("status", "active").order("last_changed_at", { ascending: false }).limit(24),
     supabase.from("icai_sources").select("id,name,official_url,is_active").eq("is_active", true),
-    supabase.from("resource_attempt_map").select("resource_id,attempt_id"),
-    supabase.from("resource_subject_map").select("resource_id,subject_id"),
+    attempt ? supabase.from("resource_attempt_map").select("resource_id,attempt_id").eq("attempt_id", attempt.id) : Promise.resolve({ data: [], error: null }),
+    subjectIds.length ? supabase.from("resource_subject_map").select("resource_id,subject_id").in("subject_id", subjectIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const firstError = [eventResponse.error, resourceResponse.error, sourceResponse.error, attemptMapResponse.error, subjectMapResponse.error].find(Boolean);
   if (firstError) throw firstError;
