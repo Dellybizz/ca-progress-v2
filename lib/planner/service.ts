@@ -5,6 +5,7 @@ import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/supabase-compat";
+import { getHotActivityRows, getHotCalendarRows, getHotPlannerRows } from "@/lib/data/d1/hot-screens";
 import type { Database } from "@/lib/supabase/database.types";
 import type { StudySubjectOption } from "@/lib/study/types";
 import type { ActivityItem, ActivityPageModel, CalendarItem, CalendarPageModel, GoalsPageModel, PlannerGoal, PlannerPageModel, PlannerTask } from "./types";
@@ -46,6 +47,10 @@ export async function getPlannerPageModel(): Promise<PlannerPageModel> {
   if (!validProfile(profile)) return { mode: "setup", viewerName: name };
   const subjects = await academicOptions(profile!);
   const names = maps(subjects);
+  if (isCloudflareDataRuntime()) {
+    const hot = await getHotPlannerRows(identity.id);
+    return { mode: "ready", viewerName: name, subjects, tasks: hot.tasks.map((row) => taskDto(row as TaskRow, names.subjects, names.chapters)), goals: hot.goals.map((row) => goalDto(row as GoalRow)) };
+  }
   const supabase = await createServerSupabaseClient();
   const [tasks, goals] = await Promise.all([
     supabase.from("tasks").select("*").eq("user_id", identity.id).neq("status", "cancelled").order("due_at").limit(250),
@@ -106,6 +111,8 @@ async function loadActivityRows(userId: string) {
     ]);
     return { sessions: sessions.data ?? [], progress: progress.data ?? [], error: sessions.error || progress.error };
   }
+  const hot = await getHotActivityRows(userId, 40);
+  return { sessions: hot.sessions, progress: hot.progress, error: null };
   const db = getD1RuntimeDatabase();
   const [sessions, progress] = await Promise.all([
     db.prepare("SELECT id,subject_id,chapter_id,ended_at,duration_seconds FROM study_sessions WHERE user_id=?1 ORDER BY ended_at DESC LIMIT 40").bind(userId).all<Pick<SessionRow, "id"|"subject_id"|"chapter_id"|"ended_at"|"duration_seconds">>(),
