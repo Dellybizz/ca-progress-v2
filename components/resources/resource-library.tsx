@@ -17,7 +17,14 @@ function statusTone(status: string) { return status === "approved" ? "success" :
 function matches(value: string, query: string) { return value.toLowerCase().includes(query); }
 
 
-async function readApiPayload<T extends Record<string, unknown> = { error?: string }>(response: Response): Promise<T> {\n  const body = await response.text();\n  if (!body.trim()) return {} as T;\n  try { return JSON.parse(body) as T; }\n  catch { return {} as T; }\n}\n\nfunction uploadFallbackMessage(status: number) {
+async function readApiPayload<T extends Record<string, unknown> = { error?: string }>(response: Response): Promise<T> {
+  const body = await response.text();
+  if (!body.trim()) return {} as T;
+  try { return JSON.parse(body) as T; }
+  catch { return {} as T; }
+}
+
+function uploadFallbackMessage(status: number) {
   if (status === 413) return "This upload is larger than the 10 MB file limit.";
   if (status === 401) return "Your session expired. Sign in again and retry the upload.";
   if (status >= 500) return "The upload service returned a server error. Please retry in a moment.";
