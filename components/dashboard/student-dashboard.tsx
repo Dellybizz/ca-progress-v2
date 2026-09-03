@@ -33,7 +33,7 @@ function GuestDashboard() {
         preview={false}
         eyebrow="Dashboard"
         title="Explore your CA study workspace."
-        description="Browse the study tools now. Sign in whenever you want to save your own course, plan and progress."
+        description="Browse the study tools now. Sign in to personalize your dashboard and save your own course, plan and progress."
       />
 
       <section className="dashboard-overview-grid" aria-label="Study overview">
