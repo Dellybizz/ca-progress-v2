@@ -1,4 +1,4 @@
-# Phase 3 shared data caching deployment
+# Phase 3 shared data caching deployment - contract refresh
 # Phase 5 cutover trigger marker — runtime logic unchanged
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
