@@ -86,7 +86,7 @@ function itemIsActive(item: NavItem, pathname: string) {
 
 function NavLink({ item, pathname, compact = false }: { item: NavItem; pathname: string; compact?: boolean }) {
   const active = itemIsActive(item, pathname);
-  return <Link href={item.href} className={`${active ? "is-active" : ""}${compact ? " sidebar-nav__child" : ""}`} aria-current={active ? "page" : undefined}>
+  return <Link prefetch={true} href={item.href} className={`${active ? "is-active" : ""}${compact ? " sidebar-nav__child" : ""}`} aria-current={active ? "page" : undefined}>
     <Icon name={item.icon} size={compact ? 16 : 19}/><span>{item.label}</span>{active ? <i className="sidebar-nav__active" aria-hidden="true"/> : null}
   </Link>;
 }
