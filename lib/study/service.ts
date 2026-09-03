@@ -71,7 +71,7 @@ export async function getStudyAnalytics(userId: string, options?: { now?: Date; 
   const now = options?.now ?? new Date();
   const since = new Date(now.valueOf() - 60 * DAY_MS).toISOString();
   const supabase = await createServerSupabaseClient();
-  const response = await supabase.from("study_sessions").select("*").eq("user_id", userId).gte("ended_at", since).order("ended_at", { ascending: false }).limit(600);
+  const response = await supabase.from("study_sessions").select("id,subject_id,chapter_id,started_at,ended_at,duration_seconds,mode,timezone").eq("user_id", userId).gte("ended_at", since).order("ended_at", { ascending: false }).limit(600);
   if (response.error) throw new Error(`Study analytics could not be loaded: ${response.error.message}`);
   const rows = (response.data ?? []) as SessionRow[];
   const subjectNames = options?.subjectNames ?? new Map<string, string>();
