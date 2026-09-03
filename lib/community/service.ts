@@ -87,7 +87,7 @@ async function publicCommunityContext() {
   const supabase = createAdminSupabaseClient();
   const [channelsResult, messagesResult] = await Promise.all([
     supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("is_active", true).eq("scope_type", "global").order("sort_order").order("title"),
-    supabase.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("moderation_status", "active").order("sequence_id", { ascending: false }).limit(200),
+    supabase.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("moderation_status", "active").order("sequence_id", { ascending: false }).limit(60),
   ]);
   const error = channelsResult.error || messagesResult.error;
   if (error) throw new Error(`Public Community could not be loaded: ${error.message}`);
@@ -156,7 +156,7 @@ export async function getCommunityHomeModel(): Promise<CommunityHomeModel> {
   if (context.mode === "setup") return { mode: "setup", viewerName: context.viewerName };
   const notifications = await context.supabase
     .from("community_notifications")
-    .select("*")
+    .select("id,channel_id,notification_type,message_id,created_at,read_at")
     .eq("user_id", context.identity.id)
     .is("read_at", null)
     .order("created_at", { ascending: false })
@@ -199,10 +199,10 @@ async function hydrateMessages(
   const replyIds = [...new Set(rows.map((row) => row.reply_to_message_id).filter((id): id is string => Boolean(id)))];
   const resourceIds = [...new Set(rows.map((row) => row.attached_resource_id).filter((id): id is string => Boolean(id)))];
   const [reactions, pins, replies, resources] = await Promise.all([
-    supabase.from("message_reactions").select("*").in("message_id", ids),
-    supabase.from("pinned_messages").select("*").in("message_id", ids),
+    supabase.from("message_reactions").select("message_id,user_id,emoji").in("message_id", ids),
+    supabase.from("pinned_messages").select("message_id").in("message_id", ids),
     replyIds.length ? supabase.from("community_messages").select("id,author_label,body").in("id", replyIds) : Promise.resolve({ data: [], error: null }),
-    resourceIds.length ? supabase.from("uploaded_resources").select("*").in("id", resourceIds).eq("visibility", "shared").eq("moderation_status", "approved") : Promise.resolve({ data: [], error: null }),
+    resourceIds.length ? supabase.from("uploaded_resources").select("id,title,original_filename,extension,owner_label").in("id", resourceIds).eq("visibility", "shared").eq("moderation_status", "approved") : Promise.resolve({ data: [], error: null }),
   ]);
   const error = reactions.error || pins.error || replies.error || resources.error;
   if (error) throw new Error(`Community message details could not be loaded: ${error.message}`);
@@ -241,7 +241,7 @@ export async function getCommunityMessagePage(options: { channelSlug: string; cu
   if (!channel.data) throw new Error("Channel not found or access denied.");
   let query = supabase
     .from("community_messages")
-    .select("*")
+    .select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id")
     .eq("channel_id", channel.data.id)
     .in("moderation_status", ["active", "moderated"])
     .order("sequence_id", { ascending: false })
@@ -264,10 +264,10 @@ async function pinnedMessage(
   channelId: string,
   viewerId: string,
 ) {
-  const pin = await supabase.from("pinned_messages").select("*").eq("channel_id", channelId).order("pinned_at", { ascending: false }).limit(1).maybeSingle();
+  const pin = await supabase.from("pinned_messages").select("message_id,pinned_at").eq("channel_id", channelId).order("pinned_at", { ascending: false }).limit(1).maybeSingle();
   if (pin.error) throw new Error(`Pinned message could not be loaded: ${pin.error.message}`);
   if (!pin.data) return null;
-  const message = await supabase.from("community_messages").select("*").eq("id", pin.data.message_id).maybeSingle();
+  const message = await supabase.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("id", pin.data.message_id).maybeSingle();
   if (message.error || !message.data) return null;
   return (await hydrateMessages(supabase, [message.data as MessageRow], viewerId))[0] ?? null;
 }
@@ -301,7 +301,7 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
   const [memberResult, resourceResult, blockResult, pinned] = await Promise.all([
     context.supabase.rpc("phase10_list_channel_members", { p_channel_key: channel.key, p_limit: 120 }),
     context.supabase.from("uploaded_resources").select("id,title,extension,owner_label").eq("visibility", "shared").eq("moderation_status", "approved").order("published_at", { ascending: false }).limit(80),
-    context.supabase.from("chat_blocks").select("*").eq("user_id", context.identity.id).gt("ends_at", new Date().toISOString()).order("ends_at", { ascending: false }).limit(20),
+    context.supabase.from("chat_blocks").select("id,user_id,channel_id,reason,ends_at").eq("user_id", context.identity.id).gt("ends_at", new Date().toISOString()).order("ends_at", { ascending: false }).limit(4),
     pinnedMessage(context.supabase, channel.id, context.identity.id),
   ]);
   const error = memberResult.error || resourceResult.error || blockResult.error;
