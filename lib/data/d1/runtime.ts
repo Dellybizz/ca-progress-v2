@@ -6,6 +6,7 @@ export type HotD1Statement = {
   bind(...values: unknown[]): HotD1Statement;
   first<T = Record<string, unknown>>(): Promise<T | null>;
   all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>;
+  run(): Promise<unknown>;
 };
 export type HotD1Database = {
   prepare(sql: string): HotD1Statement;
