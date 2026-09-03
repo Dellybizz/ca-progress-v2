@@ -417,6 +417,8 @@ function guestTestEnabled() {
 
 async function ensureGuestTestUser(applicationUserId: string) {
   const database = getDb();
+  const existing = await database.prepare("SELECT auth_provider FROM app_users WHERE user_id=?1 LIMIT 1").bind(applicationUserId).first<{ auth_provider: string }>();
+  if (existing && existing.auth_provider !== "guest-test") return false;
   const attempt = await database.prepare(
     "SELECT attempt_key FROM exam_attempts WHERE verification_status='verified' ORDER BY start_date DESC LIMIT 1",
   ).first<{ attempt_key: string }>();
@@ -426,6 +428,7 @@ async function ensureGuestTestUser(applicationUserId: string) {
     database.prepare("INSERT OR IGNORE INTO profiles(user_id,display_name,ca_level,group_choice,attempt_key,daily_target_minutes,onboarding_step,onboarding_completed_at) VALUES(?1,'Guest Tester','intermediate','both',?2,120,4,CURRENT_TIMESTAMP)").bind(applicationUserId, attemptKey),
     database.prepare("INSERT OR IGNORE INTO user_preferences(user_id) VALUES(?1)").bind(applicationUserId),
   ]);
+  return true;
 }
 
 export async function isCurrentGuestTestUser(applicationUserId: string) {
@@ -440,7 +443,7 @@ export async function getCloudflareApplicationSession(): Promise<CloudflareAppli
   if (!rawToken && guestTestEnabled()) {
     const applicationUserId = cookieStore.get(GUEST_TEST_COOKIE)?.value || "";
     if (/^[0-9a-f-]{36}$/i.test(applicationUserId)) {
-      await ensureGuestTestUser(applicationUserId);
+      if (!(await ensureGuestTestUser(applicationUserId))) return null;
       return { sessionId: applicationUserId, applicationUserId, role: "student", entitlements: [], email: null, phone: null, displayName: "Guest Tester", avatarUrl: null, rememberDevice: true, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), absoluteExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() };
     }
   }
