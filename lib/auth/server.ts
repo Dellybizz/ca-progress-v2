@@ -53,7 +53,7 @@ async function getProfileForUserUncached(userId: string): Promise<ProfileRow | n
     return await measureServerPerformance("auth.profile", () => getCloudflareProfileForUser(userId) as Promise<ProfileRow | null>);
   }
   const supabase = await createServerSupabaseClient();
-  const { data } = await measureServerPerformance("auth.profile", () => supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle());
+  const { data } = await measureServerPerformance("auth.profile", async () => await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle());
   return data ?? null;
 }
 
