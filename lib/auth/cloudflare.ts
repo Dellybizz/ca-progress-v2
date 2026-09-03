@@ -411,18 +411,6 @@ async function currentSessionRow(rawToken: string) {
   ).bind(tokenHash).first<SessionRow>();
 }
 
-async function loadEntitlements(applicationUserId: string) {
-  const result = await getDb().prepare(
-    `SELECT DISTINCT pe.feature_key
-       FROM user_subscriptions us
-       JOIN plan_entitlements pe ON pe.plan_id=us.plan_id AND pe.enabled=1
-      WHERE us.user_id=?1 AND us.status='active'
-        AND julianday(us.starts_at) <= julianday(CURRENT_TIMESTAMP)
-        AND (us.ends_at IS NULL OR julianday(us.ends_at) > julianday(CURRENT_TIMESTAMP))`,
-  ).bind(applicationUserId).all<{ feature_key: string }>();
-  return (result.results || []).map((row) => row.feature_key).filter(Boolean);
-}
-
 function guestTestEnabled() {
   return getServerRuntimeValue("CA_GUEST_TEST_MODE").trim().toLowerCase() === "true";
 }
