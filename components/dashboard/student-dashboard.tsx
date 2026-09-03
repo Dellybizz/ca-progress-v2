@@ -28,18 +28,90 @@ function formatMinutes(value: number) {
 
 function GuestDashboard() {
   return (
-    <div className="student-dashboard student-dashboard--simple-state">
+    <div className="student-dashboard student-dashboard--home">
       <PageHeader
         preview={false}
         eyebrow="Dashboard"
-        title="Your CA study workspace"
-        description="Sign in to sync your course, progress, planner and study history across devices."
+        title="Explore your CA study workspace."
+        description="Browse the study tools now. Sign in whenever you want to save your own course, plan and progress."
       />
-      <Card className="dashboard-access-card">
+
+      <section className="dashboard-overview-grid" aria-label="Study overview">
+        <Link href="/subjects" className="dashboard-overview-card" aria-label="Browse subjects">
+          <header className="dashboard-overview-card__header">
+            <span className="dashboard-overview-card__icon"><Icon name="book" size={17}/></span>
+            <div><strong>Subjects</strong><small>Explore the syllabus</small></div>
+            <Icon name="chevron" size={14}/>
+          </header>
+          <div className="dashboard-overview-card__primary">
+            <strong>Browse</strong><span>the course</span><small>Choose a subject to begin</small>
+          </div>
+          <div className="dashboard-overview-card__metrics">
+            <span><b>Public</b> syllabus</span>
+            <span><b>Free</b> to explore</span>
+          </div>
+        </Link>
+
+        <Link href="/study" className="dashboard-overview-card" aria-label="Open study mode">
+          <header className="dashboard-overview-card__header">
+            <span className="dashboard-overview-card__icon"><Icon name="timer" size={17}/></span>
+            <div><strong>Study</strong><small>Try focus mode</small></div>
+            <Icon name="chevron" size={14}/>
+          </header>
+          <div className="dashboard-overview-card__primary">
+            <strong>Start</strong><span>a session</span><small>Sign in to save study time</small>
+          </div>
+          <div className="dashboard-overview-card__metrics dashboard-overview-card__metrics--three">
+            <span><b>Focus</b> mode</span>
+            <span><b>Save</b> your history</span>
+          </div>
+        </Link>
+
+        <Link href="/progress" className="dashboard-overview-card dashboard-overview-card--progress" aria-label="Explore progress tracking">
+          <header className="dashboard-overview-card__header">
+            <span className="dashboard-overview-card__icon"><Icon name="chart" size={17}/></span>
+            <div><strong>Progress</strong><small>See how tracking works</small></div>
+            <Icon name="chevron" size={14}/>
+          </header>
+          <div className="dashboard-overview-card__primary">
+            <strong>Track</strong><span>your syllabus</span><small>Sign in to keep your progress</small>
+          </div>
+          <div className="dashboard-overview-progress">
+            <div><span>Course progress</span><i aria-hidden="true"><b style={{ width: "0%" }}/></i><small>—</small></div>
+          </div>
+        </Link>
+      </section>
+
+      <section className="dashboard-home-grid">
+        <Card className="dashboard-next-card">
+          <CardHeader title="Get started" />
+          <CardBody>
+            <div className="dashboard-next-card__row">
+              <span className="dashboard-next-card__icon"><Icon name="sparkles" size={18}/></span>
+              <div><strong>Choose a subject to explore</strong><p>Review the public syllabus first, then sign in when you want a personal study plan.</p></div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="dashboard-actions-card">
+          <CardHeader title="Quick actions"/>
+          <CardBody>
+            <div className="dashboard-quick-actions">
+              <Link href="/subjects" className="dashboard-quick-action"><span><Icon name="book" size={16}/></span><strong>Browse Subjects</strong><small>Explore the syllabus</small></Link>
+              <Link href="/updates" className="dashboard-quick-action"><span><Icon name="bell" size={16}/></span><strong>ICAI Updates</strong><small>View official updates</small></Link>
+              <Link href="/login?next=%2Fdashboard" className="dashboard-quick-action"><span><Icon name="arrow" size={16}/></span><strong>Sign In</strong><small>Save your workspace</small></Link>
+            </div>
+          </CardBody>
+        </Card>
+      </section>
+
+      <Card className="dashboard-icai-compact">
+        <CardHeader title="ICAI updates" action={<Link className="ui-text-link" href="/updates">View all <Icon name="arrow" size={13}/></Link>}/>
         <CardBody>
-          <span className="dashboard-access-card__icon"><Icon name="shield" size={22}/></span>
-          <div><h2>Sign in to personalize your dashboard</h2><p>Your academic selection and saved study data will appear here.</p></div>
-          <Link className="dashboard-primary-link" href="/login?next=%2Fdashboard">Sign in <Icon name="arrow" size={15}/></Link>
+          <div className="dashboard-no-update">
+            <span><Icon name="book" size={16}/></span>
+            <div><strong>Official updates are available</strong><p>Open the updates page to see the latest verified ICAI notices.</p></div>
+          </div>
         </CardBody>
       </Card>
     </div>
