@@ -31,7 +31,7 @@
   },
   "durable_objects": { "bindings": [{ "name": "COMMUNITY_COORDINATORS", "class_name": "CommunityChannelCoordinator" }] },
   "migrations": [{ "tag": "community-coordinators-v1", "new_classes": ["CommunityChannelCoordinator"] }],
-  "triggers": { "crons": ["30 0 * * *"] },
+  "triggers": { "crons": ["30 0 * * *", "0 * * * *"] },
   "vars": {
     "NEXT_PUBLIC_APP_NAME": "CA Progress",
     "NEXT_PUBLIC_APP_ENV": "production",
