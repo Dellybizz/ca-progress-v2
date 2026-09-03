@@ -37,7 +37,7 @@ const plans = [
   ["progress events", "SELECT id FROM progress_events WHERE user_id='u' AND chapter_id='c' ORDER BY created_at DESC LIMIT 20", "idx_progress_events_user_chapter_created"],
   ["study sessions", "SELECT id FROM study_sessions WHERE user_id='u' ORDER BY ended_at DESC LIMIT 40", "idx_study_sessions_user_ended"],
   ["tasks", "SELECT id FROM tasks WHERE user_id='u' AND status='todo' ORDER BY due_at LIMIT 250", "idx_tasks_user_status_due"],
-  ["community messages", "SELECT id FROM community_messages WHERE channel_id='c' AND moderation_status IN ('active','moderated') ORDER BY sequence_id DESC LIMIT 41", "idx_community_messages_channel_status_sequence"],
+  ["community messages", "SELECT id FROM community_messages WHERE channel_id='c' AND moderation_status IN ('active','moderated') ORDER BY sequence_id DESC LIMIT 41", "community_messages_channel_sequence_idx"],
   ["read state", "SELECT last_read_sequence FROM channel_read_state WHERE channel_id='c' AND user_id='u' LIMIT 1", "idx_channel_read_state_channel_user_sequence"],
   ["reactions", "SELECT emoji FROM message_reactions WHERE message_id='m' AND user_id='u'", "idx_message_reactions_message_user_emoji"],
   ["pins", "SELECT message_id FROM pinned_messages WHERE channel_id='c' ORDER BY pinned_at DESC LIMIT 1", "idx_pinned_messages_channel_pinned_message"],
