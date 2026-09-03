@@ -83,7 +83,7 @@ const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 120;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
 
-function requestId(request: Request) {
+function errorFingerprint(error: unknown) {\n  const source = error instanceof Error ? `${error.name}:${error.message}` : String(error);\n  let hash = 2166136261;\n  for (let index = 0; index < source.length; index += 1) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);\n  return `fp-${(hash >>> 0).toString(16).padStart(8, "0")}`;\n}\n\nfunction requestId(request: Request) {
   const incoming = request.headers.get("x-request-id")?.trim();
   return incoming && /^[A-Za-z0-9._:-]{8,120}$/.test(incoming) ? incoming : crypto.randomUUID();
 }
@@ -125,11 +125,11 @@ async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContex
     headers.set("server-timing", `worker;dur=${Math.round((performance.now() - startedAt) * 100) / 100}`);
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   } catch (error) {
-    const fingerprint = error instanceof Error ? error.message : String(error);
+    const fingerprint = errorFingerprint(error);
     console.error(JSON.stringify({ event: "worker.request_error", requestId: id, fingerprint, path: new URL(request.url).pathname }));
     return new Response(JSON.stringify({ error: "The service encountered a temporary error.", requestId: id }), {
       status: 500,
-      headers: { "content-type": "application/json", "cache-control": "no-store", "x-request-id": id },
+      headers: { "content-type": "application/json", "cache-control": "no-store", "x-request-id": id, "x-error-fingerprint": fingerprint },
     });
   }
 }
