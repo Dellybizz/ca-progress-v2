@@ -38,13 +38,13 @@ function versionDto(row: VersionRow): AcademicVersion {
 async function loadRawAcademic(): Promise<RawAcademic> {
   const supabase = await createServerSupabaseClient();
   const [levels, groups, subjects, versions, chapters, topics, attemptMap] = await Promise.all([
-    supabase.from("course_levels").select("id,code,name,sort_order,is_active").eq("is_active", true).order("sort_order"),
-    supabase.from("course_groups").select("id,level_id,code,name,sort_order,is_default,is_active").eq("is_active", true).order("sort_order"),
-    supabase.from("subjects").select("id,code,slug,paper_label,title,subject_kind,level_id,group_id,source_url,is_active,sort_order").eq("is_active", true).order("sort_order"),
-    supabase.from("syllabus_versions").select("id,version_key,title,status,effective_from,effective_to,supersedes_version_id,source_url,source_label,source_verified_at,subject_id").order("effective_from", { ascending: false }),
-    supabase.from("chapters").select("id,stable_key,chapter_number,title,section_key,chapter_kind,syllabus_version_id,sort_order").order("sort_order"),
-    supabase.from("topics").select("id,stable_key,unit_number,title,topic_kind,chapter_id,sort_order").order("sort_order"),
-    supabase.from("attempt_syllabus_map").select("level_id,attempt_key,group_id,subject_id,syllabus_version_id").order("attempt_key"),
+    supabase.from("course_levels").select("id,code,name,sort_order,is_active,created_at,updated_at").eq("is_active", true).order("sort_order"),
+    supabase.from("course_groups").select("id,level_id,code,name,sort_order,is_default,is_active,created_at,updated_at").eq("is_active", true).order("sort_order"),
+    supabase.from("subjects").select("id,code,slug,paper_label,title,subject_kind,level_id,group_id,source_url,is_active,sort_order,created_at,updated_at").eq("is_active", true).order("sort_order"),
+    supabase.from("syllabus_versions").select("id,version_key,title,status,effective_from,effective_to,supersedes_version_id,source_url,source_label,source_verified_at,subject_id,content_hash,created_at,updated_at,verification_method").order("effective_from", { ascending: false }),
+    supabase.from("chapters").select("id,stable_key,chapter_number,title,section_key,chapter_kind,syllabus_version_id,sort_order,slug,source_url,created_at,updated_at").order("sort_order"),
+    supabase.from("topics").select("id,stable_key,unit_number,title,topic_kind,chapter_id,sort_order,source_url,created_at,updated_at").order("sort_order"),
+    supabase.from("attempt_syllabus_map").select("id,level_id,attempt_key,group_id,subject_id,syllabus_version_id,created_at").order("attempt_key"),
   ]);
   const firstError = [levels.error, groups.error, subjects.error, versions.error, chapters.error, topics.error, attemptMap.error].find(Boolean);
   if (firstError) throw new AcademicDataError(firstError.message);
