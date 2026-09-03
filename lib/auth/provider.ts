@@ -3,7 +3,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   exchangeCloudflareOAuthCode,
-  getCloudflareApplicationSession,
+  getCloudflareRequestAuth,
   isCloudflareAuthRuntime,
   signOutCloudflareSession,
   startCloudflareOAuth,
@@ -47,16 +47,17 @@ function claimString(claims: Record<string, unknown>, key: string) {
 
 export async function getCurrentApplicationIdentity(): Promise<ApplicationAuthIdentity | null> {
   if (isCloudflareAuthRuntime()) {
-    const session = await getCloudflareApplicationSession();
+    const auth = await getCloudflareRequestAuth();
+    const session = auth.session;
     if (!session) return null;
     return {
-      id: session.applicationUserId,
+      id: auth.applicationUserId!,
       email: session.email,
       phone: session.phone,
       displayName: session.displayName,
       avatarUrl: session.avatarUrl,
-      role: session.role,
-      entitlements: session.entitlements,
+      role: auth.role,
+      entitlements: auth.entitlements,
     };
   }
 
