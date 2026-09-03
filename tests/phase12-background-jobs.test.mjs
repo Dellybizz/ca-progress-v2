@@ -30,7 +30,7 @@ test("dashboard and planner use persisted plans without doing AI work in page re
 });
 
 test("uploads enqueue attachment processing after durable metadata commit", () => {
-  const upload = read("app/api/resources/upload/route.ts");
+  const upload = read("app/api/resources/upload-complete/route.ts");
   assert.match(upload, /type: "attachment-process"/);
   assert.match(upload, /processing: "queued"/);
 });
