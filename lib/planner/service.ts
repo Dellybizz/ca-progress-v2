@@ -92,7 +92,7 @@ export async function getCalendarPageModel(month?: string | null): Promise<Calen
   ]);
   const error = tasks.error || goals.error || userEvents.error || attempt.error;
   if (error) throw new Error(`Calendar could not be loaded: ${error.message}`);
-  const examEvents = attempt.data?.id ? await supabase.from("exam_events").select("*").eq("attempt_id", attempt.data.id).eq("verification_status", "verified").gte("event_date", bounds.start.toISOString().slice(0, 10)).lt("event_date", bounds.end.toISOString().slice(0, 10)).order("event_date") : { data: [], error: null };
+  const examEvents = attempt.data?.id ? await supabase.from("exam_events").select("id,attempt_id,title,event_type,event_date,source_url,last_seen_at,verification_status").eq("attempt_id", attempt.data.id).eq("verification_status", "verified").gte("event_date", bounds.start.toISOString().slice(0, 10)).lt("event_date", bounds.end.toISOString().slice(0, 10)).order("event_date") : { data: [], error: null };
   if (examEvents.error) throw new Error(`Official exam calendar could not be loaded: ${examEvents.error.message}`);
   const items: CalendarItem[] = [];
   for (const row of (tasks.data ?? []) as TaskRow[]) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes });
