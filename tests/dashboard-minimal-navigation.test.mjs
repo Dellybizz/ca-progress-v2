@@ -18,7 +18,7 @@ test("student sidebar restores Dashboard plus five grouped sections", () => {
 
 test("mobile navigation uses Dashboard directly and opens the other four section menus", () => {
   const mobile = read("components/shell/mobile-nav-placeholder.tsx");
-  assert.match(mobile, /<Link href="\/dashboard"/);
+  assert.match(mobile, /<Link (?:prefetch=\\{true\\} )?href="\/dashboard"/);
   for (const label of ["Study", "Progress", "Resources", "Community"]) assert.match(mobile, new RegExp(`label: "${label}"`));
   assert.match(mobile, /BottomSheet/);
   assert.match(mobile, /setOpenSection\(section\.key\)/);
