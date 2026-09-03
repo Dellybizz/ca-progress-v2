@@ -2,7 +2,7 @@ import "server-only";
 
 import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
-import { getPlannerDashboardSummary } from "@/lib/planner/dashboard";
+import { getLatestStoredPlanRecommendation, getPlannerDashboardSummary } from "@/lib/planner/dashboard";
 import { getProgressDashboardSummary } from "@/lib/progress/service";
 
 // Compatibility marker for the source contract: the optimized path replaces getProgressPageModel while retaining the same onboarding guard semantics.
@@ -77,10 +77,11 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
     subjectIds: academic.subjects.map((subject) => subject.id),
     today,
   }));
-  const [progressModel, studyAnalytics, planner] = await Promise.all([
+  const [progressModel, studyAnalytics, planner, storedPlan] = await Promise.all([
     measureServerPerformance("dashboard.progress", () => getProgressDashboardSummary(identity.id, academic.subjects)),
     measureServerPerformance("dashboard.study", () => getStudyAnalytics(identity.id, { now, timezone: profile.timezone })),
     measureServerPerformance("dashboard.planner", () => getPlannerDashboardSummary(identity.id, profile.timezone, now)),
+    measureServerPerformance("dashboard.stored_plan", () => getLatestStoredPlanRecommendation(identity.id)),
   ]);
   const live = await livePromise;
 
@@ -182,23 +183,25 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
         phase: 6,
       },
     ],
-    recommendation: nextSubject
-      ? {
-          slot: "next_study",
-          status: "contextual_fallback",
-          title: `Open ${nextSubject.title}`,
-          description: "Based on your current syllabus and saved progress, this subject still has work remaining.",
-          href: `/subjects/${nextSubject.slug}/progress`,
-          phase9Ready: true,
-        }
-      : {
-          slot: "next_study",
-          status: "empty",
-          title: "No subject is available for this selection",
-          description: "Review your level, group or attempt in profile settings to refresh your study recommendations.",
-          href: "/settings/profile",
-          phase9Ready: true,
-        },
+    recommendation: storedPlan
+      ? { slot: "next_study", status: "contextual_fallback", title: storedPlan.title, description: storedPlan.description, href: storedPlan.href, phase9Ready: true }
+      : nextSubject
+        ? {
+            slot: "next_study",
+            status: "contextual_fallback",
+            title: `Open ${nextSubject.title}`,
+            description: "Based on your current syllabus and saved progress, this subject still has work remaining.",
+            href: `/subjects/${nextSubject.slug}/progress`,
+            phase9Ready: true,
+          }
+        : {
+            slot: "next_study",
+            status: "empty",
+            title: "No subject is available for this selection",
+            description: "Review your level, group or attempt in profile settings to refresh your study recommendations.",
+            href: "/settings/profile",
+            phase9Ready: true,
+          },
     quickActions: [
       { key: "start_study", label: "Start Study", description: "Open focus mode", href: "/study" },
       { key: "add_task", label: "Add Task", description: "Open planner", href: "/planner?intent=add-task" },
