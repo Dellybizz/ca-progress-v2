@@ -34,6 +34,8 @@ test("Community chat keeps D1 pagination and broadcasts only refresh signals", (
   const messages = read("app/api/community/channels/[channel]/messages/route.ts");
   const chat = read("components/community/community-chat.tsx");
   assert.match(messages, /getCommunityMessagePage/);
+  assert.match(read("lib/community/service.ts"), /PAGE_SIZE = 30/);
+  assert.match(read("app/api/community/channels/[channel]/options/route.ts"), /private, no-store/);
   assert.match(messages, /Cache-Control.*private, no-store/);
   assert.match(chat, /channelSlug: model\.channel\.slug/);
   assert.match(chat, /type: "refresh", reason: "message"/);
