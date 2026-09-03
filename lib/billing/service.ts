@@ -14,8 +14,6 @@ export type Entitlement = { planId: string; tier: PlanTier; planName: string; fe
 export type BillingModel = { mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: SubscriptionRow | null; payments?: PaymentRow[]; events?: SubscriptionEventRow[]; plans?: SubscriptionPlan[] };
 
 type CurrentPlanRow = { plan_id: string; starts_at: string; ends_at: string | null };
-type PlanIdentityRow = { id: string; tier_key: PlanTier; name: string };
-type EntitlementRow = PlanEntitlement;
 type StorageRow = { size_bytes: number };
 type IdRow = { id: string };
 type ProfileLabelRow = { display_name: string | null };
