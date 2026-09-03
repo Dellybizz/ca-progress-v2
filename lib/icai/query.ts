@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import type { IcaiAdminDashboard, IcaiPublicCatalog, IcaiPublicFilters, IcaiResourceCard, IcaiResourceType } from "./types";
+import { getSharedPublicJson } from "@/lib/cache/public";
 
 type LevelRow = Database["public"]["Tables"]["course_levels"]["Row"];
 type AttemptRow = Database["public"]["Tables"]["exam_attempts"]["Row"];
@@ -25,7 +26,13 @@ function dateSort(a: string | null, b: string | null) {
 }
 
 export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Promise<IcaiPublicCatalog> {
-  const supabase = await createServerSupabaseClient();
+  const key = ["catalog-v1", filters.level, filters.attempt, filters.subject, filters.type].map((value) => encodeURIComponent(value ?? "")).join(":");
+  return getSharedPublicJson({
+    namespace: "icai",
+    key,
+    ttlSeconds: 300,
+    load: async () => {
+      const supabase = await createServerSupabaseClient();
   const [levelsResponse, attemptsResponse, resourcesResponse, sourcesResponse, subjectsResponse, attemptMapResponse, subjectMapResponse, eventsResponse] = await Promise.all([
     supabase.from("course_levels").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("exam_attempts").select("*").eq("verification_status", "verified").order("attempt_key", { ascending: false }),
@@ -166,7 +173,7 @@ export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Pro
     subjects: subjects.map((row: SubjectRow) => ({ id: row.id, title: row.title, levelCode: levelById.get(row.level_id)?.code ?? "" })),
     filters: selected,
     verifiedAt,
-  };
+      };\n    },\n  });
 }
 
 export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
