@@ -95,7 +95,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       realtimeRef.current = null;
       unsubscribe();
     };
-  }, [model.channel.id, refreshMessages, router]);
+  }, [model.channel.id, model.channel.slug, model.viewerId, refreshMessages, router]);
 
   useEffect(() => {
     const element = listRef.current;
