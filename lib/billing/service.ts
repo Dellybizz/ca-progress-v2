@@ -3,7 +3,7 @@ import "server-only";
 import { optionalUser } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
 import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
-import { getSharedPublicJson, getCachedEntitlement } from "@/lib/cache/public";
+import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
