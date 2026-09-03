@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getCloudflareApplicationSession } from "@/lib/auth/cloudflare";
+import { logServerPerformance, measureServerPerformance } from "@/lib/cloudflare/runtime-env";
 import type { AppRole } from "@/lib/authorization/roles";
 
 type D1Result<T = Record<string, unknown>> = { results?: T[]; success?: boolean };
@@ -510,10 +511,10 @@ class D1QueryBuilder {
   private where(extra?:Filter){const all=[...this.filters];if(extra)all.push(extra);return {sql:all.length?` WHERE ${all.map(v=>v.sql).join(" AND ")}`:"",values:all.flatMap(v=>v.values)};}
   private async preparedRow(input:Record<string,unknown>){const info=await tableInfo(this.db,this.table);const row={...(INSERT_DEFAULTS[this.table]??{}),...input};const idInfo=info.find(v=>v.name==="id"&&v.pk===1&&String(v.type).toUpperCase().includes("TEXT"));if(idInfo&&!Object.hasOwn(row,"id"))row.id=uuid();const owner=OWNER_COLUMN[this.table];if(!this.options.admin&&owner&&this.options.actorUserId){if(Object.hasOwn(row,owner)&&row[owner]!==this.options.actorUserId)throw new Error("Cannot write data for another user.");row[owner]=this.options.actorUserId;}return row;}
   private mutationOwnerFilter(){const owner=OWNER_COLUMN[this.table];if(this.options.admin||!owner)return undefined;if(!this.options.actorUserId)return {sql:"1=0",values:[]};return {sql:`${ident(owner)}=?`,values:[this.options.actorUserId]};}
-  private async execute():Promise<QueryResult>{try{
+  private async execute():Promise<QueryResult>{const startedAt=performance.now();let rowCount:number|null=null;try{
     if(this.operation==="select"){
       const where=this.where();const order=this.orders.length?` ORDER BY ${this.orders.map(v=>`${ident(v.column)} ${v.ascending?"ASC":"DESC"}`).join(",")}`:"";let limit="";if(this.fromRow!==null&&this.toRow!==null)limit=` LIMIT ${this.toRow-this.fromRow+1} OFFSET ${this.fromRow}`;else if(this.maxRows!==null)limit=` LIMIT ${this.maxRows}`;
-      const result=await this.db.prepare(`SELECT ${selectList(this.columns)} FROM ${ident(this.table)}${where.sql}${order}${limit}`).bind(...where.values).all<Record<string,unknown>>();const data=(result.results??[]).map(decodeRow);
+      const result=await this.db.prepare(`SELECT ${selectList(this.columns)} FROM ${ident(this.table)}${where.sql}${order}${limit}`).bind(...where.values).all<Record<string,unknown>>();const data=(result.results??[]).map(decodeRow);rowCount=data.length;
       if(this.cardinality==="single"){if(data.length!==1)return{data:null,error:{message:`Expected one ${this.table} row, found ${data.length}.`,code:"PGRST116"}};return{data:data[0],error:null};}
       if(this.cardinality==="maybe"){if(data.length>1)return{data:null,error:{message:`Expected at most one ${this.table} row, found ${data.length}.`,code:"PGRST116"}};return{data:data[0]??null,error:null};}
       return{data,error:null};
@@ -523,19 +524,19 @@ class D1QueryBuilder {
       for(const input of inputs){const row=await this.preparedRow(input);const keys=Object.keys(row);if(!keys.length)throw new Error("Insert payload is empty.");const values=keys.map(k=>encodeValue(row[k]));let sql=`INSERT INTO ${ident(this.table)}(${keys.map(ident).join(",")}) VALUES(${keys.map(()=>"?").join(",")})`;
         if(this.operation==="upsert"){if(!this.conflict.length)throw new Error("D1 upsert requires onConflict.");const updates=keys.filter(k=>!this.conflict.includes(k));sql+=` ON CONFLICT(${this.conflict.map(ident).join(",")}) ${updates.length?`DO UPDATE SET ${updates.map(k=>`${ident(k)}=excluded.${ident(k)}`).join(",")}`:"DO NOTHING"}`;}
         if(this.returning)sql+=` RETURNING ${selectList(this.returning)}`;const stmt=this.db.prepare(sql).bind(...values);if(this.returning){const result=await stmt.all<Record<string,unknown>>();out.push(...(result.results??[]).map(decodeRow));}else await stmt.run();}
-      const data=this.returning?(Array.isArray(this.payload)?out:out[0]??null):null;return{data,error:null};
+      rowCount=this.returning ? out.length : null;const data=this.returning?(Array.isArray(this.payload)?out:out[0]??null):null;return{data,error:null};
     }
     if(this.operation==="update"){
-      const row:Record<string,unknown>={...(Array.isArray(this.payload)?{}:(this.payload??{}))};const info=await tableInfo(this.db,this.table);if(info.some(v=>v.name==="updated_at")&&!Object.hasOwn(row,"updated_at"))row.updated_at=nowIso();const keys=Object.keys(row);if(!keys.length)throw new Error("Update payload is empty.");const where=this.where(this.mutationOwnerFilter());let sql=`UPDATE ${ident(this.table)} SET ${keys.map(k=>`${ident(k)}=?`).join(",")}${where.sql}`;if(this.returning)sql+=` RETURNING ${selectList(this.returning)}`;const stmt=this.db.prepare(sql).bind(...keys.map(k=>encodeValue(row[k])),...where.values);if(this.returning){const result=await stmt.all<Record<string,unknown>>();const rows=(result.results??[]).map(decodeRow);return{data:rows,error:null};}await stmt.run();return{data:null,error:null};
+      const row:Record<string,unknown>={...(Array.isArray(this.payload)?{}:(this.payload??{}))};const info=await tableInfo(this.db,this.table);if(info.some(v=>v.name==="updated_at")&&!Object.hasOwn(row,"updated_at"))row.updated_at=nowIso();const keys=Object.keys(row);if(!keys.length)throw new Error("Update payload is empty.");const where=this.where(this.mutationOwnerFilter());let sql=`UPDATE ${ident(this.table)} SET ${keys.map(k=>`${ident(k)}=?`).join(",")}${where.sql}`;if(this.returning)sql+=` RETURNING ${selectList(this.returning)}`;const stmt=this.db.prepare(sql).bind(...keys.map(k=>encodeValue(row[k])),...where.values);if(this.returning){const result=await stmt.all<Record<string,unknown>>();const rows=(result.results??[]).map(decodeRow);rowCount=rows.length;return{data:rows,error:null};}await stmt.run();return{data:null,error:null};
     }
     const where=this.where(this.mutationOwnerFilter());let sql=`DELETE FROM ${ident(this.table)}${where.sql}`;if(this.returning)sql+=` RETURNING ${selectList(this.returning)}`;const stmt=this.db.prepare(sql).bind(...where.values);if(this.returning){const result=await stmt.all<Record<string,unknown>>();return{data:(result.results??[]).map(decodeRow),error:null};}await stmt.run();return{data:null,error:null};
-  }catch(error){return errorResult(error);}}
+  }catch(error){return errorResult(error);}finally{logServerPerformance(`d1.${this.operation}`,startedAt,{table:this.table,rows:rowCount});}}
 }
 
 export class D1SupabaseCompatClient {
   constructor(private db:D1DatabaseLike,private options:ClientOptions={}){}
   from(table:string){return new D1QueryBuilder(this.db,table,this.options);}
-  async rpc(name:string,args:Record<string,unknown>={}){try{return{data:await executeRpc(this.db,name,args,this.options),error:null};}catch(error){return errorResult(error);}}
+  async rpc(name:string,args:Record<string,unknown>={}){const startedAt=performance.now();try{return{data:await executeRpc(this.db,name,args,this.options),error:null};}catch(error){return errorResult(error);}finally{logServerPerformance(`d1.rpc.${name}`,startedAt,{table:"rpc",rows:null});}}
   auth={getClaims:async()=>({data:{claims:null},error:{message:"Supabase Auth is retired in the Cloudflare runtime."}}),signOut:async()=>({error:null})};
   storage={from:()=>({createSignedUrl:async()=>({data:null,error:{message:"Supabase Storage is retired; use R2."}})})};
 }
