@@ -41,8 +41,6 @@ export function TopbarControls({ viewer: initialViewer = guestViewer }: { viewer
       .then((response) => response.ok ? response.json() as Promise<Viewer> : null)
       .then((nextViewer) => {
         if (!cancelled && nextViewer) {
-          // The account controls hydrate after the persistent shell paints.
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setViewer(nextViewer);
         }
       })
