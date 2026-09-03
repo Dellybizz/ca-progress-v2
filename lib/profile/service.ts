@@ -3,6 +3,7 @@ import "server-only";
 import type { Database } from "@/lib/supabase/database.types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isCloudflareAuthRuntime } from "@/lib/auth/provider";
+import { saveCloudflareProfilePatch } from "@/lib/auth/cloudflare-profile";
 import { setCloudflareProfileAvatar } from "@/lib/auth/cloudflare-profile";
 import { deleteOwnedAvatarObject, isOwnedAvatarObjectKey, putAvatarObject } from "@/lib/resources/r2";
 
@@ -42,8 +43,11 @@ function toDatabasePatch(patch: ProfilePatch): ProfileUpdate {
 }
 
 export async function saveProfilePatch(userId: string, patch: ProfilePatch) {
-  // General profile persistence remains on the active database provider until the
-  // Phase 4 data cutover. Phase 3 only removes Supabase Storage from new writes.
+  if (isCloudflareAuthRuntime()) {
+    const data = await saveCloudflareProfilePatch(userId, patch);
+    if (!data) throw new Error("Cloudflare profile update returned no row.");
+    return data;
+  }
   const client = await createServerSupabaseClient();
   const { data, error } = await client.from("profiles").update(toDatabasePatch(patch)).eq("user_id", userId).select("*").single();
   if (error) throw error;
