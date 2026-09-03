@@ -88,7 +88,13 @@ const worker = {
   fetch(request: Request, env: WorkerEnv, ctx: WorkerContext) { return openNextWorker.fetch(request, env, ctx); },
   scheduled(controller: ScheduledController, env: WorkerEnv, ctx: WorkerContext) {
     if (!env.BACKGROUND_JOBS) throw new Error("BACKGROUND_JOBS queue binding is required in the production runtime.");
-    ctx.waitUntil(env.BACKGROUND_JOBS.send(scheduledJob(controller)));
+    const jobs: BackgroundJob[] = controller.cron === "0 * * * *"
+      ? [
+          { id: crypto.randomUUID(), type: "analytics-aggregate", idempotencyKey: `analytics-aggregate:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { date: new Date(controller.scheduledTime).toISOString().slice(0, 10) } },
+          { id: crypto.randomUUID(), type: "cleanup", idempotencyKey: `cleanup:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { retentionDays: 30 } },
+        ]
+      : [scheduledJob(controller)];
+    ctx.waitUntil(Promise.all(jobs.map((job) => env.BACKGROUND_JOBS!.send(job))).then(() => undefined));
   },
   async queue(batch: QueueBatch<unknown>, env: WorkerEnv) {
     await Promise.all(batch.messages.map((message) => runQueuedJob(message, env)));
