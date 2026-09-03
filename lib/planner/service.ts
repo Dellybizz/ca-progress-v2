@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/supabase-compat";
@@ -39,7 +39,7 @@ function taskDto(row: TaskRow, subjectNames: Map<string, string>, chapterNames: 
 function goalDto(row: GoalRow): PlannerGoal { return { id: row.id, title: row.title, description: row.description, dueDate: row.due_date, status: row.status as PlannerGoal["status"], completedAt: row.completed_at }; }
 
 export async function getPlannerPageModel(): Promise<PlannerPageModel> {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return { mode: "guest" };
   const profile = await getProfileForUser(identity.id);
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
@@ -71,7 +71,7 @@ function monthBounds(month?: string | null) {
 }
 
 export async function getCalendarPageModel(month?: string | null): Promise<CalendarPageModel> {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return { mode: "guest" };
   const profile = await getProfileForUser(identity.id);
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
@@ -150,7 +150,7 @@ async function loadActivityNames(sessions: SessionRow[], progress: ProgressEvent
 }
 
 export async function getActivityPageModel(): Promise<ActivityPageModel> {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return { mode: "guest" };
   const profile = await getProfileForUser(identity.id);
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
