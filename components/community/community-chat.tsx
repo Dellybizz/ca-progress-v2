@@ -34,6 +34,9 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
   const [messages, setMessages] = useState(model.messages);
   const [nextCursor, setNextCursor] = useState(model.nextCursor);
   const [body, setBody] = useState("");
+  const [members, setMembers] = useState(model.members);
+  const [resources, setResources] = useState(model.resources);
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
   const [replyTo, setReplyTo] = useState<CommunityMessage | null>(null);
   const [resourceId, setResourceId] = useState("");
   const [mentionUserId, setMentionUserId] = useState("");
@@ -205,7 +208,17 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     try { await refreshMessages(clean); } catch (err) { setError(err instanceof Error ? err.message : "Search failed."); } finally { setBusy(null); }
   }
 
-  const mentionLabel = useMemo(() => model.members.find((member) => member.userId === mentionUserId)?.label ?? null, [mentionUserId, model.members]);
+  const loadComposerOptions = useCallback(async () => {
+    if (optionsLoaded || isGuest) return;
+    const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/options`, { cache: "no-store" });
+    const payload = await response.json().catch(() => ({})) as { members?: typeof members; resources?: typeof resources; error?: string };
+    if (!response.ok) throw new Error(payload.error || "Composer options could not be loaded.");
+    setMembers(payload.members ?? []);
+    setResources(payload.resources ?? []);
+    setOptionsLoaded(true);
+  }, [isGuest, model.channel.slug, optionsLoaded]);
+  
+  const mentionLabel = useMemo(() => members.find((member) => member.userId === mentionUserId)?.label ?? null, [mentionUserId, members]);
 
   return <div className="phase10-split-chat">
     <aside className="phase10-chat-sidebar"><div className="phase10-chat-sidebar-head"><Link href="/community" className="phase10-back"><Icon name="arrow" size={16}/>Community</Link><strong>Channels</strong></div><CommunityChannelList groups={model.groups} activeSlug={model.channel.slug}/></aside>
@@ -237,8 +250,8 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       <form className="phase10-composer" onSubmit={send}>
         {replyTo ? <div className="phase10-composer-context"><span><strong>Replying to {replyTo.authorLabel}</strong>{shortBody(replyTo.body)}</span><button type="button" onClick={() => setReplyTo(null)}><Icon name="close" size={14}/></button></div> : null}
         {mentionLabel ? <div className="phase10-composer-context"><span><strong>Mentioning @{mentionLabel}</strong>The mentioned student will receive a notification.</span><button type="button" onClick={() => setMentionUserId("")}><Icon name="close" size={14}/></button></div> : null}
-        <div className="phase10-composer-tools"><select value={mentionUserId} onChange={(event) => setMentionUserId(event.target.value)} disabled={!model.channel.canWrite || Boolean(model.activeBlock)}><option value="">@ Mention</option>{model.members.map((member) => <option key={member.userId} value={member.userId}>@{member.label}</option>)}</select><select value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={!model.channel.canWrite || Boolean(model.activeBlock)}><option value="">Attach approved resource</option>{model.resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title} · {resource.extension.toUpperCase()}</option>)}</select></div>
-        <div className="phase10-composer-row"><textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} placeholder={model.activeBlock ? "Chat is temporarily blocked" : model.channel.canWrite ? `Message #${model.channel.title}` : "Sign in to chat"} disabled={!model.channel.canWrite || Boolean(model.activeBlock)} rows={1}/><span>{body.length}/2000</span><button className="ui-button ui-button--primary" disabled={!body.trim() || !model.channel.canWrite || Boolean(model.activeBlock) || busy === "send"}>{busy === "send" ? "Sending…" : model.viewerId ? "Send" : "Sign in to chat"}</button></div>
+        <div className="phase10-composer-tools"><select onFocus={() => void loadComposerOptions().catch((err) => setError(err instanceof Error ? err.message : "Composer options could not be loaded."))} value={mentionUserId} onChange={(event) => setMentionUserId(event.target.value)} disabled={!model.channel.canWrite || Boolean(model.activeBlock)}><option value="">@ Mention</option>{members.map((member) => <option key={member.userId} value={member.userId}>@{member.label}</option>)}</select><select onFocus={() => void loadComposerOptions().catch((err) => setError(err instanceof Error ? err.message : "Composer options could not be loaded."))} value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={!model.channel.canWrite || Boolean(model.activeBlock)}><option value="">Attach approved resource</option>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title} · {resource.extension.toUpperCase()}</option>)}</select></div>
+        <div className="phase10-composer-row"><textarea onFocus={() => void loadComposerOptions().catch((err) => setError(err instanceof Error ? err.message : "Composer options could not be loaded."))} value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} placeholder={model.activeBlock ? "Chat is temporarily blocked" : model.channel.canWrite ? `Message #${model.channel.title}` : "Sign in to chat"} disabled={!model.channel.canWrite || Boolean(model.activeBlock)} rows={1}/><span>{body.length}/2000</span><button className="ui-button ui-button--primary" disabled={!body.trim() || !model.channel.canWrite || Boolean(model.activeBlock) || busy === "send"}>{busy === "send" ? "Sending…" : model.viewerId ? "Send" : "Sign in to chat"}</button></div>
       </form>
     </section>
   </div>;
