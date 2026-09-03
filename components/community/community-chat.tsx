@@ -30,6 +30,7 @@ function shortBody(body: string) {
 export function CommunityChat({ model }: { model: ReadyModel }) {
   const router = useRouter();
   const listRef = useRef<HTMLDivElement | null>(null);
+  const realtimeRef = useRef<ReturnType<typeof subscribeToCommunityRealtime> | null>(null);
   const [messages, setMessages] = useState(model.messages);
   const [nextCursor, setNextCursor] = useState(model.nextCursor);
   const [body, setBody] = useState("");
@@ -77,14 +78,17 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     };
     const unsubscribe = subscribeToCommunityRealtime({
       channelId: model.channel.id,
+      channelSlug: model.channel.slug,
       onDataChanged: scheduleRefresh,
       onPinnedChanged: () => {
         scheduleRefresh();
         router.refresh();
       },
     });
+    realtimeRef.current = unsubscribe;
     return () => {
       if (timer) clearTimeout(timer);
+      realtimeRef.current = null;
       unsubscribe();
     };
   }, [model.channel.id, refreshMessages, router]);
@@ -131,6 +135,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       setReplyTo(null);
       setResourceId("");
       setMentionUserId("");
+      realtimeRef.current?.send({ type: "refresh", reason: "message" });
       await refreshMessages();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Message could not be sent.");
@@ -147,6 +152,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       const response = await fetch(`/api/community/messages/${messageId}/reaction`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Reaction could not be updated.");
+      realtimeRef.current?.send({ type: "refresh", reason: "reaction" });
       await refreshMessages();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reaction could not be updated.");
