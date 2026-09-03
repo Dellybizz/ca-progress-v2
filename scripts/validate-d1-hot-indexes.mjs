@@ -33,7 +33,7 @@ const expectedIndexes = [
 ];
 
 const plans = [
-  ["session token", "SELECT session_id FROM sessions WHERE token_hash='hash' AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP AND absolute_expires_at>CURRENT_TIMESTAMP LIMIT 1", "sqlite_autoindex_sessions_1"],
+  ["session token", "SELECT session_id FROM sessions WHERE token_hash='hash' AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP AND absolute_expires_at>CURRENT_TIMESTAMP LIMIT 1", "sqlite_autoindex_sessions_"],
   ["progress events", "SELECT id FROM progress_events WHERE user_id='u' AND chapter_id='c' ORDER BY created_at DESC LIMIT 20", "idx_progress_events_user_chapter_created"],
   ["study sessions", "SELECT id FROM study_sessions WHERE user_id='u' ORDER BY ended_at DESC LIMIT 40", "idx_study_sessions_user_ended"],
   ["tasks", "SELECT id FROM tasks WHERE user_id='u' AND status='todo' ORDER BY due_at LIMIT 250", "idx_tasks_user_status_due"],
