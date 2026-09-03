@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cookies } from "next/headers";
 import { getServerRuntimeValue } from "@/lib/cloudflare/runtime-env";
