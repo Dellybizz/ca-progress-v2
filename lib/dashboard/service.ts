@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
 import { getPlannerDashboardSummary } from "@/lib/planner/dashboard";
 import { getProgressDashboardSummary } from "@/lib/progress/service";
@@ -46,7 +46,7 @@ function setupRequired(identity: { id: string }, displayName: string, generatedA
 
 async function getDashboardPageModelUncached(now = new Date()): Promise<DashboardPageModel> {
   const generatedAt = now.toISOString();
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return { mode: "guest", generatedAt, viewer: { authenticated: false, displayName: "Guest" } };
 
   const profile = await getProfileForUser(identity.id);
