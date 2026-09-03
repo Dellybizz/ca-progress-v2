@@ -2,6 +2,7 @@ import "server-only";
 
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 import { runIcaiSync } from "@/lib/icai/sync";
+import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
 import type { BackgroundJob } from "./queue";
 
 function db() { return getHotD1Database() as any; }
@@ -50,12 +51,11 @@ export async function executeBackgroundJob(job: BackgroundJob) {
       const userId = typeof job.payload.userId === "string" ? job.payload.userId : null;
       const planDate = typeof job.payload.planDate === "string" ? job.payload.planDate : new Date().toISOString().slice(0, 10);
       if (!userId) throw new Error("AI plan generation requires userId.");
-      const existing = await db().prepare("SELECT id,plan_date,generated_at FROM daily_plans WHERE user_id=?1 AND plan_date=?2 LIMIT 1").bind(userId, planDate).first() as {id:string;plan_date:string;generated_at:string}|null;
-      if (!existing) throw new Error("No persisted planner input is available yet.");
-      const items = await db().prepare("SELECT id,source_type,source_key,title,item_kind,estimated_minutes,priority_score,status,position FROM daily_plan_items WHERE plan_id=?1 ORDER BY position LIMIT 120").bind(existing.id).all();
+      const generated = await generateTodayPlanForUser(userId, planDate);
       await db().prepare("INSERT INTO student_plan_snapshots(id,user_id,plan_date,status,plan_json,generated_at,source_job_id,updated_at) VALUES(?1,?2,?3,'ready',?4,?5,?6,CURRENT_TIMESTAMP) ON CONFLICT(user_id,plan_date) DO UPDATE SET status='ready',plan_json=excluded.plan_json,generated_at=excluded.generated_at,source_job_id=excluded.source_job_id,error=NULL,updated_at=CURRENT_TIMESTAMP")
-        .bind(crypto.randomUUID(), userId, planDate, json({ plan: existing, items: items.results ?? [] }), existing.generated_at ?? new Date().toISOString(), job.id).run();
-      return { userId, planDate, itemCount: (items.results ?? []).length };
+        .bind(crypto.randomUUID(), userId, planDate, json({ plan: generated.plan, items: generated.items, forecast: generated.forecast }), generated.plan.generated_at ?? new Date().toISOString(), job.id).run();
+      return { userId, planDate, itemCount: generated.items.length };
+    }
     }
   }
 }
