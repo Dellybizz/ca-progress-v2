@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { getCloudflareApplicationSession } from "@/lib/auth/cloudflare";
+import { getCloudflareRequestAuth } from "@/lib/auth/cloudflare";
 import { logServerPerformance } from "@/lib/cloudflare/runtime-env";
 import type { AppRole } from "@/lib/authorization/roles";
 
@@ -480,8 +480,8 @@ async function icaiReview(db:D1DatabaseLike,userId:string,role:AppRole,args:Reco
 }
 
 async function executeRpc(db:D1DatabaseLike,name:string,args:Record<string,unknown>,options:ClientOptions){
-  const session = options.actorUserId !== undefined ? null : await getCloudflareApplicationSession();
-  const userId=options.actorUserId ?? session?.applicationUserId ?? null; const role=options.actorRole ?? session?.role ?? (await userRole(db,userId));
+  const auth = options.actorUserId !== undefined ? null : await getCloudflareRequestAuth();
+  const userId=options.actorUserId ?? auth?.applicationUserId ?? null; const role=options.actorRole ?? auth?.role ?? (await userRole(db,userId));
   if(["progress_set_stage","progress_undo_event","phase6_set_timezone","study_timer_start","study_timer_pause","study_timer_resume","study_timer_finish","study_timer_discard","study_timer_touch","phase7_save_note","phase7_report_resource","phase7_moderate_resource","phase9_set_revision_rules","phase10_list_channels","phase10_list_channel_members","phase10_create_message","phase10_mark_read","phase10_toggle_reaction","phase10_report_message","phase10_moderate","icai_review_decide"].includes(name)&&!userId) throw new Error("Authentication required.");
   if(name==="progress_set_stage") return progressSetStage(db,userId!,args);
   if(name==="progress_undo_event") return progressUndo(db,userId!,args);
@@ -563,5 +563,5 @@ export class D1SupabaseCompatClient {
   storage={from:()=>({createSignedUrl:async()=>({data:null,error:{message:"Supabase Storage is retired; use R2."}})})};
 }
 
-export async function createD1ServerCompatClient(){const session=await getCloudflareApplicationSession();return new D1SupabaseCompatClient(getD1RuntimeDatabase(),{actorUserId:session?.applicationUserId??null,actorRole:session?.role??null});}
+export async function createD1ServerCompatClient(){const auth=await getCloudflareRequestAuth();return new D1SupabaseCompatClient(getD1RuntimeDatabase(),{actorUserId:auth.applicationUserId,actorRole:auth.role});}
 export function createD1AdminCompatClient(){return new D1SupabaseCompatClient(getD1RuntimeDatabase(),{admin:true});}
