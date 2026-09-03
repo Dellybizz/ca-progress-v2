@@ -136,9 +136,9 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
   const supabase = await createServerSupabaseClient();
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const [progressResponse, eventResponse, weeklyEventResponse] = await Promise.all([
-    chapterIds.length ? supabase.from("chapter_progress").select("*").eq("user_id", identity.id).in("chapter_id", chapterIds) : Promise.resolve({ data: [], error: null }),
-    chapterIds.length ? supabase.from("progress_events").select("*").eq("user_id", identity.id).in("chapter_id", chapterIds).order("created_at", { ascending: false }).limit(120) : Promise.resolve({ data: [], error: null }),
-    chapterIds.length ? supabase.from("progress_events").select("*").eq("user_id", identity.id).in("chapter_id", chapterIds).gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(1000) : Promise.resolve({ data: [], error: null }),
+    chapterIds.length ? supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds) : Promise.resolve({ data: [], error: null }),
+    chapterIds.length ? supabase.from("progress_events").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds).order("created_at", { ascending: false }).limit(120) : Promise.resolve({ data: [], error: null }),
+    chapterIds.length ? supabase.from("progress_events").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds).gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(1000) : Promise.resolve({ data: [], error: null }),
   ]);
   const error = progressResponse.error || eventResponse.error || weeklyEventResponse.error;
   if (error) throw new Error(`Progress data could not be loaded: ${error.message}`);
@@ -190,7 +190,7 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
 export async function getProgressAnalyticsForDashboard(userId: string, chapterIds: string[]) {
   if (!chapterIds.length) return { overallPercent: 0, byChapter: new Map<string, ProgressState>() };
   const supabase = await createServerSupabaseClient();
-  const response = await supabase.from("chapter_progress").select("*").eq("user_id", userId).in("chapter_id", chapterIds);
+  const response = await supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", userId).in("chapter_id", chapterIds);
   if (response.error) throw new Error(response.error.message);
   const rows = (response.data ?? []) as ProgressRow[];
   const byChapter = new Map(rows.map((row) => [row.chapter_id, stateFromRow(row)]));
