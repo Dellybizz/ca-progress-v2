@@ -37,7 +37,7 @@ test("screen query inputs are bounded and parameterized", () => {
 test("hot-query migration is resumable, idempotent, and applied to staging", () => {
   const migration = read("d1/migrations/0009_phase5_hot_query_indexes.sql");
   assert.match(migration, /CREATE INDEX IF NOT EXISTS/g);
-  assert.match(read("scripts/validate-d1-hot-indexes.mjs"), /migrations apply/);
+  assert.match(read("scripts/validate-d1-hot-indexes.mjs"), /"migrations",\s*"apply"/);
   assert.match(read("scripts/validate-d1-hot-indexes.mjs"), /PRAGMA foreign_key_check/);
   const workflow = read(".github/workflows/deploy-staging.yml");
   assert.match(workflow, /d1:hot-indexes:validate/);
