@@ -368,16 +368,16 @@ async function communityRpc(db: D1DatabaseLike, userId: string, role: AppRole, n
     const profile = await db.prepare("SELECT ca_level,group_choice,attempt_key FROM profiles WHERE user_id=?1 AND onboarding_completed_at IS NOT NULL").bind(userId).first<Record<string, unknown>>();
     const level = profile ? await db.prepare("SELECT id FROM course_levels WHERE code=?1").bind(profile.ca_level).first<{id:string}>() : null;
     const visibleSql = profile && level
-      ? \`(c.scope_type='global' OR (c.scope_type='level' AND c.level_id=?1) OR (c.scope_type='subject' AND EXISTS (
+      ? `(c.scope_type='global' OR (c.scope_type='level' AND c.level_id=?1) OR (c.scope_type='subject' AND EXISTS (
           SELECT 1 FROM attempt_syllabus_map asm
           JOIN course_groups g ON g.id=asm.group_id
           WHERE asm.level_id=?1 AND asm.attempt_key=?2 AND asm.subject_id=c.subject_id
             AND (?3 IN ('foundation') OR ?4 IN ('both','not_applicable') OR g.code=?4)
-        )))\`
+        )))`
       : "(c.scope_type='global')";
     const visibilityValues = profile && level ? [level.id, profile.attempt_key, profile.ca_level, profile.group_choice] : [];
     const privilegedFlag = privileged(role) ? 1 : 0;
-    const rows = (await db.prepare(\`
+    const rows = (await db.prepare(`
       SELECT c.*,
         (SELECT m.sequence_id FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_sequence,
         (SELECT m.body FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_body,
@@ -393,7 +393,7 @@ async function communityRpc(db: D1DatabaseLike, userId: string, role: AppRole, n
       FROM community_channels c
       WHERE c.is_active=1 AND \${visibleSql}
       ORDER BY c.sort_order,c.title
-    \`).bind(...visibilityValues, userId, userId, nowIso(), privilegedFlag).all<Record<string, unknown>>()).results ?? [];
+    `).bind(...visibilityValues, userId, userId, nowIso(), privilegedFlag).all<Record<string, unknown>>()).results ?? [];
     return rows.map((row) => decodeRow(row));
   }
   const key = args.p_channel_key ? String(args.p_channel_key) : null;
