@@ -41,6 +41,6 @@ export async function POST(request: Request) {
   const uploadId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
   await getHotD1Database().prepare("INSERT INTO r2_upload_intents(id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)")
-    .bind(uploadId, identity.id, signed.url.split(`/${RESOURCE_R2_BUCKET_NAME}/`)[1]?.split("?")[0] ?? "", filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt).run();
+    .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt).run();
   return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: RESOURCE_MAX_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
 }
