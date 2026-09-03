@@ -17,7 +17,7 @@ function statusTone(status: string) { return status === "approved" ? "success" :
 function matches(value: string, query: string) { return value.toLowerCase().includes(query); }
 
 
-function uploadFallbackMessage(status: number) {
+async function readApiPayload<T extends Record<string, unknown> = { error?: string }>(response: Response): Promise<T> {\n  const body = await response.text();\n  if (!body.trim()) return {} as T;\n  try { return JSON.parse(body) as T; }\n  catch { return {} as T; }\n}\n\nfunction uploadFallbackMessage(status: number) {
   if (status === 413) return "This upload is larger than the 10 MB file limit.";
   if (status === 401) return "Your session expired. Sign in again and retry the upload.";
   if (status >= 500) return "The upload service returned a server error. Please retry in a moment.";
@@ -46,12 +46,12 @@ function UploadPanel({ model, close }: { model: ResourceLibraryReady; close: () 
 
       const descriptor = { filename: selectedFile.name, mimeType: selectedFile.type, sizeBytes: selectedFile.size, title: form.get("title"), description: form.get("description"), subjectId, chapterId, visibility };
       const issueResponse = await fetch("/api/resources/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(descriptor) });
-      const issuePayload = await issueResponse.json().catch(() => ({})) as { uploadId?: string; uploadUrl?: string; headers?: Record<string, string>; error?: string };
+      const issuePayload = await readApiPayload<{ uploadId?: string; uploadUrl?: string; headers?: Record<string, string>; error?: string }>(issueResponse);
       if (!issueResponse.ok || !issuePayload.uploadId || !issuePayload.uploadUrl) throw new Error(issuePayload.error || uploadFallbackMessage(issueResponse.status));
       const directResponse = await fetch(issuePayload.uploadUrl, { method: "PUT", headers: issuePayload.headers, body: selectedFile });
       if (!directResponse.ok) throw new Error("Direct R2 upload failed. Please retry.");
       const completeResponse = await fetch("/api/resources/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issuePayload.uploadId }) });
-      const completePayload = await completeResponse.json().catch(() => ({})) as { error?: string };
+      const completePayload = await readApiPayload<{ error?: string }>(completeResponse);
       if (!completeResponse.ok) throw new Error(completePayload.error || uploadFallbackMessage(completeResponse.status));
       close(); router.refresh();
     } catch (caught) {
