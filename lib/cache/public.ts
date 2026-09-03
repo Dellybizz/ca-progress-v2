@@ -12,6 +12,8 @@ type CacheStorageLike = { default?: EdgeCache };
 
 const BASE_VERSION = "v1";
 const VERSION_TTL_SECONDS = 31_536_000;
+const MIN_DATA_TTL_SECONDS = 30;
+const MAX_DATA_TTL_SECONDS = 3_600;
 const PUBLIC_NAMESPACES = ["academic", "pricing", "icai"] as const;
 export type PublicCacheNamespace = (typeof PUBLIC_NAMESPACES)[number];
 
@@ -24,6 +26,19 @@ function cacheUrl(namespace: string, key: string) {
   const { appName } = getPublicRuntimeConfig();
   const safeApp = encodeURIComponent(appName.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
   return new URL(`https://${safeApp}.public-cache.invalid/${encodeURIComponent(namespace)}/${encodeURIComponent(key)}`).toString();
+}
+
+function boundedTtl(ttlSeconds: number) {
+  return Math.min(MAX_DATA_TTL_SECONDS, Math.max(MIN_DATA_TTL_SECONDS, Math.floor(ttlSeconds)));
+}
+
+function metric(namespace: PublicCacheNamespace, outcome: "hit" | "miss" | "bypass" | "write" | "invalidate", ttlSeconds?: number) {
+  console.info(JSON.stringify({
+    event: "public_cache",
+    namespace,
+    outcome,
+    ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
+  }));
 }
 
 async function namespaceVersion(cache: EdgeCache, namespace: PublicCacheNamespace) {
@@ -40,41 +55,54 @@ export async function getSharedPublicJson<T>(input: {
   ttlSeconds: number;
   load: () => Promise<T>;
 }): Promise<T> {
+  const ttlSeconds = boundedTtl(input.ttlSeconds);
   const cache = edgeCache();
-  if (!cache) return input.load();
+  if (!cache) {
+    metric(input.namespace, "bypass", ttlSeconds);
+    return input.load();
+  }
 
   const version = await namespaceVersion(cache, input.namespace);
   const request = new Request(cacheUrl(input.namespace, `${BASE_VERSION}:${version}:${input.key}`));
   const hit = await cache.match(request);
   if (hit) {
     try {
+      metric(input.namespace, "hit", ttlSeconds);
       return await hit.json() as T;
     } catch {
       await cache.delete(request);
     }
   }
 
+  metric(input.namespace, "miss", ttlSeconds);
   const value = await input.load();
   await cache.put(request, new Response(JSON.stringify(value), {
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": `public, max-age=${Math.max(1, Math.floor(input.ttlSeconds))}`,
+      "cache-control": `public, max-age=${ttlSeconds}`,
     },
   }));
+  metric(input.namespace, "write", ttlSeconds);
   return value;
 }
 
 export async function invalidateSharedPublicCache(namespaces: readonly PublicCacheNamespace[] = PUBLIC_NAMESPACES) {
   const cache = edgeCache();
-  if (!cache) return;
+  if (!cache) {
+    for (const namespace of namespaces) metric(namespace, "bypass");
+    return;
+  }
   const version = `${Date.now().toString(36)}-${crypto.randomUUID()}`;
-  await Promise.all(namespaces.map((namespace) => cache.put(
-    new Request(cacheUrl(`_version/${BASE_VERSION}`, namespace)),
-    new Response(version, {
-      headers: {
-        "content-type": "text/plain; charset=utf-8",
-        "cache-control": `public, max-age=${VERSION_TTL_SECONDS}`,
-      },
-    }),
-  )));
+  await Promise.all(namespaces.map(async (namespace) => {
+    await cache.put(
+      new Request(cacheUrl(`_version/${BASE_VERSION}`, namespace)),
+      new Response(version, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": `public, max-age=${VERSION_TTL_SECONDS}`,
+        },
+      }),
+    );
+    metric(namespace, "invalidate");
+  }));
 }
