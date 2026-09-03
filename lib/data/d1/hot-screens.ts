@@ -83,6 +83,30 @@ export async function getHotDashboardProgress(userId: string, chapterIds: string
 export type HotCommunityChannel = { id: string; channel_key: string; slug: string; scope_type: string; channel_kind: string; title: string; description: string; level_id: string | null; subject_id: string | null; write_policy: string; sort_order: number; is_active: number };
 export type HotCommunityMessage = { id: string; sequence_id: number; channel_id: string; user_id: string; author_label: string; body: string; created_at: string; moderation_status: string; reply_to_message_id: string | null; attached_resource_id: string | null };
 
+export type HotAcademicLevel = { id: string; code: string; name: string; is_active: number };
+export type HotAcademicGroup = { id: string; level_id: string; code: string; name: string; is_active: number; sort_order: number };
+export type HotAcademicSubject = { id: string; level_id: string; group_id: string; title: string; slug: string; is_active: number; sort_order: number };
+export type HotAttemptMap = { level_id: string; attempt_key: string; group_id: string; subject_id: string; syllabus_version_id: string };
+export type HotChapter = { id: string; syllabus_version_id: string; sort_order: number };
+
+export async function getHotAcademicReference(levelCode: string, attemptKey: string, db = getHotD1Database()) {
+  const level = await db.prepare("SELECT id,code,name,is_active FROM course_levels WHERE code=?1 AND is_active=1 LIMIT 1").bind(levelCode).first<HotAcademicLevel>();
+  if (!level) return null;
+  const result = await db.batch([
+    db.prepare("SELECT id,level_id,code,name,is_active,sort_order FROM course_groups WHERE level_id=?1 AND is_active=1 ORDER BY sort_order").bind(level.id),
+    db.prepare("SELECT id,level_id,group_id,title,slug,is_active,sort_order FROM subjects WHERE level_id=?1 AND is_active=1 ORDER BY sort_order").bind(level.id),
+    db.prepare("SELECT level_id,attempt_key,group_id,subject_id,syllabus_version_id FROM attempt_syllabus_map WHERE level_id=?1 AND attempt_key=?2").bind(level.id, attemptKey),
+  ]);
+  const groups = (result[0]?.results ?? []) as HotAcademicGroup[];
+  const subjects = (result[1]?.results ?? []) as HotAcademicSubject[];
+  const maps = (result[2]?.results ?? []) as HotAttemptMap[];
+  const versionIds = [...new Set(maps.map((row) => row.syllabus_version_id))];
+  const chapters = versionIds.length
+    ? ((await db.prepare(`SELECT id,syllabus_version_id,sort_order FROM chapters WHERE syllabus_version_id IN (${versionIds.map((_, index) => `?${index + 1}`).join(",")}) ORDER BY sort_order`).bind(...versionIds).all<HotChapter>()).results ?? [])
+    : [];
+  return { level, groups, subjects, maps, chapters };
+}
+
 export async function getHotCommunityChannel(slug: string, db = getHotD1Database()) {
   return db.prepare(`SELECT id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active FROM community_channels WHERE slug=?1 AND is_active=1 LIMIT 1`).bind(slug).first<HotCommunityChannel>();
 }
