@@ -831,3 +831,34 @@ export async function performTodayPlanAction(action: TodayPlanAction) {
   if (event.error) throw new Error("Planner history could not be recorded.");
   return { ok: true };
 }
+
+
+/** Queue-only planner generation. It uses the same ranking and persistence path as Today Plan,
+ * but receives an explicit user id so no request cookie or page render is involved. */
+export async function generateTodayPlanForUser(userId: string, planDate: string) {
+  if (!/^d{4}-d{2}-d{2}$/.test(planDate)) throw new Error("Invalid plan date.");
+  const profile = await getProfileForUser(userId);
+  if (!validProfile(profile)) throw new Error("Student profile is not ready for plan generation.");
+  const catalog = await getAcademicCatalog({ level: profile!.ca_level!, group: profile!.group_choice!, attempt: profile!.attempt_key! });
+  const chapterToSubject = new Map<string, string>();
+  const chapterTitles = new Map<string, string>();
+  const subjectTitles = new Map<string, string>();
+  for (const subject of catalog.subjects) {
+    subjectTitles.set(subject.id, subject.title);
+    for (const chapter of subject.chapters) {
+      chapterToSubject.set(chapter.id, subject.id);
+      chapterTitles.set(chapter.id, chapter.title);
+    }
+  }
+  const context = {
+    mode: "ready" as const,
+    identity: { id: userId, email: null, phone: null } as NonNullable<Awaited<ReturnType<typeof optionalUser>>>,
+    profile: profile!,
+    viewerName: viewerLabel(profile?.display_name ?? null, null, null),
+    catalog,
+    chapterToSubject,
+    chapterTitles,
+    subjectTitles,
+  };
+  return persistPlan(context, planDate, true);
+}
