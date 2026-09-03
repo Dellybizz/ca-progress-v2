@@ -82,9 +82,44 @@ function groupChannels(channels: CommunityChannel[], levelLabel: string) {
   return groups;
 }
 
+async function publicCommunityContext() {
+  const supabase = createAdminSupabaseClient();
+  const [channelsResult, messagesResult] = await Promise.all([
+    supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("is_active", true).eq("scope_type", "global").order("sort_order").order("title"),
+    supabase.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("moderation_status", "active").order("sequence_id", { ascending: false }).limit(200),
+  ]);
+  const error = channelsResult.error || messagesResult.error;
+  if (error) throw new Error(`Public Community could not be loaded: ${error.message}`);
+  const latestByChannel = new Map<string, MessageRow>();
+  for (const row of (messagesResult.data ?? []) as MessageRow[]) {
+    if (!latestByChannel.has(row.channel_id)) latestByChannel.set(row.channel_id, row);
+  }
+  const channels = ((channelsResult.data ?? []) as ChannelRow[]).map((row) => {
+    const latest = latestByChannel.get(row.id);
+    return {
+      id: row.id,
+      key: row.channel_key,
+      slug: row.slug,
+      scope: row.scope_type as CommunityChannel["scope"],
+      kind: row.channel_kind as CommunityChannel["kind"],
+      title: row.title,
+      description: row.description,
+      levelId: row.level_id,
+      subjectId: row.subject_id,
+      canWrite: false,
+      unreadCount: 0,
+      latestSequence: latest ? Number(latest.sequence_id) : null,
+      latestBody: latest?.body ?? null,
+      latestAuthor: latest?.author_label ?? null,
+      latestAt: latest?.created_at ?? null,
+    } satisfies CommunityChannel;
+  });
+  return { mode: "guest" as const, supabase, channels, groups: groupChannels(channels, "Community") };
+}
+
 async function baseCommunityContext() {
   const identity = await optionalUser();
-  if (!identity) return { mode: "guest" as const };
+  if (!identity) return publicCommunityContext();
   const profile = await getProfileForUser(identity.id);
   const viewerName = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
   if (!profileReady(profile)) return { mode: "setup" as const, viewerName };
@@ -114,7 +149,9 @@ async function mapNotifications(
 
 export async function getCommunityHomeModel(): Promise<CommunityHomeModel> {
   const context = await baseCommunityContext();
-  if (context.mode !== "ready") return context;
+  if (context.mode === "guest") {
+    return { mode: "ready", viewerName: "Guest", role: "student", groups: context.groups, notifications: [], totalUnread: 0 };
+  }
   const notifications = await context.supabase
     .from("community_notifications")
     .select("*")
@@ -195,9 +232,9 @@ async function hydrateMessages(
 
 export async function getCommunityMessagePage(options: { channelSlug: string; cursor?: string | null; query?: string | null }): Promise<CommunityMessagePage> {
   const identity = await optionalUser();
-  if (!identity) throw new Error("Sign in to view this channel.");
-  const supabase = await createServerSupabaseClient();
-  const channel = await supabase.from("community_channels").select("*").eq("slug", options.channelSlug).eq("is_active", true).maybeSingle();
+  const supabase = identity ? await createServerSupabaseClient() : createAdminSupabaseClient();
+  const channel = await supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("slug", options.channelSlug).eq("is_active", true).maybeSingle();
+  if (!identity && channel.data?.scope_type !== "global") throw new Error("Sign in to view this channel.");
   if (channel.error) throw new Error(`Community channel could not be loaded: ${channel.error.message}`);
   if (!channel.data) throw new Error("Channel not found or access denied.");
   let query = supabase
@@ -216,7 +253,7 @@ export async function getCommunityMessagePage(options: { channelSlug: string; cu
   const raw = (result.data ?? []) as MessageRow[];
   const hasMore = raw.length > PAGE_SIZE;
   const pageRows = raw.slice(0, PAGE_SIZE);
-  const messages = await hydrateMessages(supabase, pageRows, identity.id);
+  const messages = await hydrateMessages(supabase, pageRows, identity?.id ?? "");
   return { messages: messages.reverse(), nextCursor: hasMore && pageRows.length ? String(pageRows[pageRows.length - 1].sequence_id) : null };
 }
 
@@ -235,7 +272,26 @@ async function pinnedMessage(
 
 export async function getCommunityChannelModel(channelSlug: string): Promise<CommunityChannelModel> {
   const context = await baseCommunityContext();
-  if (context.mode !== "ready") return context;
+  if (context.mode === "guest") {
+    const channel = context.channels.find((item) => item.slug === channelSlug);
+    if (!channel) return { mode: "denied", viewerName: "Guest" };
+    const page = await getCommunityMessagePage({ channelSlug });
+    return {
+      mode: "ready",
+      viewerId: "",
+      viewerName: "Guest",
+      role: "student",
+      canModerate: false,
+      channel,
+      groups: context.groups,
+      messages: page.messages,
+      nextCursor: page.nextCursor,
+      pinned: null,
+      members: [],
+      resources: [],
+      activeBlock: null,
+    };
+  }
   const channel = context.channels.find((item) => item.slug === channelSlug);
   if (!channel) return { mode: "denied", viewerName: context.viewerName };
   const page = await getCommunityMessagePage({ channelSlug });
