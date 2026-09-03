@@ -364,15 +364,37 @@ async function canWriteChannel(db: D1DatabaseLike, userId: string, role: AppRole
 
 async function communityRpc(db: D1DatabaseLike, userId: string, role: AppRole, name: string, args: Record<string, unknown>) {
   if (name === "phase10_list_channels") {
-    const rows = (await db.prepare("SELECT * FROM community_channels WHERE is_active=1 ORDER BY sort_order,title").all<Record<string, unknown>>()).results ?? [];
-    const out: Record<string, unknown>[] = [];
-    for (const channel of rows) {
-      if (!(await channelVisible(db,userId,channel))) continue;
-      const latest = await db.prepare("SELECT sequence_id,body,author_label,created_at FROM community_messages WHERE channel_id=?1 AND moderation_status IN ('active','moderated') ORDER BY sequence_id DESC LIMIT 1").bind(channel.id).first<Record<string, unknown>>();
-      const read = await db.prepare("SELECT last_read_sequence FROM channel_read_state WHERE channel_id=?1 AND user_id=?2").bind(channel.id,userId).first<{last_read_sequence:number}>();
-      out.push({ ...decodeRow(channel), can_write: await canWriteChannel(db,userId,role,channel), unread_count: Math.max(0,Number(latest?.sequence_id??0)-Number(read?.last_read_sequence??0)), latest_sequence: latest?.sequence_id??null, latest_body:latest?.body??null, latest_author:latest?.author_label??null, latest_at:latest?.created_at??null });
-    }
-    return out;
+    // One set-based read replaces the previous per-channel visibility/latest/read/write loop.
+    const profile = await db.prepare("SELECT ca_level,group_choice,attempt_key FROM profiles WHERE user_id=?1 AND onboarding_completed_at IS NOT NULL").bind(userId).first<Record<string, unknown>>();
+    const level = profile ? await db.prepare("SELECT id FROM course_levels WHERE code=?1").bind(profile.ca_level).first<{id:string}>() : null;
+    const visibleSql = profile && level
+      ? \`(c.scope_type='global' OR (c.scope_type='level' AND c.level_id=?1) OR (c.scope_type='subject' AND EXISTS (
+          SELECT 1 FROM attempt_syllabus_map asm
+          JOIN course_groups g ON g.id=asm.group_id
+          WHERE asm.level_id=?1 AND asm.attempt_key=?2 AND asm.subject_id=c.subject_id
+            AND (?3 IN ('foundation') OR ?4 IN ('both','not_applicable') OR g.code=?4)
+        )))\`
+      : "(c.scope_type='global')";
+    const visibilityValues = profile && level ? [level.id, profile.attempt_key, profile.ca_level, profile.group_choice] : [];
+    const privilegedFlag = privileged(role) ? 1 : 0;
+    const rows = (await db.prepare(\`
+      SELECT c.*,
+        (SELECT m.sequence_id FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_sequence,
+        (SELECT m.body FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_body,
+        (SELECT m.author_label FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_author,
+        (SELECT m.created_at FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1) AS latest_at,
+        MAX(0, COALESCE((SELECT m.sequence_id FROM community_messages m WHERE m.channel_id=c.id AND m.moderation_status IN ('active','moderated') ORDER BY m.sequence_id DESC LIMIT 1), 0) -
+          COALESCE((SELECT r.last_read_sequence FROM channel_read_state r WHERE r.channel_id=c.id AND r.user_id=?\${visibilityValues.length + 1}), 0)) AS unread_count,
+        CASE WHEN \${visibleSql}
+          AND NOT EXISTS (SELECT 1 FROM chat_blocks b WHERE b.user_id=?\${visibilityValues.length + 2} AND b.ends_at>?\${visibilityValues.length + 3} AND (b.channel_id IS NULL OR b.channel_id=c.id))
+          AND ((c.write_policy NOT IN ('moderators','read_only') AND c.channel_kind<>'announcement')
+            OR (?\${visibilityValues.length + 4}=1 AND (c.write_policy='moderators' OR c.channel_kind='announcement')))
+          THEN 1 ELSE 0 END AS can_write
+      FROM community_channels c
+      WHERE c.is_active=1 AND \${visibleSql}
+      ORDER BY c.sort_order,c.title
+    \`).bind(...visibilityValues, userId, userId, nowIso(), privilegedFlag).all<Record<string, unknown>>()).results ?? [];
+    return rows.map((row) => decodeRow(row));
   }
   const key = args.p_channel_key ? String(args.p_channel_key) : null;
   const channel = key ? await db.prepare("SELECT * FROM community_channels WHERE channel_key=?1 AND is_active=1").bind(key).first<Record<string, unknown>>() : null;
