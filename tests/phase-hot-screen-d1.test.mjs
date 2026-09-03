@@ -24,7 +24,7 @@ test("hot screen services route Cloudflare reads through the typed repository", 
   assert.match(read("lib/planner/service.ts"), /getHotPlannerRows|getHotCalendarRows|getHotActivityRows/);
   assert.match(read("lib/planner/dashboard.ts"), /getHotD1Database/);
   assert.match(read("lib/community/service.ts"), /getHotCommunityChannel|getHotCommunityMessages/);
-  assert.doesNotMatch(read("lib/data/d1/hot-screens.ts"), /SELECT \\*/);
+  assert.doesNotMatch(read("lib/data/d1/hot-screens.ts"), /SELECT \*/);
 });
 test("screen query inputs are bounded and parameterized", () => {
   const hot = read("lib/data/d1/hot-screens.ts");
