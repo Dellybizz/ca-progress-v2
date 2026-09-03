@@ -1,4 +1,4 @@
-# Phase 1 performance instrumentation deployment
+# Phase 2 D1 query optimization deployment
 # Phase 5 cutover trigger marker — runtime logic unchanged
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
@@ -76,6 +76,9 @@ jobs:
           npx wrangler deployments list --name ca-progress-v2 --json > phase5-cutover/web-deployments-before.json
           npx wrangler secret list --config wrangler.web.jsonc > phase5-cutover/web-secrets-before.json
           npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > phase5-cutover/d1-before.txt
+
+      - name: Apply Phase 2 D1 performance indexes
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0007_phase2_performance_indexes.sql
 
       - name: Prepare ephemeral Worker secret files
         shell: bash
