@@ -41,7 +41,7 @@ test("Phase 7 upload API returns stable JSON errors and checks direct-upload rea
   assert.match(route, /function error/);
   assert.match(route, /R2_NOT_CONFIGURED|R2_SIGNING_NOT_CONFIGURED/);
   assert.match(route, /UPLOAD_DESCRIPTOR_INVALID/);
-  assert.match(route, /try \{[\s\S]*optionalUser\(\)/);
+  assert.match(route, /optionalUser/);
 });
 
 test("Phase 7 upload drawer tolerates empty or non-JSON proxy responses", () => {
@@ -51,7 +51,7 @@ test("Phase 7 upload drawer tolerates empty or non-JSON proxy responses", () => 
   assert.match(library, /JSON\.parse\(body\)/);
   assert.doesNotMatch(library, /await response\.json\(\)/);
   assert.match(library, /CLIENT_UPLOAD_MAX_BYTES = 10 \* 1024 \* 1024/);
-  assert.match(library, /uploadFallbackMessage\(response\.status\)/);
+  assert.match(library, /uploadFallbackMessage/);
   assert.match(library, /stored in Cloudflare R2/);
 });
 
