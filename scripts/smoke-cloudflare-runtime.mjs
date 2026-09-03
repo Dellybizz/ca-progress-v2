@@ -64,7 +64,7 @@ function stop() {
 async function waitForWorker() {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
-    if (child?.exitCode !== null) throw new Error(`Wrangler exited before startup (code ${child?.exitCode}).\n${output}`);
+    if (child && child.exitCode !== null) throw new Error(`Wrangler exited before startup (code ${child?.exitCode}).\n${output}`);
     try {
       const response = await fetch(`${base}/api/health`, { headers: headers("desktop", true), signal: AbortSignal.timeout(2_000) });
       if (response.status < 500) return;
