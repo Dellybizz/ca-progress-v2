@@ -13,7 +13,7 @@ export async function getBackgroundJobStatus(limit = 100) {
 
 export async function getOpenDeadLetters(limit = 50) {
   const safeLimit = Math.max(1, Math.min(100, Math.round(limit)));
-  const result = await (getHotD1Database() as any).prepare(
+  const result = await database.prepare(
     "SELECT id,job_id,idempotency_key,job_type,attempts,error,created_at FROM background_job_dead_letters WHERE resolved_at IS NULL ORDER BY created_at DESC LIMIT ?1"
   ).bind(safeLimit).all();
   return (result.results ?? []) as Array<Record<string, unknown>>;
