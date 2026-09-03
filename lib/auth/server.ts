@@ -10,6 +10,7 @@ import type { AttemptOption, CALevel } from "@/lib/profile/validation";
 import type { AppRole } from "@/lib/authorization/roles";
 import { getCloudflareProfileForUser, ensureCloudflareUserBootstrap } from "./cloudflare-profile";
 import { getCurrentApplicationIdentity, isCloudflareAuthRuntime } from "./provider";
+import { getCloudflareRequestAuth } from "./cloudflare";
 import { loginPathFor, sanitizeReturnPath } from "./navigation";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -24,19 +25,54 @@ export type ServerIdentity = {
 };
 export type Viewer = { authenticated: boolean; id?: string; label: string; initial: string };
 
-async function optionalUserUncached(): Promise<ServerIdentity | null> {
-  if (!isCloudflareAuthRuntime() && !getSupabasePublicConfig().configured) return null;
+export type RequestAuthContext = {
+  identity: ServerIdentity | null;
+  role: AppRole;
+  entitlements: string[];
+  authenticated: boolean;
+};
+
+async function getRequestAuthContextUncached(): Promise<RequestAuthContext> {
+  if (isCloudflareAuthRuntime()) {
+    const auth = await getCloudflareRequestAuth();
+    const session = auth.session;
+    return {
+      identity: session ? {
+        id: auth.applicationUserId!,
+        email: session.email,
+        phone: session.phone,
+        displayName: session.displayName,
+        avatarUrl: session.avatarUrl,
+        role: auth.role,
+        entitlements: auth.entitlements,
+      } : null,
+      role: auth.role,
+      entitlements: auth.entitlements,
+      authenticated: auth.authenticated,
+    };
+  }
+  if (!getSupabasePublicConfig().configured) return { identity: null, role: "student", entitlements: [], authenticated: false };
   const identity = await measureServerPerformance("auth.identity", () => getCurrentApplicationIdentity());
-  if (!identity) return null;
   return {
-    id: identity.id,
-    email: identity.email,
-    phone: identity.phone,
-    displayName: identity.displayName,
-    avatarUrl: identity.avatarUrl,
-    role: identity.role,
-    entitlements: identity.entitlements,
+    identity: identity ? {
+      id: identity.id,
+      email: identity.email,
+      phone: identity.phone,
+      displayName: identity.displayName,
+      avatarUrl: identity.avatarUrl,
+      role: identity.role,
+      entitlements: identity.entitlements,
+    } : null,
+    role: identity?.role ?? "student",
+    entitlements: identity?.entitlements ?? [],
+    authenticated: Boolean(identity),
   };
+}
+
+export const getRequestAuthContext = cache(getRequestAuthContextUncached);
+
+async function optionalUserUncached(): Promise<ServerIdentity | null> {
+  return (await getRequestAuthContext()).identity;
 }
 
 // Share the authenticated identity across the shell and page loaders during one request.
@@ -61,7 +97,7 @@ async function getProfileForUserUncached(userId: string): Promise<ProfileRow | n
 export const getProfileForUser = cache(getProfileForUserUncached);
 
 export async function ensureUserBootstrap() {
-  const identity = await getCurrentApplicationIdentity();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return null;
   if (isCloudflareAuthRuntime()) {
     await ensureCloudflareUserBootstrap({
