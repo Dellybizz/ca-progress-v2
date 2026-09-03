@@ -3,7 +3,8 @@ import "server-only";
 import { optionalUser } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
 import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
-import { getSharedPublicJson } from "@/lib/cache/public";
+import { getSharedPublicJson, getCachedEntitlement } from "@/lib/cache/public";
+import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
 export type PlanTier = "free" | "basic" | "pro";
@@ -67,17 +68,20 @@ async function currentPlanId(userId: string) {
 
 export async function getEntitlementForUser(userId: string, featureKey: string): Promise<Entitlement> {
   if (await isCurrentGuestTestUser(userId)) return { planId: "guest-test", tier: "pro", planName: "Guest test access", featureKey, allowed: true, limitValue: null, limitUnit: "unlimited", resetPeriod: "never", upgradeMessage: "" };
-  const client = db();
-  const planId = await currentPlanId(userId);
-  if (!planId) return { planId: "", tier: "free", planName: "Free", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "This feature is not available on your current plan." };
-  const [planResult, entitlementResult] = await Promise.all([
-    client.from("subscription_plans").select("id,tier_key,name").eq("id", planId).maybeSingle(),
-    client.from("plan_entitlements").select("plan_id,feature_key,enabled,limit_value,limit_unit,reset_period,upgrade_message").eq("plan_id", planId).eq("feature_key", featureKey).maybeSingle(),
-  ]);
-  if (planResult.error || entitlementResult.error) throw new Error((planResult.error || entitlementResult.error)!.message);
-  const plan = asRow<PlanIdentityRow>(planResult.data);
-  const row = asRow<EntitlementRow>(entitlementResult.data);
-  return { planId, tier: plan?.tier_key ?? "free", planName: plan?.name ?? "Free", featureKey, allowed: Boolean(row?.enabled), limitValue: row?.limit_value == null ? null : Number(row.limit_value), limitUnit: row?.limit_unit ?? "unlimited", resetPeriod: row?.reset_period ?? "never", upgradeMessage: row?.upgrade_message ?? "Upgrade your plan to use this feature." };
+  return getCachedEntitlement({
+    userId,
+    featureKey,
+    load: async () => {
+      try {
+        const response = await invokeBillingService({ path: "/entitlement", method: "GET", userId, query: `?featureKey=${encodeURIComponent(featureKey)}` });
+        const payload = await response.json().catch(() => null) as Partial<Entitlement> | { error?: string } | null;
+        if (!response.ok || !payload || typeof payload !== "object" || typeof (payload as Partial<Entitlement>).featureKey !== "string") throw new Error(typeof (payload as { error?: unknown } | null)?.error === "string" ? (payload as { error: string }).error : "Billing entitlement lookup failed.");
+        return payload as Entitlement;
+      } catch {
+        return { planId: "", tier: "free", planName: "Free", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
+      }
+    },
+  });
 }
 
 export async function getResourceStorageAccess(userId: string) {
