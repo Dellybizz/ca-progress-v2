@@ -26,3 +26,17 @@ export async function getPlannerDashboardSummary(userId: string, timezone: strin
     estimatedMinutes: today.reduce((sum, row) => sum + row.estimated_minutes, 0),
   };
 }
+
+
+export async function getLatestStoredPlanRecommendation(userId: string) {
+  if (!isCloudflareDataRuntime()) return null;
+  try {
+    const result = await getHotD1Database().prepare(
+      "SELECT i.title,i.item_kind,i.chapter_id,i.subject_id,p.plan_date FROM daily_plans p JOIN daily_plan_items i ON i.plan_id=p.id WHERE p.user_id=?1 AND i.status='planned' ORDER BY p.plan_date DESC,i.position ASC LIMIT 1"
+    ).bind(userId).all<{title:string;item_kind:string;chapter_id:string|null;subject_id:string|null;plan_date:string}>();
+    const row = result.results?.[0];
+    return row ? { title: row.title, description: `From your stored ${row.plan_date} study plan.`, href: "/planner/today" } : null;
+  } catch {
+    return null;
+  }
+}
