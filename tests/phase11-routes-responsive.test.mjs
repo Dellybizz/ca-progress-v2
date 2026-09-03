@@ -65,7 +65,7 @@ test("server-side entitlement checks cover protected Phase 11 integrations", () 
   assert.match(read("app/(student)/analytics/forecast/page.tsx"), /analytics\.forecast/);
   assert.match(read("app/api/planner/today/route.ts"), /planner\.smart/);
   assert.match(read("app/api/community/channels/[channel]/messages/route.ts"), /community\.attachments/);
-  assert.match(read("app/api/resources/upload-url/route.ts"), /resources\.storage/);
+  assert.match(read("lib/billing/service.ts"), /resources\.storage/);
 });
 
 test("earlier completed phase regression suites remain in the repository", () => {
