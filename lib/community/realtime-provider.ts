@@ -3,6 +3,7 @@
 type CommunityRealtimeSubscription = {
   channelId: string;
   channelSlug?: string;
+  userId?: string;
   onDataChanged: () => void;
   onPinnedChanged: () => void;
   onPresenceChanged?: (payload: unknown) => void;
@@ -32,6 +33,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
   noop.send = () => undefined;
   if (!input.channelId || !input.channelSlug || typeof window === "undefined" || typeof WebSocket === "undefined") return noop;
 
+  const presenceId = input.userId || `guest:${crypto.randomUUID()}`;
   let socket: WebSocket | null = null;
   let closed = false;
   let reconnectTimer: number | null = null;
@@ -66,7 +68,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
     socket.addEventListener("open", () => {
       reconnectMs = 500;
       stopFallback();
-      socket?.send(JSON.stringify({ type: "presence", userId: input.channelId, state: "online" }));
+      socket?.send(JSON.stringify({ type: "presence", userId: presenceId, state: "online" }));
     });
     socket.addEventListener("message", (event) => {
       if (typeof event.data !== "string") return;
@@ -96,7 +98,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
     if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
     stopFallback();
     document.removeEventListener("visibilitychange", onVisibility);
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "presence", userId: input.channelId, state: "offline" }));
+    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "presence", userId: presenceId, state: "offline" }));
     socket?.close();
     socket = null;
   }) as CommunityRealtimeHandle;
