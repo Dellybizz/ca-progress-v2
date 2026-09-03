@@ -30,7 +30,11 @@ export default async function TodayPlanPage() {
     if (!access.allowed) return <div className="phase9-page"><PageHeader preview={false} eyebrow="Smart Planner" title="Smart planning is not included in your current plan." description="Your existing progress and manual planner data remain available."/><FeatureLock planName={access.planName} title="Unlock Smart Planner" description={access.upgradeMessage || "Compare plans to enable explainable daily recommendations."}/></div>;
   }
   const model = await getTodayPlanDisplayModel();
-  if (model.mode === "guest") return <div className="phase9-page"><LoginRequired next="/planner/today" title="Sign in to generate your Today Plan"/></div>;
+  if (model.mode === "guest") return <div className="phase9-page">
+    <PageHeader preview={false} eyebrow="Today" title="Today’s study plan" description="Browse the Today Plan page as a guest. A personal plan is generated only after sign-in."/>
+    <Card><CardBody><div className="phase6-empty"><Icon name="calendar"/><strong>Today Plan preview</strong><p>Sign in to generate and save tasks for your own schedule.</p></div></CardBody></Card>
+    <LoginRequired next="/planner/today" title="Sign in to generate your Today Plan"/>
+  </div>;
   if (model.mode === "setup") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Today" title="Complete your academic profile first." description="Add your CA level, group, attempt and daily study target to build your daily plan."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
   return <div className="phase9-page today-plan-page"><PageHeader preview={false} eyebrow="Today" title="Today’s study plan" description={formatPlanDate(model.planDate)}/><TodayPlanClient model={model}/></div>;
 }
