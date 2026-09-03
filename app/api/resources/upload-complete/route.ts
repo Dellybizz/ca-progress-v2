@@ -32,6 +32,7 @@ export async function POST(request: Request) {
 
   let bucket;
   try { bucket = getResourceR2Bucket(); } catch { return fail("R2 storage is unavailable.", 503, "R2_NOT_CONFIGURED"); }
+  if (typeof bucket.head !== "function") return fail("R2 object metadata checks are unavailable.", 503, "R2_HEAD_NOT_CONFIGURED");
   const object = await bucket.head(String(intent.object_key));
   if (!object) return fail("The direct upload was not found in R2.", 404, "OBJECT_NOT_FOUND");
   if (Number(object.size) !== Number(intent.expected_size_bytes)) {
