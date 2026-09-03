@@ -33,8 +33,9 @@ export async function POST(request: Request) {
   if (!access.allowed) return error(access.upgradeMessage || "Your plan does not allow file storage.", 403, "ENTITLEMENT_REQUIRED");
   if (access.limitBytes !== null && access.usedBytes + sizeBytes > access.limitBytes) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
 
+  const objectKey = `uploads/${identity.id}/${crypto.randomUUID()}/${normalizeFilename(filename)}`;
   let signed;
-  try { signed = await createR2PresignedUrl({ key: `uploads/${identity.id}/${crypto.randomUUID()}/${normalizeFilename(filename)}`, method: "PUT", expiresInSeconds: 300, contentType: mimeType }); }
+  try { signed = await createR2PresignedUrl({ key: objectKey, method: "PUT", expiresInSeconds: 300, contentType: mimeType }); }
   catch { return error("Direct R2 upload is temporarily unavailable.", 503, "R2_SIGNING_NOT_CONFIGURED"); }
 
   const uploadId = crypto.randomUUID();
