@@ -1,6 +1,7 @@
 import "server-only";
 
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { getSupabasePublicConfig } from "@/lib/env";
 import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -22,7 +23,7 @@ export type ServerIdentity = {
 };
 export type Viewer = { authenticated: boolean; id?: string; label: string; initial: string };
 
-export async function optionalUser(): Promise<ServerIdentity | null> {
+async function optionalUserUncached(): Promise<ServerIdentity | null> {
   if (!isCloudflareAuthRuntime() && !getSupabasePublicConfig().configured) return null;
   const identity = await getCurrentApplicationIdentity();
   if (!identity) return null;
@@ -37,13 +38,16 @@ export async function optionalUser(): Promise<ServerIdentity | null> {
   };
 }
 
+// Share the authenticated identity across the shell and page loaders during one request.
+export const optionalUser = cache(optionalUserUncached);
+
 export async function requireUser(next = "/dashboard") {
   const user = await optionalUser();
   if (!user) redirect(loginPathFor(next));
   return user;
 }
 
-export async function getProfileForUser(userId: string): Promise<ProfileRow | null> {
+async function getProfileForUserUncached(userId: string): Promise<ProfileRow | null> {
   if (isCloudflareAuthRuntime()) {
     return await getCloudflareProfileForUser(userId) as unknown as ProfileRow | null;
   }
@@ -51,6 +55,9 @@ export async function getProfileForUser(userId: string): Promise<ProfileRow | nu
   const { data } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
   return data ?? null;
 }
+
+// Profile reads are shared by the shell, page services, and authorization checks.
+export const getProfileForUser = cache(getProfileForUserUncached);
 
 export async function ensureUserBootstrap() {
   const identity = await getCurrentApplicationIdentity();
