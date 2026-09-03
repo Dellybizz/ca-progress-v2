@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getHotD1Database } from "@/lib/data/d1/runtime";
+import { getResourceR2Bucket } from "@/lib/resources/r2";
 import { runIcaiSync } from "@/lib/icai/sync";
 import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
 import type { BackgroundJob } from "./queue";
@@ -45,7 +46,15 @@ export async function executeBackgroundJob(job: BackgroundJob) {
       const days = Math.max(1, Math.min(90, Number(job.payload.retentionDays ?? 30)));
       await db().prepare("DELETE FROM background_jobs WHERE status='succeeded' AND updated_at < datetime('now', ?1)").bind(`-${days} days`).run();
       await db().prepare("DELETE FROM notification_outbox WHERE status='sent' AND created_at < datetime('now', ?1)").bind(`-${days} days`).run();
-      return { retentionDays: days };
+      const abandoned = await db().prepare("SELECT id,object_key FROM r2_upload_intents WHERE status='issued' AND expires_at < CURRENT_TIMESTAMP LIMIT 100").all();
+      try {
+        const bucket = getResourceR2Bucket();
+        for (const row of (abandoned.results ?? []) as Array<{id:string;object_key:string}>) {
+          await bucket.delete(row.object_key).catch(() => undefined);
+          await db().prepare("UPDATE r2_upload_intents SET status='abandoned' WHERE id=?1").bind(row.id).run();
+        }
+      } catch { /* R2 cleanup retries on the next scheduled run. */ }
+      return { retentionDays: days, abandonedUploads: abandoned.results?.length ?? 0 };
     }
     case "ai-plan-generation": {
       const userId = typeof job.payload.userId === "string" ? job.payload.userId : null;
