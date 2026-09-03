@@ -31,13 +31,14 @@ type ResourceR2Bucket = {
     },
   ): Promise<unknown>;
   get(key: string): Promise<R2ObjectBodyLike | null>;
+  head(key: string): Promise<Omit<R2ObjectBodyLike, "body" | "writeHttpMetadata"> | null>;
   delete(key: string): Promise<void>;
 };
 
 export function getResourceR2Bucket(): ResourceR2Bucket {
   const { env } = getCloudflareContext();
   const bucket = (env as unknown as Record<string, unknown>)[RESOURCE_R2_BINDING] as ResourceR2Bucket | undefined;
-  if (!bucket || typeof bucket.put !== "function" || typeof bucket.get !== "function" || typeof bucket.delete !== "function") {
+  if (!bucket || typeof bucket.put !== "function" || typeof bucket.get !== "function" || typeof bucket.head !== "function" || typeof bucket.delete !== "function") {
     throw new Error("Cloudflare R2 resource bucket binding is not configured.");
   }
   return bucket;
