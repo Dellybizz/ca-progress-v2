@@ -137,6 +137,14 @@ async function baseCommunityContext() {
   return { mode: "ready" as const, identity, profile: profile!, viewerName, role, channels, groups: groupChannels(channels, levelLabel), supabase };
 }
 
+export async function getCommunityChannelAccess(channelSlug: string): Promise<{ allowed: boolean; status: number; reason: string }> {
+  const context = await baseCommunityContext();
+  if (context.mode === "setup") return { allowed: false, status: 403, reason: "Complete your academic profile first." };
+  const channel = context.channels.find((item) => item.slug === channelSlug);
+  if (!channel) return { allowed: false, status: 404, reason: "Community channel not found." };
+  return { allowed: true, status: 101, reason: "" };
+}
+
 async function mapNotifications(
   rows: NotificationRow[],
   channels: CommunityChannel[],
