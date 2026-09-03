@@ -15,7 +15,7 @@ function config(): PresignConfig {
   return { accountId, accessKeyId, secretAccessKey, endpoint: typeof values.R2_S3_ENDPOINT === "string" ? values.R2_S3_ENDPOINT : undefined };
 }
 
-function hex(buffer: ArrayBuffer) { return Array.from(new Uint8Array(buffer), (v) => v.toString(16).padStart(2, "0")).join(""); }
+function hex(buffer: ArrayBuffer | Uint8Array) {\n  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);\n  return Array.from(bytes, (v) => v.toString(16).padStart(2, "0")).join("");\n}
 async function sha256(value: string) { return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))); }
 async function hmac(key: ArrayBuffer | Uint8Array, value: string) {
   const material = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
