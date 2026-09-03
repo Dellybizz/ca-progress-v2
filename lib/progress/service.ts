@@ -1,7 +1,8 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
+import { getHotProgressRows, getHotDashboardProgress } from "@/lib/data/d1/hot-screens";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -124,7 +125,7 @@ function groupLabel(groupChoice: string, groups: Array<{ code: string; name: str
 }
 
 export async function getProgressPageModel(subjectSlug?: string | null): Promise<ProgressPageModel> {
-  const identity = await optionalUser();
+  const identity = (await getRequestAuthContext()).identity;
   if (!identity) return { mode: "guest" };
   const profile = await getProfileForUser(identity.id);
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
@@ -133,8 +134,19 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
   const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
   const subjects = subjectSlug ? catalog.subjects.filter((subject) => subject.slug === subjectSlug) : catalog.subjects;
   const chapterIds = subjects.flatMap((subject) => subject.chapters.map((chapter) => chapter.id));
-  const supabase = await createServerSupabaseClient();
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  if (process.env.CA_AUTH_RUNTIME === "cloudflare") {
+    const hot = await getHotProgressRows(identity.id, chapterIds, sevenDaysAgo);
+    const rowByChapter = new Map(hot.progress.map((row) => [row.chapter_id, row]));
+    const groupsById = new Map(catalog.groups.map((group) => [group.id, group]));
+    const chapters: ProgressChapter[] = subjects.flatMap((subject) => {
+      const group = groupsById.get(subject.groupId);
+      return subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title, subjectId: subject.id, subjectTitle: subject.title, subjectSlug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All papers", state: stateFromRow(rowByChapter.get(chapter.id) as ProgressRow | undefined), updatedAt: rowByChapter.get(chapter.id)?.updated_at ?? null }));
+    });
+    const titleByChapter = new Map(chapters.map((chapter) => [chapter.id, chapter.title]));
+    return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, attemptKey: profile.attempt_key, groupLabel: groupLabel(profile.group_choice, catalog.groups), chapters, analytics: buildAnalytics(chapters, hot.weeklyEvents as EventRow[]), history: (hot.events as EventRow[]).slice(0, 20).map((event) => ({ id: event.id, chapterId: event.chapter_id, chapterTitle: titleByChapter.get(event.chapter_id) ?? "Chapter", stage: event.stage as ProgressHistoryItem["stage"], action: event.action as ProgressHistoryItem["action"], createdAt: event.created_at, canUndo: event.action !== "undo" && !event.undone_at })) } satisfies ProgressReadyModel;
+  }
+  const supabase = await createServerSupabaseClient();
   const [progressResponse, eventResponse, weeklyEventResponse] = await Promise.all([
     chapterIds.length ? supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds) : Promise.resolve({ data: [], error: null }),
     chapterIds.length ? supabase.from("progress_events").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds).order("created_at", { ascending: false }).limit(120) : Promise.resolve({ data: [], error: null }),
@@ -212,7 +224,7 @@ export async function getProgressDashboardSummary(userId: string, subjects: Dash
   const chapterIds = [...new Set(subjects.flatMap((subject) => subject.chapterIds))];
   const supabase = await createServerSupabaseClient();
   const response = chapterIds.length
-    ? await supabase.from("chapter_progress").select("*").eq("user_id", userId).in("chapter_id", chapterIds)
+    ? (process.env.CA_AUTH_RUNTIME === "cloudflare" ? { data: await getHotDashboardProgress(userId, chapterIds), error: null } : await supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", userId).in("chapter_id", chapterIds))
     : { data: [], error: null };
   if (response.error) throw new Error(`Dashboard progress could not be loaded: ${response.error.message}`);
 
