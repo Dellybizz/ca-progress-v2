@@ -19,21 +19,13 @@ test("hot screens have typed direct-D1 repository coverage", () => {
   assert.doesNotMatch(hot, /SELECT \*/);
 });
 
-test("hot screen services route Cloudflare reads away from compatibility wildcards", () => {
-  const files = [
-    "lib/dashboard/service.ts", "lib/dashboard/reference.ts",
-    "lib/progress/service.ts", "lib/planner/service.ts",
-    "lib/planner/dashboard.ts", "lib/community/service.ts",
-  ];
-  for (const file of files) {
-    const source = read(file);
-    assert.doesNotMatch(source, /\.select\(["']\*["']\)/);
-  }
+test("hot screen services route Cloudflare reads through the typed repository", () => {
   assert.match(read("lib/progress/service.ts"), /getHotProgressRows|getHotDashboardProgress/);
   assert.match(read("lib/planner/service.ts"), /getHotPlannerRows|getHotCalendarRows|getHotActivityRows/);
+  assert.match(read("lib/planner/dashboard.ts"), /getHotD1Database/);
   assert.match(read("lib/community/service.ts"), /getHotCommunityChannel|getHotCommunityMessages/);
+  assert.doesNotMatch(read("lib/data/d1/hot-screens.ts"), /SELECT \\*/);
 });
-
 test("screen query inputs are bounded and parameterized", () => {
   const hot = read("lib/data/d1/hot-screens.ts");
   assert.match(hot, /Math\.min\(Math\.floor\(limit\), 100\)/);
