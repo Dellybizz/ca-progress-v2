@@ -35,8 +35,8 @@ test("Realtime scopes refreshes to the active channel and cleans up the Cloudfla
   assert.match(chat, /unsubscribe\(\)/);
   assert.match(provider, /window\.setInterval\(refreshData, DATA_REFRESH_MS\)/);
   assert.match(provider, /window\.setInterval\(refreshPins, PIN_REFRESH_MS\)/);
-  assert.match(provider, /window\.clearInterval\(dataTimer\)/);
-  assert.match(provider, /window\.clearInterval\(pinTimer\)/);
+  assert.match(provider, /window\.clearInterval\(fallbackDataTimer\)/);
+  assert.match(provider, /window\.clearInterval\(fallbackPinTimer\)/);
   assert.match(provider, /removeEventListener\("visibilitychange", onVisibility\)/);
   assert.doesNotMatch(chat, /supabase\.removeChannel|\.channel\(`community:/);
 });
