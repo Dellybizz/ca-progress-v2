@@ -14,7 +14,7 @@ test("shared cache is versioned, observable, and TTL bounded", () => {
   assert.match(source, /cache\\.delete/);
   assert.match(source, /outcome: "hit" \\| "miss" \\| "bypass" \\| "write" \\| "invalidate"/);
   assert.match(source, /MAX_DATA_TTL_SECONDS/);
-  assert.match(source, /Math\\.min\\(MAX_DATA_TTL_SECONDS/);
+  assert.ok(source.includes("Math.min(MAX_DATA_TTL_SECONDS"));
   assert.match(source, /"academic", "pricing", "icai"/);
   assert.doesNotMatch(source, /progress|activity|entitlement|community/i);
 });
