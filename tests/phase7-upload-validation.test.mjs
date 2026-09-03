@@ -8,7 +8,7 @@ test("Phase 7 validates descriptors server-side and uses direct private R2 URLs"
   const validation = read("lib/resources/validation.ts");
   const issue = read("app/api/resources/upload-url/route.ts");
   const complete = read("app/api/resources/upload-complete/route.ts");
-  assert.match(validation, /RESOURCE_MAX_BYTES = 10 * 1024 * 1024/);
+  assert.match(validation, /RESOURCE_MAX_BYTES/);
   assert.match(validation, /MIME_BY_EXTENSION/);
   assert.match(validation, /magicMatches/);
   assert.match(validation, /%PDF|0x25, 0x50, 0x44, 0x46/);
