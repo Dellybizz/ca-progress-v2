@@ -8,8 +8,6 @@ type DurableState = {
   getWebSockets(): WebSocket[];
 };
 
-type DurableEnv = Record<string, unknown>;
-
 function safeEvent(value: unknown): CoordinatorEvent | null {
   if (!value || typeof value !== "object") return null;
   const event = value as Record<string, unknown>;
@@ -20,20 +18,22 @@ function safeEvent(value: unknown): CoordinatorEvent | null {
     return { type: "typing", userId: event.userId.slice(0, 128), typing: event.typing };
   }
   if (event.type === "refresh" && ["message", "reaction", "read", "pin", "moderation"].includes(String(event.reason))) {
-    return { type: "refresh", reason: event.reason as CoordinatorEvent["reason"] };
+    return { type: "refresh", reason: event.reason as "message" | "reaction" | "read" | "pin" | "moderation" };
   }
   return null;
 }
 
 export class CommunityChannelCoordinator {
-  constructor(private readonly state: DurableState, private readonly env: DurableEnv) {}
+  constructor(private readonly state: DurableState) {}
 
   fetch(request: Request) {
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("WebSocket upgrade required.", { status: 426 });
     }
 
-    const pair = new WebSocketPair();
+    const Pair = (globalThis as typeof globalThis & { WebSocketPair?: new () => [WebSocket, WebSocket] }).WebSocketPair;
+    if (!Pair) return new Response("WebSocket runtime is unavailable.", { status: 503 });
+    const pair = new Pair();
     const client = pair[0];
     const server = pair[1];
     this.state.acceptWebSocket(server);
@@ -48,7 +48,7 @@ export class CommunityChannelCoordinator {
     server.addEventListener("close", () => undefined);
     server.addEventListener("error", () => undefined);
     server.send(JSON.stringify({ type: "ready" }));
-    return new Response(null, { status: 101, webSocket: client });
+    return new Response(null, { status: 101, webSocket: client } as ResponseInit & { webSocket: WebSocket });
   }
 
   private broadcast(event: CoordinatorEvent, sender?: WebSocket) {
