@@ -37,6 +37,7 @@
     "CA_AUTH_RUNTIME": "cloudflare",
     "CA_DATA_RUNTIME": "cloudflare",
     "CA_PHASE4_SHADOW_READ": "0",
+    "CA_GUEST_TEST_MODE": "true",
     "ICAI_SYNC_ENABLED": "true",
     "ICAI_SYNC_USER_AGENT": "CA Progress V2 Official ICAI Monitor/phase8"
   },
