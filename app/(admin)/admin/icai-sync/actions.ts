@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdminOperator } from "@/lib/authorization/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { runIcaiSync } from "@/lib/icai/sync";
+import { invalidateSharedPublicCache } from "@/lib/cache/public";
 
 function message(error: unknown) {
   return error instanceof Error ? error.message : "Unknown Phase 8 operation error.";
@@ -15,6 +16,7 @@ export async function runIcaiSyncAction() {
   try {
     const operator = await requireAdminOperator();
     const result = await runIcaiSync({ trigger: "manual", requestedBy: operator.user.id });
+    await invalidateSharedPublicCache(["icai"]);
     revalidatePath("/admin/icai-sync");
     revalidatePath("/updates");
     revalidatePath("/resources/icai");
@@ -41,6 +43,7 @@ export async function decideIcaiReviewAction(formData: FormData) {
       p_notes: "",
     });
     if (error) throw error;
+    await invalidateSharedPublicCache(["icai"]);
 
     revalidatePath("/admin/icai-sync");
     revalidatePath("/updates");
