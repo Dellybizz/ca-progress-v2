@@ -11,13 +11,8 @@ function shouldTrackClick(event: MouseEvent, anchor: HTMLAnchorElement) {
   return url.origin === window.location.origin && url.pathname !== window.location.pathname;
 }
 
-export function NavigationProgress() {
-  const pathname = usePathname();
+function NavigationProgressState() {
   const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    setPending(false);
-  }, [pathname]);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -31,4 +26,9 @@ export function NavigationProgress() {
   }, []);
 
   return pending ? <div className="app-navigation-progress" role="status" aria-label="Loading next page" /> : null;
+}
+
+export function NavigationProgress() {
+  const pathname = usePathname();
+  return <NavigationProgressState key={pathname} />;
 }
