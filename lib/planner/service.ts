@@ -82,11 +82,12 @@ export async function getCalendarPageModel(month?: string | null): Promise<Calen
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
   if (!validProfile(profile)) return { mode: "setup", viewerName: name };
   const bounds = monthBounds(month);
+  const hotCalendar = isCloudflareDataRuntime() ? await getHotCalendarRows(identity.id, bounds.start.toISOString(), bounds.end.toISOString()) : null;
   const supabase = await createServerSupabaseClient();
   const [tasks, goals, userEvents, attempt] = await Promise.all([
-    supabase.from("tasks").select("*").eq("user_id", identity.id).gte("due_at", bounds.start.toISOString()).lt("due_at", bounds.end.toISOString()).neq("status", "cancelled").order("due_at"),
-    supabase.from("goals").select("*").eq("user_id", identity.id).gte("due_date", bounds.start.toISOString().slice(0, 10)).lt("due_date", bounds.end.toISOString().slice(0, 10)).neq("status", "cancelled").order("due_date"),
-    supabase.from("user_calendar_events").select("*").eq("user_id", identity.id).gte("starts_at", bounds.start.toISOString()).lt("starts_at", bounds.end.toISOString()).order("starts_at"),
+    hotCalendar ? Promise.resolve({ data: hotCalendar.tasks, error: null }) : supabase.from("tasks").select("id,title,notes,task_kind,subject_id,chapter_id,due_at,estimated_minutes,status,completed_at").eq("user_id", identity.id).gte("due_at", bounds.start.toISOString()).lt("due_at", bounds.end.toISOString()).neq("status", "cancelled").order("due_at"),
+    hotCalendar ? Promise.resolve({ data: hotCalendar.goals, error: null }) : supabase.from("goals").select("id,title,description,due_date,status,completed_at").eq("user_id", identity.id).gte("due_date", bounds.start.toISOString().slice(0, 10)).lt("due_date", bounds.end.toISOString().slice(0, 10)).neq("status", "cancelled").order("due_date"),
+    hotCalendar ? Promise.resolve({ data: hotCalendar.events, error: null }) : supabase.from("user_calendar_events").select("id,title,notes,starts_at,ends_at,all_day").eq("user_id", identity.id).gte("starts_at", bounds.start.toISOString()).lt("starts_at", bounds.end.toISOString()).order("starts_at"),
     supabase.from("exam_attempts").select("id").eq("attempt_key", profile!.attempt_key!).eq("verification_status", "verified").limit(1).maybeSingle(),
   ]);
   const error = tasks.error || goals.error || userEvents.error || attempt.error;
