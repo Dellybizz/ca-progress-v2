@@ -342,8 +342,8 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
     messages: page.messages,
     nextCursor: page.nextCursor,
     pinned,
-    members,
-    resources,
+    members: [],
+    resources: [],
     activeBlock: block ? { reason: block.reason, endsAt: block.ends_at, channelSpecific: Boolean(block.channel_id) } : null,
   };
 }
