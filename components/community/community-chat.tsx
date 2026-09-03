@@ -81,6 +81,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     };
     const unsubscribe = subscribeToCommunityRealtime({
       channelId: model.channel.id,
+      userId: model.viewerId || undefined,
       channelSlug: model.channel.slug,
       onDataChanged: scheduleRefresh,
       onPinnedChanged: () => {
