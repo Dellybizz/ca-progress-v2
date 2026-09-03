@@ -3,7 +3,8 @@ import "server-only";
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { getHotStudySessions, getHotStudyTimer } from "@/lib/data/d1/hot-screens";
 import type { Database } from "@/lib/supabase/database.types";
 import type { StudyAnalytics, StudyPageModel, StudySessionItem, StudySubjectOption, StudyTimerSnapshot } from "./types";
 
@@ -70,10 +71,12 @@ function sessionItem(row: SessionRow, subjectNames: Map<string, string>, chapter
 export async function getStudyAnalytics(userId: string, options?: { now?: Date; subjectNames?: Map<string, string>; chapterNames?: Map<string, string>; timezone?: string }): Promise<StudyAnalytics> {
   const now = options?.now ?? new Date();
   const since = new Date(now.valueOf() - 60 * DAY_MS).toISOString();
-  const supabase = await createServerSupabaseClient();
-  const response = await supabase.from("study_sessions").select("id,subject_id,chapter_id,started_at,ended_at,duration_seconds,mode,timezone").eq("user_id", userId).gte("ended_at", since).order("ended_at", { ascending: false }).limit(600);
-  if (response.error) throw new Error(`Study analytics could not be loaded: ${response.error.message}`);
-  const rows = (response.data ?? []) as SessionRow[];
+  const rows = (isCloudflareDataRuntime()
+    ? await getHotStudySessions(userId, since)
+    : (await createServerSupabaseClient()).from("study_sessions").select("id,subject_id,chapter_id,started_at,ended_at,duration_seconds,mode,timezone").eq("user_id", userId).gte("ended_at", since).order("ended_at", { ascending: false }).limit(600).then((response) => {
+      if (response.error) throw new Error(`Study analytics could not be loaded: ${response.error.message}`);
+      return response.data ?? [];
+    })) as SessionRow[];
   const subjectNames = options?.subjectNames ?? new Map<string, string>();
   const chapterNames = options?.chapterNames ?? new Map<string, string>();
   const timezone = safeTimeZone(options?.timezone ?? rows[0]?.timezone ?? "UTC");
@@ -108,10 +111,13 @@ export async function getStudyPageModel(now = new Date()): Promise<StudyPageMode
   const subjects: StudySubjectOption[] = catalog.subjects.map((subject) => ({ id: subject.id, slug: subject.slug, title: subject.title, chapters: subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title })) }));
   const subjectNames = new Map(subjects.map((subject) => [subject.id, subject.title]));
   const chapterNames = new Map(subjects.flatMap((subject) => subject.chapters.map((chapter) => [chapter.id, chapter.title] as const)));
-  const supabase = await createServerSupabaseClient();
-  const timerResponse = await supabase.from("study_timer_state").select("*").eq("user_id", identity.id).maybeSingle();
-  if (timerResponse.error) throw new Error(`Study timer could not be loaded: ${timerResponse.error.message}`);
-  const timerRow = timerResponse.data as TimerRow | null;
+  const timerRow = (isCloudflareDataRuntime()
+    ? await getHotStudyTimer(identity.id)
+    : await (async () => {
+      const response = await (await createServerSupabaseClient()).from("study_timer_state").select("*").eq("user_id", identity.id).maybeSingle();
+      if (response.error) throw new Error(`Study timer could not be loaded: ${response.error.message}`);
+      return response.data;
+    })()) as TimerRow | null;
   const analytics = await getStudyAnalytics(identity.id, { now, subjectNames, chapterNames, timezone: timerRow?.timezone });
   const timer: StudyTimerSnapshot | null = timerRow ? {
     status: timerRow.status as StudyTimerSnapshot["status"],
