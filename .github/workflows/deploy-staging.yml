@@ -1,4 +1,4 @@
-# Guest dashboard panel deployment - contract wording
+# Guest same-panel read-only guest access deployment
 # Phase 5 cutover trigger marker — runtime logic unchanged
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
