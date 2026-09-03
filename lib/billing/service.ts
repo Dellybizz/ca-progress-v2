@@ -66,7 +66,7 @@ async function currentPlanId(userId: string) {
 
 export async function getEntitlementForUser(userId: string, featureKey: string): Promise<Entitlement> {
   if (await isCurrentGuestTestUser(userId)) return { planId: "guest-test", tier: "pro", planName: "Guest test access", featureKey, allowed: true, limitValue: null, limitUnit: "unlimited", resetPeriod: "never", upgradeMessage: "" };
-  return getCachedEntitlement({
+  return getCachedUserFeature({
     userId,
     featureKey,
     load: async () => {
