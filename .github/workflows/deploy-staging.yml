@@ -1,4 +1,4 @@
-# Dashboard query optimization deploy
+# Dashboard parallel data-query optimization deploy
 # Phase 5 cutover trigger marker — runtime logic unchanged
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
