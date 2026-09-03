@@ -4,21 +4,11 @@ import { MobileNavigation } from "./mobile-nav-placeholder";
 import { MobileOverscrollGuard } from "./mobile-overscroll-guard";
 import { DesktopNavigation } from "./navigation";
 import { TopbarControls } from "./topbar-controls";
-import { Icon } from "@/components/ui/icon";
-import { loadViewer, type Viewer } from "@/lib/auth/server";
+import { ViewerStatus } from "./viewer-status";
 import { NavigationProgress } from "./navigation-progress";
+import { Icon } from "@/components/ui/icon";
 
-const guestViewer: Viewer = { authenticated: false, label: "Guest", initial: "G" };
-
-export async function AppShell({ children, area = "student" }: { children: React.ReactNode; area?: "student" | "admin" }) {
-  let viewer: Viewer;
-  try {
-    viewer = await loadViewer();
-  } catch (error) {
-    console.error("[app-shell] viewer lookup failed; rendering guest shell", error);
-    viewer = guestViewer;
-  }
-
+export function AppShell({ children, area = "student" }: { children: React.ReactNode; area?: "student" | "admin" }) {
   return (
     <>
       <NavigationProgress/>
@@ -33,10 +23,7 @@ export async function AppShell({ children, area = "student" }: { children: React
           <div className="sidebar-section-label">Workspace</div>
           <DesktopNavigation area={area}/>
           <div className="sidebar-spacer"/>
-          <div className="sidebar-status">
-            <span className="sidebar-status__icon"><Icon name={viewer.authenticated ? "shield" : "sparkles"} size={16}/></span>
-            <div><strong>{viewer.authenticated ? "Signed in" : "Guest mode"}</strong><span>{viewer.authenticated ? "Sync enabled" : "Local access"}</span></div>
-          </div>
+          <ViewerStatus/>
           {area === "admin" ? <Link className="sidebar-switch" href="/dashboard"><Icon name="home" size={16}/>Student workspace</Link> : null}
         </aside>
 
@@ -48,9 +35,9 @@ export async function AppShell({ children, area = "student" }: { children: React
             </Link>
             <div className="topbar-context">
               <span className="topbar-context__dot"/>
-              <div><strong>{area === "admin" ? "Admin workspace" : "Student workspace"}</strong><span>{viewer.authenticated ? `Signed in as ${viewer.label}` : "Browsing as guest"}</span></div>
+              <div><strong>{area === "admin" ? "Admin workspace" : "Student workspace"}</strong><span>Workspace ready</span></div>
             </div>
-            <TopbarControls viewer={viewer}/>
+            <TopbarControls/>
           </header>
           <main className="content-wrap">{children}</main>
         </div>
