@@ -6,6 +6,7 @@ import { DesktopNavigation } from "./navigation";
 import { TopbarControls } from "./topbar-controls";
 import { Icon } from "@/components/ui/icon";
 import { loadViewer, type Viewer } from "@/lib/auth/server";
+import { NavigationProgress } from "./navigation-progress";
 
 const guestViewer: Viewer = { authenticated: false, label: "Guest", initial: "G" };
 
@@ -20,6 +21,7 @@ export async function AppShell({ children, area = "student" }: { children: React
 
   return (
     <>
+      <NavigationProgress/>
       <MobileOverscrollGuard/>
       <EnvironmentBanner/>
       <div className="app-shell">
