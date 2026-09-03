@@ -15,7 +15,6 @@ import type {
   CommunityChannelGroup,
   CommunityChannelModel,
   CommunityHomeModel,
-  CommunityMemberOption,
   CommunityMessage,
   CommunityMessagePage,
   CommunityModerationAction,
@@ -25,7 +24,6 @@ import type {
   CommunityReaction,
   CommunityReactionEmoji,
   CommunityResourceAttachment,
-  CommunityResourceOption,
 } from "./types";
 
 type ChannelRow = Database["public"]["Tables"]["community_channels"]["Row"];
