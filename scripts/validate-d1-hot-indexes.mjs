@@ -21,7 +21,7 @@ function execute(sql) {
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
 const expectedIndexes = [
-  "idx_sessions_token_active", "idx_profiles_user_id",
+  "idx_sessions_token_active",
   "idx_progress_events_user_chapter_created", "idx_study_sessions_user_ended",
   "idx_tasks_user_status_due", "idx_community_messages_channel_status_sequence",
   "idx_channel_read_state_channel_user_sequence",
@@ -33,7 +33,7 @@ const expectedIndexes = [
 ];
 
 const plans = [
-  ["profile", "SELECT user_id FROM profiles WHERE user_id='u' LIMIT 1", "idx_profiles_user_id"],
+  ["session token", "SELECT session_id FROM sessions WHERE token_hash='hash' AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP AND absolute_expires_at>CURRENT_TIMESTAMP LIMIT 1", "sqlite_autoindex_sessions_1"],
   ["progress events", "SELECT id FROM progress_events WHERE user_id='u' AND chapter_id='c' ORDER BY created_at DESC LIMIT 20", "idx_progress_events_user_chapter_created"],
   ["study sessions", "SELECT id FROM study_sessions WHERE user_id='u' ORDER BY ended_at DESC LIMIT 40", "idx_study_sessions_user_ended"],
   ["tasks", "SELECT id FROM tasks WHERE user_id='u' AND status='todo' ORDER BY due_at LIMIT 250", "idx_tasks_user_status_due"],
