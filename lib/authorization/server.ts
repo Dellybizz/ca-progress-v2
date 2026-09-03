@@ -34,5 +34,5 @@ export async function getAdminOperator(): Promise<{ allowed: boolean; user: Serv
 export async function requireAdminOperator() {
   const operator = await getAdminOperator();
   if (!operator.allowed || !operator.user) throw new Error("Access denied: an admin, owner or parent owner role is required.");
-  return { user: operator.user, role: operator.role };
+  return { allowed: true, user: operator.user, role: operator.role };
 }
