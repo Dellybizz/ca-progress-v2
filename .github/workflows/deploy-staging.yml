@@ -1,5 +1,5 @@
 # Phase 5 Pro CPU budget and seamless navigation deployment - contract refresh
-# Phase 5 cutover trigger marker — Activity targeted-label reads
+# Phase 5 cutover trigger marker — streamed route shells
 name: Cloudflare Migration Phase 5 Cutover Deploy
 
 on:
