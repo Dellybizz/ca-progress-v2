@@ -4,7 +4,7 @@ import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { getHotProgressRows, getHotDashboardProgress } from "@/lib/data/d1/hot-screens";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type {
   ProgressAnalytics,
@@ -135,7 +135,7 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
   const subjects = subjectSlug ? catalog.subjects.filter((subject) => subject.slug === subjectSlug) : catalog.subjects;
   const chapterIds = subjects.flatMap((subject) => subject.chapters.map((chapter) => chapter.id));
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  if (process.env.CA_AUTH_RUNTIME === "cloudflare") {
+  if (isCloudflareDataRuntime()) {
     const hot = await getHotProgressRows(identity.id, chapterIds, sevenDaysAgo);
     const rowByChapter = new Map(hot.progress.map((row) => [row.chapter_id, row]));
     const groupsById = new Map(catalog.groups.map((group) => [group.id, group]));
@@ -224,7 +224,7 @@ export async function getProgressDashboardSummary(userId: string, subjects: Dash
   const chapterIds = [...new Set(subjects.flatMap((subject) => subject.chapterIds))];
   const supabase = await createServerSupabaseClient();
   const response = chapterIds.length
-    ? (process.env.CA_AUTH_RUNTIME === "cloudflare" ? { data: await getHotDashboardProgress(userId, chapterIds), error: null } : await supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", userId).in("chapter_id", chapterIds))
+    ? (isCloudflareDataRuntime() ? { data: await getHotDashboardProgress(userId, chapterIds), error: null } : await supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", userId).in("chapter_id", chapterIds))
     : { data: [], error: null };
   if (response.error) throw new Error(`Dashboard progress could not be loaded: ${response.error.message}`);
 
