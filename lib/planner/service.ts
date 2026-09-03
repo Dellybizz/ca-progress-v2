@@ -105,8 +105,8 @@ export async function getActivityPageModel(): Promise<ActivityPageModel> {
   const names = maps(subjects);
   const supabase = await createServerSupabaseClient();
   const [sessions, progress] = await Promise.all([
-    supabase.from("study_sessions").select("*").eq("user_id", identity.id).order("ended_at", { ascending: false }).limit(40),
-    supabase.from("progress_events").select("*").eq("user_id", identity.id).order("created_at", { ascending: false }).limit(40),
+    supabase.from("study_sessions").select("id,subject_id,chapter_id,ended_at,duration_seconds").eq("user_id", identity.id).order("ended_at", { ascending: false }).limit(40),
+    supabase.from("progress_events").select("id,chapter_id,stage,action,created_at,undone_at").eq("user_id", identity.id).order("created_at", { ascending: false }).limit(40),
   ]);
   const error = sessions.error || progress.error;
   if (error) throw new Error(`Activity could not be loaded: ${error.message}`);
