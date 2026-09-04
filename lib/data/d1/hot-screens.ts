@@ -80,6 +80,28 @@ export async function getHotDashboardProgress(userId: string, chapterIds: string
   return (result.results ?? []) as HotProgressState[];
 }
 
+export type HotNoteRow = { id: string; user_id: string; title: string; body_text: string; body_html: string; subject_id: string | null; chapter_id: string | null; visibility: string; moderation_status: string; owner_label: string; updated_at: string; published_at: string | null };
+export type HotUploadRow = { id: string; owner_user_id: string; title: string; description: string | null; original_filename: string; mime_type: string; extension: string; size_bytes: number; subject_id: string | null; chapter_id: string | null; visibility: string; moderation_status: string; owner_label: string; updated_at: string; published_at: string | null };
+
+export async function getHotResourceLibraryRows(userId: string, db = getHotD1Database()) {
+  const result = await db.batch([
+    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE user_id=?1 ORDER BY updated_at DESC LIMIT 250").bind(userId),
+    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE owner_user_id=?1 ORDER BY updated_at DESC LIMIT 250").bind(userId),
+    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE visibility='shared' AND moderation_status='approved' AND user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
+    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE visibility='shared' AND moderation_status='approved' AND owner_user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
+  ]);
+  return {
+    ownNotes: (result[0]?.results ?? []) as HotNoteRow[],
+    ownUploads: (result[1]?.results ?? []) as HotUploadRow[],
+    sharedNotes: (result[2]?.results ?? []) as HotNoteRow[],
+    sharedUploads: (result[3]?.results ?? []) as HotUploadRow[],
+  };
+}
+
+export async function getHotResourceDetail(resourceId: string, db = getHotD1Database()) {
+  return db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE id=?1 LIMIT 1").bind(resourceId).first<HotUploadRow>();
+}
+
 export type HotStudySession = { id: string; subject_id: string | null; chapter_id: string | null; started_at: string; ended_at: string; duration_seconds: number; mode: string; timezone: string };
 export type HotTimerState = { status: string; mode: string; subject_id: string | null; chapter_id: string | null; focus_target_seconds: number; break_target_seconds: number; started_at: string | null; running_since: string | null; elapsed_seconds: number; paused_at: string | null; timezone: string; last_interaction_at: string };
 
