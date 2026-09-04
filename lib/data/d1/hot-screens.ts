@@ -119,6 +119,30 @@ export async function getHotAcademicReference(levelCode: string, attemptKey: str
   return { level, groups, subjects, maps, chapters };
 }
 
+export type HotCommunityListRow = HotCommunityChannel & { can_write: number; unread_count: number; latest_sequence: number | null; latest_body: string | null; latest_author: string | null; latest_at: string | null };
+
+export async function getHotCommunityChannels(userId: string | null, db = getHotD1Database()) {
+  const rows = await db.prepare(`SELECT cc.id,cc.channel_key,cc.slug,cc.scope_type,cc.channel_kind,cc.title,cc.description,cc.level_id,cc.subject_id,cc.write_policy,cc.sort_order,cc.is_active,
+    CASE WHEN ?1 IS NOT NULL AND cc.write_policy IN ('members','all') THEN 1 ELSE 0 END AS can_write,
+    COALESCE((SELECT COUNT(*) FROM community_messages m LEFT JOIN channel_read_state rs ON rs.channel_id=m.channel_id AND rs.user_id=?1 WHERE m.channel_id=cc.id AND m.moderation_status='active' AND (rs.last_read_sequence IS NULL OR m.sequence_id>rs.last_read_sequence)),0) AS unread_count,
+    (SELECT MAX(m.sequence_id) FROM community_messages m WHERE m.channel_id=cc.id AND m.moderation_status='active') AS latest_sequence,
+    (SELECT m.body FROM community_messages m WHERE m.channel_id=cc.id AND m.moderation_status='active' ORDER BY m.sequence_id DESC LIMIT 1) AS latest_body,
+    (SELECT m.author_label FROM community_messages m WHERE m.channel_id=cc.id AND m.moderation_status='active' ORDER BY m.sequence_id DESC LIMIT 1) AS latest_author,
+    (SELECT m.created_at FROM community_messages m WHERE m.channel_id=cc.id AND m.moderation_status='active' ORDER BY m.sequence_id DESC LIMIT 1) AS latest_at
+    FROM community_channels cc
+    WHERE cc.is_active=1
+      AND (cc.scope_type='global' OR (?1 IS NOT NULL AND (
+        (cc.scope_type='level' AND cc.level_id=(SELECT l.id FROM profiles p JOIN course_levels l ON l.code=p.ca_level WHERE p.user_id=?1 LIMIT 1))
+        OR (cc.scope_type='subject' AND cc.subject_id IN (
+          SELECT asm.subject_id FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+          JOIN attempt_syllabus_map asm ON asm.level_id=l.id AND asm.attempt_key=p.attempt_key
+          WHERE p.user_id=?1
+        ))
+      )))
+    ORDER BY cc.sort_order,cc.title`).bind(userId,userId,userId,userId).all<HotCommunityListRow>();
+  return (rows.results ?? []) as HotCommunityListRow[];
+}
+
 export async function getHotCommunityChannel(slug: string, db = getHotD1Database()) {
   return db.prepare(`SELECT id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active FROM community_channels WHERE slug=?1 AND is_active=1 LIMIT 1`).bind(slug).first<HotCommunityChannel>();
 }
