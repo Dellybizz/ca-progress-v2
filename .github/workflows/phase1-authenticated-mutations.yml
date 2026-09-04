@@ -10,7 +10,6 @@ on:
       - scripts/phase5/authenticated-mutations.mjs
       - tests/phase1-authenticated-harness.test.mjs
       - package.json
-      - package-lock.json
 
 permissions:
   contents: read
@@ -35,10 +34,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: npm
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
 
       - name: Verify Phase 1 harness contract
         run: node --test tests/phase1-authenticated-harness.test.mjs
