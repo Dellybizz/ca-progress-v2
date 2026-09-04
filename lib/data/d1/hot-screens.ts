@@ -301,7 +301,7 @@ export async function moderateHotCommunity(input: {
   const allowedActions = ["delete_message","restore_message","pin","unpin","block","unblock","dismiss_report","resolve_report"];
   if (!allowedActions.includes(input.action)) communityError("Unsupported moderation action.");
   const message = input.messageId ? await db.prepare(`SELECT id,channel_id,user_id,moderation_status FROM community_messages WHERE id=?1 LIMIT 1`).bind(input.messageId).first<{ id: string; channel_id: string; user_id: string; moderation_status: string }>() : null;
-  let channelId = input.channelId ?? message?.channel_id ?? null;
+  const channelId = input.channelId ?? message?.channel_id ?? null;
   if (message && input.channelId && input.channelId !== message.channel_id) communityError("Message and channel do not match.");
   if (["delete_message","restore_message","pin","unpin"].includes(input.action) && !message) communityError("Message is required.");
   if (["block","unblock"].includes(input.action) && !input.targetUserId) communityError("Target user is required.");
