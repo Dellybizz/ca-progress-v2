@@ -9,6 +9,21 @@ on:
     branches: [phase-12-operations-admin-platform]
     paths:
       - .github/workflows/deploy-staging.yml
+      - app/api/community/**
+      - app/api/admin/community/**
+      - app/api/notes/**
+      - app/api/resources/**
+      - app/api/admin/resources/**
+      - app/api/planner/**
+      - app/api/progress/**
+      - lib/community/**
+      - lib/resources/**
+      - lib/progress/**
+      - lib/data/d1/**
+      - lib/billing/**
+      - workers/billing/**
+      - wrangler.web.jsonc
+      - package.json
 
 permissions:
   contents: read
