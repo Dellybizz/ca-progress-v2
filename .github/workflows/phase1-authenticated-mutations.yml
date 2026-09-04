@@ -1,0 +1,32 @@
+name: Phase 1 Authenticated Mutation Verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/phase1-authenticated-mutations.yml
+      - scripts/phase5/authenticated-mutations.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-mutations:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 30
+    env:
+      SMOKE_AUTH_COOKIE: ${{ secrets.SMOKE_MUTATION_AUTH_COOKIE }}
+      SMOKE_MODERATOR_AUTH_COOKIE: ${{ secrets.SMOKE_MODERATOR_AUTH_COOKIE }}
+      SMOKE_BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Authenticated route smoke
+        run: npm run cf:smoke
+      - name: Verify health
+        run: curl --fail --silent --show-error "$SMOKE_BASE_URL/api/health"
