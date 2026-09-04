@@ -98,6 +98,13 @@ export async function getHotResourceLibraryRows(userId: string, db = getHotD1Dat
   };
 }
 
+export type HotExamEvent = { id: string; attempt_id: string; title: string; event_type: string; event_date: string; source_url: string | null; last_seen_at: string | null; verification_status: string };
+
+export async function getHotExamEvents(attemptKey: string, startDate: string, endDate: string, db = getHotD1Database()) {
+  const rows = await db.prepare("SELECT ee.id,ee.attempt_id,ee.title,ee.event_type,ee.event_date,ee.source_url,ee.last_seen_at,ee.verification_status FROM exam_events ee JOIN exam_attempts ea ON ea.id=ee.attempt_id WHERE ea.attempt_key=?1 AND ea.verification_status='verified' AND ee.verification_status='verified' AND ee.event_date>=?2 AND ee.event_date<?3 ORDER BY ee.event_date LIMIT 100").bind(attemptKey,startDate.slice(0,10),endDate.slice(0,10)).all<HotExamEvent>();
+  return (rows.results ?? []) as HotExamEvent[];
+}
+
 export async function getHotResourceDetail(resourceId: string, db = getHotD1Database()) {
   return db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE id=?1 LIMIT 1").bind(resourceId).first<HotUploadRow>();
 }
