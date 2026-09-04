@@ -35,6 +35,20 @@ function deploymentId(deployment) {
   return String(deployment.id ?? deployment.version_id ?? deployment.versionId ?? deployment.deployment_id ?? "");
 }
 
+function bookmarkId(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = bookmarkId(item);
+      if (found) return found;
+    }
+    return "";
+  }
+  if (!value || typeof value !== "object") return "";
+  if (typeof value.bookmark === "string" && value.bookmark.length > 20) return value.bookmark;
+  if (typeof value.current_bookmark === "string" && value.current_bookmark.length > 20) return value.current_bookmark;
+  return bookmarkId(value.result);
+}
+
 export function sourceStateDigest(payload) {
   return sha256(JSON.stringify({
     authUsers: payload?.authUsers ?? [],
@@ -48,19 +62,27 @@ export function evaluateStage1(input) {
   const beforeDigest = input?.sourceStability?.beforeContentSha256 ?? "";
   const afterDigest = input?.sourceStability?.afterContentSha256 ?? "";
   checks.push(check(
-    "Supabase source remained frozen across final delta",
+    "Supabase source remained frozen during Stage 1",
     Boolean(beforeDigest) && beforeDigest === afterDigest && input?.sourceStability?.stable === true,
     `before=${beforeDigest || "missing"}; after=${afterDigest || "missing"}`,
   ));
 
-  const reconciliation = input?.reconciliation ?? {};
-  const failures = Array.isArray(reconciliation.failures) ? reconciliation.failures.length : Number.POSITIVE_INFINITY;
-  const discrepancies = Array.isArray(reconciliation.discrepancies) ? reconciliation.discrepancies.length : Number.POSITIVE_INFINITY;
-  const reconciliationFk = Number(reconciliation.foreignKeyViolations ?? Number.NaN);
+  const sourceAudit = input?.sourceAudit ?? {};
+  const baseline = sourceAudit.baselineFinalDelta ?? {};
   checks.push(check(
-    "Final source to D1 reconciliation is clean",
-    reconciliation.status === "reconciled" && failures === 0 && discrepancies === 0 && reconciliationFk === 0,
-    `status=${reconciliation.status ?? "missing"}; failures=${failures}; discrepancies=${discrepancies}; foreignKeyViolations=${reconciliationFk}`,
+    "Last source-authoritative final delta remains clean",
+    baseline.status === "reconciled" && Number(baseline.failureCount) === 0 && Number(baseline.discrepancyCount) === 0,
+    `status=${baseline.status ?? "missing"}; failures=${baseline.failureCount ?? "missing"}; discrepancies=${baseline.discrepancyCount ?? "missing"}`,
+  ));
+  checks.push(check(
+    "No pending Supabase source write remains after cutover",
+    sourceAudit.status === "passed" && Number(sourceAudit?.summary?.pendingSourceWrites) === 0,
+    `changedSinceFinalDelta=${sourceAudit?.summary?.sourceChangedSinceFinalDelta ?? "missing"}; pending=${sourceAudit?.summary?.pendingSourceWrites ?? "missing"}; changedTables=${(sourceAudit.changedSinceFinalDeltaTables || []).join(",") || "none"}`,
+  ));
+  checks.push(check(
+    "Migrated Supabase auth identities remain mapped in D1",
+    Number(sourceAudit?.auth?.missingAppUsers) === 0 && Number(sourceAudit?.auth?.missingSupabaseIdentities) === 0 && Number(sourceAudit?.auth?.sourceAuthUserCount) > 0,
+    `source=${sourceAudit?.auth?.sourceAuthUserCount ?? "missing"}; missingAppUsers=${sourceAudit?.auth?.missingAppUsers ?? "missing"}; missingIdentities=${sourceAudit?.auth?.missingSupabaseIdentities ?? "missing"}`,
   ));
 
   const d1 = input?.d1Health ?? {};
@@ -82,12 +104,36 @@ export function evaluateStage1(input) {
     missingCounts.length ? `missing=${missingCounts.join(",")}` : REQUIRED_COUNT_KEYS.map((key) => `${key}=${counts[key]}`).join("; "),
   ));
 
+  const matrix = input?.liveMatrix ?? {};
+  const requiredMatrixFailures = Array.isArray(matrix.checks)
+    ? matrix.checks.filter((item) => item?.required !== false && item?.status !== "passed").length
+    : Number.POSITIVE_INFINITY;
+  checks.push(check(
+    "Fresh authenticated production mutation matrix is green",
+    matrix.status === "passed" && Number(matrix?.summary?.failed) === 0 && requiredMatrixFailures === 0,
+    `status=${matrix.status ?? "missing"}; passed=${matrix?.summary?.passed ?? "missing"}; failed=${matrix?.summary?.failed ?? "missing"}; unsupported=${matrix?.summary?.unsupported ?? "missing"}; requiredFailures=${requiredMatrixFailures}`,
+  ));
+
+  const closure = input?.verificationClosure ?? {};
+  checks.push(check(
+    "Fresh Phase 4 verification closure is green",
+    closure.status === "passed" && Number(closure?.summary?.failed) === 0,
+    `status=${closure.status ?? "missing"}; passed=${closure?.summary?.passed ?? "missing"}; failed=${closure?.summary?.failed ?? "missing"}`,
+  ));
+
   const candidate = firstDeployment(input?.deployments);
   const candidateId = deploymentId(candidate);
   checks.push(check(
     "Production Worker rollback candidate recorded",
     Boolean(candidateId),
     candidateId ? `deployment=${candidateId}` : "deployment id/version missing",
+  ));
+
+  const bookmark = bookmarkId(input?.d1Bookmark);
+  checks.push(check(
+    "Production D1 Time Travel rollback bookmark recorded",
+    Boolean(bookmark),
+    bookmark ? `bookmark=${bookmark}` : "bookmark missing",
   ));
 
   const secretNames = Array.isArray(input?.secretNames) ? input.secretNames.filter((name) => typeof name === "string") : [];
@@ -108,14 +154,21 @@ export function evaluateStage1(input) {
 
   const backup = input?.backup ?? {};
   checks.push(check(
-    "Final logical backup manifest is present",
+    "Final Supabase logical backup manifest is present",
     typeof backup.sha256 === "string" && /^[a-f0-9]{64}$/.test(backup.sha256) && Number(backup.authUserCount) > 0,
     `sha256=${backup.sha256 ?? "missing"}; authUsers=${backup.authUserCount ?? "missing"}; records=${backup.publicRecordCount ?? "missing"}; storageObjects=${backup.storageObjectCount ?? "missing"}`,
   ));
 
+  const d1Backup = input?.d1Backup ?? {};
+  checks.push(check(
+    "Current production D1 export is preserved in the retirement pack",
+    typeof d1Backup.sha256 === "string" && /^[a-f0-9]{64}$/.test(d1Backup.sha256) && Number(d1Backup.bytes) > 0,
+    `sha256=${d1Backup.sha256 ?? "missing"}; bytes=${d1Backup.bytes ?? "missing"}`,
+  ));
+
   const durable = input?.durable ?? {};
   checks.push(check(
-    "Final backup is durably preserved in private R2",
+    "Final retirement backup is durably preserved in private R2",
     durable.verified === true && typeof durable.bucket === "string" && durable.bucket.length > 0 && typeof durable.objectKey === "string" && durable.objectKey.length > 0 && /^[a-f0-9]{64}$/.test(String(durable.archiveSha256 ?? "")),
     `bucket=${durable.bucket || "missing"}; object=${durable.objectKey || "missing"}; verified=${durable.verified === true}`,
   ));
@@ -123,7 +176,7 @@ export function evaluateStage1(input) {
   checks.push(check(
     "Destructive Supabase operations remain frozen",
     input?.destructiveSupabaseActionsPerformed === false,
-    "Stage 1 performs read-only Supabase source access only; project deletion/key revocation is deferred to Stage 5.",
+    "Stage 1 uses read-only Supabase access only; project deletion/key revocation remains deferred to Stage 5.",
   ));
 
   return {
@@ -133,13 +186,14 @@ export function evaluateStage1(input) {
       createdOn: candidate?.created_on ?? candidate?.createdAt ?? candidate?.created_at ?? null,
       source: candidate?.source ?? null,
     } : null,
+    d1RollbackBookmark: bookmark || null,
     secretNames: uniqueSecretNames,
     bindingNames,
   };
 }
 
 function markdown(report) {
-  return `# Supabase Retirement — Stage 1 Baseline\n\n- Status: **${report.status}**\n- Branch: \`${report.branch}\`\n- Commit: \`${report.commit}\`\n- Workflow run: \`${report.workflowRun}\`\n- Rollback Worker deployment: \`${report.rollbackCandidate?.deploymentId ?? "missing"}\`\n- Durable backup: \`r2://${report.durable.bucket}/${report.durable.objectKey}\`\n- Durable archive SHA-256: \`${report.durable.archiveSha256}\`\n- Final logical export SHA-256: \`${report.backup.sha256}\`\n\n| Check | Status | Evidence |\n|---|---|---|\n${report.checks.map((item) => `| ${item.name} | ${item.status} | ${item.evidence.replaceAll("|", "\\|")} |`).join("\n")}\n`;
+  return `# Supabase Retirement — Stage 1 Baseline\n\n- Status: **${report.status}**\n- Branch: \`${report.branch}\`\n- Commit: \`${report.commit}\`\n- Workflow run: \`${report.workflowRun}\`\n- Rollback Worker deployment: \`${report.rollbackCandidate?.deploymentId ?? "missing"}\`\n- D1 rollback bookmark: \`${report.d1RollbackBookmark ?? "missing"}\`\n- Durable backup: \`r2://${report.durable.bucket}/${report.durable.objectKey}\`\n- Durable archive SHA-256: \`${report.durable.archiveSha256}\`\n- Final Supabase export SHA-256: \`${report.backup.sha256}\`\n- Current D1 export SHA-256: \`${report.d1Backup.sha256}\`\n- Source tables changed since final delta: ${(report.sourceAudit.changedSinceFinalDeltaTables || []).join(", ") || "none"}\n- Pending source writes: ${report.sourceAudit?.summary?.pendingSourceWrites ?? "missing"}\n\n| Check | Status | Evidence |\n|---|---|---|\n${report.checks.map((item) => `| ${item.name} | ${item.status} | ${item.evidence.replaceAll("|", "\\|")} |`).join("\n")}\n`;
 }
 
 async function json(path) {
@@ -150,14 +204,18 @@ export async function runStage1({
   root = process.env.RETIREMENT_STAGE1_DIR || "retirement-stage1",
   outputDir = process.env.RETIREMENT_STAGE1_OUTPUT || "retirement-stage1/report",
 } = {}) {
-  const [sourceStability, reconciliation, d1Health, deployments, secretNames, bindings, backup] = await Promise.all([
+  const [sourceStability, sourceAudit, d1Health, liveMatrix, verificationClosure, deployments, d1Bookmark, secretNames, bindings, backup, d1Backup] = await Promise.all([
     json(`${root}/evidence/source-stability.json`),
-    json(`${root}/evidence/phase4-report.json`),
+    json(`${root}/evidence/post-cutover-source-audit.json`),
     json(`${root}/evidence/d1-health.json`),
+    json(`${root}/evidence/mutation-matrix.json`),
+    json(`${root}/evidence/phase4-closure.json`),
     json(`${root}/evidence/worker-deployments.json`),
+    json(`${root}/evidence/d1-bookmark.json`),
     json(`${root}/evidence/worker-secret-names-only.json`),
     json(`${root}/evidence/binding-snapshot.json`),
     json(`${root}/source-after/manifest.json`),
+    json(`${root}/evidence/d1-backup-manifest.json`),
   ]);
 
   const durable = {
@@ -168,18 +226,22 @@ export async function runStage1({
   };
   const evaluated = evaluateStage1({
     sourceStability,
-    reconciliation,
+    sourceAudit,
     d1Health,
+    liveMatrix,
+    verificationClosure,
     deployments,
+    d1Bookmark,
     secretNames,
     bindings,
     backup,
+    d1Backup,
     durable,
     destructiveSupabaseActionsPerformed: false,
   });
   const failed = evaluated.checks.filter((item) => item.status !== "passed");
   const report = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     phase: "supabase-retirement-stage-1",
     generatedAt: new Date().toISOString(),
     status: failed.length ? "failed" : "passed",
@@ -187,14 +249,18 @@ export async function runStage1({
     commit: process.env.GITHUB_SHA || "local",
     workflowRun: process.env.GITHUB_RUN_ID || "local",
     sourceStability,
-    reconciliation: {
-      status: reconciliation.status ?? null,
-      failures: Array.isArray(reconciliation.failures) ? reconciliation.failures.length : null,
-      discrepancies: Array.isArray(reconciliation.discrepancies) ? reconciliation.discrepancies.length : null,
-      foreignKeyViolations: reconciliation.foreignKeyViolations ?? null,
-    },
+    sourceAudit,
     d1Health,
+    liveMatrix: {
+      status: liveMatrix.status,
+      summary: liveMatrix.summary,
+    },
+    verificationClosure: {
+      status: verificationClosure.status,
+      summary: verificationClosure.summary,
+    },
     rollbackCandidate: evaluated.rollbackCandidate,
+    d1RollbackBookmark: evaluated.d1RollbackBookmark,
     secretNames: evaluated.secretNames,
     bindingNames: evaluated.bindingNames,
     backup: {
@@ -204,6 +270,7 @@ export async function runStage1({
       publicRecordCount: backup.publicRecordCount,
       storageObjectCount: backup.storageObjectCount,
     },
+    d1Backup,
     durable,
     destructiveSupabaseActionsPerformed: false,
     checks: evaluated.checks,
