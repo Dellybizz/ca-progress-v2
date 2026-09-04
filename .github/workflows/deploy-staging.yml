@@ -22,6 +22,8 @@ on:
       - lib/data/d1/**
       - lib/billing/**
       - workers/billing/**
+      - d1/migrations/0010_phase12_background_jobs.sql
+      - d1/migrations/0011_phase12_r2_upload_intents.sql
       - wrangler.web.jsonc
       - package.json
 
@@ -131,6 +133,22 @@ jobs:
       - name: Apply Phase 5 hot-query index completion
         run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0009_phase5_hot_query_indexes.sql
 
+      - name: Apply Phase 12 durable background-job schema
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0010_phase12_background_jobs.sql
+
+      - name: Apply Phase 12 direct R2 upload-intent schema
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0011_phase12_r2_upload_intents.sql
+
+      - name: Verify Phase 12 remote D1 schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('background_jobs','r2_upload_intents') ORDER BY name; SELECT version FROM _ca_schema_migrations WHERE version IN ('0010','0011') ORDER BY version; PRAGMA foreign_key_check;" > phase5-cutover/d1-phase12-schema.txt
+          grep -q 'background_jobs' phase5-cutover/d1-phase12-schema.txt || { echo "::error::background_jobs is missing from retained D1"; exit 1; }
+          grep -q 'r2_upload_intents' phase5-cutover/d1-phase12-schema.txt || { echo "::error::r2_upload_intents is missing from retained D1"; exit 1; }
+          grep -q '0010' phase5-cutover/d1-phase12-schema.txt || { echo "::error::D1 migration 0010 is not recorded"; exit 1; }
+          grep -q '0011' phase5-cutover/d1-phase12-schema.txt || { echo "::error::D1 migration 0011 is not recorded"; exit 1; }
+
       - name: Deploy private ICAI service
         shell: bash
         run: |
@@ -152,12 +170,12 @@ jobs:
           for name in RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET; do
             grep -q "\"name\": \"$name\"" phase5-cutover/billing-secrets-after.json || { echo "::error::$name was not installed on Billing Worker"; exit 1; }
           done
-      - name: Verify manually staged direct OAuth secrets
+      - name: Verify manually staged web secrets
         shell: bash
         run: |
           set -euo pipefail
           npx wrangler secret list --config wrangler.web.jsonc > phase5-cutover/web-secrets-staged.json
-          for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET; do
+          for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
             grep -q "\"name\": \"$name\"" phase5-cutover/web-secrets-staged.json || { echo "::error::$name is missing from web Worker"; exit 1; }
           done
       - name: Deploy Cloudflare-auth and D1 web runtime
