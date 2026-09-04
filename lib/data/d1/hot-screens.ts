@@ -444,6 +444,28 @@ async function assertHotProgressChapter(userId: string, chapterId: string, db: H
     AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR g.code=p.group_choice) LIMIT 1`).bind(chapterId,userId).first();
   if (!row) throw new Error("Chapter is not applicable to the current academic profile.");
 }
+function hotAlignedDue(baseIso:string,days:number,weekdays:number[]) {
+  const date=new Date(baseIso); date.setUTCDate(date.getUTCDate()+days);
+  for(let i=0;i<7&&weekdays.length&&!weekdays.includes(date.getUTCDay());i+=1) date.setUTCDate(date.getUTCDate()+1);
+  return date.toISOString();
+}
+async function rebuildHotRevisionSchedule(userId:string,db:HotD1Database) {
+  let rules=await db.prepare("SELECT interval_days,preferred_weekdays,revision_minutes,new_chapter_minutes,test_minutes FROM revision_rules WHERE user_id=?1 LIMIT 1").bind(userId).first<{interval_days:string|number[];preferred_weekdays:string|number[];revision_minutes:number;new_chapter_minutes:number;test_minutes:number}>();
+  if(!rules){
+    await db.prepare("INSERT OR IGNORE INTO revision_rules(user_id,interval_days,preferred_weekdays,revision_minutes,new_chapter_minutes,test_minutes) VALUES(?1,?2,?3,45,90,60)").bind(userId,JSON.stringify([1,7,21]),JSON.stringify([1,2,3,4,5,6])).run();
+    rules=await db.prepare("SELECT interval_days,preferred_weekdays,revision_minutes,new_chapter_minutes,test_minutes FROM revision_rules WHERE user_id=?1 LIMIT 1").bind(userId).first();
+  }
+  const intervals=typeof rules?.interval_days==='string'?JSON.parse(rules.interval_days) as number[]:[1,7,21];
+  const weekdays=typeof rules?.preferred_weekdays==='string'?JSON.parse(rules.preferred_weekdays) as number[]:[1,2,3,4,5,6];
+  const rows=(await db.prepare("SELECT chapter_id,completed_at,revision_1_at,revision_2_at FROM chapter_progress WHERE user_id=?1 AND completed_at IS NOT NULL").bind(userId).all<{chapter_id:string;completed_at:string;revision_1_at:string|null;revision_2_at:string|null}>()).results??[];
+  for(const row of rows) for(let index=0;index<intervals.length;index+=1){
+    const revision=index+1, existing=await db.prepare("SELECT id,status,manual_due_at,completed_at FROM revision_due_items WHERE user_id=?1 AND chapter_id=?2 AND revision_number=?3 AND source_completed_at=?4 LIMIT 1").bind(userId,row.chapter_id,revision,row.completed_at).first<{id:string;status:string;manual_due_at:string|null;completed_at:string|null}>();
+    const alreadyDone=(revision===1&&row.revision_1_at)||(revision===2&&row.revision_2_at);
+    const status=existing?.status==='completed'||alreadyDone?'completed':'pending', completedAt=status==='completed'?(existing?.completed_at??new Date().toISOString()):null, due=hotAlignedDue(row.completed_at,Number(intervals[index]),weekdays), updatedAt=new Date().toISOString();
+    if(existing){ if(!existing.manual_due_at) await db.prepare("UPDATE revision_due_items SET due_at=?1,status=?2,completed_at=?3,updated_at=?4 WHERE id=?5").bind(due,status,completedAt,updatedAt,existing.id).run(); }
+    else await db.prepare("INSERT INTO revision_due_items(id,user_id,chapter_id,revision_number,source_completed_at,due_at,manual_due_at,status,completed_at) VALUES(?1,?2,?3,?4,?5,?6,NULL,?7,?8)").bind(crypto.randomUUID(),userId,row.chapter_id,revision,row.completed_at,due,status,completedAt).run();
+  }
+}
 export async function setHotProgressStage(userId:string,chapterId:string,stage:string,enabled:boolean,db:HotD1Database=getHotD1Database()){
   if(!["completed","revision_1","revision_2","test_1","test_2"].includes(stage)) throw new Error("Unknown progress stage.");
   await assertHotProgressChapter(userId,chapterId,db);
@@ -457,8 +479,10 @@ export async function setHotProgressStage(userId:string,chapterId:string,stage:s
   const eventId=crypto.randomUUID();
   await db.batch([
     db.prepare("UPDATE chapter_progress SET completed_at=?1,revision_1_at=?2,revision_2_at=?3,test_1_at=?4,test_2_at=?5,updated_at=?6 WHERE user_id=?7 AND chapter_id=?8").bind(next.completed_at,next.revision_1_at,next.revision_2_at,next.test_1_at,next.test_2_at,savedAt,userId,chapterId),
-    db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(eventId,userId,chapterId,stage,enabled?"set":"clear",JSON.stringify(previous),JSON.stringify(next))
+    db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(eventId,userId,chapterId,stage,enabled?"set":"clear",JSON.stringify(previous),JSON.stringify(next)),
+    db.prepare("INSERT INTO planner_events(id,user_id,event_type,entity_type,entity_id,payload,created_at) VALUES(?1,?2,'progress_changed','chapter_progress',?3,?4,?5)").bind(crypto.randomUUID(),userId,chapterId,JSON.stringify(next),savedAt)
   ]);
+  await rebuildHotRevisionSchedule(userId,db);
   return {chapter_id:chapterId,state:next,event_id:eventId,saved_at:savedAt};
 }
 export async function undoHotProgressEvent(userId:string,eventId:string,db:HotD1Database=getHotD1Database()){
@@ -479,5 +503,6 @@ export async function undoHotProgressEvent(userId:string,eventId:string,db:HotD1
     db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state,reverts_event_id) VALUES (?1,?2,?3,?4,'undo',?5,?6,?7)").bind(undoId,userId,event.chapter_id,event.stage,JSON.stringify(current),JSON.stringify(previous),event.id),
     db.prepare("UPDATE progress_events SET undone_at=?1 WHERE id=?2 AND user_id=?3").bind(savedAt,event.id,userId)
   ]);
+  await rebuildHotRevisionSchedule(userId,db);
   return {chapter_id:event.chapter_id,state:previous,event_id:undoId,saved_at:savedAt,reverted_event_id:event.id};
 }
