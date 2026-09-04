@@ -8,7 +8,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
-import { getHotCommunityChannel, getHotCommunityMessages, getHotCommunityChannels } from "@/lib/data/d1/hot-screens";
+import { createHotCommunityMessage, getHotCommunityChannel, getHotCommunityMessages, getHotCommunityChannels, markHotCommunityRead, moderateHotCommunity, reportHotCommunityMessage, toggleHotCommunityReaction } from "@/lib/data/d1/hot-screens";
 import type {
   CommunityBlock,
   CommunityChannel,
@@ -363,6 +363,18 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
 export async function createCommunityMessage(input: { channelSlug: string; body: string; replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[] }) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to send a message.");
+  if (isCloudflareDataRuntime()) {
+    const profile = await getProfileForUser(identity.id);
+    return createHotCommunityMessage({
+      channelSlug: input.channelSlug,
+      userId: identity.id,
+      authorLabel: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
+      body: input.body,
+      replyToId: input.replyToId ?? null,
+      resourceId: input.resourceId ?? null,
+      mentionUserIds: input.mentionUserIds ?? [],
+    });
+  }
   const supabase = await createServerSupabaseClient();
   const channel = await supabase.from("community_channels").select("channel_key").eq("slug", input.channelSlug).eq("is_active", true).maybeSingle();
   if (channel.error || !channel.data) throw new Error("Channel not found or access denied.");
@@ -380,6 +392,7 @@ export async function createCommunityMessage(input: { channelSlug: string; body:
 export async function markCommunityRead(channelSlug: string, sequence?: number | null) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to update read state.");
+  if (isCloudflareDataRuntime()) return markHotCommunityRead(channelSlug, identity.id, sequence ?? null);
   const supabase = await createServerSupabaseClient();
   const channel = await supabase.from("community_channels").select("channel_key").eq("slug", channelSlug).eq("is_active", true).maybeSingle();
   if (channel.error || !channel.data) throw new Error("Channel not found or access denied.");
@@ -391,6 +404,7 @@ export async function markCommunityRead(channelSlug: string, sequence?: number |
 export async function toggleCommunityReaction(messageId: string, emoji: string) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to react.");
+  if (isCloudflareDataRuntime()) return toggleHotCommunityReaction(messageId, identity.id, emoji);
   const supabase = await createServerSupabaseClient();
   const result = await supabase.rpc("phase10_toggle_reaction", { p_message_id: messageId, p_emoji: emoji });
   if (result.error) throw new Error(result.error.message);
@@ -400,6 +414,7 @@ export async function toggleCommunityReaction(messageId: string, emoji: string) 
 export async function reportCommunityMessage(messageId: string, reason: string, details?: string | null) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to report a message.");
+  if (isCloudflareDataRuntime()) return reportHotCommunityMessage(messageId, identity.id, reason, details ?? null);
   const supabase = await createServerSupabaseClient();
   const result = await supabase.rpc("phase10_report_message", { p_message_id: messageId, p_reason: reason, p_details: details ?? null });
   if (result.error) throw new Error(result.error.message);
@@ -411,6 +426,19 @@ export async function moderateCommunity(input: { action: string; messageId?: str
   if (!identity) throw new Error("Moderator authentication required.");
   const role = await getServerAppRole();
   if (!isPrivilegedRole(role)) throw new Error("Moderator access required.");
+  if (isCloudflareDataRuntime()) {
+    return moderateHotCommunity({
+      actorUserId: identity.id,
+      actorRole: role,
+      action: input.action,
+      messageId: input.messageId ?? null,
+      reportId: input.reportId ?? null,
+      targetUserId: input.targetUserId ?? null,
+      channelId: input.channelId ?? null,
+      reason: input.reason ?? null,
+      durationMinutes: input.durationMinutes ?? null,
+    });
+  }
   const supabase = await createServerSupabaseClient();
   const result = await supabase.rpc("phase10_moderate", {
     p_action: input.action,
