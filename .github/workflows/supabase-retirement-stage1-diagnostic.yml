@@ -1,0 +1,87 @@
+name: Supabase Retirement Stage 1 Diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/supabase-retirement-stage1-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      D1_NAME: ca-progress-v2-phase4-shadow
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Capture failed-run and final-delta checkpoint diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p retirement-stage1-diagnostic
+          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT run_id,status,source_fingerprint,target_fingerprint,started_at,completed_at,failure_count,notes FROM phase4_migration_runs WHERE run_id IN ('phase5-final-delta-v1','retirement-stage1-33928890767') ORDER BY started_at;" > retirement-stage1-diagnostic/runs.json
+          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT run_id,source_table,target_table,status,source_count,next_offset,migrated_count,failed_count,source_hash,target_hash,updated_at FROM phase4_migration_checkpoints WHERE run_id IN ('phase5-final-delta-v1','retirement-stage1-33928890767') ORDER BY run_id,source_table;" > retirement-stage1-diagnostic/checkpoints.json
+          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "PRAGMA foreign_key_check;" > retirement-stage1-diagnostic/fk.json
+          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT 'app_users' AS table_name, COUNT(*) AS row_count FROM app_users UNION ALL SELECT 'profiles',COUNT(*) FROM profiles UNION ALL SELECT 'user_preferences',COUNT(*) FROM user_preferences UNION ALL SELECT 'chapter_progress',COUNT(*) FROM chapter_progress UNION ALL SELECT 'progress_events',COUNT(*) FROM progress_events UNION ALL SELECT 'study_sessions',COUNT(*) FROM study_sessions UNION ALL SELECT 'tasks',COUNT(*) FROM tasks UNION ALL SELECT 'goals',COUNT(*) FROM goals UNION ALL SELECT 'user_calendar_events',COUNT(*) FROM user_calendar_events UNION ALL SELECT 'notes',COUNT(*) FROM notes UNION ALL SELECT 'uploaded_resources',COUNT(*) FROM uploaded_resources UNION ALL SELECT 'community_messages',COUNT(*) FROM community_messages UNION ALL SELECT 'message_reactions',COUNT(*) FROM message_reactions UNION ALL SELECT 'channel_read_state',COUNT(*) FROM channel_read_state UNION ALL SELECT 'moderation_actions',COUNT(*) FROM moderation_actions UNION ALL SELECT 'user_subscriptions',COUNT(*) FROM user_subscriptions UNION ALL SELECT 'payment_orders',COUNT(*) FROM payment_orders UNION ALL SELECT 'subscription_events',COUNT(*) FROM subscription_events;" > retirement-stage1-diagnostic/current-counts.json
+      - name: Summarize diagnostics without row/user data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const rows = (path) => {
+            const raw=JSON.parse(readFileSync(path,'utf8'));
+            return (Array.isArray(raw)?raw:[raw]).flatMap((entry)=>Array.isArray(entry?.results)?entry.results:[]);
+          };
+          const checkpoints=rows('retirement-stage1-diagnostic/checkpoints.json');
+          const failed=checkpoints.filter((row)=>row.run_id==='retirement-stage1-33928890767');
+          const baseline=checkpoints.filter((row)=>row.run_id==='phase5-final-delta-v1');
+          const baselineByTable=new Map(baseline.map((row)=>[row.source_table,row]));
+          const tableSummary=failed.map((row)=>{
+            const old=baselineByTable.get(row.source_table);
+            return {
+              table: row.source_table,
+              failedRunStatus: row.status,
+              sourceCount: Number(row.source_count ?? 0),
+              failedRunTargetHashEqualsSource: Boolean(row.source_hash && row.target_hash && row.source_hash===row.target_hash),
+              sourceChangedSinceFinalDelta: old ? old.source_hash!==row.source_hash : null,
+              finalDeltaSourceCount: old ? Number(old.source_count ?? 0) : null,
+              migratedCount: Number(row.migrated_count ?? 0),
+              failedCount: Number(row.failed_count ?? 0),
+            };
+          });
+          const sourceChanged=tableSummary.filter((row)=>row.sourceChangedSinceFinalDelta===true);
+          const failedTables=tableSummary.filter((row)=>row.failedRunStatus!=='complete');
+          const summary={
+            diagnosticOnly:true,
+            noMutationCommandsUsed:true,
+            failedRunId:'retirement-stage1-33928890767',
+            baselineRunId:'phase5-final-delta-v1',
+            checkpointCount:tableSummary.length,
+            sourceChangedTableCount:sourceChanged.length,
+            sourceChangedTables:sourceChanged.map((row)=>row.table),
+            failedCheckpointCount:failedTables.length,
+            failedCheckpointTables:failedTables.map((row)=>row.table),
+            tableSummary,
+            foreignKeyViolations:rows('retirement-stage1-diagnostic/fk.json').length,
+            currentCounts:Object.fromEntries(rows('retirement-stage1-diagnostic/current-counts.json').map((row)=>[row.table_name,Number(row.row_count)])),
+          };
+          writeFileSync('retirement-stage1-diagnostic/summary.json',JSON.stringify(summary,null,2));
+          console.log(JSON.stringify({sourceChangedTableCount:summary.sourceChangedTableCount,sourceChangedTables:summary.sourceChangedTables,failedCheckpointCount:summary.failedCheckpointCount,failedCheckpointTables:summary.failedCheckpointTables,foreignKeyViolations:summary.foreignKeyViolations,currentCounts:summary.currentCounts},null,2));
+          NODE
+      - uses: actions/upload-artifact@v5
+        with:
+          name: supabase-retirement-stage1-diagnostic-${{ github.run_id }}
+          retention-days: 14
+          path: retirement-stage1-diagnostic/
