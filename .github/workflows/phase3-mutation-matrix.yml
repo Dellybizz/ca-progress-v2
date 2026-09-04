@@ -21,6 +21,7 @@ on:
       - lib/community/**
       - lib/resources/**
       - lib/progress/**
+      - lib/billing/**
       - package.json
 
 permissions:
