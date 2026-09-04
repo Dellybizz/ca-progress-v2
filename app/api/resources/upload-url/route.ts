@@ -18,7 +18,7 @@ function error(message: string, status: number, code: string) {
 }
 function extension(name: string) { return name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ""; }
 
-export async function POST(request: Request) {
+async function createUploadIntent(request: Request) {
   const identity = await optionalUser();
   if (!identity) return error("Authentication required.", 401, "AUTH_REQUIRED");
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -49,4 +49,15 @@ export async function POST(request: Request) {
     return error("Upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");
   }
   return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: RESOURCE_MAX_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
+export async function POST(request: Request) {
+  try {
+    return await createUploadIntent(request);
+  } catch (caught) {
+    console.error("resource_upload_intent_unhandled", {
+      name: caught instanceof Error ? caught.name : "UnknownError",
+    });
+    return error("Resource upload is temporarily unavailable.", 503, "UPLOAD_SERVICE_UNAVAILABLE");
+  }
 }
