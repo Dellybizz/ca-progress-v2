@@ -427,3 +427,57 @@ export async function moderateHotResource(input:{entityType:"note"|"upload";enti
   ]);
   return {ok:true,status:to};
 }
+
+function hotProgressState(row: { completed_at?: string|null; revision_1_at?: string|null; revision_2_at?: string|null; test_1_at?: string|null; test_2_at?: string|null }|null) {
+  return { completed_at: row?.completed_at ?? null, revision_1_at: row?.revision_1_at ?? null, revision_2_at: row?.revision_2_at ?? null, test_1_at: row?.test_1_at ?? null, test_2_at: row?.test_2_at ?? null };
+}
+function validateHotProgressState(state: ReturnType<typeof hotProgressState>) {
+  if (state.revision_1_at && !state.completed_at) throw new Error("Revision 1 requires Completed first.");
+  if (state.revision_2_at && !state.revision_1_at) throw new Error("Revision 2 requires Revision 1 first.");
+  if (state.test_1_at && !state.completed_at) throw new Error("Test 1 requires Completed first.");
+  if (state.test_2_at && !state.test_1_at) throw new Error("Test 2 requires Test 1 first.");
+}
+async function assertHotProgressChapter(userId: string, chapterId: string, db: HotD1Database) {
+  const row = await db.prepare(`SELECT 1 AS valid FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+    JOIN chapters c ON c.id=?1 JOIN attempt_syllabus_map asm ON asm.syllabus_version_id=c.syllabus_version_id AND asm.level_id=l.id AND asm.attempt_key=p.attempt_key
+    JOIN course_groups g ON g.id=asm.group_id WHERE p.user_id=?2 AND p.onboarding_completed_at IS NOT NULL
+    AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR g.code=p.group_choice) LIMIT 1`).bind(chapterId,userId).first();
+  if (!row) throw new Error("Chapter is not applicable to the current academic profile.");
+}
+export async function setHotProgressStage(userId:string,chapterId:string,stage:string,enabled:boolean,db:HotD1Database=getHotD1Database()){
+  if(!["completed","revision_1","revision_2","test_1","test_2"].includes(stage)) throw new Error("Unknown progress stage.");
+  await assertHotProgressChapter(userId,chapterId,db);
+  await db.prepare("INSERT OR IGNORE INTO chapter_progress (user_id,chapter_id) VALUES (?1,?2)").bind(userId,chapterId).run();
+  const row=await db.prepare("SELECT chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at FROM chapter_progress WHERE user_id=?1 AND chapter_id=?2 LIMIT 1").bind(userId,chapterId).first<{chapter_id:string;completed_at:string|null;revision_1_at:string|null;revision_2_at:string|null;test_1_at:string|null;test_2_at:string|null;updated_at:string|null}>();
+  const previous=hotProgressState(row);
+  const next={...previous,[stage+"_at"]:enabled?new Date().toISOString():null};
+  validateHotProgressState(next);
+  const savedAt=new Date().toISOString();
+  if(JSON.stringify(previous)===JSON.stringify(next)) return {chapter_id:chapterId,state:previous,event_id:null,saved_at:row?.updated_at??savedAt};
+  const eventId=crypto.randomUUID();
+  await db.batch([
+    db.prepare("UPDATE chapter_progress SET completed_at=?1,revision_1_at=?2,revision_2_at=?3,test_1_at=?4,test_2_at=?5,updated_at=?6 WHERE user_id=?7 AND chapter_id=?8").bind(next.completed_at,next.revision_1_at,next.revision_2_at,next.test_1_at,next.test_2_at,savedAt,userId,chapterId),
+    db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(eventId,userId,chapterId,stage,enabled?"set":"clear",JSON.stringify(previous),JSON.stringify(next))
+  ]);
+  return {chapter_id:chapterId,state:next,event_id:eventId,saved_at:savedAt};
+}
+export async function undoHotProgressEvent(userId:string,eventId:string,db:HotD1Database=getHotD1Database()){
+  const event=await db.prepare("SELECT id,chapter_id,stage,action,previous_state,new_state,reverts_event_id,undone_at FROM progress_events WHERE id=?1 AND user_id=?2 LIMIT 1").bind(eventId,userId).first<{id:string;chapter_id:string;stage:string;action:string;previous_state:string;new_state:string;reverts_event_id:string|null;undone_at:string|null}>();
+  if(!event) throw new Error("Progress event not found.");
+  if(event.action==="undo"||event.undone_at) throw new Error("This progress change cannot be undone again.");
+  const row=await db.prepare("SELECT chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at FROM chapter_progress WHERE user_id=?1 AND chapter_id=?2 LIMIT 1").bind(userId,event.chapter_id).first<{chapter_id:string;completed_at:string|null;revision_1_at:string|null;revision_2_at:string|null;test_1_at:string|null;test_2_at:string|null;updated_at:string|null}>();
+  const current=hotProgressState(row);
+  let previous: ReturnType<typeof hotProgressState>;
+  let recorded: ReturnType<typeof hotProgressState>;
+  try { previous=JSON.parse(event.previous_state) as ReturnType<typeof hotProgressState>; recorded=JSON.parse(event.new_state) as ReturnType<typeof hotProgressState>; } catch { throw new Error("Progress history is invalid."); }
+  if(JSON.stringify(current)!==JSON.stringify(recorded)) throw new Error("Progress changed after this event; undo would overwrite a newer change.");
+  validateHotProgressState(previous);
+  const savedAt=new Date().toISOString();
+  const undoId=crypto.randomUUID();
+  await db.batch([
+    db.prepare("UPDATE chapter_progress SET completed_at=?1,revision_1_at=?2,revision_2_at=?3,test_1_at=?4,test_2_at=?5,updated_at=?6 WHERE user_id=?7 AND chapter_id=?8").bind(previous.completed_at,previous.revision_1_at,previous.revision_2_at,previous.test_1_at,previous.test_2_at,savedAt,userId,event.chapter_id),
+    db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state,reverts_event_id) VALUES (?1,?2,?3,?4,'undo',?5,?6,?7)").bind(undoId,userId,event.chapter_id,event.stage,JSON.stringify(current),JSON.stringify(previous),event.id),
+    db.prepare("UPDATE progress_events SET undone_at=?1 WHERE id=?2 AND user_id=?3").bind(savedAt,event.id,userId)
+  ]);
+  return {chapter_id:event.chapter_id,state:previous,event_id:undoId,saved_at:savedAt,reverted_event_id:event.id};
+}
