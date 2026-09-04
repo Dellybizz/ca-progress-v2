@@ -418,11 +418,11 @@ export async function deleteHotCalendarEvent(userId:string,id:string,db:HotD1Dat
 export async function moderateHotResource(input:{entityType:"note"|"upload";entityId:string;actorUserId:string;decision:"approve"|"reject";notes:string|null},db:HotD1Database=getHotD1Database()){
   const table=input.entityType==="note"?"notes":"uploaded_resources";
   const idColumn=input.entityType==="note"?"id":"id";
-  const row=await db.prepare(\`SELECT \${idColumn} AS id,moderation_status FROM \${table} WHERE id=?1 AND visibility='shared' LIMIT 1\`).bind(input.entityId).first<{id:string;moderation_status:string}>();
+  const row=await db.prepare(`SELECT ${idColumn} AS id,moderation_status FROM ${table} WHERE id=?1 AND visibility='shared' LIMIT 1`).bind(input.entityId).first<{id:string;moderation_status:string}>();
   if(!row) throw new Error("Shared resource not found.");
   const to=input.decision==="approve"?"approved":"rejected";
   await db.batch([
-    db.prepare(\`UPDATE \${table} SET moderation_status=?1,published_at=\${to==="approved"?"CURRENT_TIMESTAMP":"NULL"},updated_at=CURRENT_TIMESTAMP WHERE id=?2\`).bind(to,input.entityId),
+    db.prepare(`UPDATE ${table} SET moderation_status=?1,published_at=${to==="approved"?"CURRENT_TIMESTAMP":"NULL"},updated_at=CURRENT_TIMESTAMP WHERE id=?2`).bind(to,input.entityId),
     db.prepare("INSERT INTO resource_moderation (id,entity_type,note_id,uploaded_resource_id,actor_user_id,action,from_status,to_status,notes) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").bind(crypto.randomUUID(),input.entityType,input.entityType==="note"?input.entityId:null,input.entityType==="upload"?input.entityId:null,input.actorUserId,input.decision,row.moderation_status,to,input.notes)
   ]);
   return {ok:true,status:to};
