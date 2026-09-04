@@ -6,7 +6,7 @@ import { RESOURCE_MAX_BYTES, normalizeFilename } from "@/lib/resources/validatio
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 
 export const dynamic = "force-dynamic";
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const MIME_BY_EXTENSION: Record<string, string[]> = {
   pdf: ["application/pdf"], jpg: ["image/jpeg"], jpeg: ["image/jpeg"], png: ["image/png"],
