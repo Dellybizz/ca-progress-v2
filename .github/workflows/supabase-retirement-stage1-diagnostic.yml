@@ -25,16 +25,35 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - name: Capture failed-run and final-delta checkpoint diagnostics
+
+      - name: Capture migration-run diagnostics
+        run: |
+          mkdir -p retirement-stage1-diagnostic
+          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT run_id,status,source_fingerprint,target_fingerprint,started_at,completed_at,failure_count,notes FROM phase4_migration_runs WHERE run_id IN ('phase5-final-delta-v1','retirement-stage1-33928890767') ORDER BY started_at;" > retirement-stage1-diagnostic/runs.json
+
+      - name: Capture checkpoint diagnostics
+        run: |
+          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT run_id,source_table,target_table,status,source_count,next_offset,migrated_count,failed_count,source_hash,target_hash,updated_at FROM phase4_migration_checkpoints WHERE run_id IN ('phase5-final-delta-v1','retirement-stage1-33928890767') ORDER BY run_id,source_table;" > retirement-stage1-diagnostic/checkpoints.json
+
+      - name: Capture D1 foreign-key integrity
+        run: |
+          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "PRAGMA foreign_key_check;" > retirement-stage1-diagnostic/fk.json
+
+      - name: Capture representative current counts safely
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p retirement-stage1-diagnostic
-          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT run_id,status,source_fingerprint,target_fingerprint,started_at,completed_at,failure_count,notes FROM phase4_migration_runs WHERE run_id IN ('phase5-final-delta-v1','retirement-stage1-33928890767') ORDER BY started_at;" > retirement-stage1-diagnostic/runs.json
-          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT run_id,source_table,target_table,status,source_count,next_offset,migrated_count,failed_count,source_hash,target_hash,updated_at FROM phase4_migration_checkpoints WHERE run_id IN ('phase5-final-delta-v1','retirement-stage1-33928890767') ORDER BY run_id,source_table;" > retirement-stage1-diagnostic/checkpoints.json
-          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "PRAGMA foreign_key_check;" > retirement-stage1-diagnostic/fk.json
-          npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT 'app_users' AS table_name, COUNT(*) AS row_count FROM app_users UNION ALL SELECT 'profiles',COUNT(*) FROM profiles UNION ALL SELECT 'user_preferences',COUNT(*) FROM user_preferences UNION ALL SELECT 'chapter_progress',COUNT(*) FROM chapter_progress UNION ALL SELECT 'progress_events',COUNT(*) FROM progress_events UNION ALL SELECT 'study_sessions',COUNT(*) FROM study_sessions UNION ALL SELECT 'tasks',COUNT(*) FROM tasks UNION ALL SELECT 'goals',COUNT(*) FROM goals UNION ALL SELECT 'user_calendar_events',COUNT(*) FROM user_calendar_events UNION ALL SELECT 'notes',COUNT(*) FROM notes UNION ALL SELECT 'uploaded_resources',COUNT(*) FROM uploaded_resources UNION ALL SELECT 'community_messages',COUNT(*) FROM community_messages UNION ALL SELECT 'message_reactions',COUNT(*) FROM message_reactions UNION ALL SELECT 'channel_read_state',COUNT(*) FROM channel_read_state UNION ALL SELECT 'moderation_actions',COUNT(*) FROM moderation_actions UNION ALL SELECT 'user_subscriptions',COUNT(*) FROM user_subscriptions UNION ALL SELECT 'payment_orders',COUNT(*) FROM payment_orders UNION ALL SELECT 'subscription_events',COUNT(*) FROM subscription_events;" > retirement-stage1-diagnostic/current-counts.json
-      - name: Summarize diagnostics without row/user data
+          : > retirement-stage1-diagnostic/current-counts.tsv
+          for table in app_users profiles user_preferences chapter_progress progress_events study_sessions tasks goals user_calendar_events notes uploaded_resources community_messages message_reactions channel_read_state moderation_actions user_subscriptions payment_orders; do
+            out=$(npx wrangler d1 execute "$D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT COUNT(*) AS n FROM \"$table\";" 2>/dev/null) || { echo "$table\tQUERY_FAILED" >> retirement-stage1-diagnostic/current-counts.tsv; continue; }
+            TABLE="$table" RAW="$out" node --input-type=module <<'NODE' >> retirement-stage1-diagnostic/current-counts.tsv
+            const raw=JSON.parse(process.env.RAW);
+            const rows=(Array.isArray(raw)?raw:[raw]).flatMap((entry)=>Array.isArray(entry?.results)?entry.results:[]);
+            console.log(`${process.env.TABLE}\t${Number(rows[0]?.n ?? -1)}`);
+            NODE
+          done
+
+      - name: Summarize diagnostics without row or user data
         shell: bash
         run: |
           set -euo pipefail
@@ -57,17 +76,30 @@ jobs:
               failedRunTargetHashEqualsSource: Boolean(row.source_hash && row.target_hash && row.source_hash===row.target_hash),
               sourceChangedSinceFinalDelta: old ? old.source_hash!==row.source_hash : null,
               finalDeltaSourceCount: old ? Number(old.source_count ?? 0) : null,
+              finalDeltaTargetHashEqualsSource: old ? Boolean(old.source_hash && old.target_hash && old.source_hash===old.target_hash) : null,
               migratedCount: Number(row.migrated_count ?? 0),
               failedCount: Number(row.failed_count ?? 0),
             };
           });
           const sourceChanged=tableSummary.filter((row)=>row.sourceChangedSinceFinalDelta===true);
-          const failedTables=tableSummary.filter((row)=>row.failedRunStatus!=='complete');
+          const failedTables=tableSummary.filter((row)=>!['complete','source_absent'].includes(row.failedRunStatus));
+          const counts={};
+          for (const line of readFileSync('retirement-stage1-diagnostic/current-counts.tsv','utf8').trim().split(/\n+/).filter(Boolean)) {
+            const [table,value]=line.split('\t');
+            counts[table]=value==='QUERY_FAILED' ? null : Number(value);
+          }
+          const runRows=rows('retirement-stage1-diagnostic/runs.json').map((row)=>({
+            runId:row.run_id,
+            status:row.status,
+            failureCount:Number(row.failure_count ?? 0),
+            completedAt:row.completed_at ?? null,
+          }));
           const summary={
             diagnosticOnly:true,
             noMutationCommandsUsed:true,
             failedRunId:'retirement-stage1-33928890767',
             baselineRunId:'phase5-final-delta-v1',
+            runRows,
             checkpointCount:tableSummary.length,
             sourceChangedTableCount:sourceChanged.length,
             sourceChangedTables:sourceChanged.map((row)=>row.table),
@@ -75,13 +107,24 @@ jobs:
             failedCheckpointTables:failedTables.map((row)=>row.table),
             tableSummary,
             foreignKeyViolations:rows('retirement-stage1-diagnostic/fk.json').length,
-            currentCounts:Object.fromEntries(rows('retirement-stage1-diagnostic/current-counts.json').map((row)=>[row.table_name,Number(row.row_count)])),
+            currentCounts:counts,
           };
           writeFileSync('retirement-stage1-diagnostic/summary.json',JSON.stringify(summary,null,2));
-          console.log(JSON.stringify({sourceChangedTableCount:summary.sourceChangedTableCount,sourceChangedTables:summary.sourceChangedTables,failedCheckpointCount:summary.failedCheckpointCount,failedCheckpointTables:summary.failedCheckpointTables,foreignKeyViolations:summary.foreignKeyViolations,currentCounts:summary.currentCounts},null,2));
+          console.log(JSON.stringify({
+            runs:summary.runRows,
+            sourceChangedTableCount:summary.sourceChangedTableCount,
+            sourceChangedTables:summary.sourceChangedTables,
+            failedCheckpointCount:summary.failedCheckpointCount,
+            failedCheckpointTables:summary.failedCheckpointTables,
+            foreignKeyViolations:summary.foreignKeyViolations,
+            currentCounts:summary.currentCounts,
+          },null,2));
           NODE
+
       - uses: actions/upload-artifact@v5
+        if: always()
         with:
           name: supabase-retirement-stage1-diagnostic-${{ github.run_id }}
           retention-days: 14
+          if-no-files-found: warn
           path: retirement-stage1-diagnostic/
