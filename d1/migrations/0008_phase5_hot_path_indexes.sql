@@ -33,3 +33,6 @@ ON chat_blocks(user_id,ends_at,channel_id);
 
 CREATE INDEX IF NOT EXISTS idx_community_channels_active_scope_sort
 ON community_channels(is_active,scope_type,sort_order,title);
+
+INSERT OR IGNORE INTO _ca_schema_migrations(version,description,source_freeze_commit)
+VALUES ('0008','phase 5 Cloudflare auth and hot-path indexes','phase-12-operations-admin-platform');
