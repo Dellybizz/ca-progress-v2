@@ -21,3 +21,6 @@ CREATE INDEX IF NOT EXISTS idx_chapter_progress_user_chapter ON chapter_progress
 CREATE INDEX IF NOT EXISTS idx_progress_events_user_chapter_created ON progress_events(user_id,chapter_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_study_sessions_user_ended ON study_sessions(user_id,ended_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_user_status_due ON tasks(user_id,status,due_at);
+
+INSERT OR IGNORE INTO _ca_schema_migrations(version,description,source_freeze_commit)
+VALUES ('0007','phase 2 dashboard performance indexes','phase-12-operations-admin-platform');
