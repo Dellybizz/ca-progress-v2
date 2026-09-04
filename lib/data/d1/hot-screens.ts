@@ -172,6 +172,158 @@ export async function getHotCommunityChannels(userId: string | null, db = getHot
   return (rows.results ?? []) as HotCommunityListRow[];
 }
 
+
+const COMMUNITY_EMOJIS = ["👍", "❤️", "🎯", "👏", "💡", "✅"] as const;
+const COMMUNITY_REPORT_REASONS = ["spam", "harassment", "misinformation", "off_topic", "other"] as const;
+const COMMUNITY_MODERATOR_ROLES = ["moderator", "admin", "owner", "parent_owner"] as const;
+
+function communityError(message: string): never {
+  throw new Error(message);
+}
+
+async function visibleCommunityChannel(slug: string, userId: string, db: HotD1Database = getHotD1Database()) {
+  const channel = await db.prepare(`SELECT id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active
+    FROM community_channels cc WHERE cc.slug=?1 AND cc.is_active=1
+      AND (cc.scope_type='global' OR
+        (cc.scope_type='level' AND cc.level_id=(SELECT l.id FROM profiles p JOIN course_levels l ON l.code=p.ca_level WHERE p.user_id=?2 LIMIT 1)) OR
+        (cc.scope_type='subject' AND cc.subject_id IN (
+          SELECT asm.subject_id FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+          JOIN attempt_syllabus_map asm ON asm.level_id=l.id AND asm.attempt_key=p.attempt_key WHERE p.user_id=?2
+        ))) LIMIT 1`).bind(slug, userId).first<HotCommunityChannel>();
+  if (!channel) communityError("Channel not found or access denied.");
+  return channel;
+}
+
+async function visibleCommunityMessage(messageId: string, userId: string, db: HotD1Database = getHotD1Database()) {
+  const message = await db.prepare(`SELECT m.id,m.sequence_id,m.channel_id,m.user_id,m.author_label,m.body,m.created_at,m.moderation_status,m.reply_to_message_id,m.attached_resource_id,
+      cc.channel_key,cc.slug,cc.write_policy FROM community_messages m JOIN community_channels cc ON cc.id=m.channel_id
+    WHERE m.id=?1 AND m.moderation_status IN ('active','moderated') AND cc.is_active=1
+      AND (cc.scope_type='global' OR
+        (cc.scope_type='level' AND cc.level_id=(SELECT l.id FROM profiles p JOIN course_levels l ON l.code=p.ca_level WHERE p.user_id=?2 LIMIT 1)) OR
+        (cc.scope_type='subject' AND cc.subject_id IN (
+          SELECT asm.subject_id FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+          JOIN attempt_syllabus_map asm ON asm.level_id=l.id AND asm.attempt_key=p.attempt_key WHERE p.user_id=?2
+        ))) LIMIT 1`).bind(messageId, userId).first<HotCommunityMessage & { channel_key: string; slug: string; write_policy: string }>();
+  if (!message) communityError("Message not found or access denied.");
+  return message;
+}
+
+export async function createHotCommunityMessage(input: {
+  channelSlug: string; userId: string; authorLabel: string; body: string;
+  replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[];
+}, db: HotD1Database = getHotD1Database()) {
+  const channel = await visibleCommunityChannel(input.channelSlug, input.userId, db);
+  if (!["members", "all"].includes(channel.write_policy)) communityError("You cannot write in this channel.");
+  const blocked = await db.prepare(`SELECT 1 AS blocked FROM chat_blocks WHERE user_id=?1 AND (channel_id IS NULL OR channel_id=?2) AND ends_at>datetime('now') LIMIT 1`).bind(input.userId, channel.id).first<{ blocked: number }>();
+  if (blocked) communityError("You are temporarily blocked from this channel.");
+  const body = input.body.trim().replace(/\s+/g, " ");
+  if (body.length < 1 || body.length > 2000) communityError("Message must be between 1 and 2000 characters.");
+  const recent = await db.prepare(`SELECT COUNT(*) AS count FROM community_messages WHERE user_id=?1 AND created_at>=datetime('now','-60 seconds')`).bind(input.userId).first<{ count: number }>();
+  if (Number(recent?.count ?? 0) >= 12) communityError("Message rate limit exceeded.");
+  const duplicate = await db.prepare(`SELECT 1 AS duplicate FROM community_messages WHERE channel_id=?1 AND user_id=?2 AND body=?3 AND created_at>=datetime('now','-90 seconds') LIMIT 1`).bind(channel.id, input.userId, body).first<{ duplicate: number }>();
+  if (duplicate) communityError("Duplicate message rejected.");
+  if (input.replyToId) {
+    const reply = await db.prepare(`SELECT 1 AS valid FROM community_messages WHERE id=?1 AND channel_id=?2 AND moderation_status='active' LIMIT 1`).bind(input.replyToId, channel.id).first<{ valid: number }>();
+    if (!reply) communityError("Reply target is unavailable.");
+  }
+  if (input.resourceId) {
+    const resource = await db.prepare(`SELECT 1 AS valid FROM uploaded_resources WHERE id=?1 AND visibility='shared' AND moderation_status='approved' LIMIT 1`).bind(input.resourceId).first<{ valid: number }>();
+    if (!resource) communityError("Attachment is unavailable.");
+  }
+  const id = crypto.randomUUID();
+  const sequence = await db.prepare(`SELECT COALESCE(MAX(sequence_id),0)+1 AS next_sequence FROM community_messages WHERE channel_id=?1`).bind(channel.id).first<{ next_sequence: number }>();
+  const mentionIds = [...new Set((input.mentionUserIds ?? []).filter(Boolean))].slice(0, 10);
+  const statements = [
+    db.prepare(`INSERT INTO community_messages (id,sequence_id,channel_id,user_id,author_label,body,reply_to_message_id,attached_resource_id,moderation_status)
+      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'active')`).bind(id, Number(sequence?.next_sequence ?? 1), channel.id, input.userId, input.authorLabel || "Student", body, input.replyToId ?? null, input.resourceId ?? null),
+  ];
+  for (const mentionedUserId of mentionIds) {
+    statements.push(db.prepare(`INSERT OR IGNORE INTO community_message_mentions (message_id,user_id) VALUES (?1,?2)`).bind(id, mentionedUserId));
+    statements.push(db.prepare(`INSERT INTO community_notifications (id,user_id,channel_id,message_id,notification_type) VALUES (?1,?2,?3,?4,'mention')`).bind(crypto.randomUUID(), mentionedUserId, channel.id, id));
+  }
+  if (input.replyToId) {
+    statements.push(db.prepare(`INSERT INTO community_notifications (id,user_id,channel_id,message_id,notification_type)
+      SELECT ?1,user_id,?2,?3,'reply' FROM community_messages WHERE id=?4 AND user_id<>?5`).bind(crypto.randomUUID(), channel.id, id, input.replyToId, input.userId));
+  }
+  await db.batch(statements);
+  return { id, sequence: Number(sequence?.next_sequence ?? 1) };
+}
+
+export async function markHotCommunityRead(channelSlug: string, userId: string, sequence?: number | null, db: HotD1Database = getHotD1Database()) {
+  const channel = await visibleCommunityChannel(channelSlug, userId, db);
+  const maxRow = await db.prepare(`SELECT COALESCE(MAX(sequence_id),0) AS max_sequence FROM community_messages WHERE channel_id=?1 AND moderation_status='active'`).bind(channel.id).first<{ max_sequence: number }>();
+  const requested = sequence == null ? Number(maxRow?.max_sequence ?? 0) : Math.max(0, Math.min(Number(sequence), Number(maxRow?.max_sequence ?? 0)));
+  await db.batch([
+    db.prepare(`INSERT INTO channel_read_state (channel_id,user_id,last_read_sequence,last_read_at)
+      VALUES (?1,?2,?3,CURRENT_TIMESTAMP)
+      ON CONFLICT(channel_id,user_id) DO UPDATE SET last_read_sequence=MAX(channel_read_state.last_read_sequence,excluded.last_read_sequence),
+        last_read_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP`).bind(channel.id, userId, requested),
+    db.prepare(`UPDATE community_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE user_id=?1 AND channel_id=?2
+      AND message_id IN (SELECT id FROM community_messages WHERE channel_id=?2 AND sequence_id<=?3)`).bind(userId, channel.id, requested),
+  ]);
+  return { channelId: channel.id, lastReadSequence: requested };
+}
+
+export async function toggleHotCommunityReaction(messageId: string, userId: string, emoji: string, db: HotD1Database = getHotD1Database()) {
+  if (!(COMMUNITY_EMOJIS as readonly string[]).includes(emoji)) communityError("Unsupported reaction.");
+  const message = await visibleCommunityMessage(messageId, userId, db);
+  const existing = await db.prepare(`SELECT 1 AS present FROM message_reactions WHERE message_id=?1 AND user_id=?2 AND emoji=?3 LIMIT 1`).bind(message.id, userId, emoji).first<{ present: number }>();
+  if (existing) {
+    await db.prepare(`DELETE FROM message_reactions WHERE message_id=?1 AND user_id=?2 AND emoji=?3`).bind(message.id, userId, emoji).run();
+    return { reacted: false };
+  }
+  await db.prepare(`INSERT INTO message_reactions (message_id,channel_id,user_id,emoji) VALUES (?1,?2,?3,?4)`).bind(message.id, message.channel_id, userId, emoji).run();
+  return { reacted: true };
+}
+
+export async function reportHotCommunityMessage(messageId: string, userId: string, reason: string, details?: string | null, db: HotD1Database = getHotD1Database()) {
+  if (!(COMMUNITY_REPORT_REASONS as readonly string[]).includes(reason)) communityError("Unsupported report reason.");
+  const message = await visibleCommunityMessage(messageId, userId, db);
+  const cleanDetails = details?.trim().slice(0, 1000) || null;
+  const existing = await db.prepare(`SELECT id FROM message_reports WHERE message_id=?1 AND reporter_user_id=?2 LIMIT 1`).bind(message.id, userId).first<{ id: string }>();
+  if (existing) {
+    await db.prepare(`UPDATE message_reports SET channel_id=?1,reason=?2,details=?3,status='open',reviewed_by=NULL,reviewed_at=NULL WHERE id=?4`).bind(message.channel_id, reason, cleanDetails, existing.id).run();
+    return { id: existing.id, status: "open" };
+  }
+  const id = crypto.randomUUID();
+  await db.prepare(`INSERT INTO message_reports (id,message_id,channel_id,reporter_user_id,reason,details,status) VALUES (?1,?2,?3,?4,?5,?6,'open')`).bind(id, message.id, message.channel_id, userId, reason, cleanDetails).run();
+  return { id, status: "open" };
+}
+
+export async function moderateHotCommunity(input: {
+  actorUserId: string; actorRole: string; action: string; messageId?: string | null;
+  reportId?: string | null; targetUserId?: string | null; channelId?: string | null;
+  reason?: string | null; durationMinutes?: number | null;
+}, db: HotD1Database = getHotD1Database()) {
+  if (!(COMMUNITY_MODERATOR_ROLES as readonly string[]).includes(input.actorRole)) communityError("Moderator access required.");
+  const reason = input.reason?.trim().slice(0, 500) || null;
+  const allowedActions = ["delete_message","restore_message","pin","unpin","block","unblock","dismiss_report","resolve_report"];
+  if (!allowedActions.includes(input.action)) communityError("Unsupported moderation action.");
+  const message = input.messageId ? await db.prepare(`SELECT id,channel_id,user_id,moderation_status FROM community_messages WHERE id=?1 LIMIT 1`).bind(input.messageId).first<{ id: string; channel_id: string; user_id: string; moderation_status: string }>() : null;
+  let channelId = input.channelId ?? message?.channel_id ?? null;
+  if (message && input.channelId && input.channelId !== message.channel_id) communityError("Message and channel do not match.");
+  if (["delete_message","restore_message","pin","unpin"].includes(input.action) && !message) communityError("Message is required.");
+  if (["block","unblock"].includes(input.action) && !input.targetUserId) communityError("Target user is required.");
+  if (["dismiss_report","resolve_report"].includes(input.action) && !input.reportId) communityError("Report is required.");
+  if (input.action === "pin" && message?.moderation_status !== "active") communityError("Only active messages can be pinned.");
+  if (input.action === "block" && ![60,480,1440,2880].includes(Number(input.durationMinutes))) communityError("Invalid block duration.");
+  const auditId = crypto.randomUUID();
+  const statements = [];
+  if (input.action === "delete_message") statements.push(db.prepare(`UPDATE community_messages SET moderation_status='moderated',deleted_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?1`).bind(message!.id));
+  if (input.action === "restore_message") statements.push(db.prepare(`UPDATE community_messages SET moderation_status='active',deleted_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?1`).bind(message!.id));
+  if (input.action === "pin") statements.push(db.prepare(`INSERT OR IGNORE INTO pinned_messages (channel_id,message_id,pinned_by) VALUES (?1,?2,?3)`).bind(channelId, message!.id, input.actorUserId));
+  if (input.action === "unpin") statements.push(db.prepare(`DELETE FROM pinned_messages WHERE channel_id=?1 AND message_id=?2`).bind(channelId, message!.id));
+  if (input.action === "block") statements.push(db.prepare(`INSERT INTO chat_blocks (id,user_id,channel_id,blocked_by,reason,starts_at,ends_at)
+    VALUES (?1,?2,?3,?4,?5,CURRENT_TIMESTAMP,datetime('now','+' || ?6 || ' minutes'))`).bind(crypto.randomUUID(), input.targetUserId, channelId, input.actorUserId, reason ?? "Community moderation", Number(input.durationMinutes)));
+  if (input.action === "unblock") statements.push(db.prepare(`UPDATE chat_blocks SET ends_at=CURRENT_TIMESTAMP WHERE user_id=?1 AND (?2 IS NULL OR channel_id=?2) AND ends_at>CURRENT_TIMESTAMP`).bind(input.targetUserId, channelId));
+  if (input.action === "dismiss_report" || input.action === "resolve_report") statements.push(db.prepare(`UPDATE message_reports SET status=?1,reviewed_by=?2,reviewed_at=CURRENT_TIMESTAMP WHERE id=?3`).bind(input.action === "dismiss_report" ? "dismissed" : "actioned", input.actorUserId, input.reportId));
+  if (input.reportId && ["delete_message","block"].includes(input.action)) statements.push(db.prepare(`UPDATE message_reports SET status='actioned',reviewed_by=?1,reviewed_at=CURRENT_TIMESTAMP WHERE id=?2`).bind(input.actorUserId, input.reportId));
+  statements.push(db.prepare(`INSERT INTO moderation_actions (id,actor_user_id,actor_role,action_type,target_user_id,channel_id,message_id,report_id,reason,metadata)
+    VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`).bind(auditId, input.actorUserId, input.actorRole, input.action, input.targetUserId ?? message?.user_id ?? null, channelId, message?.id ?? null, input.reportId ?? null, reason, JSON.stringify({ durationMinutes: input.durationMinutes ?? null })));
+  await db.batch(statements);
+  return { id: auditId, action: input.action };
+}
+
 export async function getHotCommunityChannel(slug: string, db = getHotD1Database()) {
   return db.prepare(`SELECT id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active FROM community_channels WHERE slug=?1 AND is_active=1 LIMIT 1`).bind(slug).first<HotCommunityChannel>();
 }
