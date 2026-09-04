@@ -5,7 +5,7 @@ import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const identity = await optionalUser();
