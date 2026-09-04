@@ -4,6 +4,7 @@ import { optionalUser } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
 import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
 import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
+import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -103,7 +104,7 @@ export async function createResourceMetadataWithinQuota(input: { userId: string;
   if (profileResult.error) throw new Error(profileResult.error.message);
   const profile = asRow<ProfileLabelRow>(profileResult.data);
   const moderationStatus = input.visibility === "shared" ? "pending" : "private";
-  const createdResult = await client.from("uploaded_resources").insert({ owner_user_id: input.userId, owner_label: profile?.display_name?.trim() || "CA Progress student", title: input.title, description: input.description, subject_id: input.subjectId, chapter_id: input.chapterId, original_filename: input.originalFilename, safe_filename: input.safeFilename, storage_bucket: "user-resources", storage_path: input.storagePath, mime_type: input.mimeType, extension: input.extension, size_bytes: input.sizeBytes, visibility: input.visibility, moderation_status: moderationStatus, published_at: null }).select("id,moderation_status").single();
+  const createdResult = await client.from("uploaded_resources").insert({ owner_user_id: input.userId, owner_label: profile?.display_name?.trim() || "CA Progress student", title: input.title, description: input.description, subject_id: input.subjectId, chapter_id: input.chapterId, original_filename: input.originalFilename, safe_filename: input.safeFilename, storage_bucket: RESOURCE_R2_STORAGE_BUCKET, storage_path: input.storagePath, mime_type: input.mimeType, extension: input.extension, size_bytes: input.sizeBytes, visibility: input.visibility, moderation_status: moderationStatus, published_at: null }).select("id,moderation_status").single();
   if (createdResult.error) throw new Error(createdResult.error.message);
   const created = asRow<CreatedResourceRow>(createdResult.data);
   if (!created) throw new Error("Resource metadata could not be created within the plan allowance.");
