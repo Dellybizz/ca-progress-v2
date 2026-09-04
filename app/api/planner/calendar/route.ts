@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { createHotCalendarEvent, deleteHotCalendarEvent, updateHotCalendarEvent } from "@/lib/data/d1/hot-screens";
 
 export const dynamic = "force-dynamic";
 type Body =
@@ -15,6 +16,16 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Sign in to manage calendar events." }, { status: 401 });
   let body: Body;
   try { body = await request.json() as Body; } catch { return NextResponse.json({ error: "Invalid calendar request." }, { status: 400 }); }
+  if (isCloudflareDataRuntime()) {
+    try {
+      if (body.action === "delete") return NextResponse.json(await deleteHotCalendarEvent(user.id, body.id), { headers: { "Cache-Control": "private, no-store" } });
+      const event = { title: body.title?.trim() || "", notes: body.notes?.trim() || null, startsAt: body.startsAt, endsAt: body.endsAt || null, allDay: Boolean(body.allDay) };
+      if (body.action === "create") return NextResponse.json(await createHotCalendarEvent(user.id, event), { status: 201, headers: { "Cache-Control": "private, no-store" } });
+      if (body.action === "update") return NextResponse.json(await updateHotCalendarEvent(user.id, body.id, event), { headers: { "Cache-Control": "private, no-store" } });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Calendar event could not be saved." }, { status: 400 });
+    }
+  }
   const supabase = await createServerSupabaseClient();
   if (body.action === "delete") {
     if (!body.id) return NextResponse.json({ error: "Event id is required." }, { status: 400 });
