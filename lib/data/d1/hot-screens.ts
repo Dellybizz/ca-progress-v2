@@ -139,7 +139,7 @@ export async function getHotCommunityChannels(userId: string | null, db = getHot
           WHERE p.user_id=?1
         ))
       )))
-    ORDER BY cc.sort_order,cc.title`).bind(userId,userId,userId,userId).all<HotCommunityListRow>();
+    ORDER BY cc.sort_order,cc.title`).bind(userId).all<HotCommunityListRow>();
   return (rows.results ?? []) as HotCommunityListRow[];
 }
 
