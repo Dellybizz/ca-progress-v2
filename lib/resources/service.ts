@@ -8,7 +8,8 @@ import { getIcaiPublicCatalog } from "@/lib/icai/query";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { getHotResourceLibraryRows, getHotResourceDetail } from "@/lib/data/d1/hot-screens";
 import type { StudySubjectOption } from "@/lib/study/types";
 import type { ModerationPageModel, ModerationQueueItem, ModerationReport, NoteCard, NoteDetailModel, OfficialResourceCard, ResourceDetailModel, ResourceLibraryModel, UploadCard } from "./types";
 
@@ -135,6 +136,24 @@ export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
   if (!identity) return { mode: "guest", officialResources };
 
   const supabase = await createServerSupabaseClient();
+  if (isCloudflareDataRuntime()) {
+    const [names, tagsByNote, rows, subjects] = await Promise.all([
+      nameMaps(supabase),
+      tagsForOwnNotes(supabase, identity.id),
+      getHotResourceLibraryRows(identity.id),
+      academicOptions(profile),
+    ]);
+    return {
+      mode: "ready",
+      viewerName: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
+      subjects,
+      myNotes: rows.ownNotes.map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id)),
+      myUploads: rows.ownUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
+      sharedNotes: rows.sharedNotes.map((row) => noteDto(row as NoteRow, names, [], identity.id)),
+      sharedUploads: rows.sharedUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
+      officialResources,
+    };
+  }
   const [names, tagsByNote, ownNotes, ownUploads, sharedNotes, sharedUploads, subjects] = await Promise.all([
     nameMaps(supabase),
     tagsForOwnNotes(supabase, identity.id),
@@ -182,7 +201,9 @@ export async function getResourceDetailModel(resourceId: string): Promise<Resour
   const identity = await optionalUser();
   if (!identity) return { mode: "guest" };
   const supabase = await createServerSupabaseClient();
-  const response = await supabase.from("uploaded_resources").select("*").eq("id", resourceId).maybeSingle();
+  const response = isCloudflareDataRuntime()
+    ? { data: await getHotResourceDetail(resourceId), error: null }
+    : await supabase.from("uploaded_resources").select("*").eq("id", resourceId).maybeSingle();
   if (response.error) throw new Error(`Resource could not be loaded: ${response.error.message}`);
   if (!response.data) return { mode: "missing" };
   const names = await nameMaps(supabase);
