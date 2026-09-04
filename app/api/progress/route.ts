@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { setHotProgressStage, undoHotProgressEvent } from "@/lib/data/d1/hot-screens";
 import { PROGRESS_STAGES, type ProgressMutationResult, type ProgressStage } from "@/lib/progress/types";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,22 @@ export async function POST(request: Request) {
     body = await request.json() as Body;
   } catch {
     return NextResponse.json({ error: "Invalid progress request." }, { status: 400 });
+  }
+
+  if (isCloudflareDataRuntime()) {
+    try {
+      if (body.action === "set_stage") {
+        if (!body.chapterId || !PROGRESS_STAGES.includes(body.stage) || typeof body.enabled !== "boolean") return NextResponse.json({ error: "Invalid progress stage request." }, { status: 400 });
+        return NextResponse.json(await setHotProgressStage(user.id, body.chapterId, body.stage, body.enabled));
+      }
+      if (body.action === "undo") {
+        if (!body.eventId) return NextResponse.json({ error: "Choose a progress change to undo." }, { status: 400 });
+        return NextResponse.json(await undoHotProgressEvent(user.id, body.eventId));
+      }
+    } catch (error) {
+      const message = cleanError(error instanceof Error ? error.message : "Progress could not be saved.");
+      return NextResponse.json({ error: message }, { status: /applicable|requires/.test(message) ? 403 : 409 });
+    }
   }
 
   const supabase = await createServerSupabaseClient();
