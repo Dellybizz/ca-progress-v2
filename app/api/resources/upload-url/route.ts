@@ -29,7 +29,9 @@ export async function POST(request: Request) {
   if (!filename || filename.length > 180 || !Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > RESOURCE_MAX_BYTES) return error("File name or size is invalid.", 400, "UPLOAD_DESCRIPTOR_INVALID");
   if (!MIME_BY_EXTENSION[ext]?.includes(mimeType)) return error("File MIME type does not match the allowed extension.", 400, "UPLOAD_MIME_INVALID");
 
-  const access = await getResourceStorageAccess(identity.id);
+  let access;
+  try { access = await getResourceStorageAccess(identity.id); }
+  catch { return error("Resource storage access is temporarily unavailable.", 503, "STORAGE_ACCESS_UNAVAILABLE"); }
   if (!access.allowed) return error(access.upgradeMessage || "Your plan does not allow file storage.", 403, "ENTITLEMENT_REQUIRED");
   if (access.limitBytes !== null && access.usedBytes + sizeBytes > access.limitBytes) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
 
@@ -40,7 +42,11 @@ export async function POST(request: Request) {
 
   const uploadId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-  await getHotD1Database().prepare("INSERT INTO r2_upload_intents(id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)")
-    .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt).run();
+  try {
+    await getHotD1Database().prepare("INSERT INTO r2_upload_intents(id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)")
+      .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt).run();
+  } catch {
+    return error("Upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");
+  }
   return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: RESOURCE_MAX_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
 }
