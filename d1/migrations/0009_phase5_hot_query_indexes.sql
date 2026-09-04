@@ -13,3 +13,6 @@ ON pinned_messages(channel_id,pinned_at,message_id);
 -- Public/shared resource feed filtering and newest-first ordering.
 CREATE INDEX IF NOT EXISTS idx_uploaded_resources_visibility_moderation_published
 ON uploaded_resources(visibility,moderation_status,published_at);
+
+INSERT OR IGNORE INTO _ca_schema_migrations(version,description,source_freeze_commit)
+VALUES ('0009','phase 5 hot-query index completion','phase-12-operations-admin-platform');
