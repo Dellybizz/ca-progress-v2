@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const runner = await readFile(new URL('../scripts/phase5/mutation-matrix.mjs', import.meta.url), 'utf8');
-const workflow = await readFile(new URL('../.github/workflows/phase3-mutation-matrix.yml', import.meta.url), 'utf8').catch(()=>'');
+const workflow = await readFile(new URL('../.github/workflows/phase3-mutation-matrix.yml', import.meta.url), 'utf8').catch(()=> '');
 const hotScreens = await readFile(new URL('../lib/data/d1/hot-screens.ts', import.meta.url), 'utf8');
+const billingService = await readFile(new URL('../lib/billing/service.ts', import.meta.url), 'utf8');
 const uploadIntentRoute = await readFile(new URL('../app/api/resources/upload-url/route.ts', import.meta.url), 'utf8');
 const resourceAccessRoute = await readFile(new URL('../app/api/resources/[id]/access/route.ts', import.meta.url), 'utf8');
 const legacyUploadRoute = await readFile(new URL('../app/api/resources/upload/route.ts', import.meta.url), 'utf8');
@@ -69,6 +70,12 @@ test('Resource upload intent fails closed with a structured outer error', () => 
   assert.match(uploadIntentRoute, /UPLOAD_SERVICE_UNAVAILABLE/);
   assert.match(uploadIntentRoute, /caught instanceof Error \? caught\.name : "UnknownError"/);
   assert.doesNotMatch(uploadIntentRoute, /caught instanceof Error \? caught\.message/);
+});
+
+test('Resource metadata uses the canonical R2 storage bucket identifier', () => {
+  assert.match(billingService, /import \{ RESOURCE_R2_STORAGE_BUCKET \} from "@\/lib\/resources\/r2";/);
+  assert.match(billingService, /storage_bucket: RESOURCE_R2_STORAGE_BUCKET/);
+  assert.doesNotMatch(billingService, /storage_bucket: "user-resources"/);
 });
 
 test('R2 resource routes use the supported OpenNext Node.js runtime', () => {
