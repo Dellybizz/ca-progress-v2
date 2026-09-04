@@ -339,3 +339,78 @@ export async function getHotCommunityMessages(channelId: string, cursor?: number
   const rows = await db.prepare(`SELECT id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id FROM community_messages WHERE ${filters.join(" AND ")} ORDER BY sequence_id DESC LIMIT ${bounded + 1}`).bind(...values).all<HotCommunityMessage>();
   return rows.results ?? [];
 }
+
+
+async function assertHotAcademicSelection(userId: string, subjectId: string | null, chapterId: string | null, db: HotD1Database) {
+  if (subjectId) {
+    const row = await db.prepare(\`SELECT 1 AS valid FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+      JOIN attempt_syllabus_map asm ON asm.level_id=l.id AND asm.attempt_key=p.attempt_key AND asm.subject_id=?1
+      JOIN course_groups g ON g.id=asm.group_id WHERE p.user_id=?2 AND p.onboarding_completed_at IS NOT NULL
+      AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR g.code=p.group_choice) LIMIT 1\`).bind(subjectId,userId).first();
+    if (!row) throw new Error("Selected subject is not applicable.");
+  }
+  if (chapterId) {
+    const row = await db.prepare(\`SELECT c.id,sv.subject_id FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+      JOIN attempt_syllabus_map asm ON asm.level_id=l.id AND asm.attempt_key=p.attempt_key
+      JOIN chapters c ON c.syllabus_version_id=asm.syllabus_version_id JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id
+      WHERE p.user_id=?1 AND c.id=?2 AND p.onboarding_completed_at IS NOT NULL
+      AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR asm.group_id IN (SELECT id FROM course_groups WHERE code=p.group_choice)) LIMIT 1\`).bind(userId,chapterId).first<{id:string;subject_id:string}>();
+    if (!row || (subjectId && row.subject_id !== subjectId)) throw new Error("Selected chapter is not applicable.");
+  }
+}
+
+export async function saveHotNote(input: { id: string|null; userId: string; ownerLabel: string; title: string; bodyHtml: string; bodyText: string; subjectId: string|null; chapterId: string|null; tags: string[]; visibility: "private"|"shared" }, db: HotD1Database = getHotD1Database()) {
+  if (!input.title || input.title.length > 160) throw new Error("A note title is required.");
+  if (new TextEncoder().encode(input.bodyHtml).length > 200000 || new TextEncoder().encode(input.bodyText).length > 120000) throw new Error("Note content is too large.");
+  if (input.tags.length > 12) throw new Error("A note can have at most 12 tags.");
+  await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
+  const id=input.id ?? crypto.randomUUID();
+  const existing=input.id ? await db.prepare("SELECT id FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(input.id,input.userId).first() : null;
+  if (input.id && !existing) throw new Error("Note not found.");
+  const status=input.visibility==="shared"?"pending":"private";
+  const statements=[existing
+    ? db.prepare("UPDATE notes SET title=?1,body_html=?2,body_text=?3,subject_id=?4,chapter_id=?5,visibility=?6,moderation_status=?7,published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?8 AND user_id=?9").bind(input.title,input.bodyHtml,input.bodyText,input.subjectId,input.chapterId,input.visibility,status,id,input.userId)
+    : db.prepare("INSERT INTO notes (id,user_id,owner_label,title,body_html,body_text,subject_id,chapter_id,visibility,moderation_status,published_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,NULL)").bind(id,input.userId,input.ownerLabel||"CA Progress student",input.title,input.bodyHtml,input.bodyText,input.subjectId,input.chapterId,input.visibility,status),
+    db.prepare("DELETE FROM note_tag_map WHERE note_id=?1 AND user_id=?2").bind(id,input.userId)];
+  for (const tag of [...new Set(input.tags.map((v)=>v.trim().slice(0,32).toLowerCase()).filter(Boolean))]) {
+    const tagId=crypto.randomUUID();
+    statements.push(db.prepare("INSERT INTO note_tags (id,user_id,name,normalized_name) VALUES (?1,?2,?3,?4) ON CONFLICT(user_id,normalized_name) DO UPDATE SET name=excluded.name").bind(tagId,input.userId,tag,tag));
+    statements.push(db.prepare("INSERT OR IGNORE INTO note_tag_map (note_id,tag_id,user_id) SELECT ?1,id,?2 FROM note_tags WHERE user_id=?2 AND normalized_name=?3").bind(id,input.userId,tag));
+  }
+  await db.batch(statements); return {id,status};
+}
+export async function deleteHotNote(id:string,userId:string,db:HotD1Database=getHotD1Database()){ await db.prepare("DELETE FROM notes WHERE id=?1 AND user_id=?2").bind(id,userId).run(); return {ok:true}; }
+export async function patchHotResource(input:{id:string;userId:string;title:string;description:string|null;subjectId:string|null;chapterId:string|null;visibility:"private"|"shared"},db:HotD1Database=getHotD1Database()){
+  if(!input.title||input.title.length>160) throw new Error("A resource title is required.");
+  await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
+  const row=await db.prepare("SELECT id FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(input.id,input.userId).first(); if(!row) throw new Error("Resource not found.");
+  const status=input.visibility==="shared"?"pending":"private";
+  await db.prepare("UPDATE uploaded_resources SET title=?1,description=?2,subject_id=?3,chapter_id=?4,visibility=?5,moderation_status=?6,published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?7 AND owner_user_id=?8").bind(input.title,input.description,input.subjectId,input.chapterId,input.visibility,status,input.id,input.userId).run();
+  return {id:input.id,status};
+}
+export async function getHotOwnedResource(id:string,userId:string,db:HotD1Database=getHotD1Database()){return db.prepare("SELECT id,owner_user_id,storage_bucket,storage_path FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(id,userId).first<{id:string;owner_user_id:string;storage_bucket:string;storage_path:string}>();}
+export async function deleteHotResource(id:string,userId:string,db:HotD1Database=getHotD1Database()){await db.prepare("DELETE FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2").bind(id,userId).run();return {ok:true};}
+export async function reportHotResource(input:{entityType:"note"|"upload";entityId:string;userId:string;reason:string;details:string|null},db:HotD1Database=getHotD1Database()){
+  if(!["spam","misleading","copyright","unsafe","other"].includes(input.reason)) throw new Error("Unknown report reason.");
+  const table=input.entityType==="note"?"notes":"uploaded_resources", owner=input.entityType==="note"?"user_id":"owner_user_id";
+  const row=await db.prepare(\`SELECT id,\${owner} AS owner_id,moderation_status,visibility FROM \${table} WHERE id=?1 LIMIT 1\`).bind(input.entityId).first<{id:string;owner_id:string;moderation_status:string;visibility:string}>();
+  if(!row||row.visibility!=="shared"||row.moderation_status!=="approved") throw new Error("Only approved shared resources can be reported.");
+  if(row.owner_id===input.userId) throw new Error("You cannot report your own resource.");
+  const id=crypto.randomUUID();
+  await db.batch([
+    db.prepare("INSERT INTO resource_reports (id,entity_type,note_id,uploaded_resource_id,reporter_user_id,reason,details,status) VALUES (?1,?2,?3,?4,?5,?6,?7,'open')").bind(id,input.entityType,input.entityType==="note"?input.entityId:null,input.entityType==="upload"?input.entityId:null,input.userId,input.reason,input.details),
+    db.prepare(\`UPDATE \${table} SET moderation_status='reported',updated_at=CURRENT_TIMESTAMP WHERE id=?1\`).bind(input.entityId)]);
+  return {id,status:"reported"};
+}
+function validateHotTask(input:{title:string;notes:string|null;taskKind:string;subjectId:string|null;chapterId:string|null;dueAt:string;estimatedMinutes:number}){if(!input.title||input.title.length>160||!["study","revision","test","other"].includes(input.taskKind)||!Number.isFinite(Date.parse(input.dueAt))||!Number.isFinite(input.estimatedMinutes)||input.estimatedMinutes<1||input.estimatedMinutes>720)throw new Error("Check the task title, date, type and estimated minutes.");}
+export async function createHotTask(userId:string,input:{title:string;notes:string|null;taskKind:string;subjectId:string|null;chapterId:string|null;dueAt:string;estimatedMinutes:number},db:HotD1Database=getHotD1Database()){validateHotTask(input);await assertHotAcademicSelection(userId,input.subjectId,input.chapterId,db);const id=crypto.randomUUID();await db.prepare("INSERT INTO tasks (id,user_id,title,notes,task_kind,subject_id,chapter_id,due_at,estimated_minutes,status,completed_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'todo',NULL)").bind(id,userId,input.title,input.notes,input.taskKind,input.subjectId,input.chapterId,input.dueAt,input.estimatedMinutes).run();return {id,...input,status:"todo",completed_at:null};}
+export async function updateHotTask(userId:string,id:string,input:{title:string;notes:string|null;taskKind:string;subjectId:string|null;chapterId:string|null;dueAt:string;estimatedMinutes:number},db:HotD1Database=getHotD1Database()){validateHotTask(input);await assertHotAcademicSelection(userId,input.subjectId,input.chapterId,db);await db.prepare("UPDATE tasks SET title=?1,notes=?2,task_kind=?3,subject_id=?4,chapter_id=?5,due_at=?6,estimated_minutes=?7,updated_at=CURRENT_TIMESTAMP WHERE id=?8 AND user_id=?9").bind(input.title,input.notes,input.taskKind,input.subjectId,input.chapterId,input.dueAt,input.estimatedMinutes,id,userId).run();return {ok:true};}
+export async function toggleHotTask(userId:string,id:string,done:boolean,db:HotD1Database=getHotD1Database()){await db.prepare("UPDATE tasks SET status=?1,completed_at=?2,updated_at=CURRENT_TIMESTAMP WHERE id=?3 AND user_id=?4").bind(done?"done":"todo",done?new Date().toISOString():null,id,userId).run();return {ok:true};}
+export async function deleteHotTask(userId:string,id:string,db:HotD1Database=getHotD1Database()){await db.prepare("DELETE FROM tasks WHERE id=?1 AND user_id=?2").bind(id,userId).run();return {ok:true};}
+export async function createHotGoal(userId:string,input:{title:string;description:string|null;dueDate:string},db:HotD1Database=getHotD1Database()){if(!input.title||input.title.length>160||!/^\d{4}-\d{2}-\d{2}$/.test(input.dueDate))throw new Error("Enter a goal title and valid due date.");const id=crypto.randomUUID();await db.prepare("INSERT INTO goals (id,user_id,title,description,due_date,status,completed_at) VALUES (?1,?2,?3,?4,?5,'active',NULL)").bind(id,userId,input.title,input.description,input.dueDate).run();return {id,...input,status:"active",completed_at:null};}
+export async function toggleHotGoal(userId:string,id:string,done:boolean,db:HotD1Database=getHotD1Database()){await db.prepare("UPDATE goals SET status=?1,completed_at=?2,updated_at=CURRENT_TIMESTAMP WHERE id=?3 AND user_id=?4").bind(done?"completed":"active",done?new Date().toISOString():null,id,userId).run();return {ok:true};}
+export async function deleteHotGoal(userId:string,id:string,db:HotD1Database=getHotD1Database()){await db.prepare("DELETE FROM goals WHERE id=?1 AND user_id=?2").bind(id,userId).run();return {ok:true};}
+async function validateHotEvent(input:{title:string;notes:string|null;startsAt:string;endsAt:string|null;allDay:boolean}){if(!input.title||input.title.length>160||!Number.isFinite(Date.parse(input.startsAt))||(input.endsAt&&!Number.isFinite(Date.parse(input.endsAt)))||(input.endsAt&&Date.parse(input.endsAt)<Date.parse(input.startsAt)))throw new Error("Check the event title and time range.");}
+export async function createHotCalendarEvent(userId:string,input:{title:string;notes:string|null;startsAt:string;endsAt:string|null;allDay:boolean},db:HotD1Database=getHotD1Database()){await validateHotEvent(input);const id=crypto.randomUUID();await db.prepare("INSERT INTO user_calendar_events (id,user_id,title,notes,starts_at,ends_at,all_day) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(id,userId,input.title,input.notes,input.startsAt,input.endsAt,input.allDay?1:0).run();return {id,...input,user_id:userId,starts_at:input.startsAt,ends_at:input.endsAt,all_day:input.allDay?1:0};}
+export async function updateHotCalendarEvent(userId:string,id:string,input:{title:string;notes:string|null;startsAt:string;endsAt:string|null;allDay:boolean},db:HotD1Database=getHotD1Database()){await validateHotEvent(input);await db.prepare("UPDATE user_calendar_events SET title=?1,notes=?2,starts_at=?3,ends_at=?4,all_day=?5,updated_at=CURRENT_TIMESTAMP WHERE id=?6 AND user_id=?7").bind(input.title,input.notes,input.startsAt,input.endsAt,input.allDay?1:0,id,userId).run();return {ok:true};}
+export async function deleteHotCalendarEvent(userId:string,id:string,db:HotD1Database=getHotD1Database()){await db.prepare("DELETE FROM user_calendar_events WHERE id=?1 AND user_id=?2").bind(id,userId).run();return {ok:true};}
