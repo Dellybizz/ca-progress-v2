@@ -9,6 +9,9 @@ on:
       - scripts/phase5/retirement-stage1.mjs
       - scripts/phase5/final-backup.mjs
       - scripts/phase4/**
+      - d1/migrations/0007_phase2_performance_indexes.sql
+      - d1/migrations/0008_phase5_hot_path_indexes.sql
+      - d1/migrations/0009_phase5_hot_query_indexes.sql
       - tests/retirement-stage1.test.mjs
       - SUPABASE_RETIREMENT_PLAN.md
 
@@ -19,6 +22,7 @@ env:
   PHASE4_D1_NAME: ca-progress-v2-phase4-shadow
   PHASE4_R2_BUCKET: ca-progress-v2-staging-user-resources
   RETIREMENT_BACKUP_BUCKET: ca-progress-v2-retirement-backups
+  RETIREMENT_STAGE1_DURABLE_BUCKET: ca-progress-v2-retirement-backups
   RETIREMENT_STAGE1_DIR: retirement-stage1
   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
   CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -55,6 +59,23 @@ jobs:
           npm run test:cloudflare-phase4
           npm run d1:phase4:validate
 
+      - name: Repair and verify production migration provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p retirement-stage1/evidence
+          npx wrangler d1 execute "$PHASE4_D1_NAME" --remote --config wrangler.web.jsonc --file d1/migrations/0007_phase2_performance_indexes.sql
+          npx wrangler d1 execute "$PHASE4_D1_NAME" --remote --config wrangler.web.jsonc --file d1/migrations/0008_phase5_hot_path_indexes.sql
+          npx wrangler d1 execute "$PHASE4_D1_NAME" --remote --config wrangler.web.jsonc --file d1/migrations/0009_phase5_hot_query_indexes.sql
+          npx wrangler d1 execute "$PHASE4_D1_NAME" --remote --json --config wrangler.web.jsonc --command "SELECT version FROM _ca_schema_migrations WHERE version IN ('0007','0008','0009') ORDER BY version;" > retirement-stage1/evidence/migration-provenance.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const raw = JSON.parse(readFileSync('retirement-stage1/evidence/migration-provenance.json', 'utf8'));
+          const rows = (Array.isArray(raw) ? raw : [raw]).flatMap((entry) => entry?.results ?? []);
+          const versions = rows.map((row) => String(row.version)).sort();
+          if (versions.join(',') !== '0007,0008,0009') throw new Error(`Migration provenance incomplete: ${versions.join(',')}`);
+          NODE
+
       - name: Create pre-delta read-only Supabase snapshot
         env:
           PHASE5_BACKUP_DIR: retirement-stage1/source-before
@@ -74,7 +95,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p retirement-stage1/evidence
           node --input-type=module <<'NODE'
           import { readFileSync, writeFileSync } from 'node:fs';
           import { sourceStateDigest } from './scripts/phase5/retirement-stage1.mjs';
@@ -174,6 +194,7 @@ jobs:
           sha256sum "$archive" | awk '{print $1}' > retirement-stage1/archive/archive.sha256
           echo "RETIREMENT_ARCHIVE=$archive" >> "$GITHUB_ENV"
           echo "RETIREMENT_ARCHIVE_SHA256=$(cat retirement-stage1/archive/archive.sha256)" >> "$GITHUB_ENV"
+          echo "RETIREMENT_STAGE1_ARCHIVE_SHA256=$(cat retirement-stage1/archive/archive.sha256)" >> "$GITHUB_ENV"
           echo "RETIREMENT_OBJECT_PREFIX=stage1/${GITHUB_SHA}/${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
 
       - name: Ensure private durable R2 backup bucket exists
@@ -196,13 +217,11 @@ jobs:
           test "$actual" = "$RETIREMENT_ARCHIVE_SHA256" || { echo "::error::Durable R2 backup checksum mismatch"; exit 1; }
           rm -f retirement-stage1/archive/verify.tar.gz
           echo "RETIREMENT_DURABLE_OBJECT=$object" >> "$GITHUB_ENV"
+          echo "RETIREMENT_STAGE1_DURABLE_OBJECT=$object" >> "$GITHUB_ENV"
 
       - name: Evaluate Stage 1 retirement baseline
         env:
           RETIREMENT_STAGE1_DURABLE_VERIFIED: "1"
-          RETIREMENT_STAGE1_DURABLE_BUCKET: ${{ env.RETIREMENT_BACKUP_BUCKET }}
-          RETIREMENT_STAGE1_DURABLE_OBJECT: ${{ env.RETIREMENT_DURABLE_OBJECT }}
-          RETIREMENT_STAGE1_ARCHIVE_SHA256: ${{ env.RETIREMENT_ARCHIVE_SHA256 }}
         run: node scripts/phase5/retirement-stage1.mjs
 
       - name: Preserve Stage 1 report beside durable backup
@@ -233,5 +252,6 @@ jobs:
             retirement-stage1/evidence/worker-deployments.json
             retirement-stage1/evidence/worker-secret-names-only.json
             retirement-stage1/evidence/binding-snapshot.json
+            retirement-stage1/evidence/migration-provenance.json
             retirement-stage1/evidence/evidence-sha256.txt
             retirement-stage1/archive/archive.sha256
