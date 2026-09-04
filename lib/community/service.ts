@@ -8,7 +8,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
-import { getHotCommunityChannel, getHotCommunityMessages } from "@/lib/data/d1/hot-screens";
+import { getHotCommunityChannel, getHotCommunityMessages, getHotCommunityChannels } from "@/lib/data/d1/hot-screens";
 import type {
   CommunityBlock,
   CommunityChannel,
@@ -84,6 +84,10 @@ function groupChannels(channels: CommunityChannel[], levelLabel: string) {
 
 async function publicCommunityContext() {
   const supabase = createAdminSupabaseClient();
+  if (isCloudflareDataRuntime()) {
+    const channels = (await getHotCommunityChannels(null)).map((row) => channelDto(row as never)).map((channel) => ({ ...channel, canWrite: false, unreadCount: 0 }));
+    return { mode: "guest" as const, supabase, channels, groups: groupChannels(channels, "Community") };
+  }
   const [channelsResult, messagesResult] = await Promise.all([
     supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("is_active", true).eq("scope_type", "global").order("sort_order").order("title"),
     supabase.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("moderation_status", "active").order("sequence_id", { ascending: false }).limit(60),
@@ -124,6 +128,16 @@ async function baseCommunityContext() {
   const viewerName = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
   if (!profileReady(profile)) return { mode: "setup" as const, viewerName };
   const supabase = await createServerSupabaseClient();
+  if (isCloudflareDataRuntime()) {
+    const [directRows, levelResult, role] = await Promise.all([
+      getHotCommunityChannels(identity.id),
+      supabase.from("course_levels").select("name,code").eq("code", profile!.ca_level!).maybeSingle(),
+      getServerAppRole(),
+    ]);
+    const channels = directRows.map((row) => channelDto(row as never));
+    const levelLabel = levelResult.data?.name ?? profile!.ca_level ?? "Your level";
+    return { mode: "ready" as const, identity, profile: profile!, viewerName, role, channels, groups: groupChannels(channels, levelLabel), supabase };
+  }
   const [channelsResult, levelResult, role] = await Promise.all([
     supabase.rpc("phase10_list_channels"),
     supabase.from("course_levels").select("name,code").eq("code", profile!.ca_level!).maybeSingle(),
