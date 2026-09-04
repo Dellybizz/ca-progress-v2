@@ -215,3 +215,4 @@ jobs:
           name: phase5-cutover-${{ github.run_id }}
           retention-days: 30
           path: phase5-cutover/
+# Manual migration verification marker — preserves existing deployment and rollback gates.
