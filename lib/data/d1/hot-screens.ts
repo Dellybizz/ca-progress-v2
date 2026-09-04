@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getHotD1Database } from "./runtime";
+import type { HotD1Database } from "./runtime";
 
 export type HotProfile = {
   user_id: string; display_name: string | null; avatar_url: string | null;
