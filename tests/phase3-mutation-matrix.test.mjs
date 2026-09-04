@@ -6,6 +6,9 @@ const runner = await readFile(new URL('../scripts/phase5/mutation-matrix.mjs', i
 const workflow = await readFile(new URL('../.github/workflows/phase3-mutation-matrix.yml', import.meta.url), 'utf8').catch(()=>'');
 const hotScreens = await readFile(new URL('../lib/data/d1/hot-screens.ts', import.meta.url), 'utf8');
 const uploadIntentRoute = await readFile(new URL('../app/api/resources/upload-url/route.ts', import.meta.url), 'utf8');
+const resourceAccessRoute = await readFile(new URL('../app/api/resources/[id]/access/route.ts', import.meta.url), 'utf8');
+const legacyUploadRoute = await readFile(new URL('../app/api/resources/upload/route.ts', import.meta.url), 'utf8');
+const uploadCompleteRoute = await readFile(new URL('../app/api/resources/upload-complete/route.ts', import.meta.url), 'utf8');
 const baseD1Schema = await readFile(new URL('../d1/migrations/0001_phase2_platform.sql', import.meta.url), 'utf8');
 
 test('Phase 3 covers the required product mutation families', () => {
@@ -66,6 +69,18 @@ test('Resource upload intent fails closed with a structured outer error', () => 
   assert.match(uploadIntentRoute, /UPLOAD_SERVICE_UNAVAILABLE/);
   assert.match(uploadIntentRoute, /caught instanceof Error \? caught\.name : "UnknownError"/);
   assert.doesNotMatch(uploadIntentRoute, /caught instanceof Error \? caught\.message/);
+});
+
+test('R2 resource routes use the supported OpenNext Node.js runtime', () => {
+  for (const [name, source] of [
+    ['upload intent', uploadIntentRoute],
+    ['signed access', resourceAccessRoute],
+    ['legacy upload redirect', legacyUploadRoute],
+    ['upload completion', uploadCompleteRoute],
+  ]) {
+    assert.match(source, /export const runtime = "nodejs"/, `${name} must use Node.js runtime`);
+    assert.doesNotMatch(source, /export const runtime = "edge"/, `${name} must not force Edge runtime`);
+  }
 });
 
 test('Phase 3 workflow is strict and uploads evidence even on failure', () => {
