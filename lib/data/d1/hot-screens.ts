@@ -343,18 +343,18 @@ export async function getHotCommunityMessages(channelId: string, cursor?: number
 
 async function assertHotAcademicSelection(userId: string, subjectId: string | null, chapterId: string | null, db: HotD1Database) {
   if (subjectId) {
-    const row = await db.prepare(\`SELECT 1 AS valid FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+    const row = await db.prepare(`SELECT 1 AS valid FROM profiles p JOIN course_levels l ON l.code=p.ca_level
       JOIN attempt_syllabus_map asm ON asm.level_id=l.id AND asm.attempt_key=p.attempt_key AND asm.subject_id=?1
       JOIN course_groups g ON g.id=asm.group_id WHERE p.user_id=?2 AND p.onboarding_completed_at IS NOT NULL
-      AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR g.code=p.group_choice) LIMIT 1\`).bind(subjectId,userId).first();
+      AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR g.code=p.group_choice) LIMIT 1`).bind(subjectId,userId).first();
     if (!row) throw new Error("Selected subject is not applicable.");
   }
   if (chapterId) {
-    const row = await db.prepare(\`SELECT c.id,sv.subject_id FROM profiles p JOIN course_levels l ON l.code=p.ca_level
+    const row = await db.prepare(`SELECT c.id,sv.subject_id FROM profiles p JOIN course_levels l ON l.code=p.ca_level
       JOIN attempt_syllabus_map asm ON asm.level_id=l.id AND asm.attempt_key=p.attempt_key
       JOIN chapters c ON c.syllabus_version_id=asm.syllabus_version_id JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id
       WHERE p.user_id=?1 AND c.id=?2 AND p.onboarding_completed_at IS NOT NULL
-      AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR asm.group_id IN (SELECT id FROM course_groups WHERE code=p.group_choice)) LIMIT 1\`).bind(userId,chapterId).first<{id:string;subject_id:string}>();
+      AND (p.ca_level='foundation' OR p.group_choice IN ('both','not_applicable') OR asm.group_id IN (SELECT id FROM course_groups WHERE code=p.group_choice)) LIMIT 1`).bind(userId,chapterId).first<{id:string;subject_id:string}>();
     if (!row || (subjectId && row.subject_id !== subjectId)) throw new Error("Selected chapter is not applicable.");
   }
 }
@@ -393,13 +393,13 @@ export async function deleteHotResource(id:string,userId:string,db:HotD1Database
 export async function reportHotResource(input:{entityType:"note"|"upload";entityId:string;userId:string;reason:string;details:string|null},db:HotD1Database=getHotD1Database()){
   if(!["spam","misleading","copyright","unsafe","other"].includes(input.reason)) throw new Error("Unknown report reason.");
   const table=input.entityType==="note"?"notes":"uploaded_resources", owner=input.entityType==="note"?"user_id":"owner_user_id";
-  const row=await db.prepare(\`SELECT id,\${owner} AS owner_id,moderation_status,visibility FROM \${table} WHERE id=?1 LIMIT 1\`).bind(input.entityId).first<{id:string;owner_id:string;moderation_status:string;visibility:string}>();
+  const row=await db.prepare(`SELECT id,${owner} AS owner_id,moderation_status,visibility FROM ${table} WHERE id=?1 LIMIT 1`).bind(input.entityId).first<{id:string;owner_id:string;moderation_status:string;visibility:string}>();
   if(!row||row.visibility!=="shared"||row.moderation_status!=="approved") throw new Error("Only approved shared resources can be reported.");
   if(row.owner_id===input.userId) throw new Error("You cannot report your own resource.");
   const id=crypto.randomUUID();
   await db.batch([
     db.prepare("INSERT INTO resource_reports (id,entity_type,note_id,uploaded_resource_id,reporter_user_id,reason,details,status) VALUES (?1,?2,?3,?4,?5,?6,?7,'open')").bind(id,input.entityType,input.entityType==="note"?input.entityId:null,input.entityType==="upload"?input.entityId:null,input.userId,input.reason,input.details),
-    db.prepare(\`UPDATE \${table} SET moderation_status='reported',updated_at=CURRENT_TIMESTAMP WHERE id=?1\`).bind(input.entityId)]);
+    db.prepare(`UPDATE ${table} SET moderation_status='reported',updated_at=CURRENT_TIMESTAMP WHERE id=?1`).bind(input.entityId)]);
   return {id,status:"reported"};
 }
 function validateHotTask(input:{title:string;notes:string|null;taskKind:string;subjectId:string|null;chapterId:string|null;dueAt:string;estimatedMinutes:number}){if(!input.title||input.title.length>160||!["study","revision","test","other"].includes(input.taskKind)||!Number.isFinite(Date.parse(input.dueAt))||!Number.isFinite(input.estimatedMinutes)||input.estimatedMinutes<1||input.estimatedMinutes>720)throw new Error("Check the task title, date, type and estimated minutes.");}
