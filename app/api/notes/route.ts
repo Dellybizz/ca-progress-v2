@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { optionalUser } from "@/lib/auth/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { saveHotNote } from "@/lib/data/d1/hot-screens";
 import { cleanText, normalizeTags, nullableId, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/resources/validation";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,16 @@ export async function POST(request: Request) {
 
   if (!title) return NextResponse.json({ error: "A note title is required." }, { status: 400 });
   if (!bodyText && !bodyHtml) return NextResponse.json({ error: "Add some note content before saving." }, { status: 400 });
+
+  if (isCloudflareDataRuntime()) {
+    try {
+      const profile = await getProfileForUser(identity.id);
+      const result = await saveHotNote({ id: noteId, userId: identity.id, ownerLabel: profile?.display_name?.trim() || "CA Progress student", title, bodyHtml, bodyText, subjectId, chapterId, tags, visibility });
+      return NextResponse.json({ id: result.id, status: result.status }, { status: noteId ? 200 : 201 });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Note could not be saved." }, { status: 400 });
+    }
+  }
 
   const supabase = await createServerSupabaseClient();
   const response = await supabase.rpc("phase7_save_note", {
