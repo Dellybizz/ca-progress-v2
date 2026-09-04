@@ -414,3 +414,16 @@ async function validateHotEvent(input:{title:string;notes:string|null;startsAt:s
 export async function createHotCalendarEvent(userId:string,input:{title:string;notes:string|null;startsAt:string;endsAt:string|null;allDay:boolean},db:HotD1Database=getHotD1Database()){await validateHotEvent(input);const id=crypto.randomUUID();await db.prepare("INSERT INTO user_calendar_events (id,user_id,title,notes,starts_at,ends_at,all_day) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(id,userId,input.title,input.notes,input.startsAt,input.endsAt,input.allDay?1:0).run();return {id,...input,user_id:userId,starts_at:input.startsAt,ends_at:input.endsAt,all_day:input.allDay?1:0};}
 export async function updateHotCalendarEvent(userId:string,id:string,input:{title:string;notes:string|null;startsAt:string;endsAt:string|null;allDay:boolean},db:HotD1Database=getHotD1Database()){await validateHotEvent(input);await db.prepare("UPDATE user_calendar_events SET title=?1,notes=?2,starts_at=?3,ends_at=?4,all_day=?5,updated_at=CURRENT_TIMESTAMP WHERE id=?6 AND user_id=?7").bind(input.title,input.notes,input.startsAt,input.endsAt,input.allDay?1:0,id,userId).run();return {ok:true};}
 export async function deleteHotCalendarEvent(userId:string,id:string,db:HotD1Database=getHotD1Database()){await db.prepare("DELETE FROM user_calendar_events WHERE id=?1 AND user_id=?2").bind(id,userId).run();return {ok:true};}
+
+export async function moderateHotResource(input:{entityType:"note"|"upload";entityId:string;actorUserId:string;decision:"approve"|"reject";notes:string|null},db:HotD1Database=getHotD1Database()){
+  const table=input.entityType==="note"?"notes":"uploaded_resources";
+  const idColumn=input.entityType==="note"?"id":"id";
+  const row=await db.prepare(\`SELECT \${idColumn} AS id,moderation_status FROM \${table} WHERE id=?1 AND visibility='shared' LIMIT 1\`).bind(input.entityId).first<{id:string;moderation_status:string}>();
+  if(!row) throw new Error("Shared resource not found.");
+  const to=input.decision==="approve"?"approved":"rejected";
+  await db.batch([
+    db.prepare(\`UPDATE \${table} SET moderation_status=?1,published_at=\${to==="approved"?"CURRENT_TIMESTAMP":"NULL"},updated_at=CURRENT_TIMESTAMP WHERE id=?2\`).bind(to,input.entityId),
+    db.prepare("INSERT INTO resource_moderation (id,entity_type,note_id,uploaded_resource_id,actor_user_id,action,from_status,to_status,notes) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)").bind(crypto.randomUUID(),input.entityType,input.entityType==="note"?input.entityId:null,input.entityType==="upload"?input.entityId:null,input.actorUserId,input.decision,row.moderation_status,to,input.notes)
+  ]);
+  return {ok:true,status:to};
+}
