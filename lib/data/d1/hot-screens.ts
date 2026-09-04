@@ -173,7 +173,6 @@ export async function getHotCommunityChannels(userId: string | null, db = getHot
   return (rows.results ?? []) as HotCommunityListRow[];
 }
 
-
 const COMMUNITY_EMOJIS = ["👍", "❤️", "🎯", "👏", "💡", "✅"] as const;
 const COMMUNITY_REPORT_REASONS = ["spam", "harassment", "misinformation", "off_topic", "other"] as const;
 const COMMUNITY_MODERATOR_ROLES = ["moderator", "admin", "owner", "parent_owner"] as const;
@@ -340,7 +339,6 @@ export async function getHotCommunityMessages(channelId: string, cursor?: number
   return rows.results ?? [];
 }
 
-
 async function assertHotAcademicSelection(userId: string, subjectId: string | null, chapterId: string | null, db: HotD1Database) {
   if (subjectId) {
     const row = await db.prepare(`SELECT 1 AS valid FROM profiles p JOIN course_levels l ON l.code=p.ca_level
@@ -458,12 +456,29 @@ async function rebuildHotRevisionSchedule(userId:string,db:HotD1Database) {
   const intervals=typeof rules?.interval_days==='string'?JSON.parse(rules.interval_days) as number[]:[1,7,21];
   const weekdays=typeof rules?.preferred_weekdays==='string'?JSON.parse(rules.preferred_weekdays) as number[]:[1,2,3,4,5,6];
   const rows=(await db.prepare("SELECT chapter_id,completed_at,revision_1_at,revision_2_at FROM chapter_progress WHERE user_id=?1 AND completed_at IS NOT NULL").bind(userId).all<{chapter_id:string;completed_at:string;revision_1_at:string|null;revision_2_at:string|null}>()).results??[];
+  await db.prepare("DELETE FROM revision_due_items WHERE user_id=?1 AND chapter_id NOT IN (SELECT chapter_id FROM chapter_progress WHERE user_id=?1 AND completed_at IS NOT NULL)").bind(userId).run();
   for(const row of rows) for(let index=0;index<intervals.length;index+=1){
-    const revision=index+1, existing=await db.prepare("SELECT id,status,manual_due_at,completed_at FROM revision_due_items WHERE user_id=?1 AND chapter_id=?2 AND revision_number=?3 AND source_completed_at=?4 LIMIT 1").bind(userId,row.chapter_id,revision,row.completed_at).first<{id:string;status:string;manual_due_at:string|null;completed_at:string|null}>();
+    const revision=index+1;
+    const existing=await db.prepare("SELECT id,status,manual_due_at,completed_at,source_completed_at FROM revision_due_items WHERE user_id=?1 AND chapter_id=?2 AND revision_number=?3 LIMIT 1").bind(userId,row.chapter_id,revision).first<{id:string;status:string;manual_due_at:string|null;completed_at:string|null;source_completed_at:string}>();
+    const sourceChanged=Boolean(existing&&existing.source_completed_at!==row.completed_at);
     const alreadyDone=(revision===1&&row.revision_1_at)||(revision===2&&row.revision_2_at);
-    const status=existing?.status==='completed'||alreadyDone?'completed':'pending', completedAt=status==='completed'?(existing?.completed_at??new Date().toISOString()):null, due=hotAlignedDue(row.completed_at,Number(intervals[index]),weekdays), updatedAt=new Date().toISOString();
-    if(existing){ if(!existing.manual_due_at) await db.prepare("UPDATE revision_due_items SET due_at=?1,status=?2,completed_at=?3,updated_at=?4 WHERE id=?5").bind(due,status,completedAt,updatedAt,existing.id).run(); }
-    else await db.prepare("INSERT INTO revision_due_items(id,user_id,chapter_id,revision_number,source_completed_at,due_at,manual_due_at,status,completed_at) VALUES(?1,?2,?3,?4,?5,?6,NULL,?7,?8)").bind(crypto.randomUUID(),userId,row.chapter_id,revision,row.completed_at,due,status,completedAt).run();
+    const status=alreadyDone||(!sourceChanged&&existing?.status==='completed')?'completed':'pending';
+    const completedAt=status==='completed'?(sourceChanged?new Date().toISOString():(existing?.completed_at??new Date().toISOString())):null;
+    const due=hotAlignedDue(row.completed_at,Number(intervals[index]),weekdays), updatedAt=new Date().toISOString();
+    if(existing){
+      await db.prepare("UPDATE revision_due_items SET source_completed_at=?1,due_at=CASE WHEN manual_due_at IS NULL THEN ?2 ELSE due_at END,status=?3,completed_at=?4,updated_at=?5 WHERE id=?6").bind(row.completed_at,due,status,completedAt,updatedAt,existing.id).run();
+    } else {
+      await db.prepare("INSERT INTO revision_due_items(id,user_id,chapter_id,revision_number,source_completed_at,due_at,manual_due_at,status,completed_at) VALUES(?1,?2,?3,?4,?5,?6,NULL,?7,?8)").bind(crypto.randomUUID(),userId,row.chapter_id,revision,row.completed_at,due,status,completedAt).run();
+    }
+  }
+}
+async function rebuildHotRevisionScheduleAfterCommit(userId:string,db:HotD1Database) {
+  try {
+    await rebuildHotRevisionSchedule(userId,db);
+  } catch (error) {
+    console.error("progress_revision_schedule_rebuild_failed", {
+      name: error instanceof Error ? error.name : "UnknownError",
+    });
   }
 }
 export async function setHotProgressStage(userId:string,chapterId:string,stage:string,enabled:boolean,db:HotD1Database=getHotD1Database()){
@@ -482,7 +497,7 @@ export async function setHotProgressStage(userId:string,chapterId:string,stage:s
     db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(eventId,userId,chapterId,stage,enabled?"set":"clear",JSON.stringify(previous),JSON.stringify(next)),
     db.prepare("INSERT INTO planner_events(id,user_id,event_type,entity_type,entity_id,payload,created_at) VALUES(?1,?2,'progress_changed','chapter_progress',?3,?4,?5)").bind(crypto.randomUUID(),userId,chapterId,JSON.stringify(next),savedAt)
   ]);
-  await rebuildHotRevisionSchedule(userId,db);
+  await rebuildHotRevisionScheduleAfterCommit(userId,db);
   return {chapter_id:chapterId,state:next,event_id:eventId,saved_at:savedAt};
 }
 export async function undoHotProgressEvent(userId:string,eventId:string,db:HotD1Database=getHotD1Database()){
@@ -503,6 +518,6 @@ export async function undoHotProgressEvent(userId:string,eventId:string,db:HotD1
     db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state,reverts_event_id) VALUES (?1,?2,?3,?4,'undo',?5,?6,?7)").bind(undoId,userId,event.chapter_id,event.stage,JSON.stringify(current),JSON.stringify(previous),event.id),
     db.prepare("UPDATE progress_events SET undone_at=?1 WHERE id=?2 AND user_id=?3").bind(savedAt,event.id,userId)
   ]);
-  await rebuildHotRevisionSchedule(userId,db);
+  await rebuildHotRevisionScheduleAfterCommit(userId,db);
   return {chapter_id:event.chapter_id,state:previous,event_id:undoId,saved_at:savedAt,reverted_event_id:event.id};
 }
