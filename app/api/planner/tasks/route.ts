@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { createHotTask, deleteHotTask, toggleHotTask, updateHotTask } from "@/lib/data/d1/hot-screens";
 import type { TaskKind } from "@/lib/planner/types";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,20 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Sign in to manage tasks." }, { status: 401 });
   let body: Body;
   try { body = await request.json() as Body; } catch { return NextResponse.json({ error: "Invalid task request." }, { status: 400 }); }
+  if (isCloudflareDataRuntime()) {
+    try {
+      if (body.action === "create" || body.action === "update") {
+        const task = { title: body.title?.trim() || "", notes: body.notes?.trim() || null, taskKind: body.taskKind ?? "study", subjectId: body.subjectId || null, chapterId: body.chapterId || null, dueAt: body.dueAt, estimatedMinutes: Math.round(Number(body.estimatedMinutes ?? 30)) };
+        const result = body.action === "create" ? await createHotTask(user.id, task) : await updateHotTask(user.id, body.id, task);
+        return NextResponse.json(result, { status: body.action === "create" ? 201 : 200, headers: { "Cache-Control": "private, no-store" } });
+      }
+      if (body.action === "toggle") return NextResponse.json(await toggleHotTask(user.id, body.id, body.done), { headers: { "Cache-Control": "private, no-store" } });
+      if (body.action === "delete") return NextResponse.json(await deleteHotTask(user.id, body.id), { headers: { "Cache-Control": "private, no-store" } });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Task could not be saved." }, { status: 400 });
+    }
+  }
+
   const supabase = await createServerSupabaseClient();
 
   if (body.action === "create") {
