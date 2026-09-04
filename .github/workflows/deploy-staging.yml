@@ -28,6 +28,7 @@ jobs:
       RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
       RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
       RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+      SMOKE_AUTH_COOKIE: ${{ secrets.SMOKE_AUTH_COOKIE }}
       NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_APP_NAME: CA Progress
       NEXT_PUBLIC_APP_VERSION: cloudflare-migration-phase-5
