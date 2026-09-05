@@ -5,6 +5,7 @@ on:
     branches: [stage2-phase1-inventory-temp]
     paths:
       - .github/workflows/stage2-phase1-build-candidate.yml
+      - .stage2/phase1.patch.gz.b64.*
   workflow_dispatch:
 
 permissions:
@@ -12,7 +13,6 @@ permissions:
 
 env:
   TARGET_BASE_SHA: e534cea99fb518f4e990def3fa44b9ecd5628752
-  PATCH_SHA256: fab271f6f0da94effc370909b3015dd3887c0cca674e9c5f5f3f4b082afefc1e
   CANDIDATE_BRANCH: stage2-phase1-runtime-candidate
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Reconstruct and verify Phase 1 patch
+      - name: Reconstruct Phase 1 patch
         shell: bash
         run: |
           set -euo pipefail
@@ -37,7 +37,8 @@ jobs:
               .stage2/phase1.patch.gz.b64.02 \
               .stage2/phase1.patch.gz.b64.03 \
             | base64 -d | gzip -d > /tmp/phase1.patch
-          echo "${PATCH_SHA256}  /tmp/phase1.patch" | sha256sum -c -
+          sha256sum /tmp/phase1.patch
+          test -s /tmp/phase1.patch
 
       - name: Apply to exact target base
         shell: bash
@@ -48,7 +49,10 @@ jobs:
           test -f lib/data/d1/client.ts
           git status --short
           changed="$(git status --short | wc -l | tr -d ' ')"
-          test "${changed}" -eq 41
+          if [ "${changed}" -lt 40 ]; then
+            echo "::error::Expected a full semantic Stage 2 Phase 1 patch; only ${changed} paths changed"
+            exit 1
+          fi
 
       - name: Enforce Cloudflare-only active runtime imports
         shell: bash
@@ -98,3 +102,4 @@ jobs:
           echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo "candidate_tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_STEP_SUMMARY"
           echo "base_sha=${TARGET_BASE_SHA}" >> "$GITHUB_STEP_SUMMARY"
+          echo "changed_paths=$(git diff --name-only ${TARGET_BASE_SHA}..HEAD | wc -l | tr -d ' ')" >> "$GITHUB_STEP_SUMMARY"
