@@ -31,11 +31,12 @@ test("Supabase SDK packages are retired from the application dependency graph", 
   assert.equal(dependencies["@supabase/supabase-js"], undefined);
 });
 
-test("Supabase runtime client modules are removed while type-only schema remains available", () => {
+test("Supabase runtime client modules stay retired and the schema contract is provider-neutral", () => {
   for (const modulePath of retiredClientModules) {
     assert.equal(existsSync(path.join(root, modulePath)), false, `${modulePath} must stay retired`);
   }
-  assert.equal(existsSync(path.join(root, "lib/supabase/database.types.ts")), true, "database types remain until compatibility architecture retirement");
+  assert.equal(existsSync(path.join(root, "lib/data/database.types.ts")), true, "provider-neutral database types must remain available");
+  assert.equal(existsSync(path.join(root, "lib/supabase/database.types.ts")), false, "Supabase-named type boundary must stay retired after Phase 5");
 });
 
 test("application runtime environment no longer declares Supabase host or secret configuration", () => {
@@ -61,14 +62,14 @@ test("retirement static validation reruns when the environment template changes"
   assert.match(workflow, /- \.env\.example/);
 });
 
-test("migration evidence and type history remain preserved for later retirement phases", () => {
+test("migration evidence remains preserved for later retirement phases", () => {
   for (const retainedPath of [
-    "lib/supabase/database.types.ts",
+    "lib/data/database.types.ts",
     "scripts/phase4/production-shadow.mjs",
     "scripts/phase5/final-backup.mjs",
     "supabase/migrations",
     "docs/SUPABASE_RETIREMENT_PHASE3_STATUS.md",
   ]) {
-    assert.equal(existsSync(path.join(root, retainedPath)), true, `retained Phase 4 boundary missing ${retainedPath}`);
+    assert.equal(existsSync(path.join(root, retainedPath)), true, `retained retirement evidence missing ${retainedPath}`);
   }
 });
