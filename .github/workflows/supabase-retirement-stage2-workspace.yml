@@ -1,26 +1,69 @@
-name: Supabase Retirement Stage 2 Workspace
+name: Supabase Retirement Stage 2 Apply
 
 on:
-  workflow_dispatch:
   push:
     branches: [phase-12-operations-admin-platform]
     paths:
-      - .github/workflows/supabase-retirement-stage2-workspace.yml
+      - .stage2/stage2-changes.tar.gz
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  workspace:
+  apply-stage2:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - name: Package repository source for Stage 2 refactor
-        run: git archive --format=tar.gz --output=stage2-workspace.tar.gz HEAD
-      - uses: actions/upload-artifact@v5
         with:
-          name: supabase-retirement-stage2-workspace-${{ github.run_id }}
-          retention-days: 3
-          if-no-files-found: error
-          path: stage2-workspace.tar.gz
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Validate Stage 2 bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .stage2/stage2-changes.tar.gz
+          tar -tzf .stage2/stage2-changes.tar.gz > /tmp/stage2-files.txt
+          if grep -Eq '(^/|(^|/)\.\.(/|$))' /tmp/stage2-files.txt; then
+            echo '::error::Unsafe path found in Stage 2 archive'
+            exit 1
+          fi
+          for required in lib/auth/provider.ts scripts/phase5/retirement-stage2-scan.mjs tests/retirement-stage2.test.mjs .github/workflows/supabase-retirement-stage2-final.yml; do
+            grep -Fxq "$required" /tmp/stage2-files.txt || { echo "::error::Stage 2 archive is missing $required"; exit 1; }
+          done
+          echo "Stage 2 bundle contains $(wc -l < /tmp/stage2-files.txt) files"
+      - name: Apply Stage 2 semantic refactor
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf .stage2/stage2-changes.tar.gz -C .
+          rm -rf .stage2
+          rm -f .github/workflows/supabase-retirement-stage2-inventory.yml
+          rm -f .github/workflows/supabase-retirement-stage2-workspace.yml
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Enforce zero active Supabase runtime fallbacks
+        env:
+          STAGE2_ENFORCE: "1"
+        run: node scripts/phase5/retirement-stage2-scan.mjs
+      - name: Verify Stage 2 contract
+        run: node --test tests/retirement-stage2.test.mjs
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Repository tests
+        run: npm test
+      - name: Commit Stage 2 runtime retirement
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then echo '::error::Stage 2 bundle produced no changes'; exit 1; fi
+          git commit -m "Remove active Supabase runtime fallbacks"
+          git push origin HEAD:phase-12-operations-admin-platform
