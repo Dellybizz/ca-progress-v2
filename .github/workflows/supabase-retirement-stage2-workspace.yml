@@ -1,0 +1,26 @@
+name: Supabase Retirement Stage 2 Workspace
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/supabase-retirement-stage2-workspace.yml
+
+permissions:
+  contents: read
+
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Package repository source for Stage 2 refactor
+        run: tar --exclude=.git --exclude=node_modules --exclude=.next --exclude=.open-next -czf stage2-workspace.tar.gz .
+      - uses: actions/upload-artifact@v5
+        with:
+          name: supabase-retirement-stage2-workspace-${{ github.run_id }}
+          retention-days: 3
+          if-no-files-found: error
+          path: stage2-workspace.tar.gz
