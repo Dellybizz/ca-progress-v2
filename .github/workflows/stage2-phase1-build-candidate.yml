@@ -1,0 +1,99 @@
+name: Stage 2 Phase 1 Build Candidate
+
+on:
+  push:
+    branches: [stage2-phase1-inventory-temp]
+    paths:
+      - .github/workflows/stage2-phase1-build-candidate.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TARGET_BASE_SHA: e534cea99fb518f4e990def3fa44b9ecd5628752
+  PATCH_SHA256: fab271f6f0da94effc370909b3015dd3887c0cca674e9c5f5f3f4b082afefc1e
+  CANDIDATE_BRANCH: stage2-phase1-runtime-candidate
+
+jobs:
+  build-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Reconstruct and verify Phase 1 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .stage2/phase1.patch.gz.b64.00 \
+              .stage2/phase1.patch.gz.b64.01 \
+              .stage2/phase1.patch.gz.b64.02 \
+              .stage2/phase1.patch.gz.b64.03 \
+            | base64 -d | gzip -d > /tmp/phase1.patch
+          echo "${PATCH_SHA256}  /tmp/phase1.patch" | sha256sum -c -
+
+      - name: Apply to exact target base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach "${TARGET_BASE_SHA}"
+          patch -p1 < /tmp/phase1.patch
+          test -f lib/data/d1/client.ts
+          git status --short
+          changed="$(git status --short | wc -l | tr -d ' ')"
+          test "${changed}" -eq 41
+
+      - name: Enforce Cloudflare-only active runtime imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad=0
+          check() {
+            label="$1"; pattern="$2"
+            hits="$(grep -RInE \
+              --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' \
+              --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git \
+              --exclude-dir=supabase \
+              "${pattern}" app components lib server workers proxy.ts 2>/dev/null || true)"
+            if [ -n "${hits}" ]; then
+              echo "::error title=${label}::Forbidden active-runtime reference found"
+              echo "${hits}"
+              bad=1
+            fi
+          }
+          check 'Supabase package import' '@supabase/(supabase-js|ssr)'
+          check 'Supabase runtime module import' '@/lib/supabase/(server|admin|client|browser|proxy)'
+          check 'Supabase client constructor' 'create(Server|Admin)SupabaseClient'
+          check 'Active runtime selector' '(CA_DATA_RUNTIME|CA_AUTH_RUNTIME|isCloudflareDataRuntime|isCloudflareAuthRuntime|isD1Runtime)'
+          check 'Supabase host/API runtime' '(supabase\.co|SUPABASE_SERVICE_ROLE|NEXT_PUBLIC_SUPABASE)'
+          test "${bad}" -eq 0
+          echo 'Active runtime reference scan: 0 blockers'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck candidate
+        run: npm run typecheck
+
+      - name: Lint candidate
+        run: npm run lint
+
+      - name: Commit validated candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app components lib server workers proxy.ts
+          git commit -m 'Retire active Supabase runtime fallbacks'
+          git push origin "HEAD:refs/heads/${CANDIDATE_BRANCH}" --force
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "candidate_tree=$(git rev-parse HEAD^{tree})" >> "$GITHUB_STEP_SUMMARY"
+          echo "base_sha=${TARGET_BASE_SHA}" >> "$GITHUB_STEP_SUMMARY"
