@@ -7,7 +7,7 @@ import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { getIcaiPublicCatalog } from "@/lib/icai/query";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createD1AdminClient, createD1ServerClient } from "@/lib/data/d1/client";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import { getHotResourceLibraryRows, getHotResourceDetail } from "@/lib/data/d1/hot-screens";
 import type { StudySubjectOption } from "@/lib/study/types";
 import type { ModerationPageModel, ModerationQueueItem, ModerationReport, NoteCard, NoteDetailModel, OfficialResourceCard, ResourceDetailModel, ResourceLibraryModel, UploadCard } from "./types";
