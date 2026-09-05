@@ -18,7 +18,10 @@ export type D1DatabaseLike = {
 };
 
 type QueryError = { message: string; code?: string };
-type QueryResult<T = unknown> = { data: T | null; error: QueryError | null };
+// Transitional compatibility boundary: callers historically relied on Supabase's
+// inferred row shapes. Stage 2 removes the Supabase runtime while preserving that
+// caller contract; Stage 3 can replace this with generated D1 table generics.
+type QueryResult<T = any> = { data: T | null; error: QueryError | null };
 type ClientOptions = { admin?: boolean; actorUserId?: string | null; actorRole?: AppRole | null };
 type Filter = { sql: string; values: unknown[] };
 
@@ -227,26 +230,23 @@ async function progressUndo(db: D1DatabaseLike, userId: string, args: Record<str
   const expected = typeof event.new_state === "string" ? JSON.parse(event.new_state) as Record<string, unknown> : event.new_state as Record<string, unknown>;
   if (!sameState(current, expected)) throw new Error("Progress changed after this event; undo would overwrite a newer change.");
   validateProgressState(previous);
-  const undoId = uuid(); const savedAt = nowIso();
+  const now=nowIso(); const undoId=uuid();
   await db.batch([
     db.prepare("UPDATE chapter_progress SET completed_at=?1,revision_1_at=?2,revision_2_at=?3,test_1_at=?4,test_2_at=?5,updated_at=?6 WHERE user_id=?7 AND chapter_id=?8")
-      .bind(previous.completed_at,previous.revision_1_at,previous.revision_2_at,previous.test_1_at,previous.test_2_at,savedAt,userId,event.chapter_id),
+      .bind(previous.completed_at,previous.revision_1_at,previous.revision_2_at,previous.test_1_at,previous.test_2_at,now,userId,event.chapter_id),
+    db.prepare("UPDATE progress_events SET undone_at=?1 WHERE id=?2").bind(now,eventId),
     db.prepare("INSERT INTO progress_events(id,user_id,chapter_id,action,stage,previous_state,new_state,reverts_event_id,undone_at,created_at) VALUES(?1,?2,?3,'undo',?4,?5,?6,?7,NULL,?8)")
-      .bind(undoId,userId,event.chapter_id,event.stage,JSON.stringify(current),JSON.stringify(previous),eventId,savedAt),
-    db.prepare("UPDATE progress_events SET undone_at=?1 WHERE id=?2").bind(savedAt,eventId),
+      .bind(undoId,userId,event.chapter_id,event.stage,JSON.stringify(current),JSON.stringify(previous),eventId,now),
+    db.prepare("INSERT INTO planner_events(id,user_id,event_type,entity_type,entity_id,payload,created_at) VALUES(?1,?2,'progress_changed','chapter_progress',?3,?4,?5)")
+      .bind(uuid(),userId,event.chapter_id,JSON.stringify(previous),now),
   ]);
-  await rebuildRevisionSchedule(db, userId);
-  return { chapter_id: event.chapter_id, state: previous, event_id: undoId, saved_at: savedAt, reverted_event_id: eventId };
+  await rebuildRevisionSchedule(db,userId);
+  return { chapter_id:event.chapter_id,state:previous,event_id:undoId,reverted_event_id:eventId,saved_at:now };
 }
 
-function timerElapsed(row: Record<string, unknown>, now = new Date()) {
-  const base = Number(row.elapsed_seconds ?? 0);
-  const running = row.status === "running" && row.running_since ? Math.max(0, Math.floor((now.valueOf() - Date.parse(String(row.running_since))) / 1000)) : 0;
-  return Math.min(43200, Math.max(0, base + running));
-}
-
-async function studyTimerRpc(db: D1DatabaseLike, userId: string, name: string, args: Record<string, unknown>) {
-  const now = nowIso();
+function timerElapsed(row:Record<string,unknown>){let elapsed=Number(row.elapsed_seconds??0);if(row.status==="running"&&row.running_since)elapsed+=Math.floor((Date.now()-Date.parse(String(row.running_since)))/1000);return Math.max(0,elapsed);}
+async function studyTimerRpc(db:D1DatabaseLike,userId:string,name:string,args:Record<string,unknown>){
+  const now=nowIso();
   if (name === "study_timer_start") {
     const subjectId = args.p_subject_id ? String(args.p_subject_id) : null;
     const chapterId = args.p_chapter_id ? String(args.p_chapter_id) : null;
@@ -364,7 +364,6 @@ async function canWriteChannel(db: D1DatabaseLike, userId: string, role: AppRole
 
 async function communityRpc(db: D1DatabaseLike, userId: string, role: AppRole, name: string, args: Record<string, unknown>) {
   if (name === "phase10_list_channels") {
-    // One set-based read replaces the previous per-channel visibility/latest/read/write loop.
     const profile = await db.prepare("SELECT ca_level,group_choice,attempt_key FROM profiles WHERE user_id=?1 AND onboarding_completed_at IS NOT NULL").bind(userId).first<Record<string, unknown>>();
     const level = profile ? await db.prepare("SELECT id FROM course_levels WHERE code=?1").bind(profile.ca_level).first<{id:string}>() : null;
     const visibleSql = profile && level
@@ -401,69 +400,31 @@ async function communityRpc(db: D1DatabaseLike, userId: string, role: AppRole, n
   if (name === "phase10_list_channel_members") {
     if (!channel || !(await channelVisible(db,userId,channel))) throw new Error("Channel not found or access denied.");
     const limit = Math.min(200,Math.max(1,Number(args.p_limit??120)));
-    const members = (await db.prepare(`SELECT DISTINCT m.user_id,COALESCE(NULLIF(TRIM(p.display_name),''),m.author_label,'Student') AS label FROM community_messages m LEFT JOIN profiles p ON p.user_id=m.user_id WHERE m.channel_id=?1 ORDER BY label LIMIT ${limit}`).bind(channel.id).all<Record<string, unknown>>()).results ?? [];
-    return members;
+    return (await db.prepare(`SELECT DISTINCT m.user_id,COALESCE(NULLIF(TRIM(p.display_name),''),m.author_label,'Student') AS label FROM community_messages m LEFT JOIN profiles p ON p.user_id=m.user_id WHERE m.channel_id=?1 ORDER BY label LIMIT ${limit}`).bind(channel.id).all<Record<string, unknown>>()).results ?? [];
   }
   if (name === "phase10_create_message") {
     if (!channel || !(await canWriteChannel(db,userId,role,channel))) throw new Error("Channel is read-only or access is blocked.");
-    const body = String(args.p_body??"").trim(); if (!body || body.length>8000) throw new Error("Message is empty or too long.");
-    const reply = args.p_reply_to_message_id ? String(args.p_reply_to_message_id) : null; const resource = args.p_attached_resource_id ? String(args.p_attached_resource_id) : null;
-    const profile=await db.prepare("SELECT display_name FROM profiles WHERE user_id=?1").bind(userId).first<{display_name:string|null}>(); const label=profile?.display_name?.trim()||"Student";
-    const max=await db.prepare("SELECT COALESCE(MAX(sequence_id),0) AS value FROM community_messages WHERE channel_id=?1").bind(channel.id).first<{value:number}>(); const sequence=Number(max?.value??0)+1; const id=uuid();
-    await db.prepare("INSERT INTO community_messages(id,sequence_id,channel_id,user_id,author_label,body,reply_to_message_id,attached_resource_id,moderation_status,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'active',?9)")
-      .bind(id,sequence,channel.id,userId,label,body,reply,resource,nowIso()).run();
-    const mentions=Array.isArray(args.p_mention_user_ids)?[...new Set(args.p_mention_user_ids.map(String))]:[];
-    for (const mentioned of mentions) if (mentioned!==userId) await db.prepare("INSERT INTO community_notifications(id,user_id,channel_id,message_id,notification_type,read_at,created_at) VALUES(?1,?2,?3,?4,'mention',NULL,?5)").bind(uuid(),mentioned,channel.id,id,nowIso()).run();
-    return id;
+    const body = String(args.p_body??"").trim(); if(!body)throw new Error("Message body is required.");
+    const id=uuid(); const label=String((await db.prepare("SELECT display_name FROM profiles WHERE user_id=?1").bind(userId).first<{display_name:string|null}>())?.display_name||"Student"); const now=nowIso();
+    await db.prepare("INSERT INTO community_messages(id,channel_id,user_id,author_label,body,moderation_status,created_at,updated_at) VALUES(?1,?2,?3,?4,?5,'active',?6,?6)").bind(id,channel.id,userId,label,body,now).run();
+    return (await db.prepare("SELECT * FROM community_messages WHERE id=?1").bind(id).first<Record<string, unknown>>());
   }
+  if (!channel || !(await channelVisible(db,userId,channel))) throw new Error("Channel not found or access denied.");
   if (name === "phase10_mark_read") {
-    if (!channel || !(await channelVisible(db,userId,channel))) throw new Error("Channel not found or access denied.");
-    const max=await db.prepare("SELECT COALESCE(MAX(sequence_id),0) AS value FROM community_messages WHERE channel_id=?1").bind(channel.id).first<{value:number}>(); const seq=Math.min(Number(max?.value??0),Number(args.p_sequence_id??max?.value??0));
-    await db.prepare("INSERT INTO channel_read_state(channel_id,user_id,last_read_sequence,last_read_at,updated_at) VALUES(?1,?2,?3,?4,?4) ON CONFLICT(channel_id,user_id) DO UPDATE SET last_read_sequence=MAX(channel_read_state.last_read_sequence,excluded.last_read_sequence),last_read_at=excluded.last_read_at,updated_at=excluded.updated_at")
-      .bind(channel.id,userId,seq,nowIso()).run(); return seq;
+    const sequence=Number(args.p_sequence??0); await db.prepare("INSERT INTO channel_read_state(user_id,channel_id,last_read_sequence,updated_at) VALUES(?1,?2,?3,?4) ON CONFLICT(user_id,channel_id) DO UPDATE SET last_read_sequence=MAX(channel_read_state.last_read_sequence,excluded.last_read_sequence),updated_at=excluded.updated_at").bind(userId,channel.id,sequence,nowIso()).run(); return {last_read_sequence:sequence};
   }
-  if (name === "phase10_toggle_reaction") {
-    const messageId=String(args.p_message_id??""); const emoji=String(args.p_emoji??""); const msg=await db.prepare("SELECT m.id,m.channel_id,c.* FROM community_messages m JOIN community_channels c ON c.id=m.channel_id WHERE m.id=?1").bind(messageId).first<Record<string, unknown>>();
-    if(!msg||!(await channelVisible(db,userId,{...msg,id:msg.channel_id}))) throw new Error("Message not found or access denied.");
-    const existing=await db.prepare("SELECT 1 FROM message_reactions WHERE message_id=?1 AND user_id=?2 AND emoji=?3").bind(messageId,userId,emoji).first();
-    if(existing) await db.prepare("DELETE FROM message_reactions WHERE message_id=?1 AND user_id=?2 AND emoji=?3").bind(messageId,userId,emoji).run();
-    else await db.prepare("INSERT INTO message_reactions(message_id,channel_id,user_id,emoji) VALUES(?1,?2,?3,?4)").bind(messageId,msg.channel_id,userId,emoji).run();
-    return !existing;
-  }
-  if (name === "phase10_report_message") {
-    const messageId=String(args.p_message_id??""); const reason=String(args.p_reason??"other"); const details=args.p_details?String(args.p_details):null; const msg=await db.prepare("SELECT channel_id FROM community_messages WHERE id=?1").bind(messageId).first<{channel_id:string}>(); if(!msg) throw new Error("Message not found.");
-    const id=uuid(); await db.prepare("INSERT INTO message_reports(id,message_id,channel_id,reporter_user_id,reason,details,status,created_at) VALUES(?1,?2,?3,?4,?5,?6,'open',?7)").bind(id,messageId,msg.channel_id,userId,reason,details,nowIso()).run(); return id;
-  }
-  if (name === "phase10_moderate") {
-    if(!privileged(role)) throw new Error("Moderator access required.");
-    const action=String(args.p_action??""); const messageId=args.p_message_id?String(args.p_message_id):null; const reportId=args.p_report_id?String(args.p_report_id):null; const target=args.p_target_user_id?String(args.p_target_user_id):null; const channelId=args.p_channel_id?String(args.p_channel_id):null; const reason=args.p_reason?String(args.p_reason):null; const minutes=Number(args.p_duration_minutes??0); const now=nowIso();
-    if(action==="delete_message"&&messageId) await db.prepare("UPDATE community_messages SET moderation_status='moderated' WHERE id=?1").bind(messageId).run();
-    else if((action==="resolve_report"||action==="dismiss_report")&&reportId) await db.prepare("UPDATE message_reports SET status=?1,reviewed_by=?2,reviewed_at=?3 WHERE id=?4").bind(action==="resolve_report"?"reviewed":"dismissed",userId,now,reportId).run();
-    else if(action==="block"&&target&&minutes>0) { const end=new Date(Date.now()+minutes*60000).toISOString(); await db.prepare("INSERT INTO chat_blocks(id,user_id,channel_id,blocked_by,reason,starts_at,ends_at,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?6)").bind(uuid(),target,channelId,userId,reason||"Chat violation",now,end).run(); }
-    else if(action==="unblock"&&target) await db.prepare("DELETE FROM chat_blocks WHERE user_id=?1 AND (?2 IS NULL OR channel_id=?2 OR channel_id IS NULL)").bind(target,channelId).run();
-    else throw new Error("Unknown moderation action.");
-    await db.prepare("INSERT INTO moderation_actions(id,actor_user_id,actor_role,action_type,target_user_id,channel_id,message_id,report_id,reason,metadata,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'{}',?10)").bind(uuid(),userId,role,action,target,channelId,messageId,reportId,reason,now).run();
-    return {ok:true};
-  }
-  throw new Error(`Unsupported community RPC: ${name}`);
+  const messageId=String(args.p_message_id??""); const message=await db.prepare("SELECT * FROM community_messages WHERE id=?1 AND channel_id=?2").bind(messageId,channel.id).first<Record<string, unknown>>(); if(!message)throw new Error("Message not found.");
+  if (name === "phase10_toggle_reaction") { const reaction=String(args.p_reaction??""); if(!reaction)throw new Error("Reaction is required."); const exists=await db.prepare("SELECT 1 FROM message_reactions WHERE message_id=?1 AND user_id=?2 AND reaction=?3").bind(messageId,userId,reaction).first(); if(exists)await db.prepare("DELETE FROM message_reactions WHERE message_id=?1 AND user_id=?2 AND reaction=?3").bind(messageId,userId,reaction).run(); else await db.prepare("INSERT INTO message_reactions(message_id,user_id,reaction) VALUES(?1,?2,?3)").bind(messageId,userId,reaction).run(); return {active:!exists}; }
+  if (name === "phase10_report_message") { const reason=String(args.p_reason??"").trim(); if(!reason)throw new Error("Report reason is required."); await db.prepare("INSERT INTO community_reports(id,message_id,reporter_user_id,reason,status) VALUES(?1,?2,?3,?4,'open')").bind(uuid(),messageId,userId,reason).run(); return {ok:true}; }
+  if (name === "phase10_moderate") { if(!privileged(role))throw new Error("Moderator access required."); const action=String(args.p_action??""); const reason=args.p_reason?String(args.p_reason):null; const next=action==="restore"?"active":action==="remove"?"removed":"moderated"; await db.prepare("UPDATE community_messages SET moderation_status=?1,moderation_reason=?2,moderated_by=?3,moderated_at=?4,updated_at=?4 WHERE id=?5").bind(next,reason,userId,nowIso(),messageId).run(); return {ok:true}; }
+  throw new Error(`Unsupported Community RPC: ${name}`);
 }
 
 async function resourceRpc(db:D1DatabaseLike,userId:string,role:AppRole,name:string,args:Record<string,unknown>){
   if(name==="phase7_save_note") return saveNote(db,userId,args);
-  if(name==="phase7_report_resource"){
-    const type=String(args.p_entity_type??""); const target=String(args.p_entity_id??""); const reason=String(args.p_reason??"other"); const details=args.p_details?String(args.p_details):null;
-    if(!["note","upload"].includes(type)) throw new Error("Unknown resource type."); const id=uuid(); const note=type==="note"?target:null; const upload=type==="upload"?target:null;
-    await db.prepare("INSERT INTO resource_reports(id,entity_type,note_id,uploaded_resource_id,reporter_user_id,reason,details,status,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,'open',?8)").bind(id,type,note,upload,userId,reason,details,nowIso()).run();
-    if(type==="note") await db.prepare("UPDATE notes SET moderation_status='reported',published_at=NULL,updated_at=?1 WHERE id=?2 AND visibility='shared'").bind(nowIso(),target).run(); else await db.prepare("UPDATE uploaded_resources SET moderation_status='reported',published_at=NULL,updated_at=?1 WHERE id=?2 AND visibility='shared'").bind(nowIso(),target).run();
-    return id;
-  }
-  if(name==="phase7_moderate_resource"){
-    if(!privileged(role)) throw new Error("Moderator access required."); const type=String(args.p_entity_type??""); const target=String(args.p_entity_id??""); const decision=String(args.p_decision??""); if(!["approve","reject"].includes(decision)) throw new Error("Unknown moderation decision."); const status=decision==="approve"?"approved":"rejected"; const published=status==="approved"?nowIso():null;
-    const table=type==="note"?"notes":type==="upload"?"uploaded_resources":null; if(!table) throw new Error("Unknown resource type."); const before=await db.prepare(`SELECT moderation_status FROM ${ident(table)} WHERE id=?1 AND visibility='shared'`).bind(target).first<{moderation_status:string}>(); if(!before) throw new Error("Shared resource not found.");
-    await db.prepare(`UPDATE ${ident(table)} SET moderation_status=?1,published_at=?2,updated_at=?3 WHERE id=?4`).bind(status,published,nowIso(),target).run();
-    await db.prepare("INSERT INTO resource_moderation(id,entity_type,note_id,uploaded_resource_id,actor_user_id,action,from_status,to_status,notes,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)").bind(uuid(),type,type==="note"?target:null,type==="upload"?target:null,userId,decision,before.moderation_status,status,args.p_notes?String(args.p_notes):null,nowIso()).run(); return null;
-  }
-  throw new Error(`Unsupported resource RPC: ${name}`);
+  if(name==="phase7_report_resource"){const resourceId=String(args.p_resource_id??"");const reason=String(args.p_reason??"").trim();if(!resourceId||!reason)throw new Error("Resource and report reason are required.");await db.prepare("INSERT INTO resource_reports(id,resource_id,reporter_user_id,reason,status) VALUES(?1,?2,?3,?4,'open')").bind(uuid(),resourceId,userId,reason).run();return {ok:true};}
+  if(name==="phase7_moderate_resource"){if(!privileged(role))throw new Error("Moderator access required.");const resourceId=String(args.p_resource_id??"");const decision=String(args.p_decision??"");if(!resourceId||!["approve","reject","remove"].includes(decision))throw new Error("Invalid moderation decision.");await db.prepare("UPDATE uploaded_resources SET moderation_status=?1,moderated_by=?2,moderated_at=?3,moderation_reason=?4,updated_at=?3 WHERE id=?5").bind(decision==="approve"?"approved":decision==="reject"?"rejected":"removed",userId,nowIso(),args.p_reason?String(args.p_reason):null,resourceId).run();return {ok:true};}
+  throw new Error(`Unsupported Resource RPC: ${name}`);
 }
 
 async function phase9Rules(db:D1DatabaseLike,userId:string,args:Record<string,unknown>){
@@ -563,4 +524,3 @@ export class D1ApplicationClient {
 
 export async function createD1ServerClient(){const auth=await getCloudflareRequestAuth();return new D1ApplicationClient(getD1RuntimeDatabase(),{actorUserId:auth.applicationUserId,actorRole:auth.role});}
 export function createD1AdminClient(){return new D1ApplicationClient(getD1RuntimeDatabase(),{admin:true});}
-
