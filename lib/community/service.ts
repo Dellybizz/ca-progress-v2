@@ -4,7 +4,7 @@ import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { getServerAppRole } from "@/lib/authorization/server";
 import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import { createD1AdminClient, createD1ServerClient, type D1ApplicationClient } from "@/lib/data/d1/client";
 import { createHotCommunityMessage, getHotCommunityChannel, getHotCommunityMessages, getHotCommunityChannels, markHotCommunityRead, moderateHotCommunity, reportHotCommunityMessage, toggleHotCommunityReaction } from "@/lib/data/d1/hot-screens";
 import type {
