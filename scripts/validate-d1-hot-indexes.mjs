@@ -1,12 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const wrangler = process.platform === "win32" ? "npx.cmd" : "npx";
-const database = "ca-progress-v2-phase4-local";
-let persistTo = mkdtempSync(join(tmpdir(), "ca-progress-d1-indexes-"));
-const base = ["wrangler", "--config", "wrangler.phase4.jsonc"];
+const database = "ca-progress-v2-retirement-validation";
+const persistTo = mkdtempSync(join(tmpdir(), "ca-progress-d1-indexes-"));
+const configPath = join(process.cwd(), `.wrangler-d1-validation-${process.pid}.json`);
+const base = ["wrangler", "--config", configPath];
 
 function run(args) {
   return execFileSync(wrangler, [...base, ...args], {
@@ -47,6 +48,18 @@ const plans = [
 ];
 
 try {
+  writeFileSync(configPath, JSON.stringify({
+    name: "ca-progress-v2-d1-validation",
+    compatibility_date: "2026-08-29",
+    d1_databases: [{
+      binding: "DB",
+      database_name: database,
+      database_id: "6f002cbe-fe40-4d1b-9cf4-df6faaf52350",
+      migrations_dir: "d1/migrations",
+      migrations_table: "d1_migrations",
+    }],
+  }, null, 2));
+
   run(["d1", "migrations", "apply", database, "--local", "--persist-to", persistTo]);
   run(["d1", "migrations", "apply", database, "--local", "--persist-to", persistTo]);
   const indexes = execute("SELECT name FROM sqlite_master WHERE type='index';").map((row) => row.name);
@@ -60,7 +73,8 @@ try {
   assert(execute("PRAGMA foreign_key_check;").length === 0, "D1 foreign-key check failed");
   const migrationRows = execute("SELECT name FROM d1_migrations WHERE name='0009_phase5_hot_query_indexes.sql';");
   assert(migrationRows.length === 1, "Hot-query migration was not recorded exactly once");
-  console.log("Phase 5 hot-query index validation PASS (idempotent apply, intended plans, foreign keys).");
+  console.log("Retained D1 hot-query index validation PASS (idempotent apply, intended plans, foreign keys).");
 } finally {
   rmSync(persistTo, { recursive: true, force: true });
+  rmSync(configPath, { force: true });
 }
