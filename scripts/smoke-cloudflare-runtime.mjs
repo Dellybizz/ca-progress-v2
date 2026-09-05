@@ -49,7 +49,10 @@ if (!isExternal) {
     const build = spawnSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "cf:build"], { env: { ...process.env, NO_COLOR: "1" }, stdio: "inherit" });
     if (build.status !== 0) throw new Error(`Cloudflare smoke prebuild failed with exit code ${build.status ?? "unknown"}.`);
   }
-  child = spawn(process.platform === "win32" ? "npx.cmd" : "npx", ["wrangler", "dev", "--local", "--config", "wrangler.smoke.jsonc", "--ip", host, "--port", String(port), "--var", "SUPABASE_SERVICE_ROLE_KEY:ci-smoke-only"], { env: { ...process.env, NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+  const wrangler = process.platform === "win32" ? "npx.cmd" : "npx";
+  const migrate = spawnSync(wrangler, ["wrangler", "d1", "migrations", "apply", "ca-progress-v2-smoke-local", "--local", "--config", "wrangler.smoke.jsonc"], { env: { ...process.env, NO_COLOR: "1", CI: "1", NO_D1_WARNING: "true" }, stdio: "inherit" });
+  if (migrate.status !== 0) throw new Error(`Cloudflare smoke D1 bootstrap failed with exit code ${migrate.status ?? "unknown"}.`);
+  child = spawn(wrangler, ["wrangler", "dev", "--local", "--config", "wrangler.smoke.jsonc", "--ip", host, "--port", String(port)], { env: { ...process.env, NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"] });
   for (const stream of [child.stdout, child.stderr]) {
     stream.setEncoding("utf8");
     stream.on("data", (chunk) => { output += chunk; if (output.length > 40_000) output = output.slice(-40_000); });
