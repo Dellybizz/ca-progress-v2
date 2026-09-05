@@ -4,10 +4,8 @@ import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { getServerAppRole } from "@/lib/authorization/server";
 import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { createD1AdminClient, createD1ServerClient, type D1ApplicationClient } from "@/lib/data/d1/client";
 import { createHotCommunityMessage, getHotCommunityChannel, getHotCommunityMessages, getHotCommunityChannels, markHotCommunityRead, moderateHotCommunity, reportHotCommunityMessage, toggleHotCommunityReaction } from "@/lib/data/d1/hot-screens";
 import type {
   CommunityBlock,
@@ -83,42 +81,11 @@ function groupChannels(channels: CommunityChannel[], levelLabel: string) {
 }
 
 async function publicCommunityContext() {
-  const supabase = createAdminSupabaseClient();
-  if (isCloudflareDataRuntime()) {
-    const channels = (await getHotCommunityChannels(null)).map((row) => channelDto(row as never)).map((channel) => ({ ...channel, canWrite: false, unreadCount: 0 }));
-    return { mode: "guest" as const, supabase, channels, groups: groupChannels(channels, "Community") };
-  }
-  const [channelsResult, messagesResult] = await Promise.all([
-    supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("is_active", true).eq("scope_type", "global").order("sort_order").order("title"),
-    supabase.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("moderation_status", "active").order("sequence_id", { ascending: false }).limit(60),
-  ]);
-  const error = channelsResult.error || messagesResult.error;
-  if (error) throw new Error(`Public Community could not be loaded: ${error.message}`);
-  const latestByChannel = new Map<string, MessageRow>();
-  for (const row of (messagesResult.data ?? []) as MessageRow[]) {
-    if (!latestByChannel.has(row.channel_id)) latestByChannel.set(row.channel_id, row);
-  }
-  const channels = ((channelsResult.data ?? []) as ChannelRow[]).map((row) => {
-    const latest = latestByChannel.get(row.id);
-    return {
-      id: row.id,
-      key: row.channel_key,
-      slug: row.slug,
-      scope: row.scope_type as CommunityChannel["scope"],
-      kind: row.channel_kind as CommunityChannel["kind"],
-      title: row.title,
-      description: row.description,
-      levelId: row.level_id,
-      subjectId: row.subject_id,
-      canWrite: false,
-      unreadCount: 0,
-      latestSequence: latest ? Number(latest.sequence_id) : null,
-      latestBody: latest?.body ?? null,
-      latestAuthor: latest?.author_label ?? null,
-      latestAt: latest?.created_at ?? null,
-    } satisfies CommunityChannel;
-  });
-  return { mode: "guest" as const, supabase, channels, groups: groupChannels(channels, "Community") };
+  const client = createD1AdminClient();
+  const channels = (await getHotCommunityChannels(null))
+    .map((row) => channelDto(row as never))
+    .map((channel) => ({ ...channel, canWrite: false, unreadCount: 0 }));
+  return { mode: "guest" as const, client, channels, groups: groupChannels(channels, "Community") };
 }
 
 async function baseCommunityContext() {
@@ -127,26 +94,15 @@ async function baseCommunityContext() {
   const profile = await getProfileForUser(identity.id);
   const viewerName = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
   if (!profileReady(profile)) return { mode: "setup" as const, viewerName };
-  const supabase = await createServerSupabaseClient();
-  if (isCloudflareDataRuntime()) {
-    const [directRows, levelResult, role] = await Promise.all([
-      getHotCommunityChannels(identity.id),
-      supabase.from("course_levels").select("name,code").eq("code", profile!.ca_level!).maybeSingle(),
-      getServerAppRole(),
-    ]);
-    const channels = directRows.map((row) => channelDto(row as never));
-    const levelLabel = levelResult.data?.name ?? profile!.ca_level ?? "Your level";
-    return { mode: "ready" as const, identity, profile: profile!, viewerName, role, channels, groups: groupChannels(channels, levelLabel), supabase };
-  }
-  const [channelsResult, levelResult, role] = await Promise.all([
-    supabase.rpc("phase10_list_channels"),
-    supabase.from("course_levels").select("name,code").eq("code", profile!.ca_level!).maybeSingle(),
+  const client = await createD1ServerClient();
+  const [directRows, levelResult, role] = await Promise.all([
+    getHotCommunityChannels(identity.id),
+    client.from("course_levels").select("name,code").eq("code", profile!.ca_level!).maybeSingle(),
     getServerAppRole(),
   ]);
-  if (channelsResult.error) throw new Error(`Community channels could not be loaded: ${channelsResult.error.message}`);
-  const channels = (channelsResult.data ?? []).map(channelDto);
+  const channels = directRows.map((row) => channelDto(row as never));
   const levelLabel = levelResult.data?.name ?? profile!.ca_level ?? "Your level";
-  return { mode: "ready" as const, identity, profile: profile!, viewerName, role, channels, groups: groupChannels(channels, levelLabel), supabase };
+  return { mode: "ready" as const, identity, profile: profile!, viewerName, role, channels, groups: groupChannels(channels, levelLabel), client };
 }
 
 export async function getCommunityChannelAccess(channelSlug: string): Promise<{ allowed: boolean; status: number; reason: string }> {
@@ -163,8 +119,8 @@ export async function getCommunityComposerOptions(channelSlug: string) {
   const channel = context.channels.find((item) => item.slug === channelSlug);
   if (!channel) throw new Error("Community channel not found.");
   const [memberResult, resourceResult] = await Promise.all([
-    context.supabase.rpc("phase10_list_channel_members", { p_channel_key: channel.key, p_limit: 120 }),
-    context.supabase.from("uploaded_resources").select("id,title,extension,owner_label").eq("visibility", "shared").eq("moderation_status", "approved").order("published_at", { ascending: false }).limit(80),
+    context.client.rpc("phase10_list_channel_members", { p_channel_key: channel.key, p_limit: 120 }),
+    context.client.from("uploaded_resources").select("id,title,extension,owner_label").eq("visibility", "shared").eq("moderation_status", "approved").order("published_at", { ascending: false }).limit(80),
   ]);
   const error = memberResult.error || resourceResult.error;
   if (error) throw new Error(`Community composer data could not be loaded: ${error.message}`);
@@ -192,7 +148,7 @@ export async function getCommunityHomeModel(): Promise<CommunityHomeModel> {
     return { mode: "ready", viewerName: "Guest", role: "student", groups: context.groups, notifications: [], totalUnread: 0 };
   }
   if (context.mode === "setup") return { mode: "setup", viewerName: context.viewerName };
-  const notifications = await context.supabase
+  const notifications = await context.client
     .from("community_notifications")
     .select("id,channel_id,notification_type,message_id,created_at,read_at")
     .eq("user_id", context.identity.id)
@@ -228,7 +184,7 @@ function attachmentDto(row: ResourceRow): CommunityResourceAttachment {
 }
 
 async function hydrateMessages(
-  supabase: SupabaseClient<Database>,
+  client: D1ApplicationClient,
   rows: MessageRow[],
   viewerId: string,
 ): Promise<CommunityMessage[]> {
@@ -237,10 +193,10 @@ async function hydrateMessages(
   const replyIds = [...new Set(rows.map((row) => row.reply_to_message_id).filter((id): id is string => Boolean(id)))];
   const resourceIds = [...new Set(rows.map((row) => row.attached_resource_id).filter((id): id is string => Boolean(id)))];
   const [reactions, pins, replies, resources] = await Promise.all([
-    supabase.from("message_reactions").select("message_id,user_id,emoji").in("message_id", ids),
-    supabase.from("pinned_messages").select("message_id").in("message_id", ids),
-    replyIds.length ? supabase.from("community_messages").select("id,author_label,body").in("id", replyIds) : Promise.resolve({ data: [], error: null }),
-    resourceIds.length ? supabase.from("uploaded_resources").select("id,title,original_filename,extension,owner_label").in("id", resourceIds).eq("visibility", "shared").eq("moderation_status", "approved") : Promise.resolve({ data: [], error: null }),
+    client.from("message_reactions").select("message_id,user_id,emoji").in("message_id", ids),
+    client.from("pinned_messages").select("message_id").in("message_id", ids),
+    replyIds.length ? client.from("community_messages").select("id,author_label,body").in("id", replyIds) : Promise.resolve({ data: [], error: null }),
+    resourceIds.length ? client.from("uploaded_resources").select("id,title,original_filename,extension,owner_label").in("id", resourceIds).eq("visibility", "shared").eq("moderation_status", "approved") : Promise.resolve({ data: [], error: null }),
   ]);
   const error = reactions.error || pins.error || replies.error || resources.error;
   if (error) throw new Error(`Community message details could not be loaded: ${error.message}`);
@@ -272,42 +228,28 @@ async function hydrateMessages(
 
 export async function getCommunityMessagePage(options: { channelSlug: string; cursor?: string | null; query?: string | null }): Promise<CommunityMessagePage> {
   const identity = (await getRequestAuthContext()).identity;
-  const supabase = identity ? await createServerSupabaseClient() : createAdminSupabaseClient();
-  const channel = isCloudflareDataRuntime() ? { data: await getHotCommunityChannel(options.channelSlug), error: null } : await supabase.from("community_channels").select("id,channel_key,slug,scope_type,channel_kind,title,description,level_id,subject_id,write_policy,sort_order,is_active").eq("slug", options.channelSlug).eq("is_active", true).maybeSingle();
-  if (!identity && channel.data?.scope_type !== "global") throw new Error("Sign in to view this channel.");
-  if (channel.error) throw new Error(`Community channel could not be loaded: ${channel.error.message}`);
-  if (!channel.data) throw new Error("Channel not found or access denied.");
-  let query = supabase
-    .from("community_messages")
-    .select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id")
-    .eq("channel_id", channel.data.id)
-    .in("moderation_status", ["active", "moderated"])
-    .order("sequence_id", { ascending: false })
-    .limit(PAGE_SIZE + 1);
-  const cursor = Number(options.cursor);
-  if (Number.isSafeInteger(cursor) && cursor > 0) query = query.lt("sequence_id", cursor);
-  const search = cleanSearch(options.query);
-  if (search) query = query.ilike("body", `%${search}%`);
-  const result = isCloudflareDataRuntime() ? { data: await getHotCommunityMessages(channel.data.id, Number(options.cursor), cleanSearch(options.query), PAGE_SIZE), error: null } : await query;
-  if (result.error) throw new Error(`Messages could not be loaded: ${result.error.message}`);
-  const raw = (result.data ?? []) as MessageRow[];
+  const client = identity ? await createD1ServerClient() : createD1AdminClient();
+  const channel = await getHotCommunityChannel(options.channelSlug);
+  if (!identity && channel?.scope_type !== "global") throw new Error("Sign in to view this channel.");
+  if (!channel) throw new Error("Channel not found or access denied.");
+  const raw = await getHotCommunityMessages(channel.id, Number(options.cursor), cleanSearch(options.query), PAGE_SIZE) as MessageRow[];
   const hasMore = raw.length > PAGE_SIZE;
   const pageRows = raw.slice(0, PAGE_SIZE);
-  const messages = await hydrateMessages(supabase, pageRows, identity?.id ?? "");
+  const messages = await hydrateMessages(client, pageRows, identity?.id ?? "");
   return { messages: messages.reverse(), nextCursor: hasMore && pageRows.length ? String(pageRows[pageRows.length - 1].sequence_id) : null };
 }
 
 async function pinnedMessage(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  client: Awaited<ReturnType<typeof createD1ServerClient>>,
   channelId: string,
   viewerId: string,
 ) {
-  const pin = await supabase.from("pinned_messages").select("message_id,pinned_at").eq("channel_id", channelId).order("pinned_at", { ascending: false }).limit(1).maybeSingle();
+  const pin = await client.from("pinned_messages").select("message_id,pinned_at").eq("channel_id", channelId).order("pinned_at", { ascending: false }).limit(1).maybeSingle();
   if (pin.error) throw new Error(`Pinned message could not be loaded: ${pin.error.message}`);
   if (!pin.data) return null;
-  const message = await supabase.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("id", pin.data.message_id).maybeSingle();
+  const message = await client.from("community_messages").select("id,sequence_id,channel_id,user_id,author_label,body,created_at,moderation_status,reply_to_message_id,attached_resource_id").eq("id", pin.data.message_id).maybeSingle();
   if (message.error || !message.data) return null;
-  return (await hydrateMessages(supabase, [message.data as MessageRow], viewerId))[0] ?? null;
+  return (await hydrateMessages(client, [message.data as MessageRow], viewerId))[0] ?? null;
 }
 
 export async function getCommunityChannelModel(channelSlug: string): Promise<CommunityChannelModel> {
@@ -337,8 +279,8 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
   if (!channel) return { mode: "denied", viewerName: context.viewerName };
   const page = await getCommunityMessagePage({ channelSlug });
   const [blockResult, pinned] = await Promise.all([
-    context.supabase.from("chat_blocks").select("id,user_id,channel_id,reason,ends_at").eq("user_id", context.identity.id).gt("ends_at", new Date().toISOString()).order("ends_at", { ascending: false }).limit(4),
-    pinnedMessage(context.supabase, channel.id, context.identity.id),
+    context.client.from("chat_blocks").select("id,user_id,channel_id,reason,ends_at").eq("user_id", context.identity.id).gt("ends_at", new Date().toISOString()).order("ends_at", { ascending: false }).limit(4),
+    pinnedMessage(context.client, channel.id, context.identity.id),
   ]);
   if (blockResult.error) throw new Error(`Community access data could not be loaded: ${blockResult.error.message}`);
   const blockRows = (blockResult.data ?? []) as BlockRow[];
@@ -363,62 +305,34 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
 export async function createCommunityMessage(input: { channelSlug: string; body: string; replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[] }) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to send a message.");
-  if (isCloudflareDataRuntime()) {
-    const profile = await getProfileForUser(identity.id);
-    return createHotCommunityMessage({
-      channelSlug: input.channelSlug,
-      userId: identity.id,
-      authorLabel: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
-      body: input.body,
-      replyToId: input.replyToId ?? null,
-      resourceId: input.resourceId ?? null,
-      mentionUserIds: input.mentionUserIds ?? [],
-    });
-  }
-  const supabase = await createServerSupabaseClient();
-  const channel = await supabase.from("community_channels").select("channel_key").eq("slug", input.channelSlug).eq("is_active", true).maybeSingle();
-  if (channel.error || !channel.data) throw new Error("Channel not found or access denied.");
-  const result = await supabase.rpc("phase10_create_message", {
-    p_channel_key: channel.data.channel_key,
-    p_body: input.body,
-    p_reply_to_message_id: input.replyToId ?? null,
-    p_attached_resource_id: input.resourceId ?? null,
-    p_mention_user_ids: input.mentionUserIds ?? [],
+  const profile = await getProfileForUser(identity.id);
+  return createHotCommunityMessage({
+    channelSlug: input.channelSlug,
+    userId: identity.id,
+    authorLabel: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
+    body: input.body,
+    replyToId: input.replyToId ?? null,
+    resourceId: input.resourceId ?? null,
+    mentionUserIds: input.mentionUserIds ?? [],
   });
-  if (result.error) throw new Error(result.error.message || "Message could not be sent.");
-  return { id: result.data };
 }
 
 export async function markCommunityRead(channelSlug: string, sequence?: number | null) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to update read state.");
-  if (isCloudflareDataRuntime()) return markHotCommunityRead(channelSlug, identity.id, sequence ?? null);
-  const supabase = await createServerSupabaseClient();
-  const channel = await supabase.from("community_channels").select("channel_key").eq("slug", channelSlug).eq("is_active", true).maybeSingle();
-  if (channel.error || !channel.data) throw new Error("Channel not found or access denied.");
-  const result = await supabase.rpc("phase10_mark_read", { p_channel_key: channel.data.channel_key, p_sequence_id: sequence ?? null });
-  if (result.error) throw new Error(result.error.message);
-  return result.data;
+  return markHotCommunityRead(channelSlug, identity.id, sequence ?? null);
 }
 
 export async function toggleCommunityReaction(messageId: string, emoji: string) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to react.");
-  if (isCloudflareDataRuntime()) return toggleHotCommunityReaction(messageId, identity.id, emoji);
-  const supabase = await createServerSupabaseClient();
-  const result = await supabase.rpc("phase10_toggle_reaction", { p_message_id: messageId, p_emoji: emoji });
-  if (result.error) throw new Error(result.error.message);
-  return result.data;
+  return toggleHotCommunityReaction(messageId, identity.id, emoji);
 }
 
 export async function reportCommunityMessage(messageId: string, reason: string, details?: string | null) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to report a message.");
-  if (isCloudflareDataRuntime()) return reportHotCommunityMessage(messageId, identity.id, reason, details ?? null);
-  const supabase = await createServerSupabaseClient();
-  const result = await supabase.rpc("phase10_report_message", { p_message_id: messageId, p_reason: reason, p_details: details ?? null });
-  if (result.error) throw new Error(result.error.message);
-  return result.data;
+  return reportHotCommunityMessage(messageId, identity.id, reason, details ?? null);
 }
 
 export async function moderateCommunity(input: { action: string; messageId?: string | null; reportId?: string | null; targetUserId?: string | null; channelId?: string | null; reason?: string | null; durationMinutes?: number | null }) {
@@ -426,31 +340,17 @@ export async function moderateCommunity(input: { action: string; messageId?: str
   if (!identity) throw new Error("Moderator authentication required.");
   const role = await getServerAppRole();
   if (!isPrivilegedRole(role)) throw new Error("Moderator access required.");
-  if (isCloudflareDataRuntime()) {
-    return moderateHotCommunity({
-      actorUserId: identity.id,
-      actorRole: role,
-      action: input.action,
-      messageId: input.messageId ?? null,
-      reportId: input.reportId ?? null,
-      targetUserId: input.targetUserId ?? null,
-      channelId: input.channelId ?? null,
-      reason: input.reason ?? null,
-      durationMinutes: input.durationMinutes ?? null,
-    });
-  }
-  const supabase = await createServerSupabaseClient();
-  const result = await supabase.rpc("phase10_moderate", {
-    p_action: input.action,
-    p_message_id: input.messageId ?? null,
-    p_report_id: input.reportId ?? null,
-    p_target_user_id: input.targetUserId ?? null,
-    p_channel_id: input.channelId ?? null,
-    p_reason: input.reason ?? null,
-    p_duration_minutes: input.durationMinutes ?? null,
+  return moderateHotCommunity({
+    actorUserId: identity.id,
+    actorRole: role,
+    action: input.action,
+    messageId: input.messageId ?? null,
+    reportId: input.reportId ?? null,
+    targetUserId: input.targetUserId ?? null,
+    channelId: input.channelId ?? null,
+    reason: input.reason ?? null,
+    durationMinutes: input.durationMinutes ?? null,
   });
-  if (result.error) throw new Error(result.error.message);
-  return result.data;
 }
 
 function moderationMessage(row: MessageRow, channelTitle: string, attachment: ResourceRow | null): CommunityMessage {
@@ -476,7 +376,7 @@ export async function getCommunityModerationModel(): Promise<CommunityModeration
   if (!identity) return { mode: "denied" };
   const role = await getServerAppRole();
   if (!isPrivilegedRole(role)) return { mode: "denied" };
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const [reportsResult, actionsResult, blocksResult, channelsResult] = await Promise.all([
     admin.from("message_reports").select("*").eq("status", "open").order("created_at", { ascending: false }).limit(150),
     admin.from("moderation_actions").select("*").order("created_at", { ascending: false }).limit(150),

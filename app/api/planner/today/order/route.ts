@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getEntitlementForUser } from "@/lib/billing/service";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createD1AdminClient } from "@/lib/data/d1/client";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Choose a valid Today Plan order." }, { status: 400 });
   }
 
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const rows = await admin.from("daily_plan_items").select("id,plan_id,user_id").eq("user_id", identity.id).in("id", itemIds);
   if (rows.error || !rows.data || rows.data.length !== itemIds.length) {
     return NextResponse.json({ error: "One or more plan items could not be organised." }, { status: 409 });

@@ -4,7 +4,6 @@ import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { getHotProgressRows, getHotDashboardProgress } from "@/lib/data/d1/hot-screens";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import type {
   ProgressAnalytics,
@@ -135,76 +134,20 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
   const subjects = subjectSlug ? catalog.subjects.filter((subject) => subject.slug === subjectSlug) : catalog.subjects;
   const chapterIds = subjects.flatMap((subject) => subject.chapters.map((chapter) => chapter.id));
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  if (isCloudflareDataRuntime()) {
-    const hot = await getHotProgressRows(identity.id, chapterIds, sevenDaysAgo);
-    const rowByChapter = new Map(hot.progress.map((row) => [row.chapter_id, row]));
-    const groupsById = new Map(catalog.groups.map((group) => [group.id, group]));
-    const chapters: ProgressChapter[] = subjects.flatMap((subject) => {
-      const group = groupsById.get(subject.groupId);
-      return subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title, subjectId: subject.id, subjectTitle: subject.title, subjectSlug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All papers", state: stateFromRow(rowByChapter.get(chapter.id) as ProgressRow | undefined), updatedAt: rowByChapter.get(chapter.id)?.updated_at ?? null }));
-    });
-    const titleByChapter = new Map(chapters.map((chapter) => [chapter.id, chapter.title]));
-    return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, attemptKey: profile.attempt_key, groupLabel: groupLabel(profile.group_choice, catalog.groups), chapters, analytics: buildAnalytics(chapters, hot.weeklyEvents as EventRow[]), history: (hot.events as EventRow[]).slice(0, 20).map((event) => ({ id: event.id, chapterId: event.chapter_id, chapterTitle: titleByChapter.get(event.chapter_id) ?? "Chapter", stage: event.stage as ProgressHistoryItem["stage"], action: event.action as ProgressHistoryItem["action"], createdAt: event.created_at, canUndo: event.action !== "undo" && !event.undone_at })) } satisfies ProgressReadyModel;
-  }
-  const supabase = await createServerSupabaseClient();
-  const [progressResponse, eventResponse, weeklyEventResponse] = await Promise.all([
-    chapterIds.length ? supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds) : Promise.resolve({ data: [], error: null }),
-    chapterIds.length ? supabase.from("progress_events").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds).order("created_at", { ascending: false }).limit(120) : Promise.resolve({ data: [], error: null }),
-    chapterIds.length ? supabase.from("progress_events").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", identity.id).in("chapter_id", chapterIds).gte("created_at", sevenDaysAgo).order("created_at", { ascending: false }).limit(1000) : Promise.resolve({ data: [], error: null }),
-  ]);
-  const error = progressResponse.error || eventResponse.error || weeklyEventResponse.error;
-  if (error) throw new Error(`Progress data could not be loaded: ${error.message}`);
-  const rows = (progressResponse.data ?? []) as ProgressRow[];
-  const events = (eventResponse.data ?? []) as EventRow[];
-  const weeklyEvents = (weeklyEventResponse.data ?? []) as EventRow[];
-  const rowByChapter = new Map(rows.map((row) => [row.chapter_id, row]));
+  const hot = await getHotProgressRows(identity.id, chapterIds, sevenDaysAgo);
+  const rowByChapter = new Map(hot.progress.map((row) => [row.chapter_id, row]));
   const groupsById = new Map(catalog.groups.map((group) => [group.id, group]));
   const chapters: ProgressChapter[] = subjects.flatMap((subject) => {
     const group = groupsById.get(subject.groupId);
-    return subject.chapters.map((chapter) => {
-      const row = rowByChapter.get(chapter.id);
-      return {
-        id: chapter.id,
-        number: chapter.number,
-        title: chapter.title,
-        subjectId: subject.id,
-        subjectTitle: subject.title,
-        subjectSlug: subject.slug,
-        groupCode: group?.code ?? "all",
-        groupName: group?.name ?? "All papers",
-        state: stateFromRow(row),
-        updatedAt: row?.updated_at ?? null,
-      };
-    });
+    return subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title, subjectId: subject.id, subjectTitle: subject.title, subjectSlug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All papers", state: stateFromRow(rowByChapter.get(chapter.id) as ProgressRow | undefined), updatedAt: rowByChapter.get(chapter.id)?.updated_at ?? null }));
   });
   const titleByChapter = new Map(chapters.map((chapter) => [chapter.id, chapter.title]));
-  const history: ProgressHistoryItem[] = events.slice(0, 20).map((event) => ({
-    id: event.id,
-    chapterId: event.chapter_id,
-    chapterTitle: titleByChapter.get(event.chapter_id) ?? "Chapter",
-    stage: event.stage as ProgressHistoryItem["stage"],
-    action: event.action as ProgressHistoryItem["action"],
-    createdAt: event.created_at,
-    canUndo: event.action !== "undo" && !event.undone_at,
-  }));
-  return {
-    mode: "ready",
-    viewerName: name,
-    levelName: catalog.selectedLevel.name,
-    attemptKey: profile.attempt_key,
-    groupLabel: groupLabel(profile.group_choice, catalog.groups),
-    chapters,
-    analytics: buildAnalytics(chapters, weeklyEvents),
-    history,
-  } satisfies ProgressReadyModel;
+  return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, attemptKey: profile.attempt_key, groupLabel: groupLabel(profile.group_choice, catalog.groups), chapters, analytics: buildAnalytics(chapters, hot.weeklyEvents as EventRow[]), history: (hot.events as EventRow[]).slice(0, 20).map((event) => ({ id: event.id, chapterId: event.chapter_id, chapterTitle: titleByChapter.get(event.chapter_id) ?? "Chapter", stage: event.stage as ProgressHistoryItem["stage"], action: event.action as ProgressHistoryItem["action"], createdAt: event.created_at, canUndo: event.action !== "undo" && !event.undone_at })) } satisfies ProgressReadyModel;
 }
 
 export async function getProgressAnalyticsForDashboard(userId: string, chapterIds: string[]) {
   if (!chapterIds.length) return { overallPercent: 0, byChapter: new Map<string, ProgressState>() };
-  const supabase = await createServerSupabaseClient();
-  const response = await supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", userId).in("chapter_id", chapterIds);
-  if (response.error) throw new Error(response.error.message);
-  const rows = (response.data ?? []) as ProgressRow[];
+  const rows = (await getHotDashboardProgress(userId, chapterIds)) as ProgressRow[];
   const byChapter = new Map(rows.map((row) => [row.chapter_id, stateFromRow(row)]));
   return { overallPercent: overallPercent(chapterIds.map((id) => byChapter.get(id) ?? { ...EMPTY_STATE })), byChapter };
 }
@@ -222,13 +165,9 @@ type DashboardSummarySubject = {
 
 export async function getProgressDashboardSummary(userId: string, subjects: DashboardSummarySubject[]) {
   const chapterIds = [...new Set(subjects.flatMap((subject) => subject.chapterIds))];
-  const supabase = await createServerSupabaseClient();
-  const response = chapterIds.length
-    ? (isCloudflareDataRuntime() ? { data: await getHotDashboardProgress(userId, chapterIds), error: null } : await supabase.from("chapter_progress").select("chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at").eq("user_id", userId).in("chapter_id", chapterIds))
-    : { data: [], error: null };
-  if (response.error) throw new Error(`Dashboard progress could not be loaded: ${response.error.message}`);
-
-  const rows = (response.data ?? []) as ProgressRow[];
+  const rows = chapterIds.length
+    ? (await getHotDashboardProgress(userId, chapterIds)) as ProgressRow[]
+    : [];
   const statesByChapter = new Map(rows.map((row) => [row.chapter_id, stateFromRow(row)]));
   const states = chapterIds.map((chapterId) => statesByChapter.get(chapterId) ?? { ...EMPTY_STATE });
   const count = (key: keyof ProgressState) => states.filter((state) => state[key]).length;

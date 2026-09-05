@@ -20,7 +20,7 @@ function rejectCrossSiteUnsafeRequest(request: NextRequest) {
  * Phase 5 production request boundary. Authentication is handled by the
  * Cloudflare session runtime; middleware only enforces same-origin protection
  * for unsafe browser requests. The pre-cutover Worker version remains the
- * rollback path while Supabase is retained during verification.
+ * legacy provider assets remain frozen only for rollback provenance during verification.
  */
 export async function updateAuthSession(request: NextRequest) {
   const unsafeResponse = rejectCrossSiteUnsafeRequest(request);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getPublicRuntimeConfig } from "@/lib/env";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createD1ServerClient } from "@/lib/data/d1/client";
 import type { DashboardActionKey, DashboardAnalyticsEventType } from "@/lib/dashboard/types";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +34,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Dashboard views do not accept an action key." }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.from("dashboard_events").insert({
+  const client = await createD1ServerClient();
+  const { error } = await client.from("dashboard_events").insert({
     user_id: identity.id,
     event_type: eventType,
     action_key: eventType === "quick_action" ? actionKey : null,

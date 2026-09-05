@@ -2,7 +2,7 @@ import "server-only";
 
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/supabase/database.types";
 import type { CalendarItem, CalendarPageModel } from "./types";
 
@@ -28,16 +28,16 @@ export async function getCalendarPageModel(monthParam?: string | null): Promise<
   const window = monthUtcWindow(month);
   const startDate = `${month}-01`;
   const nextMonth = new Date(`${month}-01T12:00:00Z`); nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1); const endDate = nextMonth.toISOString().slice(0, 10);
-  const supabase = await createServerSupabaseClient();
+  const client = await createD1ServerClient();
   const [tasks, goals, userEvents, attempt] = await Promise.all([
-    supabase.from("tasks").select("*").eq("user_id", identity.id).gte("due_at", window.start.toISOString()).lt("due_at", window.end.toISOString()).neq("status", "cancelled").order("due_at"),
-    supabase.from("goals").select("*").eq("user_id", identity.id).gte("due_date", startDate).lt("due_date", endDate).neq("status", "cancelled").order("due_date"),
-    supabase.from("user_calendar_events").select("*").eq("user_id", identity.id).gte("starts_at", window.start.toISOString()).lt("starts_at", window.end.toISOString()).order("starts_at"),
-    supabase.from("exam_attempts").select("id").eq("attempt_key", profile.attempt_key).eq("verification_status", "verified").limit(1).maybeSingle(),
+    client.from("tasks").select("*").eq("user_id", identity.id).gte("due_at", window.start.toISOString()).lt("due_at", window.end.toISOString()).neq("status", "cancelled").order("due_at"),
+    client.from("goals").select("*").eq("user_id", identity.id).gte("due_date", startDate).lt("due_date", endDate).neq("status", "cancelled").order("due_date"),
+    client.from("user_calendar_events").select("*").eq("user_id", identity.id).gte("starts_at", window.start.toISOString()).lt("starts_at", window.end.toISOString()).order("starts_at"),
+    client.from("exam_attempts").select("id").eq("attempt_key", profile.attempt_key).eq("verification_status", "verified").limit(1).maybeSingle(),
   ]);
   const error = tasks.error || goals.error || userEvents.error || attempt.error;
   if (error) throw new Error(`Calendar could not be loaded: ${error.message}`);
-  const examEvents = attempt.data?.id ? await supabase.from("exam_events").select("*").eq("attempt_id", attempt.data.id).eq("verification_status", "verified").gte("event_date", startDate).lt("event_date", endDate).order("event_date") : { data: [], error: null };
+  const examEvents = attempt.data?.id ? await client.from("exam_events").select("*").eq("attempt_id", attempt.data.id).eq("verification_status", "verified").gte("event_date", startDate).lt("event_date", endDate).order("event_date") : { data: [], error: null };
   if (examEvents.error) throw new Error(`Official exam calendar could not be loaded: ${examEvents.error.message}`);
   const items: CalendarItem[] = [];
   for (const row of (tasks.data ?? []) as TaskRow[]) if (localMonthKey(new Date(row.due_at), timezone) === month) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes });

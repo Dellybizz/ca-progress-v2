@@ -2,7 +2,7 @@ import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createD1AdminClient } from "@/lib/data/d1/client";
 import { getTodayPlanPageModel } from "./service";
 import { getTodayPlanStartedTimes, getTodayPlanUndoState } from "./today-interactions";
 import type { TodayPlanItem, TodayPlanPageModel, TodayPlanReadyModel } from "./types";
@@ -140,7 +140,7 @@ export async function getTodayPlanDisplayModel(): Promise<TodayPlanPageModel | T
     .map((item) => item.sourceId as string);
   const taskTimes = new Map<string, string>();
   if (taskIds.length) {
-    const admin = createAdminSupabaseClient();
+    const admin = createD1AdminClient();
     const tasks = await admin.from("tasks").select("id,due_at").eq("user_id", identity.id).in("id", taskIds);
     if (!tasks.error) {
       for (const task of (tasks.data ?? []) as TaskScheduleRow[]) taskTimes.set(task.id, task.due_at);

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess, createResourceMetadataWithinQuota } from "@/lib/billing/service";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
-import { getSupabaseAdminRuntimeConfig } from "@/lib/supabase/admin";
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
 import { normalizeFilename } from "@/lib/resources/validation";
@@ -17,7 +16,6 @@ function fail(message: string, status: number, code: string) {
 export async function POST(request: Request) {
   const identity = await optionalUser();
   if (!identity) return fail("Authentication required.", 401, "AUTH_REQUIRED");
-  if (!getSupabaseAdminRuntimeConfig().configured) return fail("Resource metadata service is unavailable.", 503, "METADATA_SERVICE_NOT_CONFIGURED");
   const body = await request.json().catch(() => null) as { uploadId?: unknown } | null;
   const uploadId = typeof body?.uploadId === "string" ? body.uploadId : "";
   if (!uploadId) return fail("Upload id is required.", 400, "UPLOAD_ID_REQUIRED");

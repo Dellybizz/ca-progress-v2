@@ -1,13 +1,8 @@
 import "server-only";
 
-import type { Database } from "@/lib/supabase/database.types";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { isCloudflareAuthRuntime } from "@/lib/auth/provider";
 import { saveCloudflareProfilePatch } from "@/lib/auth/cloudflare-profile";
 import { setCloudflareProfileAvatar } from "@/lib/auth/cloudflare-profile";
 import { deleteOwnedAvatarObject, isOwnedAvatarObjectKey, putAvatarObject } from "@/lib/resources/r2";
-
-type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
 
 export type ProfilePatch = {
   displayName?: string | null;
@@ -28,45 +23,16 @@ export class AvatarPersistenceError extends Error {
   }
 }
 
-function toDatabasePatch(patch: ProfilePatch): ProfileUpdate {
-  const update: ProfileUpdate = {};
-  if ("displayName" in patch) update.display_name = patch.displayName ?? null;
-  if ("avatarUrl" in patch) update.avatar_url = patch.avatarUrl ?? null;
-  if ("caLevel" in patch) update.ca_level = patch.caLevel ?? null;
-  if ("groupChoice" in patch) update.group_choice = patch.groupChoice ?? null;
-  if ("attemptKey" in patch) update.attempt_key = patch.attemptKey ?? null;
-  if ("dailyTargetMinutes" in patch) update.daily_target_minutes = patch.dailyTargetMinutes ?? null;
-  if ("onboardingStep" in patch) update.onboarding_step = patch.onboardingStep;
-  if ("onboardingCompletedAt" in patch) update.onboarding_completed_at = patch.onboardingCompletedAt ?? null;
-  if ("timezone" in patch) update.timezone = patch.timezone;
-  return update;
-}
-
 export async function saveProfilePatch(userId: string, patch: ProfilePatch) {
-  if (isCloudflareAuthRuntime()) {
-    const data = await saveCloudflareProfilePatch(userId, patch);
-    if (!data) throw new Error("Cloudflare profile update returned no row.");
-    return data;
-  }
-  const client = await createServerSupabaseClient();
-  const { data, error } = await client.from("profiles").update(toDatabasePatch(patch)).eq("user_id", userId).select("*").single();
-  if (error) throw error;
+  const data = await saveCloudflareProfilePatch(userId, patch);
+  if (!data) throw new Error("Cloudflare profile update returned no row.");
   return data;
 }
 
-/**
- * Provider-neutral avatar access. New Phase 3 objects are private R2 keys and are
- * served through an authenticated application route. While Supabase is still the
- * production source, legacy avatar objects keep their temporary signed-read path;
- * the Cloudflare target runtime never requires that fallback.
- */
+/** R2-owned avatars are served only through the authenticated application route. */
 export async function getProfileAvatarAccessUrl(userId: string, path: string | null | undefined) {
-  if (!path) return null;
-  if (isOwnedAvatarObjectKey(userId, path)) return `/api/profile/avatar?path=${encodeURIComponent(path)}`;
-  if (isCloudflareAuthRuntime()) return null;
-  const client = await createServerSupabaseClient();
-  const signed = await client.storage.from("avatars").createSignedUrl(path, 60 * 60);
-  return signed.data?.signedUrl ?? null;
+  if (!path || !isOwnedAvatarObjectKey(userId, path)) return null;
+  return `/api/profile/avatar?path=${encodeURIComponent(path)}`;
 }
 
 export async function replaceUserAvatar(input: {
@@ -89,21 +55,13 @@ export async function replaceUserAvatar(input: {
   }
 
   try {
-    if (isCloudflareAuthRuntime()) {
-      await setCloudflareProfileAvatar(input.userId, path);
-    } else {
-      const client = await createServerSupabaseClient();
-      const updated = await client.from("profiles").update({ avatar_url: path }).eq("user_id", input.userId);
-      if (updated.error) throw updated.error;
-    }
+    await setCloudflareProfileAvatar(input.userId, path);
   } catch {
     await deleteOwnedAvatarObject(input.userId, path).catch(() => undefined);
     throw new AvatarPersistenceError("attach");
   }
 
   if (input.previousPath && input.previousPath !== path) {
-    // Only R2-owned keys are deleted here. Legacy Supabase Storage objects are left
-    // untouched until the Phase 4 production storage migration/reconciliation.
     await deleteOwnedAvatarObject(input.userId, input.previousPath).catch(() => undefined);
   }
 

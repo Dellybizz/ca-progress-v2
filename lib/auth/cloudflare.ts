@@ -104,9 +104,7 @@ function getDb(): D1Database {
   return db;
 }
 
-export function isCloudflareAuthRuntime() {
-  return getServerRuntimeValue("CA_AUTH_RUNTIME").toLowerCase() === "cloudflare";
-}
+
 
 function requiredSecret(name: string, ...fallbackNames: string[]) {
   for (const key of [name, ...fallbackNames]) {
@@ -336,7 +334,7 @@ async function resolveApplicationIdentity(profile: ProviderProfile) {
   const applicationUserId = crypto.randomUUID();
   const identityId = crypto.randomUUID();
   await db.batch([
-    db.prepare("INSERT INTO app_users(user_id,auth_provider,provider_subject,account_state,role) VALUES(?1,'supabase',NULL,'active','student')").bind(applicationUserId),
+    db.prepare("INSERT INTO app_users(user_id,auth_provider,provider_subject,account_state,role) VALUES(?1,'cloudflare_oauth',NULL,'active','student')").bind(applicationUserId),
     db.prepare("INSERT INTO auth_identities(identity_id,provider,provider_user_id,application_user_id,email,phone,display_name,avatar_url,email_verified) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)")
       .bind(identityId, profile.provider, profile.providerUserId, applicationUserId, profile.email, profile.phone, profile.displayName, profile.avatarUrl, profile.emailVerified ? 1 : 0),
   ]);

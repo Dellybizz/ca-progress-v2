@@ -2,7 +2,7 @@ import "server-only";
 
 import { optionalUser } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
-import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
+import { createD1AdminClient } from "@/lib/data/d1/client";
 import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { invokeBillingService } from "./service-binding";
@@ -23,7 +23,7 @@ type SubscriptionRow = { id: string; plan_id: string; status: string; starts_at:
 type PaymentRow = { id: string; plan_id: string; provider_order_id: string; provider_payment_id: string | null; amount_subunits: number; currency: string; status: string; created_at: string; paid_at: string | null };
 type SubscriptionEventRow = { id: string; plan_id: string; event_type: string; source: string; starts_at: string | null; ends_at: string | null; created_at: string };
 
-function db() { return createD1AdminCompatClient(); }
+function db() { return createD1AdminClient(); }
 function asRows<T>(value: unknown): T[] { return Array.isArray(value) ? value as T[] : []; }
 function asRow<T extends object>(value: unknown): T | null { return value !== null && typeof value === "object" && !Array.isArray(value) ? value as T : null; }
 

@@ -3,8 +3,8 @@ import "server-only";
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createD1AdminClient } from "@/lib/data/d1/client";
+import { createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/supabase/database.types";
 import { selectDailyCandidates } from "./ranking";
 import type {
@@ -143,7 +143,7 @@ async function readyContext() {
 }
 
 async function ensureRules(userId: string) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const existing = await admin.from("revision_rules").select("*").eq("user_id", userId).maybeSingle();
   if (existing.error) throw new Error(`Revision settings could not be loaded: ${existing.error.message}`);
   if (existing.data) return existing.data as RulesRow;
@@ -153,7 +153,7 @@ async function ensureRules(userId: string) {
 }
 
 async function latestMeaningfulEvent(userId: string) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const result = await admin
     .from("planner_events")
     .select("*")
@@ -167,7 +167,7 @@ async function latestMeaningfulEvent(userId: string) {
 }
 
 async function attemptDetails(attemptKey: string, levelId: string) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const attempt = await admin
     .from("exam_attempts")
     .select("*")
@@ -288,7 +288,7 @@ async function calculateForecast(
 
   let row: ForecastRow | null = null;
   if (persist) {
-    const admin = createAdminSupabaseClient();
+    const admin = createD1AdminClient();
     const inserted = await admin
       .from("forecast_snapshots")
       .insert({
@@ -508,7 +508,7 @@ function itemDto(
 }
 
 async function plannerInputs(context: Extract<Awaited<ReturnType<typeof readyContext>>, { mode: "ready" }>) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const recentSince = addDays(new Date(), -28).toISOString();
   const [progress, sessions, tasks, revisions] = await Promise.all([
     admin.from("chapter_progress").select("*").eq("user_id", context.identity.id),
@@ -531,7 +531,7 @@ async function persistPlan(
   planDate: string,
   force: boolean,
 ) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const rulesRow = await ensureRules(context.identity.id);
   const rules = rulesDto(rulesRow);
   const inputs = await plannerInputs(context);
@@ -715,7 +715,7 @@ export async function getForecastPageModel(): Promise<ForecastPageModel> {
   if (context.mode !== "ready") return context;
   const planDate = dateInTimezone(context.profile.timezone);
   const result = await persistPlan(context, planDate, false);
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const historyResult = await admin.from("forecast_snapshots").select("*").eq("user_id", context.identity.id).order("created_at", { ascending: false }).limit(12);
   if (historyResult.error) throw new Error(`Forecast history could not be loaded: ${historyResult.error.message}`);
   const history: ForecastHistoryPoint[] = ((historyResult.data ?? []) as ForecastRow[]).map((row) => ({
@@ -742,7 +742,7 @@ export async function setRevisionSettings(input: {
   const preferredWeekdays = [...new Set(input.preferredWeekdays.map((value) => Math.round(value)))].sort((a, b) => a - b);
   if (intervalDays.length < 1 || intervalDays.length > 5 || intervalDays.some((value) => value < 1 || value > 180)) throw new Error("Use 1 to 5 revision intervals between 1 and 180 days.");
   if (preferredWeekdays.length < 1 || preferredWeekdays.length > 7 || preferredWeekdays.some((value) => value < 0 || value > 6)) throw new Error("Choose at least one valid preferred study day.");
-  const server = await createServerSupabaseClient();
+  const server = await createD1ServerClient();
   const result = await server.rpc("phase9_set_revision_rules", {
     p_interval_days: intervalDays,
     p_preferred_weekdays: preferredWeekdays,
@@ -755,7 +755,7 @@ export async function setRevisionSettings(input: {
 }
 
 async function ownedPlanItem(userId: string, itemId: string) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const result = await admin.from("daily_plan_items").select("*").eq("id", itemId).eq("user_id", userId).maybeSingle();
   if (result.error || !result.data) throw new Error("Plan item was not found.");
   return result.data as PlanItemRow;
@@ -766,8 +766,8 @@ export async function performTodayPlanAction(action: TodayPlanAction) {
   if (!identity) throw new Error("Sign in to update your plan.");
   if (action.action === "refresh") return getTodayPlanPageModel({ force: true });
   const item = await ownedPlanItem(identity.id, action.itemId);
-  const admin = createAdminSupabaseClient();
-  const server = await createServerSupabaseClient();
+  const admin = createD1AdminClient();
+  const server = await createD1ServerClient();
   const now = new Date().toISOString();
 
   if (action.action === "complete") {

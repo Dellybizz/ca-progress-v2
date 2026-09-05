@@ -6,9 +6,8 @@ import { getServerAppRole } from "@/lib/authorization/server";
 import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { getIcaiPublicCatalog } from "@/lib/icai/query";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createD1AdminClient, createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/supabase/database.types";
-import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
 import { getHotResourceLibraryRows, getHotResourceDetail } from "@/lib/data/d1/hot-screens";
 import type { StudySubjectOption } from "@/lib/study/types";
 import type { ModerationPageModel, ModerationQueueItem, ModerationReport, NoteCard, NoteDetailModel, OfficialResourceCard, ResourceDetailModel, ResourceLibraryModel, UploadCard } from "./types";
@@ -57,10 +56,10 @@ function officialCards(catalog: Awaited<ReturnType<typeof getIcaiPublicCatalog>>
   }));
 }
 
-async function nameMaps(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
+async function nameMaps(client: Awaited<ReturnType<typeof createD1ServerClient>>) {
   const [subjects, chapters] = await Promise.all([
-    supabase.from("subjects").select("id,title").eq("is_active", true),
-    supabase.from("chapters").select("id,title").limit(5000),
+    client.from("subjects").select("id,title").eq("is_active", true),
+    client.from("chapters").select("id,title").limit(5000),
   ]);
   if (subjects.error || chapters.error) throw new Error(`Resource academic labels could not be loaded: ${(subjects.error || chapters.error)?.message}`);
   return {
@@ -111,10 +110,10 @@ function uploadDto(row: UploadRow, names: Awaited<ReturnType<typeof nameMaps>>, 
   };
 }
 
-async function tagsForOwnNotes(supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>, userId: string) {
+async function tagsForOwnNotes(client: Awaited<ReturnType<typeof createD1ServerClient>>, userId: string) {
   const [tagsResponse, mapsResponse] = await Promise.all([
-    supabase.from("note_tags").select("*").eq("user_id", userId),
-    supabase.from("note_tag_map").select("*").eq("user_id", userId),
+    client.from("note_tags").select("*").eq("user_id", userId),
+    client.from("note_tag_map").select("*").eq("user_id", userId),
   ]);
   if (tagsResponse.error || mapsResponse.error) throw new Error(`Note tags could not be loaded: ${(tagsResponse.error || mapsResponse.error)?.message}`);
   const tagById = new Map(((tagsResponse.data ?? []) as TagRow[]).map((tag) => [tag.id, tag.name]));
@@ -135,45 +134,21 @@ export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
   const officialResources = officialCards(official);
   if (!identity) return { mode: "guest", officialResources };
 
-  const supabase = await createServerSupabaseClient();
-  if (isCloudflareDataRuntime()) {
-    const [names, tagsByNote, rows, subjects] = await Promise.all([
-      nameMaps(supabase),
-      tagsForOwnNotes(supabase, identity.id),
-      getHotResourceLibraryRows(identity.id),
-      academicOptions(profile),
-    ]);
-    return {
-      mode: "ready",
-      viewerName: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
-      subjects,
-      myNotes: rows.ownNotes.map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id)),
-      myUploads: rows.ownUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
-      sharedNotes: rows.sharedNotes.map((row) => noteDto(row as NoteRow, names, [], identity.id)),
-      sharedUploads: rows.sharedUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
-      officialResources,
-    };
-  }
-  const [names, tagsByNote, ownNotes, ownUploads, sharedNotes, sharedUploads, subjects] = await Promise.all([
-    nameMaps(supabase),
-    tagsForOwnNotes(supabase, identity.id),
-    supabase.from("notes").select("*").eq("user_id", identity.id).order("updated_at", { ascending: false }).limit(250),
-    supabase.from("uploaded_resources").select("*").eq("owner_user_id", identity.id).order("updated_at", { ascending: false }).limit(250),
-    supabase.from("notes").select("*").eq("visibility", "shared").eq("moderation_status", "approved").neq("user_id", identity.id).order("published_at", { ascending: false }).limit(150),
-    supabase.from("uploaded_resources").select("*").eq("visibility", "shared").eq("moderation_status", "approved").neq("owner_user_id", identity.id).order("published_at", { ascending: false }).limit(150),
+  const client = await createD1ServerClient();
+  const [names, tagsByNote, rows, subjects] = await Promise.all([
+    nameMaps(client),
+    tagsForOwnNotes(client, identity.id),
+    getHotResourceLibraryRows(identity.id),
     academicOptions(profile),
   ]);
-  const error = ownNotes.error || ownUploads.error || sharedNotes.error || sharedUploads.error;
-  if (error) throw new Error(`Resource library could not be loaded: ${error.message}`);
-
   return {
     mode: "ready",
     viewerName: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
     subjects,
-    myNotes: ((ownNotes.data ?? []) as NoteRow[]).map((row) => noteDto(row, names, tagsByNote.get(row.id) ?? [], identity.id)),
-    myUploads: ((ownUploads.data ?? []) as UploadRow[]).map((row) => uploadDto(row, names, identity.id)),
-    sharedNotes: ((sharedNotes.data ?? []) as NoteRow[]).map((row) => noteDto(row, names, [], identity.id)),
-    sharedUploads: ((sharedUploads.data ?? []) as UploadRow[]).map((row) => uploadDto(row, names, identity.id)),
+    myNotes: rows.ownNotes.map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id)),
+    myUploads: rows.ownUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
+    sharedNotes: rows.sharedNotes.map((row) => noteDto(row as NoteRow, names, [], identity.id)),
+    sharedUploads: rows.sharedUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
     officialResources,
   };
 }
@@ -181,12 +156,12 @@ export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
 export async function getNoteDetailModel(noteId: string): Promise<NoteDetailModel> {
   const identity = await optionalUser();
   if (!identity) return { mode: "guest" };
-  const supabase = await createServerSupabaseClient();
-  const noteResponse = await supabase.from("notes").select("*").eq("id", noteId).maybeSingle();
+  const client = await createD1ServerClient();
+  const noteResponse = await client.from("notes").select("*").eq("id", noteId).maybeSingle();
   if (noteResponse.error) throw new Error(`Note could not be loaded: ${noteResponse.error.message}`);
   if (!noteResponse.data) return { mode: "missing" };
   const row = noteResponse.data as NoteRow;
-  const [names, tagsByNote, profile] = await Promise.all([nameMaps(supabase), tagsForOwnNotes(supabase, identity.id), getProfileForUser(identity.id)]);
+  const [names, tagsByNote, profile] = await Promise.all([nameMaps(client), tagsForOwnNotes(client, identity.id), getProfileForUser(identity.id)]);
   const canManage = row.user_id === identity.id;
   return {
     mode: "ready",
@@ -200,14 +175,10 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
 export async function getResourceDetailModel(resourceId: string): Promise<ResourceDetailModel> {
   const identity = await optionalUser();
   if (!identity) return { mode: "guest" };
-  const supabase = await createServerSupabaseClient();
-  const response = isCloudflareDataRuntime()
-    ? { data: await getHotResourceDetail(resourceId), error: null }
-    : await supabase.from("uploaded_resources").select("*").eq("id", resourceId).maybeSingle();
-  if (response.error) throw new Error(`Resource could not be loaded: ${response.error.message}`);
-  if (!response.data) return { mode: "missing" };
-  const names = await nameMaps(supabase);
-  const row = response.data as UploadRow;
+  const client = await createD1ServerClient();
+  const row = (await getHotResourceDetail(resourceId)) as UploadRow | null;
+  if (!row) return { mode: "missing" };
+  const names = await nameMaps(client);
   const canManage = row.owner_user_id === identity.id;
   return { mode: "ready", resource: uploadDto(row, names, identity.id), canManage, canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved" };
 }
@@ -217,7 +188,7 @@ export async function getResourceModerationPageModel(): Promise<ModerationPageMo
   if (!identity) return { mode: "denied" };
   const role = await getServerAppRole();
   if (!isPrivilegedRole(role)) return { mode: "denied" };
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const [notes, uploads, reports] = await Promise.all([
     admin.from("notes").select("*").eq("visibility", "shared").in("moderation_status", ["pending", "reported"]).order("updated_at", { ascending: true }).limit(200),
     admin.from("uploaded_resources").select("*").eq("visibility", "shared").in("moderation_status", ["pending", "reported"]).order("updated_at", { ascending: true }).limit(200),

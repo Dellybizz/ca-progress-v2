@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOperator } from "@/lib/authorization/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createD1AdminClient } from "@/lib/data/d1/client";
 import { invalidateSharedPublicCache } from "@/lib/cache/public";
 import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
 
@@ -38,7 +38,7 @@ export async function decideIcaiReviewAction(formData: FormData) {
     const decision = String(formData.get("decision") ?? "");
     if (!reviewId || !["approved", "rejected"].includes(decision)) throw new Error("Invalid review request.");
 
-    const admin = createAdminSupabaseClient();
+    const admin = createD1AdminClient();
     const { error } = await admin.rpc("icai_review_decide", {
       p_review_id: reviewId,
       p_decision: decision,

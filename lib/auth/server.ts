@@ -2,14 +2,12 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { getSupabasePublicConfig } from "@/lib/env";
 import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
-import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
+import { createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/supabase/database.types";
 import type { AttemptOption, CALevel } from "@/lib/profile/validation";
 import type { AppRole } from "@/lib/authorization/roles";
 import { getCloudflareProfileForUser, ensureCloudflareUserBootstrap } from "./cloudflare-profile";
-import { getCurrentApplicationIdentity, isCloudflareAuthRuntime } from "./provider";
 import { getCloudflareRequestAuth } from "./cloudflare";
 import { loginPathFor, sanitizeReturnPath } from "./navigation";
 
@@ -33,39 +31,21 @@ export type RequestAuthContext = {
 };
 
 async function getRequestAuthContextUncached(): Promise<RequestAuthContext> {
-  if (isCloudflareAuthRuntime()) {
-    const auth = await getCloudflareRequestAuth();
-    const session = auth.session;
-    return {
-      identity: session ? {
-        id: auth.applicationUserId!,
-        email: session.email,
-        phone: session.phone,
-        displayName: session.displayName,
-        avatarUrl: session.avatarUrl,
-        role: auth.role,
-        entitlements: auth.entitlements,
-      } : null,
+  const auth = await getCloudflareRequestAuth();
+  const session = auth.session;
+  return {
+    identity: session ? {
+      id: auth.applicationUserId!,
+      email: session.email,
+      phone: session.phone,
+      displayName: session.displayName,
+      avatarUrl: session.avatarUrl,
       role: auth.role,
       entitlements: auth.entitlements,
-      authenticated: auth.authenticated,
-    };
-  }
-  if (!getSupabasePublicConfig().configured) return { identity: null, role: "student", entitlements: [], authenticated: false };
-  const identity = await measureServerPerformance("auth.identity", () => getCurrentApplicationIdentity());
-  return {
-    identity: identity ? {
-      id: identity.id,
-      email: identity.email,
-      phone: identity.phone,
-      displayName: identity.displayName ?? null,
-      avatarUrl: identity.avatarUrl ?? null,
-      role: identity.role,
-      entitlements: identity.entitlements,
     } : null,
-    role: identity?.role ?? "student",
-    entitlements: identity?.entitlements ?? [],
-    authenticated: Boolean(identity),
+    role: auth.role,
+    entitlements: auth.entitlements,
+    authenticated: auth.authenticated,
   };
 }
 
@@ -85,12 +65,7 @@ export async function requireUser(next = "/dashboard") {
 }
 
 async function getProfileForUserUncached(userId: string): Promise<ProfileRow | null> {
-  if (isCloudflareAuthRuntime()) {
-    return await measureServerPerformance("auth.profile", () => getCloudflareProfileForUser(userId) as Promise<ProfileRow | null>);
-  }
-  const supabase = await createServerSupabaseClient();
-  const { data } = await measureServerPerformance("auth.profile", async () => await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle());
-  return data ?? null;
+  return await measureServerPerformance("auth.profile", () => getCloudflareProfileForUser(userId) as Promise<ProfileRow | null>);
 }
 
 // Profile reads are shared by the shell, page services, and authorization checks.
@@ -99,25 +74,11 @@ export const getProfileForUser = cache(getProfileForUserUncached);
 export async function ensureUserBootstrap() {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) return null;
-  if (isCloudflareAuthRuntime()) {
-    await ensureCloudflareUserBootstrap({
-      applicationUserId: identity.id,
-      displayName: identity.displayName ?? null,
-      avatarUrl: identity.avatarUrl ?? null,
-    });
-  } else {
-    const supabase = await createServerSupabaseClient();
-    const existing = await supabase.from("profiles").select("user_id").eq("user_id", identity.id).maybeSingle();
-    if (!existing.data) {
-      await supabase.from("profiles").insert({
-        user_id: identity.id,
-        display_name: identity.displayName,
-        avatar_url: identity.avatarUrl,
-      });
-    }
-    const prefs = await supabase.from("user_preferences").select("user_id").eq("user_id", identity.id).maybeSingle();
-    if (!prefs.data) await supabase.from("user_preferences").insert({ user_id: identity.id });
-  }
+  await ensureCloudflareUserBootstrap({
+    applicationUserId: identity.id,
+    displayName: identity.displayName ?? null,
+    avatarUrl: identity.avatarUrl ?? null,
+  });
   return {
     id: identity.id,
     email: identity.email,
@@ -130,13 +91,10 @@ export async function ensureUserBootstrap() {
 }
 
 export async function loadAttemptOptions(): Promise<AttemptOption[]> {
-  if (!isCloudflareDataRuntime() && !getSupabasePublicConfig().configured) {
-    return [{ key: "undecided", label: "Not decided yet", kind: "build_fallback" }];
-  }
-  const supabase = await createServerSupabaseClient();
+  const client = await createD1ServerClient();
   const [attempts, levels] = await Promise.all([
-    supabase.from("exam_attempts").select("attempt_key, label, level_id").eq("verification_status", "verified"),
-    supabase.from("course_levels").select("id, code").eq("is_active", true),
+    client.from("exam_attempts").select("attempt_key, label, level_id").eq("verification_status", "verified"),
+    client.from("course_levels").select("id, code").eq("is_active", true),
   ]);
   if (attempts.error || levels.error || !attempts.data?.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
   const levelById = new Map(levels.data.map((level) => [level.id, level.code as CALevel]));

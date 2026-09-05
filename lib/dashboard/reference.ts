@@ -1,106 +1,72 @@
 import "server-only";
 
 import { unstable_cache } from "next/cache";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { createD1AdminCompatClient } from "@/lib/data/d1/supabase-compat";
 import { getHotAcademicReference } from "@/lib/data/d1/hot-screens";
-import { getSupabasePublicConfig } from "@/lib/env";
-import { isCloudflareDataRuntime } from "@/lib/supabase/admin";
+import { createD1AdminClient } from "@/lib/data/d1/client";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import type { DashboardAcademicReference, DashboardAcademicSubject, DashboardIcaiUpdate, DashboardLiveReference } from "./types";
 
-type GroupRow = Database["public"]["Tables"]["course_groups"]["Row"];
-type SubjectRow = Database["public"]["Tables"]["subjects"]["Row"];
-type AttemptMapRow = Database["public"]["Tables"]["attempt_syllabus_map"]["Row"];
-type ChapterRow = Database["public"]["Tables"]["chapters"]["Row"];
 type ResourceRow = Database["public"]["Tables"]["icai_resources"]["Row"];
 type SourceRow = Database["public"]["Tables"]["icai_sources"]["Row"];
 type ResourceAttemptRow = Database["public"]["Tables"]["resource_attempt_map"]["Row"];
 type ResourceSubjectRow = Database["public"]["Tables"]["resource_subject_map"]["Row"];
 
-function createReferenceClient(): SupabaseClient<Database> {
-  if (isCloudflareDataRuntime()) return createD1AdminCompatClient() as unknown as SupabaseClient<Database>;
-  const config = getSupabasePublicConfig();
-  if (!config.configured) throw new Error("V2 Supabase public configuration is missing.");
-  return createClient<Database>(config.url, config.publishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+function createReferenceClient() {
+  return createD1AdminClient();
 }
 
 function jsonRecord(value: Json): Record<string, unknown> { return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}; }
-function unique<T>(values: T[]) { return [...new Set(values)]; }
 
 async function loadAcademicReference(levelCode: string, groupChoice: string, attemptKey: string): Promise<DashboardAcademicReference | null> {
-  if (isCloudflareDataRuntime()) {
-    const direct = await getHotAcademicReference(levelCode, attemptKey);
-    if (!direct) return null;
-    const aggregateGroups = levelCode === "foundation" || groupChoice === "both" || groupChoice === "not_applicable";
-    const allowedGroups = new Set((aggregateGroups ? direct.groups : direct.groups.filter((group) => group.code === groupChoice)).map((group) => group.id));
-    const applicableMaps = direct.maps.filter((row) => allowedGroups.has(row.group_id));
-    const subjectIds = new Set(applicableMaps.map((row) => row.subject_id));
-    const versionBySubject = new Map(applicableMaps.map((row) => [row.subject_id, row.syllabus_version_id]));
-    const groupById = new Map(direct.groups.map((group) => [group.id, group]));
-    const chaptersByVersion = new Map<string, typeof direct.chapters>();
-    for (const chapter of direct.chapters) chaptersByVersion.set(chapter.syllabus_version_id, [...(chaptersByVersion.get(chapter.syllabus_version_id) ?? []), chapter]);
-    const subjects = direct.subjects.filter((subject) => allowedGroups.has(subject.group_id) && subjectIds.has(subject.id)).map((subject) => {
+  const direct = await getHotAcademicReference(levelCode, attemptKey);
+  if (!direct) return null;
+  const aggregateGroups = levelCode === "foundation" || groupChoice === "both" || groupChoice === "not_applicable";
+  const allowedGroups = new Set((aggregateGroups ? direct.groups : direct.groups.filter((group) => group.code === groupChoice)).map((group) => group.id));
+  const applicableMaps = direct.maps.filter((row) => allowedGroups.has(row.group_id));
+  const subjectIds = new Set(applicableMaps.map((row) => row.subject_id));
+  const versionBySubject = new Map(applicableMaps.map((row) => [row.subject_id, row.syllabus_version_id]));
+  const groupById = new Map(direct.groups.map((group) => [group.id, group]));
+  const chaptersByVersion = new Map<string, typeof direct.chapters>();
+  for (const chapter of direct.chapters) chaptersByVersion.set(chapter.syllabus_version_id, [...(chaptersByVersion.get(chapter.syllabus_version_id) ?? []), chapter]);
+  const subjects: DashboardAcademicSubject[] = direct.subjects
+    .filter((subject) => allowedGroups.has(subject.group_id) && subjectIds.has(subject.id))
+    .map((subject) => {
       const chapters = chaptersByVersion.get(versionBySubject.get(subject.id) ?? "") ?? [];
       const group = groupById.get(subject.group_id);
-      return { id: subject.id, title: subject.title, slug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All Papers", chapterCount: chapters.length, chapterIds: chapters.map((chapter) => chapter.id) };
+      return {
+        id: subject.id,
+        title: subject.title,
+        slug: subject.slug,
+        groupCode: group?.code ?? "all",
+        groupName: group?.name ?? "All Papers",
+        chapterCount: chapters.length,
+        chapterIds: chapters.map((chapter) => chapter.id),
+      };
     });
-    return {
-      level: { id: direct.level.id, code: direct.level.code, name: direct.level.name },
-      groups: direct.groups.filter((group) => aggregateGroups || allowedGroups.has(group.id)).map((group) => ({ id: group.id, code: group.code, name: group.name })),
-      subjects,
-      totalChapters: subjects.reduce((sum, subject) => sum + subject.chapterCount, 0),
-    };
-  }
-  const supabase = createReferenceClient();
-  const levelResponse = await supabase.from("course_levels").select("id,code,name,is_active").eq("code", levelCode).eq("is_active", true).maybeSingle();
-  if (levelResponse.error) throw levelResponse.error;
-  const level = levelResponse.data;
-  if (!level) return null;
-  const [groupResponse, subjectResponse, mapResponse] = await Promise.all([
-    supabase.from("course_groups").select("id,level_id,code,name,is_active,sort_order").eq("level_id", level.id).eq("is_active", true).order("sort_order"),
-    supabase.from("subjects").select("id,level_id,group_id,title,slug,is_active,sort_order").eq("level_id", level.id).eq("is_active", true).order("sort_order"),
-    supabase.from("attempt_syllabus_map").select("level_id,attempt_key,group_id,subject_id,syllabus_version_id").eq("level_id", level.id).eq("attempt_key", attemptKey),
-  ]);
-  const firstError = [groupResponse.error, subjectResponse.error, mapResponse.error].find(Boolean);
-  if (firstError) throw firstError;
-  const groups = (groupResponse.data ?? []) as GroupRow[];
-  const subjects = (subjectResponse.data ?? []) as SubjectRow[];
-  const maps = (mapResponse.data ?? []) as AttemptMapRow[];
-  const aggregateGroups = levelCode === "foundation" || groupChoice === "both" || groupChoice === "not_applicable";
-  const allowedGroups = new Set((aggregateGroups ? groups : groups.filter((group) => group.code === groupChoice)).map((group) => group.id));
-  const applicableMaps = maps.filter((row) => allowedGroups.has(row.group_id));
-  const subjectIds = new Set(applicableMaps.map((row) => row.subject_id));
-  const versionIds = unique(applicableMaps.map((row) => row.syllabus_version_id));
-  let chapters: ChapterRow[] = [];
-  if (versionIds.length) {
-    const chapterResponse = await supabase.from("chapters").select("id,syllabus_version_id,sort_order").in("syllabus_version_id", versionIds).order("sort_order");
-    if (chapterResponse.error) throw chapterResponse.error;
-    chapters = (chapterResponse.data ?? []) as ChapterRow[];
-  }
-  const groupById = new Map(groups.map((group) => [group.id, group]));
-  const versionBySubject = new Map(applicableMaps.map((row) => [row.subject_id, row.syllabus_version_id]));
-  const academicSubjects: DashboardAcademicSubject[] = subjects.filter((subject) => allowedGroups.has(subject.group_id) && subjectIds.has(subject.id)).map((subject) => {
-    const versionId = versionBySubject.get(subject.id); const group = groupById.get(subject.group_id);
-    const subjectChapters = versionId ? chapters.filter((chapter) => chapter.syllabus_version_id === versionId) : []; return { id: subject.id, title: subject.title, slug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All Papers", chapterCount: subjectChapters.length, chapterIds: subjectChapters.map((chapter) => chapter.id) };
-  });
-  return { level: { id: level.id, code: level.code, name: level.name }, groups: groups.filter((group) => aggregateGroups || allowedGroups.has(group.id)).map((group) => ({ id: group.id, code: group.code, name: group.name })), subjects: academicSubjects, totalChapters: academicSubjects.reduce((sum, subject) => sum + subject.chapterCount, 0) };
+  return {
+    level: { id: direct.level.id, code: direct.level.code, name: direct.level.name },
+    groups: direct.groups
+      .filter((group) => aggregateGroups || allowedGroups.has(group.id))
+      .map((group) => ({ id: group.id, code: group.code, name: group.name })),
+    subjects,
+    totalChapters: subjects.reduce((sum, subject) => sum + subject.chapterCount, 0),
+  };
 }
 
 const cachedAcademicReference = unstable_cache(loadAcademicReference,["phase3-dashboard-academic-v2"],{ revalidate: 3600 });
 
 async function loadLiveReference(levelId: string, levelCode: string, attemptKey: string, subjectIdsKey: string, today: string): Promise<DashboardLiveReference> {
-  const supabase = createReferenceClient();
+  const client = createReferenceClient();
   const subjectIds = subjectIdsKey ? subjectIdsKey.split(",").filter(Boolean) : [];
-  const attemptResponse = await supabase.from("exam_attempts").select("id,level_id,attempt_key,label,start_date,end_date,source_url,last_seen_at,verification_status").eq("level_id", levelId).eq("attempt_key", attemptKey).eq("verification_status", "verified").maybeSingle();
+  const attemptResponse = await client.from("exam_attempts").select("id,level_id,attempt_key,label,start_date,end_date,source_url,last_seen_at,verification_status").eq("level_id", levelId).eq("attempt_key", attemptKey).eq("verification_status", "verified").maybeSingle();
   if (attemptResponse.error) throw attemptResponse.error;
   const attempt = attemptResponse.data;
   const [eventResponse, resourceResponse, sourceResponse, attemptMapResponse, subjectMapResponse] = await Promise.all([
-    attempt ? supabase.from("exam_events").select("id,attempt_id,title,event_type,event_date,source_url,last_seen_at,verification_status").eq("attempt_id", attempt.id).eq("verification_status", "verified").gte("event_date", today).order("event_date").limit(24) : Promise.resolve({ data: [], error: null }),
-    supabase.from("icai_resources").select("id,resource_type,title,summary,official_url,source_id,metadata,published_on,last_seen_at,last_changed_at,verification_status,status").eq("verification_status", "verified").eq("status", "active").order("last_changed_at", { ascending: false }).limit(24),
-    supabase.from("icai_sources").select("id,name,official_url,is_active").eq("is_active", true),
-    attempt ? supabase.from("resource_attempt_map").select("resource_id,attempt_id").eq("attempt_id", attempt.id) : Promise.resolve({ data: [], error: null }),
-    subjectIds.length ? supabase.from("resource_subject_map").select("resource_id,subject_id").in("subject_id", subjectIds) : Promise.resolve({ data: [], error: null }),
+    attempt ? client.from("exam_events").select("id,attempt_id,title,event_type,event_date,source_url,last_seen_at,verification_status").eq("attempt_id", attempt.id).eq("verification_status", "verified").gte("event_date", today).order("event_date").limit(24) : Promise.resolve({ data: [], error: null }),
+    client.from("icai_resources").select("id,resource_type,title,summary,official_url,source_id,metadata,published_on,last_seen_at,last_changed_at,verification_status,status").eq("verification_status", "verified").eq("status", "active").order("last_changed_at", { ascending: false }).limit(24),
+    client.from("icai_sources").select("id,name,official_url,is_active").eq("is_active", true),
+    attempt ? client.from("resource_attempt_map").select("resource_id,attempt_id").eq("attempt_id", attempt.id) : Promise.resolve({ data: [], error: null }),
+    subjectIds.length ? client.from("resource_subject_map").select("resource_id,subject_id").in("subject_id", subjectIds) : Promise.resolve({ data: [], error: null }),
   ]);
   const firstError = [eventResponse.error, resourceResponse.error, sourceResponse.error, attemptMapResponse.error, subjectMapResponse.error].find(Boolean);
   if (firstError) throw firstError;

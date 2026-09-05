@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { createR2PresignedUrl } from "@/lib/resources/r2-presign";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createD1ServerClient } from "@/lib/data/d1/client";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,8 +11,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Authentication required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const { id } = await params;
-  const supabase = await createServerSupabaseClient();
-  const response = await supabase.from("uploaded_resources")
+  const client = await createD1ServerClient();
+  const response = await client.from("uploaded_resources")
     .select("id,owner_user_id,visibility,moderation_status,storage_bucket,storage_path")
     .eq("id", id).maybeSingle();
   if (response.error || !response.data) return NextResponse.json({ error: "Resource not found or access denied." }, { status: 404 });

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { optionalUser } from "@/lib/auth/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createD1AdminClient } from "@/lib/data/d1/client";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { getTodayPlanPageModel, performTodayPlanAction } from "./service";
 import type { TodayPlanInteractionAction } from "./types";
@@ -79,14 +79,14 @@ function preserveTimeOnDate(value: string, date: string) {
 }
 
 async function ownedItem(userId: string, itemId: string) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const result = await admin.from("daily_plan_items").select("*").eq("id", itemId).eq("user_id", userId).maybeSingle();
   if (result.error || !result.data) throw new Error("Plan item was not found.");
   return result.data as PlanItemRow;
 }
 
 async function captureSnapshot(userId: string, item: PlanItemRow): Promise<ChangeSnapshot> {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const snapshot: ChangeSnapshot = { item: itemSnapshot(item) };
 
   if (item.source_type === "task" && item.source_id) {
@@ -124,7 +124,7 @@ async function captureSnapshot(userId: string, item: PlanItemRow): Promise<Chang
 }
 
 async function recordChange(userId: string, itemId: string | null, action: string, snapshot: ChangeSnapshot) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const inserted = await admin.from("planner_events").insert({
     user_id: userId,
     event_type: "today_plan_change",
@@ -136,7 +136,7 @@ async function recordChange(userId: string, itemId: string | null, action: strin
 }
 
 async function latestUndoableEvent(userId: string) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const result = await admin
     .from("planner_events")
     .select("*")
@@ -157,7 +157,7 @@ async function latestUndoableEvent(userId: string) {
 }
 
 async function restoreSnapshot(userId: string, snapshot: ChangeSnapshot) {
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
 
   if (snapshot.targetItemId) {
     await admin.from("daily_plan_items").delete().eq("id", snapshot.targetItemId).eq("user_id", userId);
@@ -221,7 +221,7 @@ async function undoLatest(userId: string) {
   if (!snapshot) throw new Error("This change cannot be undone safely.");
 
   await restoreSnapshot(userId, snapshot);
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const inserted = await admin.from("planner_events").insert({
     user_id: userId,
     event_type: "today_plan_undo",
@@ -237,7 +237,7 @@ async function undoLatest(userId: string) {
 async function startItem(userId: string, itemId: string) {
   const item = await ownedItem(userId, itemId);
   if (item.status !== "planned") throw new Error("Only a planned item can be started.");
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const previous = await admin.from("planner_events").select("id,payload").eq("user_id", userId).eq("event_type", "today_plan_started").eq("entity_id", itemId).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (previous.data) {
     const payload = parsePayload(previous.data.payload as Json);
@@ -258,7 +258,7 @@ async function startItem(userId: string, itemId: string) {
 async function reorderItems(userId: string, itemIds: string[]) {
   const unique = [...new Set(itemIds)];
   if (!unique.length || unique.length !== itemIds.length) throw new Error("Choose a valid task order.");
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const result = await admin.from("daily_plan_items").select("*").eq("user_id", userId).in("id", unique);
   if (result.error || (result.data ?? []).length !== unique.length) throw new Error("One or more plan items could not be reordered.");
   const rows = result.data as PlanItemRow[];
@@ -292,7 +292,7 @@ export async function performTodayPlanInteraction(action: TodayPlanInteractionAc
   const snapshot = await captureSnapshot(userId, item);
   await performTodayPlanAction(action);
 
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
 
   if (action.action === "snooze" && item.source_type === "task" && item.source_id) {
     const dueAt = new Date(Date.now() + Math.max(15, Math.min(1440, Math.round(action.minutes))) * 60_000).toISOString();
@@ -326,7 +326,7 @@ export async function getTodayPlanUndoState(userId: string) {
 
 export async function getTodayPlanStartedTimes(userId: string, itemIds: string[]) {
   if (!itemIds.length) return new Map<string, string>();
-  const admin = createAdminSupabaseClient();
+  const admin = createD1AdminClient();
   const result = await admin
     .from("planner_events")
     .select("*")

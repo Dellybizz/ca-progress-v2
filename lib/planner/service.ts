@@ -3,8 +3,7 @@ import "server-only";
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient, isCloudflareDataRuntime } from "@/lib/supabase/server";
-import { getD1RuntimeDatabase } from "@/lib/data/d1/supabase-compat";
+import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { getHotActivityRows, getHotCalendarRows, getHotPlannerRows, getHotExamEvents } from "@/lib/data/d1/hot-screens";
 import type { Database } from "@/lib/supabase/database.types";
 import type { StudySubjectOption } from "@/lib/study/types";
@@ -47,18 +46,8 @@ export async function getPlannerPageModel(): Promise<PlannerPageModel> {
   if (!validProfile(profile)) return { mode: "setup", viewerName: name };
   const subjects = await academicOptions(profile!);
   const names = maps(subjects);
-  if (isCloudflareDataRuntime()) {
-    const hot = await getHotPlannerRows(identity.id);
-    return { mode: "ready", viewerName: name, subjects, tasks: hot.tasks.map((row) => taskDto(row as TaskRow, names.subjects, names.chapters)), goals: hot.goals.map((row) => goalDto(row as GoalRow)) };
-  }
-  const supabase = await createServerSupabaseClient();
-  const [tasks, goals] = await Promise.all([
-    supabase.from("tasks").select("*").eq("user_id", identity.id).neq("status", "cancelled").order("due_at").limit(250),
-    supabase.from("goals").select("*").eq("user_id", identity.id).neq("status", "cancelled").order("due_date").limit(100),
-  ]);
-  const error = tasks.error || goals.error;
-  if (error) throw new Error(`Planner could not be loaded: ${error.message}`);
-  return { mode: "ready", viewerName: name, subjects, tasks: ((tasks.data ?? []) as TaskRow[]).map((row) => taskDto(row, names.subjects, names.chapters)), goals: ((goals.data ?? []) as GoalRow[]).map(goalDto) };
+  const hot = await getHotPlannerRows(identity.id);
+  return { mode: "ready", viewerName: name, subjects, tasks: hot.tasks.map((row) => taskDto(row as TaskRow, names.subjects, names.chapters)), goals: hot.goals.map((row) => goalDto(row as GoalRow)) };
 }
 
 export async function getGoalsPageModel(): Promise<GoalsPageModel> {
@@ -82,48 +71,25 @@ export async function getCalendarPageModel(month?: string | null): Promise<Calen
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
   if (!validProfile(profile)) return { mode: "setup", viewerName: name };
   const bounds = monthBounds(month);
-  const hotCalendar = isCloudflareDataRuntime() ? await getHotCalendarRows(identity.id, bounds.start.toISOString(), bounds.end.toISOString()) : null;
-  const supabase = await createServerSupabaseClient();
-  const [tasks, goals, userEvents, attempt] = await Promise.all([
-    hotCalendar ? Promise.resolve({ data: hotCalendar.tasks, error: null }) : supabase.from("tasks").select("id,title,notes,task_kind,subject_id,chapter_id,due_at,estimated_minutes,status,completed_at").eq("user_id", identity.id).gte("due_at", bounds.start.toISOString()).lt("due_at", bounds.end.toISOString()).neq("status", "cancelled").order("due_at"),
-    hotCalendar ? Promise.resolve({ data: hotCalendar.goals, error: null }) : supabase.from("goals").select("id,title,description,due_date,status,completed_at").eq("user_id", identity.id).gte("due_date", bounds.start.toISOString().slice(0, 10)).lt("due_date", bounds.end.toISOString().slice(0, 10)).neq("status", "cancelled").order("due_date"),
-    hotCalendar ? Promise.resolve({ data: hotCalendar.events, error: null }) : supabase.from("user_calendar_events").select("id,title,notes,starts_at,ends_at,all_day").eq("user_id", identity.id).gte("starts_at", bounds.start.toISOString()).lt("starts_at", bounds.end.toISOString()).order("starts_at"),
-    supabase.from("exam_attempts").select("id").eq("attempt_key", profile!.attempt_key!).eq("verification_status", "verified").limit(1).maybeSingle(),
+  const [calendar, examEvents] = await Promise.all([
+    getHotCalendarRows(identity.id, bounds.start.toISOString(), bounds.end.toISOString()),
+    getHotExamEvents(profile!.attempt_key!, bounds.start.toISOString(), bounds.end.toISOString()),
   ]);
-  const error = tasks.error || goals.error || userEvents.error || attempt.error;
-  if (error) throw new Error(`Calendar could not be loaded: ${error.message}`);
-  const examEvents = isCloudflareDataRuntime()
-    ? { data: await getHotExamEvents(profile!.attempt_key!, bounds.start.toISOString(), bounds.end.toISOString()), error: null }
-    : (attempt.data?.id ? await supabase.from("exam_events").select("id,attempt_id,title,event_type,event_date,source_url,last_seen_at,verification_status").eq("attempt_id", attempt.data.id).eq("verification_status", "verified").gte("event_date", bounds.start.toISOString().slice(0, 10)).lt("event_date", bounds.end.toISOString().slice(0, 10)).order("event_date") : { data: [], error: null });
-  if (examEvents.error) throw new Error(`Official exam calendar could not be loaded: ${examEvents.error.message}`);
+  const tasks = calendar.tasks;
+  const goals = calendar.goals;
+  const userEvents = calendar.events;
   const items: CalendarItem[] = [];
-  for (const row of (tasks.data ?? []) as TaskRow[]) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes });
-  for (const row of (goals.data ?? []) as GoalRow[]) items.push({ id: `goal:${row.id}`, source: "goal", kind: "goal", title: row.title, startsAt: `${row.due_date}T12:00:00.000Z`, endsAt: null, allDay: true, readOnly: false, status: row.status });
-  for (const row of (userEvents.data ?? []) as EventRow[]) items.push({ id: `user:${row.id}`, source: "user", kind: "personal", title: row.title, startsAt: row.starts_at, endsAt: row.ends_at, allDay: row.all_day, readOnly: false });
-  for (const row of examEvents.data ?? []) items.push({ id: `icai:${row.id}`, source: "icai", kind: "exam", title: row.title, startsAt: `${row.event_date}T00:00:00.000Z`, endsAt: null, allDay: true, readOnly: true, status: "verified", sourceUrl: row.source_url });
+  for (const row of tasks as TaskRow[]) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes });
+  for (const row of goals as GoalRow[]) items.push({ id: `goal:${row.id}`, source: "goal", kind: "goal", title: row.title, startsAt: `${row.due_date}T12:00:00.000Z`, endsAt: null, allDay: true, readOnly: false, status: row.status });
+  for (const row of userEvents as EventRow[]) items.push({ id: `user:${row.id}`, source: "user", kind: "personal", title: row.title, startsAt: row.starts_at, endsAt: row.ends_at, allDay: row.all_day, readOnly: false });
+  for (const row of examEvents) items.push({ id: `icai:${row.id}`, source: "icai", kind: "exam", title: row.title, startsAt: `${row.event_date}T00:00:00.000Z`, endsAt: null, allDay: true, readOnly: true, status: "verified", sourceUrl: row.source_url });
   items.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   return { mode: "ready", viewerName: name, month: bounds.month, items };
 }
 
 async function loadActivityRows(userId: string) {
-  if (!isCloudflareDataRuntime()) {
-    const supabase = await createServerSupabaseClient();
-    const [sessions, progress] = await Promise.all([
-      supabase.from("study_sessions").select("id,subject_id,chapter_id,ended_at,duration_seconds").eq("user_id", userId).order("ended_at", { ascending: false }).limit(40),
-      supabase.from("progress_events").select("id,chapter_id,stage,action,created_at,undone_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(40),
-    ]);
-    return { sessions: sessions.data ?? [], progress: progress.data ?? [], error: sessions.error || progress.error };
-  }
-  if (isCloudflareDataRuntime()) {
-    const hot = await getHotActivityRows(userId, 40);
-    return { sessions: hot.sessions, progress: hot.progress, error: null };
-  }
-  const db = getD1RuntimeDatabase();
-  const [sessions, progress] = await Promise.all([
-    db.prepare("SELECT id,subject_id,chapter_id,ended_at,duration_seconds FROM study_sessions WHERE user_id=?1 ORDER BY ended_at DESC LIMIT 40").bind(userId).all<Pick<SessionRow, "id"|"subject_id"|"chapter_id"|"ended_at"|"duration_seconds">>(),
-    db.prepare("SELECT id,chapter_id,stage,action,created_at,undone_at FROM progress_events WHERE user_id=?1 ORDER BY created_at DESC LIMIT 40").bind(userId).all<Pick<ProgressEventRow, "id"|"chapter_id"|"stage"|"action"|"created_at"|"undone_at">>(),
-  ]);
-  return { sessions: sessions.results ?? [], progress: progress.results ?? [], error: null };
+  const hot = await getHotActivityRows(userId, 40);
+  return { sessions: hot.sessions, progress: hot.progress, error: null };
 }
 
 async function loadActivityNames(sessions: SessionRow[], progress: ProgressEventRow[]) {
@@ -134,19 +100,6 @@ async function loadActivityNames(sessions: SessionRow[], progress: ProgressEvent
   ].filter((id): id is string => Boolean(id)))];
   if (!subjectIds.length && !chapterIds.length) return { subjects: new Map<string, string>(), chapters: new Map<string, string>() };
 
-  if (!isCloudflareDataRuntime()) {
-    const supabase = await createServerSupabaseClient();
-    const [subjects, chapters] = await Promise.all([
-      subjectIds.length ? supabase.from("subjects").select("id,title").in("id", subjectIds) : Promise.resolve({ data: [], error: null }),
-      chapterIds.length ? supabase.from("chapters").select("id,title").in("id", chapterIds) : Promise.resolve({ data: [], error: null }),
-    ]);
-    const error = subjects.error || chapters.error;
-    if (error) throw new Error(`Activity labels could not be loaded: ${error.message}`);
-    return {
-      subjects: new Map((subjects.data ?? []).map((row) => [row.id, row.title])),
-      chapters: new Map((chapters.data ?? []).map((row) => [row.id, row.title])),
-    };
-  }
 
   const db = getD1RuntimeDatabase();
   const subjectPlaceholders = subjectIds.map((_, index) => `?${index + 1}`).join(",");
