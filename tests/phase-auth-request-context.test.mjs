@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("../", import.meta.url).pathname;
@@ -16,18 +16,19 @@ test("Cloudflare auth has one cached request-scoped session context", () => {
   assert.match(cloudflare, /s\.absolute_expires_at > CURRENT_TIMESTAMP/);
 });
 
-test("identity, authorization, and D1 compatibility consume the shared context", () => {
+test("identity, authorization, and canonical D1 client consume the shared context", () => {
   const provider = read("lib/auth/provider.ts");
   const server = read("lib/auth/server.ts");
   const authorization = read("lib/authorization/server.ts");
-  const d1 = read("lib/data/d1/supabase-compat.ts");
+  const d1 = read("lib/data/d1/client.ts");
   assert.match(provider, /getCloudflareRequestAuth/);
   assert.doesNotMatch(provider, /getCloudflareApplicationSession/);
   assert.match(server, /export const getRequestAuthContext = cache/);
   assert.match(server, /getCloudflareRequestAuth/);
   assert.match(authorization, /getRequestAuthContext/);
   assert.match(d1, /getCloudflareRequestAuth/);
-  assert.doesNotMatch(d1, /getCloudflareApplicationSession/);
+  assert.doesNotMatch(d1, /D1SupabaseCompatClient|createD1ServerCompatClient|createD1AdminCompatClient/);
+  assert.equal(existsSync(join(root, "lib/data/d1/supabase-compat.ts")), false);
 });
 
 test("personalized loaders obtain identity from the request context", () => {
