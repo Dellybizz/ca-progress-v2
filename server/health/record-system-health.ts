@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createD1AdminClient } from "@/lib/data/d1/client";
-import type { Json } from "@/lib/supabase/database.types";
+import type { Json } from "@/lib/data/database.types";
 
 export async function recordSystemHealth(input: {
   component: string;
