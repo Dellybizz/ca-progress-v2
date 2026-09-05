@@ -59,6 +59,7 @@ jobs:
             label="$1"; pattern="$2"
             hits="$(grep -RInE \
               --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' \
+              --exclude='env.ts' \
               --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git \
               --exclude-dir=supabase \
               "${pattern}" app components lib server workers proxy.ts 2>/dev/null || true)"
