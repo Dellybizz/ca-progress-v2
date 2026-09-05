@@ -31,7 +31,8 @@ test("Phase 7 R2 upload persists metadata through the server-only D1 quota servi
   assert.match(route, /getResourceR2Bucket/);
   assert.match(route, /createResourceMetadataWithinQuota/);
   assert.match(billingService, /import "server-only"/);
-  assert.match(billingService, /createD1AdminCompatClient/);
+  assert.match(billingService, /createD1AdminClient/);
+  assert.doesNotMatch(billingService, /createD1AdminCompatClient/);
   assert.match(billingService, /client\.from\("uploaded_resources"\)/);
   assert.match(route, /R2_NOT_CONFIGURED/);
   assert.match(route, /RESOURCE_METADATA_FAILED/);

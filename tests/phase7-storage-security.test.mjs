@@ -31,7 +31,8 @@ test("Phase 7 resource metadata stays server-only with D1 quota enforcement", ()
   assert.match(hardening, /metadata_mutations":"server_service_role_only/);
   assert.match(upload, /createResourceMetadataWithinQuota/);
   assert.match(billingService, /import "server-only"/);
-  assert.match(billingService, /createD1AdminCompatClient/);
+  assert.match(billingService, /createD1AdminClient/);
+  assert.doesNotMatch(billingService, /createD1AdminCompatClient/);
   assert.match(upload, /getHotD1Database/);
   assert.match(upload, /getResourceR2Bucket/);
   assert.doesNotMatch(upload, /getSupabaseAdminRuntimeConfig|getSupabaseAdminConfig|@\/lib\/supabase\/admin|admin\.storage|\.storage\.from\(/);
