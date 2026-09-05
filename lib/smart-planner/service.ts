@@ -5,7 +5,7 @@ import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createD1AdminClient } from "@/lib/data/d1/client";
 import { createD1ServerClient } from "@/lib/data/d1/client";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import { selectDailyCandidates } from "./ranking";
 import type {
   ForecastHistoryPoint,
