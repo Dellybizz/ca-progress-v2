@@ -86,19 +86,6 @@ const runtimeFiles = [
 ];
 const sourceExtension = /\.(?:ts|tsx|js|jsx|mjs|cjs|json|jsonc|yml|yaml)$/i;
 
-function walk(relativeDir) {
-  const absoluteDir = path.join(root, relativeDir);
-  if (!existsSync(absoluteDir)) return [];
-  const files = [];
-  for (const entry of readdirSync(absoluteDir)) {
-    const relative = path.join(relativeDir, entry);
-    const absolute = path.join(root, relative);
-    if (statSync(absolute).isDirectory()) files.push(...walk(relative));
-    else if (sourceExtension.test(entry)) files.push(relative);
-  }
-  return files;
-}
-
 export function scanText(text, file = "fixture") {
   const blockers = [];
   for (const [rule, pattern] of runtimeTokenRules) {
