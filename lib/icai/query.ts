@@ -2,7 +2,7 @@ import "server-only";
 
 import { createD1ServerClient } from "@/lib/data/d1/client";
 import { createD1AdminClient } from "@/lib/data/d1/client";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import type { IcaiAdminDashboard, IcaiPublicCatalog, IcaiPublicFilters, IcaiResourceCard, IcaiResourceType } from "./types";
 import { getSharedPublicJson } from "@/lib/cache/public";
 
