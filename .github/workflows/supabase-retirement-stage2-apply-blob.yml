@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      STAGE2_BUNDLE_BLOB: d4c96e4791cfe070b56e3a4430ca8edad3786576
+      STAGE2_BUNDLE_BLOB: b40e0f8dd3e0ea1cac0f064913f3677d101ebede
     steps:
       - uses: actions/checkout@v5
         with:
@@ -41,7 +41,7 @@ jobs:
             echo '::error::Unsafe path found in Stage 2 archive'
             exit 1
           fi
-          for required in lib/auth/provider.ts scripts/phase5/retirement-stage2-scan.mjs tests/retirement-stage2.test.mjs .github/workflows/supabase-retirement-stage2-final.yml; do
+          for required in lib/auth/provider.ts lib/data/d1/client.ts scripts/phase5/retirement-stage2-scan.mjs tests/retirement-stage2.test.mjs .github/workflows/supabase-retirement-stage2-closure.yml; do
             grep -Fxq "$required" /tmp/stage2-files.txt || { echo "::error::Stage 2 archive is missing $required"; exit 1; }
           done
           echo "Stage 2 bundle contains $(wc -l < /tmp/stage2-files.txt) files"
@@ -51,6 +51,8 @@ jobs:
           set -euo pipefail
           tar -xzf .stage2/stage2-changes.tar.gz -C .
           rm -rf .stage2
+          rm -f lib/supabase/browser.ts
+          rm -f lib/supabase/proxy.ts
           rm -f .github/workflows/supabase-retirement-stage2-inventory.yml
           rm -f .github/workflows/supabase-retirement-stage2-workspace.yml
           rm -f .github/workflows/supabase-retirement-stage2-apply-blob.yml
