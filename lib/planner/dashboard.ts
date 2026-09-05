@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getHotD1Database } from "@/lib/data/d1/runtime";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 const DAY_MS = 86_400_000;
