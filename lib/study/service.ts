@@ -4,7 +4,7 @@ import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { getHotStudySessions, getHotStudyTimer } from "@/lib/data/d1/hot-screens";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import type { StudyAnalytics, StudyPageModel, StudySessionItem, StudySubjectOption, StudyTimerSnapshot } from "./types";
 
 type SessionRow = Database["public"]["Tables"]["study_sessions"]["Row"];
