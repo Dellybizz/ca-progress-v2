@@ -43,8 +43,14 @@ jobs:
       - name: OpenNext Cloudflare build
         run: npm run cf:build
 
-      - name: Web Worker dry-run
+      - name: Web and admin API Worker dry-run
         run: npx wrangler deploy --dry-run --config wrangler.web.jsonc
+
+      - name: ICAI sync Worker dry-run
+        run: npx wrangler deploy --dry-run --config workers/icai-sync/wrangler.jsonc
+
+      - name: Billing Worker dry-run
+        run: npx wrangler deploy --dry-run --config workers/billing/wrangler.jsonc
 
       - name: Reconfirm zero active Supabase runtime blockers
         run: node scripts/phase5/retirement-stage2-scan.mjs
@@ -52,5 +58,6 @@ jobs:
       - name: Phase 2 boundary
         run: |
           echo 'Static/build validation only.'
+          echo 'Admin/API operations are deployed in the web Worker; there is no separate admin-ops Worker/config in this repository.'
           echo 'Do not create SUPABASE_RETIREMENT_STAGE2.md here.'
           echo 'Stage 2 remains incomplete until live authenticated production verification passes.'
