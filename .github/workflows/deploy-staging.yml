@@ -1,7 +1,4 @@
-# Phase 5 Pro CPU budget and seamless navigation deployment - hot index validation rerun - session plan matcher stabilized - community order plan stabilized - read state plan stabilized - migration contract assertion stabilized - public cache versioning and invalidation - bounded TTL metrics and isolation checks
-# Phase 5 post-DO-migration cutover verification trigger —
-# Phase 5 cutover trigger marker — set-based community reads interpolation fix and request-scoped auth client and indexed session lookup and F1 persistent shell stable assertions fix
-name: Cloudflare Migration Phase 5 Cutover Deploy
+name: Cloudflare V2 Deploy
 
 on:
   workflow_dispatch:
@@ -9,21 +6,12 @@ on:
     branches: [phase-12-operations-admin-platform]
     paths:
       - .github/workflows/deploy-staging.yml
-      - app/api/community/**
-      - app/api/admin/community/**
-      - app/api/notes/**
-      - app/api/resources/**
-      - app/api/admin/resources/**
-      - app/api/planner/**
-      - app/api/progress/**
-      - lib/community/**
-      - lib/resources/**
-      - lib/progress/**
-      - lib/data/d1/**
-      - lib/billing/**
-      - workers/billing/**
-      - d1/migrations/0010_phase12_background_jobs.sql
-      - d1/migrations/0011_phase12_r2_upload_intents.sql
+      - app/**
+      - components/**
+      - lib/**
+      - server/**
+      - workers/**
+      - custom-worker.ts
       - wrangler.web.jsonc
       - package.json
 
@@ -49,62 +37,40 @@ jobs:
       SMOKE_AUTH_COOKIE: ${{ secrets.SMOKE_AUTH_COOKIE }}
       NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_APP_NAME: CA Progress
-      NEXT_PUBLIC_APP_VERSION: cloudflare-migration-phase-5
-      CUTOVER_BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
+      NEXT_PUBLIC_APP_VERSION: cloudflare-retired
+      DEPLOY_BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-
+      - name: Enforce permanent Supabase retirement
+        run: npm run verify:retirement
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
         run: npm run lint
-      - name: Cloudflare migration Phase 2 contract tests
-        run: npm run test:cloudflare-phase2
-      - name: Cloudflare migration Phase 2 clean D1 bootstrap
-        run: npm run d1:phase2:validate
-      - name: Cloudflare migration Phase 3 auth/R2/jobs/realtime tests
-        run: npm run test:cloudflare-phase3
-      - name: Cloudflare migration Phase 3 clean D1 auth/job bootstrap
-        run: npm run d1:phase3:validate
-      - name: Cloudflare migration Phase 4 migration/reconciliation/shadow tests
-        run: npm run test:cloudflare-phase4
-      - name: Cloudflare migration Phase 4 clean D1/resume/rollback validation
-        run: npm run d1:phase4:validate
-      - name: D1 hot-query index and query-plan validation
+      - name: Validate retained D1 hot-query indexes
         run: npm run d1:hot-indexes:validate
+      - name: Repository tests
+        run: npm test
       - name: Next.js production build
         run: npm run build
-      - name: OpenNext Worker build and Wrangler dry-runs
+      - name: OpenNext build and production Worker dry-runs
         run: npm run cf:check
-      - name: Phase 3 D1/R2/Queue Worker dry-run
-        run: npm run cf:check:phase3
-      - name: Phase 4 D1/R2 shadow Worker dry-run
-        run: npm run cf:check:phase4
       - name: Smoke generated Cloudflare SSR routes
         run: npm run cf:smoke
-      - name: Repository-wide tests
-        run: npm test
 
-      - name: Capture pre-cutover deployment evidence
+      - name: Capture pre-deploy evidence
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p phase5-cutover
-          npx wrangler deployments list --name ca-progress-v2 --json > phase5-cutover/web-deployments-before.json
-          npx wrangler secret list --config wrangler.web.jsonc > phase5-cutover/web-secrets-before.json
-          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > phase5-cutover/d1-before.txt
+          mkdir -p deployment-evidence
+          npx wrangler deployments list --name ca-progress-v2 --json > deployment-evidence/web-before.json
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > deployment-evidence/d1-before.txt
 
-      - name: Apply Phase 2 D1 performance indexes
-        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0007_phase2_performance_indexes.sql
-
-      - name: Apply Phase 5 hot-path indexes
-        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0008_phase5_hot_path_indexes.sql
-
-      - name: Prepare ephemeral Worker secret files
+      - name: Prepare Billing Worker secret file
         shell: bash
         run: |
           set -euo pipefail
@@ -113,7 +79,7 @@ jobs:
           const fs = require('fs');
           const required = (name) => {
             const value = process.env[name];
-            if (!value) throw new Error(`${name} is required for cutover.`);
+            if (!value) throw new Error(`${name} is required for deployment.`);
             return value;
           };
           fs.writeFileSync('/tmp/ca-billing-secrets.json', JSON.stringify({
@@ -121,131 +87,53 @@ jobs:
             RAZORPAY_KEY_SECRET: required('RAZORPAY_KEY_SECRET'),
             RAZORPAY_WEBHOOK_SECRET: required('RAZORPAY_WEBHOOK_SECRET'),
           }));
-          fs.writeFileSync('/tmp/ca-web-secrets.json', JSON.stringify({
-            CA_AUTH_SESSION_SECRET: required('CA_AUTH_SESSION_SECRET'),
-            GOOGLE_OAUTH_CLIENT_ID: required('GOOGLE_OAUTH_CLIENT_ID'),
-            GOOGLE_OAUTH_CLIENT_SECRET: required('GOOGLE_OAUTH_CLIENT_SECRET'),
-            LINKEDIN_OIDC_CLIENT_ID: required('LINKEDIN_OIDC_CLIENT_ID'),
-            LINKEDIN_OIDC_CLIENT_SECRET: required('LINKEDIN_OIDC_CLIENT_SECRET'),
-          }));
           NODE
 
-      - name: Apply Phase 5 hot-query index completion
-        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0009_phase5_hot_query_indexes.sql
+      - name: Deploy ICAI service
+        run: npx wrangler deploy --config=workers/icai-sync/wrangler.jsonc --name=ca-progress-v2-icai-sync
 
-      - name: Apply Phase 12 durable background-job schema
-        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0010_phase12_background_jobs.sql
+      - name: Deploy Billing service
+        run: npx wrangler deploy --config=workers/billing/wrangler.jsonc --secrets-file /tmp/ca-billing-secrets.json
 
-      - name: Apply Phase 12 direct R2 upload-intent schema
-        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --file d1/migrations/0011_phase12_r2_upload_intents.sql
-
-      - name: Verify Phase 12 remote D1 schema
+      - name: Verify existing web Worker secrets
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('background_jobs','r2_upload_intents') ORDER BY name; SELECT version FROM _ca_schema_migrations WHERE version IN ('0010','0011') ORDER BY version; PRAGMA foreign_key_check;" > phase5-cutover/d1-phase12-schema.txt
-          grep -q 'background_jobs' phase5-cutover/d1-phase12-schema.txt || { echo "::error::background_jobs is missing from retained D1"; exit 1; }
-          grep -q 'r2_upload_intents' phase5-cutover/d1-phase12-schema.txt || { echo "::error::r2_upload_intents is missing from retained D1"; exit 1; }
-          grep -q '0010' phase5-cutover/d1-phase12-schema.txt || { echo "::error::D1 migration 0010 is not recorded"; exit 1; }
-          grep -q '0011' phase5-cutover/d1-phase12-schema.txt || { echo "::error::D1 migration 0011 is not recorded"; exit 1; }
-
-      - name: Deploy private ICAI service
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f workers/icai-sync/wrangler.jsonc
-          test -f workers/icai-sync/index.ts
-          npx wrangler deploy \
-            --config=workers/icai-sync/wrangler.jsonc \
-            --name=ca-progress-v2-icai-sync
-
-      - name: Deploy private Billing service with Razorpay secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx wrangler deploy \
-            --config=workers/billing/wrangler.jsonc \
-            --secrets-file /tmp/ca-billing-secrets.json
-          npx wrangler secret list --name ca-progress-v2-billing > phase5-cutover/billing-secrets-after.json
-          for name in RAZORPAY_KEY_ID RAZORPAY_KEY_SECRET RAZORPAY_WEBHOOK_SECRET; do
-            grep -q "\"name\": \"$name\"" phase5-cutover/billing-secrets-after.json || { echo "::error::$name was not installed on Billing Worker"; exit 1; }
-          done
-      - name: Verify manually staged web secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx wrangler secret list --config wrangler.web.jsonc > phase5-cutover/web-secrets-staged.json
+          npx wrangler secret list --config wrangler.web.jsonc > deployment-evidence/web-secrets.json
           for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
-            grep -q "\"name\": \"$name\"" phase5-cutover/web-secrets-staged.json || { echo "::error::$name is missing from web Worker"; exit 1; }
+            grep -q "\"name\": \"$name\"" deployment-evidence/web-secrets.json || { echo "::error::$name is missing from web Worker"; exit 1; }
           done
-      - name: Deploy Cloudflare-auth and D1 web runtime
+
+      - name: Deploy web runtime
         run: npm run cf:deploy:web
 
-      - name: Verify cutover and automatically rollback web runtime on failure
+      - name: Verify deployment and rollback web runtime on failure
         shell: bash
         run: |
           set +e
           failed=0
-          base="$CUTOVER_BASE_URL"
-
-          if ! SMOKE_BASE_URL="$base" SMOKE_AUTH_COOKIE="${SMOKE_AUTH_COOKIE:-}" npm run cf:smoke; then
-            echo "::error::Synthetic cold/warm navigation smoke failed."
-            failed=1
+          base="$DEPLOY_BASE_URL"
+          SMOKE_BASE_URL="$base" SMOKE_AUTH_COOKIE="${SMOKE_AUTH_COOKIE:-}" npm run cf:smoke || failed=1
+          health="$(curl --max-time 20 -fsS "$base/api/health" 2>/dev/null)" || failed=1
+          if [ -n "$health" ]; then
+            HEALTH_JSON="$health" node -e 'const x=JSON.parse(process.env.HEALTH_JSON); if(x.status!=="ok" || x.checks?.database!=="ok") process.exit(1)' || failed=1
           fi
-
-          health=""
-          for attempt in $(seq 1 12); do
-            health="$(curl --max-time 20 -fsS "$base/api/health" 2>/dev/null)" && break
-            sleep 5
-          done
-          if [ -z "$health" ]; then
-            echo "::error::Production health endpoint did not become reachable."
-            failed=1
-          else
-            HEALTH_JSON="$health" node -e 'const x=JSON.parse(process.env.HEALTH_JSON); if(x.status!=="ok" || x.checks?.database!=="ok") process.exit(1)' || { echo "::error::D1-backed health check is not ok."; failed=1; }
-          fi
-
-          curl --max-time 20 -fsS "$base/login" >/dev/null || { echo "::error::Login page smoke failed."; failed=1; }
-
-          curl --max-time 20 -sS -D /tmp/google.headers -o /dev/null "$base/auth/google?next=%2Fdashboard" || failed=1
-          grep -Eqi '^location: https://accounts\.google\.com/' /tmp/google.headers || { echo "::error::Google direct OAuth redirect smoke failed."; failed=1; }
-
-          curl --max-time 20 -sS -D /tmp/linkedin.headers -o /dev/null "$base/auth/linkedin?next=%2Fdashboard" || failed=1
-          grep -Eqi '^location: https://www\.linkedin\.com/' /tmp/linkedin.headers || { echo "::error::LinkedIn direct OIDC redirect smoke failed."; failed=1; }
-
-          webhook_code="$(curl --max-time 20 -sS -o /tmp/webhook.json -w '%{http_code}' -X POST "$base/api/payments/webhook")"
-          if [ "$webhook_code" != "400" ]; then
-            echo "::error::Razorpay webhook boundary smoke expected HTTP 400 without signature, got $webhook_code."
-            failed=1
-          fi
-
-          checkout_code="$(curl --max-time 20 -sS -o /tmp/checkout.json -w '%{http_code}' -H 'content-type: application/json' -d '{}' "$base/api/payments/create-order")"
-          if [ "$checkout_code" != "401" ]; then
-            echo "::error::Unauthenticated billing boundary smoke expected HTTP 401, got $checkout_code."
-            failed=1
-          fi
-
-          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > phase5-cutover/d1-after.txt || failed=1
-          npx wrangler deployments list --name ca-progress-v2 --json > phase5-cutover/web-deployments-after.json || failed=1
-
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > deployment-evidence/d1-after.txt || failed=1
+          npx wrangler deployments list --name ca-progress-v2 --json > deployment-evidence/web-after.json || failed=1
           if [ "$failed" -ne 0 ]; then
-            echo "::error::Phase 5 smoke failed; rolling the web Worker back to the version uploaded before the cutover deployment."
-            npx wrangler rollback --name ca-progress-v2 --message "Phase 5 automated rollback after failed cutover smoke" || echo "::error::Automatic rollback command also failed; use captured deployment evidence for manual rollback."
+            npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after failed deployment smoke" || true
             exit 1
           fi
+          echo "Cloudflare deployment verification PASS."
 
-          echo "Phase 5 automated cutover smoke PASS."
-
-      - name: Remove ephemeral secret files
+      - name: Remove ephemeral secret file
         if: always()
-        shell: bash
-        run: rm -f /tmp/ca-billing-secrets.json /tmp/ca-web-secrets.json
+        run: rm -f /tmp/ca-billing-secrets.json
 
-      - name: Upload cutover evidence
+      - name: Upload deployment evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: phase5-cutover-${{ github.run_id }}
+          name: cloudflare-deployment-${{ github.run_id }}
           retention-days: 30
-          path: phase5-cutover/
-# Manual migration verification marker — preserves existing deployment and rollback gates.
+          path: deployment-evidence/

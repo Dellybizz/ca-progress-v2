@@ -1,0 +1,54 @@
+name: Supabase Retirement Permanent Closure
+
+on:
+  pull_request:
+  push:
+    branches: [main, phase-12-operations-admin-platform]
+    paths:
+      - app/**
+      - components/**
+      - lib/**
+      - server/**
+      - workers/**
+      - scripts/**
+      - tests/**
+      - .github/workflows/**
+      - .env.example
+      - package.json
+      - wrangler.web.jsonc
+      - wrangler.smoke.jsonc
+      - d1/migrations/**
+
+permissions:
+  contents: read
+
+jobs:
+  retirement-closure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Enforce retired migration/runtime paths
+        run: npm run verify:retirement
+      - name: Retirement regression contract
+        run: node --test tests/supabase-retirement.test.mjs
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Retained D1 index validation
+        run: npm run d1:hot-indexes:validate
+      - name: Repository tests
+        run: npm test
+      - name: Next.js production build
+        run: npm run build
+      - name: OpenNext build and production Worker dry-runs
+        run: npm run cf:check
+      - name: SSR smoke
+        run: npm run cf:smoke
+      - name: Final retirement rescan
+        run: npm run verify:retirement

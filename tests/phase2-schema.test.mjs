@@ -4,11 +4,22 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("../", import.meta.url).pathname;
-const sql = readFileSync(join(root, "supabase/migrations/20260830020100_phase2_auth_profiles.sql"), "utf8");
-const permissions = readFileSync(join(root, "supabase/migrations/20260830020200_phase2_auth_function_permissions.sql"), "utf8");
-const socialCleanup = readFileSync(join(root, "supabase/migrations/20260830020300_phase2_social_login_only.sql"), "utf8");
-test("Phase 2 extends profiles with onboarding fields and checks", () => { for (const field of ["ca_level","group_choice","attempt_key","daily_target_minutes","onboarding_step","onboarding_completed_at"]) assert.match(sql, new RegExp(field)); assert.match(sql, /profiles_daily_target_check/); assert.match(sql, /profiles_onboarding_step_check/); });
-test("new auth users bootstrap profile and UI preference rows", () => { assert.match(sql, /handle_new_auth_user/); assert.match(sql, /on_auth_user_created/); assert.match(sql, /insert into public\.profiles/i); assert.match(sql, /insert into public\.user_preferences/i); assert.match(permissions, /revoke execute on function public\.handle_new_auth_user\(\) from public, anon, authenticated/i); });
-test("phone OTP support is cleanly retired from the current schema", () => { assert.match(socialCleanup, /drop table if exists public\.auth_otp_rate_limits/i); const types = readFileSync(join(root, "lib/data/database.types.ts"), "utf8"); assert.equal(types.includes("auth_otp_rate_limits"), false); });
-test("avatar bucket is private with own-folder policies", () => { assert.match(sql, /'avatars'/); assert.match(sql, /2097152/); for (const policy of ["avatars_select_own","avatars_insert_own","avatars_update_own","avatars_delete_own"]) assert.match(sql, new RegExp(policy)); assert.match(sql, /storage\.foldername/); });
-test("attempt selector has a database-backed non-academic placeholder until Phase 3", () => { assert.match(sql, /onboarding\.attempt_options/); assert.match(sql, /non_academic_placeholder/); assert.match(sql, /Verified academic attempts replace this placeholder in Phase 3/); });
+const d1 = readFileSync(join(root, "d1/migrations/0001_phase2_platform.sql"), "utf8");
+const types = readFileSync(join(root, "lib/data/database.types.ts"), "utf8");
+
+test("current D1 profiles schema carries onboarding fields", () => {
+  for (const field of ["ca_level", "group_choice", "attempt_key", "daily_target_minutes", "onboarding_step", "onboarding_completed_at"]) assert.match(d1, new RegExp(field));
+  assert.match(d1, /CREATE TABLE IF NOT EXISTS profiles/);
+  assert.match(d1, /CREATE TABLE IF NOT EXISTS user_preferences/);
+});
+
+test("current D1 identity model preserves stable application user ids", () => {
+  assert.match(d1, /CREATE TABLE IF NOT EXISTS app_users/);
+  assert.match(d1, /user_id TEXT PRIMARY KEY/);
+  assert.match(d1, /provider_subject TEXT/);
+  assert.match(d1, /UNIQUE\(auth_provider, provider_subject\)/);
+});
+
+test("retired phone OTP table is absent from provider-neutral application types", () => {
+  assert.equal(types.includes("auth_otp_rate_limits"), false);
+});

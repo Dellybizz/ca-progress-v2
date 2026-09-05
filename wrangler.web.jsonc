@@ -35,10 +35,9 @@
   "vars": {
     "NEXT_PUBLIC_APP_NAME": "CA Progress",
     "NEXT_PUBLIC_APP_ENV": "production",
-    "NEXT_PUBLIC_APP_VERSION": "cloudflare-migration-phase-5",
+    "NEXT_PUBLIC_APP_VERSION": "cloudflare-retired",
     "CA_AUTH_RUNTIME": "cloudflare",
     "CA_DATA_RUNTIME": "cloudflare",
-    "CA_PHASE4_SHADOW_READ": "0",
     "CA_GUEST_TEST_MODE": "true",
     "CA_PERF_LOGGING": "true",
     "ICAI_SYNC_ENABLED": "true",

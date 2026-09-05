@@ -13,34 +13,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
+      - name: Enforce permanent Supabase retirement
+        run: npm run verify:retirement
       - run: npm run typecheck
       - run: npm run lint
-      - name: Cloudflare migration Phase 2 contract tests
-        run: npm run test:cloudflare-phase2
-      - name: Cloudflare migration Phase 2 clean D1 bootstrap
-        run: npm run d1:phase2:validate
-      - name: Cloudflare migration Phase 3 auth/R2/jobs/realtime tests
-        run: npm run test:cloudflare-phase3
-      - name: Cloudflare migration Phase 3 clean D1 auth/job bootstrap
-        run: npm run d1:phase3:validate
-      - name: Cloudflare migration Phase 4 migration/reconciliation/shadow tests
-        run: npm run test:cloudflare-phase4
-      - name: Cloudflare migration Phase 4 clean D1/resume/rollback validation
-        run: npm run d1:phase4:validate
+      - name: Validate retained D1 hot-query indexes
+        run: npm run d1:hot-indexes:validate
       - name: Next.js production build
         run: npm run build
-      - name: OpenNext Worker build and existing Wrangler dry-runs
+      - name: OpenNext build and production Worker dry-runs
         run: npm run cf:check
-      - name: Phase 3 D1/R2/Queue Worker dry-run
-        run: npm run cf:check:phase3
-      - name: Phase 4 D1/R2 shadow Worker dry-run
-        run: npm run cf:check:phase4
       - name: Smoke Cloudflare SSR routes
         run: npm run cf:smoke
       - name: Repository-wide tests
         run: npm test
+      - name: Reconfirm permanent Supabase retirement
+        run: npm run verify:retirement
