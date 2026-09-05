@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs"]);
 const SOURCE_ROOTS = ["app", "components", "lib", "server", "workers"];
@@ -107,7 +107,7 @@ export function scanRepository(rootDir = process.cwd()) {
   return { files, blockers };
 }
 
-export function formatScanResult(result, rootDir = process.cwd()) {
+export function formatScanResult(result) {
   const lines = [
     `Stage 2 active runtime files scanned: ${result.files.length}`,
     `Stage 2 active runtime blockers: ${result.blockers.length}`,
@@ -125,7 +125,7 @@ export function formatScanResult(result, rootDir = process.cwd()) {
 
 export function runCli(rootDir = process.cwd()) {
   const result = scanRepository(rootDir);
-  console.log(formatScanResult(result, rootDir));
+  console.log(formatScanResult(result));
   return result.blockers.length === 0 ? 0 : 1;
 }
 
