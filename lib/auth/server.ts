@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
 import { createD1ServerClient } from "@/lib/data/d1/client";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import type { AttemptOption, CALevel } from "@/lib/profile/validation";
 import type { AppRole } from "@/lib/authorization/roles";
 import { getCloudflareProfileForUser, ensureCloudflareUserBootstrap } from "./cloudflare-profile";
