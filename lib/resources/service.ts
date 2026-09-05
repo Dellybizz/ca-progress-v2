@@ -17,6 +17,7 @@ type TagRow = Database["public"]["Tables"]["note_tags"]["Row"];
 type TagMapRow = Database["public"]["Tables"]["note_tag_map"]["Row"];
 type UploadRow = Database["public"]["Tables"]["uploaded_resources"]["Row"];
 type ReportRow = Database["public"]["Tables"]["resource_reports"]["Row"];
+type NamedRow = { id: string; title: string };
 
 function viewerLabel(name: string | null, email: string | null, phone: string | null) {
   return name?.trim() || email || phone || "Student";
@@ -63,8 +64,8 @@ async function nameMaps(client: Awaited<ReturnType<typeof createD1ServerClient>>
   ]);
   if (subjects.error || chapters.error) throw new Error(`Resource academic labels could not be loaded: ${(subjects.error || chapters.error)?.message}`);
   return {
-    subjects: new Map((subjects.data ?? []).map((row) => [row.id, row.title])),
-    chapters: new Map((chapters.data ?? []).map((row) => [row.id, row.title])),
+    subjects: new Map(((subjects.data ?? []) as NamedRow[]).map((row) => [row.id, row.title])),
+    chapters: new Map(((chapters.data ?? []) as NamedRow[]).map((row) => [row.id, row.title])),
   };
 }
 

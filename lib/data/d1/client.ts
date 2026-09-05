@@ -21,6 +21,7 @@ type QueryError = { message: string; code?: string };
 // Transitional compatibility boundary: callers historically relied on Supabase's
 // inferred row shapes. Stage 2 removes the Supabase runtime while preserving that
 // caller contract; Stage 3 can replace this with generated D1 table generics.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- transitional Stage 2 compatibility boundary
 type QueryResult<T = any> = { data: T | null; error: QueryError | null };
 type ClientOptions = { admin?: boolean; actorUserId?: string | null; actorRole?: AppRole | null };
 type Filter = { sql: string; values: unknown[] };

@@ -23,12 +23,13 @@ export async function POST(request: Request) {
 
   const admin = createD1AdminClient();
   const rows = await admin.from("daily_plan_items").select("id,plan_id,user_id").eq("user_id", identity.id).in("id", itemIds);
-  if (rows.error || !rows.data || rows.data.length !== itemIds.length) {
+  const rowData = (rows.data ?? []) as Array<{ id: string; plan_id: string; user_id: string }>;
+  if (rows.error || rowData.length !== itemIds.length) {
     return NextResponse.json({ error: "One or more plan items could not be organised." }, { status: 409 });
   }
 
-  const planId = rows.data[0]?.plan_id;
-  const planIds = new Set(rows.data.map((row) => row.plan_id));
+  const planId = rowData[0]?.plan_id;
+  const planIds = new Set(rowData.map((row) => row.plan_id));
   if (!planId || planIds.size !== 1) return NextResponse.json({ error: "Plan items must belong to the same day." }, { status: 400 });
 
   for (let position = 0; position < itemIds.length; position += 1) {

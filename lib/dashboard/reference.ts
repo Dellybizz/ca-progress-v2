@@ -10,6 +10,7 @@ type ResourceRow = Database["public"]["Tables"]["icai_resources"]["Row"];
 type SourceRow = Database["public"]["Tables"]["icai_sources"]["Row"];
 type ResourceAttemptRow = Database["public"]["Tables"]["resource_attempt_map"]["Row"];
 type ResourceSubjectRow = Database["public"]["Tables"]["resource_subject_map"]["Row"];
+type EventRow = Database["public"]["Tables"]["exam_events"]["Row"];
 
 function createReferenceClient() {
   return createD1AdminClient();
@@ -82,7 +83,7 @@ async function loadLiveReference(levelId: string, levelCode: string, attemptKey:
     const attemptMatch = Boolean(attempt && mappedAttempts.includes(attempt.id)); const subjectMatch = mappedSubjects.some((id) => selectedSubjectIds.has(id));
     if (mappedAttempts.length && !attemptMatch) return false; if (mappedSubjects.length && !subjectMatch) return false; return metadataLevels.includes(levelCode) || attemptMatch || subjectMatch;
   }).slice(0,4).map((resource) => { const source = sourceById.get(resource.source_id); return { id:resource.id,type:resource.resource_type,title:resource.title,summary:resource.summary,officialUrl:resource.official_url,sourceName:source?.name??"ICAI",sourceUrl:source?.official_url??resource.official_url,publishedOn:resource.published_on,lastVerifiedAt:resource.last_seen_at,lastChangedAt:resource.last_changed_at }; });
-  const examEvents = (eventResponse.data ?? []).filter((event) => event.event_type === "exam_start" || event.event_type === "exam_paper").map((event) => ({ id:event.id,title:event.title,eventType:event.event_type,eventDate:event.event_date,sourceUrl:event.source_url,lastVerifiedAt:event.last_seen_at }));
+  const examEvents = ((eventResponse.data ?? []) as EventRow[]).filter((event) => event.event_type === "exam_start" || event.event_type === "exam_paper").map((event) => ({ id:event.id,title:event.title,eventType:event.event_type,eventDate:event.event_date,sourceUrl:event.source_url,lastVerifiedAt:event.last_seen_at }));
   const verifiedCandidates = [attempt?.last_seen_at ?? null,...examEvents.map((event)=>event.lastVerifiedAt),...updates.map((update)=>update.lastVerifiedAt)].filter((value): value is string => Boolean(value));
   return { attempt: attempt ? { id:attempt.id,key:attempt.attempt_key,label:attempt.label,startDate:attempt.start_date,endDate:attempt.end_date,sourceUrl:attempt.source_url,lastVerifiedAt:attempt.last_seen_at } : null, examEvents, updates, verifiedAt:verifiedCandidates.sort().at(-1)??null };
 }

@@ -96,10 +96,12 @@ export async function loadAttemptOptions(): Promise<AttemptOption[]> {
     client.from("exam_attempts").select("attempt_key, label, level_id").eq("verification_status", "verified"),
     client.from("course_levels").select("id, code").eq("is_active", true),
   ]);
-  if (attempts.error || levels.error || !attempts.data?.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
-  const levelById = new Map(levels.data.map((level) => [level.id, level.code as CALevel]));
+  const attemptRows = (attempts.data ?? []) as Array<{ attempt_key: string; label: string; level_id: string }>;
+  const levelRows = (levels.data ?? []) as Array<{ id: string; code: CALevel }>;
+  if (attempts.error || levels.error || !attemptRows.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
+  const levelById = new Map<string, CALevel>(levelRows.map((level) => [level.id, level.code]));
   const grouped = new Map<string, { label: string; levels: Set<CALevel> }>();
-  for (const row of attempts.data) {
+  for (const row of attemptRows) {
     const level = levelById.get(row.level_id);
     if (!level) continue;
     const current = grouped.get(row.attempt_key) ?? { label: row.label, levels: new Set<CALevel>() };

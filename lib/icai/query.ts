@@ -14,6 +14,9 @@ type SubjectRow = Database["public"]["Tables"]["subjects"]["Row"];
 type AttemptMapRow = Database["public"]["Tables"]["resource_attempt_map"]["Row"];
 type SubjectMapRow = Database["public"]["Tables"]["resource_subject_map"]["Row"];
 type EventRow = Database["public"]["Tables"]["exam_events"]["Row"];
+type SyncRunRow = Database["public"]["Tables"]["icai_sync_runs"]["Row"];
+type ReviewRow = Database["public"]["Tables"]["icai_review_queue"]["Row"];
+type ChangeRow = Database["public"]["Tables"]["icai_change_events"]["Row"];
 
 function cleanFilter(value: string | null | undefined) {
   const next = value?.trim() ?? "";
@@ -56,14 +59,14 @@ export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Pro
   ].find(Boolean);
   if (firstError) throw firstError;
 
-  const levels = levelsResponse.data ?? [];
-  const attempts = attemptsResponse.data ?? [];
-  const resources = resourcesResponse.data ?? [];
-  const sources = sourcesResponse.data ?? [];
-  const subjects = subjectsResponse.data ?? [];
-  const attemptMaps = attemptMapResponse.data ?? [];
-  const subjectMaps = subjectMapResponse.data ?? [];
-  const events = eventsResponse.data ?? [];
+  const levels = (levelsResponse.data ?? []) as LevelRow[];
+  const attempts = (attemptsResponse.data ?? []) as AttemptRow[];
+  const resources = (resourcesResponse.data ?? []) as ResourceRow[];
+  const sources = (sourcesResponse.data ?? []) as SourceRow[];
+  const subjects = (subjectsResponse.data ?? []) as SubjectRow[];
+  const attemptMaps = (attemptMapResponse.data ?? []) as AttemptMapRow[];
+  const subjectMaps = (subjectMapResponse.data ?? []) as SubjectMapRow[];
+  const events = (eventsResponse.data ?? []) as EventRow[];
 
   const selected = {
     level: cleanFilter(filters.level),
@@ -190,9 +193,9 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
   const firstError = [runResponse.error, sourceResponse.error, reviewResponse.error, changeResponse.error].find(Boolean);
   if (firstError) throw firstError;
 
-  const sources = sourceResponse.data ?? [];
+  const sources = (sourceResponse.data ?? []) as SourceRow[];
   const sourceById = new Map(sources.map((source) => [source.id, source]));
-  const run = runResponse.data;
+  const run = runResponse.data as SyncRunRow | null;
 
   return {
     latestRun: run ? {
@@ -226,7 +229,7 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
       authoritativeListing: source.authoritative_listing,
       isActive: source.is_active,
     })),
-    reviews: (reviewResponse.data ?? []).map((review) => {
+    reviews: ((reviewResponse.data ?? []) as ReviewRow[]).map((review) => {
       const source = sourceById.get(review.source_id);
       return {
         id: review.id,
@@ -240,7 +243,7 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
         createdAt: review.created_at,
       };
     }),
-    recentChanges: (changeResponse.data ?? []).map((change) => ({
+    recentChanges: ((changeResponse.data ?? []) as ChangeRow[]).map((change) => ({
       id: change.id,
       entityType: change.entity_type,
       entityId: change.entity_id,

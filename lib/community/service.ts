@@ -125,7 +125,7 @@ export async function getCommunityComposerOptions(channelSlug: string) {
   const error = memberResult.error || resourceResult.error;
   if (error) throw new Error(`Community composer data could not be loaded: ${error.message}`);
   return {
-    members: (memberResult.data ?? []).filter((row) => row.user_id !== context.identity.id).map((row) => ({ userId: row.user_id, label: row.label })),
+    members: ((memberResult.data ?? []) as Array<{ user_id: string; label: string }>).filter((row) => row.user_id !== context.identity.id).map((row) => ({ userId: row.user_id, label: row.label })),
     resources: ((resourceResult.data ?? []) as Pick<ResourceRow, "id" | "title" | "extension" | "owner_label">[]).map((row) => ({ id: row.id, title: row.title, extension: row.extension, ownerLabel: row.owner_label })),
   };
 }

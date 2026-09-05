@@ -77,7 +77,7 @@ export async function getCalendarPageModel(month?: string | null): Promise<Calen
   ]);
   const tasks = calendar.tasks;
   const goals = calendar.goals;
-  const userEvents = calendar.events;
+  const userEvents = calendar.events as unknown as EventRow[];
   const items: CalendarItem[] = [];
   for (const row of tasks as TaskRow[]) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes });
   for (const row of goals as GoalRow[]) items.push({ id: `goal:${row.id}`, source: "goal", kind: "goal", title: row.title, startsAt: `${row.due_date}T12:00:00.000Z`, endsAt: null, allDay: true, readOnly: false, status: row.status });
@@ -119,8 +119,7 @@ export async function getActivityPageModel(): Promise<ActivityPageModel> {
   if (!identity) return { mode: "guest" };
   const profile = await getProfileForUser(identity.id);
   const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  const { sessions, progress, error } = await loadActivityRows(identity.id);
-  if (error) throw new Error(`Activity could not be loaded: ${error.message}`);
+  const { sessions, progress } = await loadActivityRows(identity.id);
   const sessionRows = (sessions ?? []) as SessionRow[];
   const progressRows = (progress ?? []) as ProgressEventRow[];
   const names = await loadActivityNames(sessionRows, progressRows);
