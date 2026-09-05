@@ -1,0 +1,48 @@
+name: Stage 2 Phase 1 Inventory
+
+on:
+  push:
+    branches: [stage2-phase1-inventory-temp]
+    paths:
+      - .github/workflows/stage2-phase1-inventory.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - name: Build runtime inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p stage2-inventory
+          rg -n --hidden \
+            --glob '!node_modules/**' \
+            --glob '!.git/**' \
+            --glob '!.next/**' \
+            --glob '!open-next/**' \
+            --glob '!SUPABASE_RETIREMENT_STAGE1.md' \
+            --glob '!SUPABASE_RETIREMENT_PLAN.md' \
+            '(supabase|createClient\(|@supabase|SUPABASE_|\.auth\.|\.storage\.|\.from\()' \
+            app components lib server workers proxy.ts 2>/dev/null \
+            > stage2-inventory/runtime-hits.txt || true
+          find app components lib server workers -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.mjs' \) -print | sort > stage2-inventory/source-files.txt
+          tar -czf stage2-inventory/source-snapshot.tar.gz \
+            app components lib server workers proxy.ts package.json tsconfig.json wrangler.web.jsonc open-next.config.ts 2>/dev/null || \
+          tar -czf stage2-inventory/source-snapshot.tar.gz \
+            app components lib server workers proxy.ts package.json tsconfig.json wrangler.web.jsonc
+          echo "runtime_hits=$(wc -l < stage2-inventory/runtime-hits.txt)"
+          head -200 stage2-inventory/runtime-hits.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage2-phase1-inventory
+          path: stage2-inventory/
+          if-no-files-found: error
+          retention-days: 2
