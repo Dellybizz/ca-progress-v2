@@ -3,7 +3,7 @@ import "server-only";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createD1ServerClient } from "@/lib/data/d1/client";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import type { CalendarItem, CalendarPageModel } from "./types";
 
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
