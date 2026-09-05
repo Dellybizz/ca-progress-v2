@@ -6,12 +6,18 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 const read = (p) => readFileSync(join(root, p), "utf8");
 
-test("service role is isolated to server-only client", () => {
-  const browser = read("lib/supabase/browser.ts");
-  const admin = read("lib/supabase/admin.ts");
-  assert.equal(browser.includes("SUPABASE_SERVICE_ROLE_KEY"), false);
-  assert.match(admin, /import "server-only"/);
-  assert.match(admin, /createAdminSupabaseClient/);
+test("active runtime is Cloudflare-only and has no Supabase SDK configuration", () => {
+  const pkg = JSON.parse(read("package.json"));
+  const dependencies = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  assert.equal(dependencies["@supabase/ssr"], undefined);
+  assert.equal(dependencies["@supabase/supabase-js"], undefined);
+
+  const env = read(".env.example");
+  assert.doesNotMatch(env, /NEXT_PUBLIC_SUPABASE_|SUPABASE_SERVICE_ROLE_KEY/);
+
+  const provider = read("lib/auth/provider.ts");
+  assert.match(provider, /startCloudflareOAuth/);
+  assert.match(provider, /getCloudflareRequestAuth/);
 });
 
 test("Phase 0 migration enables RLS on every table", () => {

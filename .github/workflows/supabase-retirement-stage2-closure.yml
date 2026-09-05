@@ -6,6 +6,7 @@ on:
     branches:
       - phase-12-operations-admin-platform
     paths:
+      - .env.example
       - app/**
       - components/**
       - lib/**

@@ -6,7 +6,6 @@ const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs"]);
 const SOURCE_ROOTS = ["app", "components", "lib", "server", "workers"];
 const SINGLE_FILES = ["proxy.ts"];
 const EXCLUDED_DIRECTORIES = new Set(["node_modules", ".next", ".git", "supabase"]);
-const EXCLUDED_BASENAMES = new Set(["env.ts"]);
 
 export const FORBIDDEN_PATTERNS = [
   {
@@ -32,7 +31,7 @@ export const FORBIDDEN_PATTERNS = [
   {
     id: "supabase-runtime-secret-or-host",
     label: "Supabase runtime host or secret",
-    pattern: /(?:\bSUPABASE_SERVICE_ROLE(?:_KEY)?\b|\bNEXT_PUBLIC_SUPABASE_(?:URL|ANON_KEY)\b|https?:\/\/[^\s"']+\.supabase\.co\b)/g,
+    pattern: /(?:\bSUPABASE_SERVICE_ROLE(?:_KEY)?\b|\bNEXT_PUBLIC_SUPABASE_(?:URL|ANON_KEY|PUBLISHABLE_KEY)\b|https?:\/\/[^\s"']+\.supabase\.co\b)/g,
   },
   {
     id: "supabase-runtime-client-usage",
@@ -60,7 +59,6 @@ function collectDirectoryFiles(directory, output) {
     }
     if (!entry.isFile()) continue;
     if (!SOURCE_EXTENSIONS.has(path.extname(entry.name))) continue;
-    if (EXCLUDED_BASENAMES.has(entry.name)) continue;
     output.push(fullPath);
   }
 }

@@ -22,8 +22,8 @@ test("Phase 2 implementation remains free of Phase 3 academic schema ownership",
 test("Phase 2 keeps auth request-scoped instead of adding a giant AuthContext", () => {
   const authSource = [
     "lib/auth/server.ts",
-    "lib/supabase/server.ts",
-    "lib/supabase/proxy.ts",
+    "lib/auth/provider.ts",
+    "lib/auth/proxy.ts",
   ].map(read).join("\n");
   assert.equal(/createContext\([^)]*auth/i.test(authSource), false);
   assert.match(read("lib/auth/server.ts"), /optionalUser/);

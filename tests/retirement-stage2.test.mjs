@@ -17,6 +17,7 @@ function read(relativePath) {
 test("Stage 2 scanner reports zero active Supabase runtime blockers", () => {
   const result = scanRepository(repoRoot);
   assert.ok(result.files.length > 100, `expected broad runtime scan, got ${result.files.length} files`);
+  assert.ok(result.files.some((file) => file.endsWith(`${path.sep}lib${path.sep}env.ts`)), "lib/env.ts must be part of the active runtime scan");
   assert.deepEqual(result.blockers, []);
 
   const output = execFileSync(process.execPath, [path.join(repoRoot, "scripts/phase5/retirement-stage2-scan.mjs")], {
@@ -27,12 +28,13 @@ test("Stage 2 scanner reports zero active Supabase runtime blockers", () => {
   assert.match(output, /PASS — zero active Supabase runtime blockers/);
 });
 
-test("scanner blocks Supabase SDK, runtime modules, selectors, hosts and client usage", () => {
+test("scanner blocks Supabase SDK, runtime modules, selectors, hosts, secrets and client usage", () => {
   const fixture = [
     'import { createClient } from "@supabase/supabase-js";',
     'import { createServerSupabaseClient } from "@/lib/supabase/server";',
     'const runtime = CA_DATA_RUNTIME;',
     'const endpoint = "https://example.supabase.co";',
+    'const retiredKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;',
     'await supabase.auth.getUser();',
   ].join("\n");
   const blockers = scanText(fixture, "fixture.ts");
