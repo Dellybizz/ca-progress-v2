@@ -1,4 +1,4 @@
-name: Phase 3 Exact-Commit Supabase Retirement Closure
+name: Phase 3 Final Delta Reconciliation Recovery
 
 on:
   push:
@@ -12,38 +12,21 @@ permissions:
 env:
   TARGET_COMMIT: 737df990350061007cd46ff4bc2adc576354a27e
   SMOKE_BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
-  PHASE1_D1_DATABASE: ca-progress-v2-phase4-shadow
-  PHASE3_D1_DATABASE: ca-progress-v2-phase4-shadow
-  PHASE4_EXPECTED_BRANCH: phase-12-operations-admin-platform
   PHASE4_D1_NAME: ca-progress-v2-phase4-shadow
   PHASE4_R2_BUCKET: ca-progress-v2-staging-user-resources
-  PHASE4_RUN_ID: phase5-final-delta-v1
+  PHASE4_RUN_ID: phase5-final-delta-${{ github.run_id }}
   CI: "true"
 
 jobs:
-  exact-commit-closure:
+  final-delta-reconciliation:
     runs-on: ubuntu-latest
     environment: v2-staging
-    timeout-minutes: 90
+    timeout-minutes: 60
     env:
-      SMOKE_MUTATION_AUTH_COOKIE: ${{ secrets.SMOKE_MUTATION_AUTH_COOKIE }}
-      SMOKE_MODERATOR_AUTH_COOKIE: ${{ secrets.SMOKE_MODERATOR_AUTH_COOKIE }}
-      SMOKE_AUTH_COOKIE: ${{ secrets.SMOKE_AUTH_COOKIE }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CA_AUTH_SESSION_SECRET: ${{ secrets.CA_AUTH_SESSION_SECRET }}
-      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
-      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
-      LINKEDIN_OIDC_CLIENT_ID: ${{ secrets.LINKEDIN_OIDC_CLIENT_ID }}
-      LINKEDIN_OIDC_CLIENT_SECRET: ${{ secrets.LINKEDIN_OIDC_CLIENT_SECRET }}
-      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
-      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
-      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      NEXT_PUBLIC_APP_ENV: production
-      NEXT_PUBLIC_APP_NAME: CA Progress
-      NEXT_PUBLIC_APP_VERSION: cloudflare-migration-phase-5
 
     steps:
       - name: Checkout exact Phase 2 commit
@@ -63,147 +46,79 @@ jobs:
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$TARGET_COMMIT"
           echo "Exact Phase 2 commit checked out: $actual"
+          echo "Fresh reconciliation run id: $PHASE4_RUN_ID"
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build exact Phase 2 web runtime
-        run: npm run cf:build
-
-      - name: Prepare ephemeral Billing Worker secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          umask 077
-          node - <<'NODE'
-          const fs = require('fs');
-          const required = (name) => {
-            const value = process.env[name];
-            if (!value) throw new Error(`${name} is required.`);
-            return value;
-          };
-          fs.writeFileSync('/tmp/ca-billing-secrets.json', JSON.stringify({
-            RAZORPAY_KEY_ID: required('RAZORPAY_KEY_ID'),
-            RAZORPAY_KEY_SECRET: required('RAZORPAY_KEY_SECRET'),
-            RAZORPAY_WEBHOOK_SECRET: required('RAZORPAY_WEBHOOK_SECRET'),
-          }));
-          NODE
-
-      - name: Deploy exact Phase 2 ICAI Worker
-        run: npx wrangler deploy --config=workers/icai-sync/wrangler.jsonc --name=ca-progress-v2-icai-sync
-
-      - name: Deploy exact Phase 2 Billing Worker
-        run: npx wrangler deploy --config=workers/billing/wrangler.jsonc --secrets-file /tmp/ca-billing-secrets.json
-
-      - name: Deploy exact Phase 2 web Worker
-        run: npm run cf:deploy:web
-
-      - name: Capture exact-commit deployment evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p phase3-exact-commit-evidence
-          printf '%s\n' "$TARGET_COMMIT" > phase3-exact-commit-evidence/target-commit.txt
-          git rev-parse HEAD > phase3-exact-commit-evidence/checked-out-commit.txt
-          npx wrangler deployments list --name ca-progress-v2 --json > phase3-exact-commit-evidence/web-deployments.json
-          npx wrangler d1 execute "$PHASE3_D1_DATABASE" --remote --command "PRAGMA foreign_key_check; SELECT COUNT(*) AS users FROM app_users;" > phase3-exact-commit-evidence/d1-before-verification.txt
-
-      - name: Post-deploy Cloudflare smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          SMOKE_BASE_URL="$SMOKE_BASE_URL" SMOKE_AUTH_COOKIE="${SMOKE_AUTH_COOKIE:-}" npm run cf:smoke
-          health="$(curl --max-time 20 -fsS "$SMOKE_BASE_URL/api/health")"
-          HEALTH_JSON="$health" node -e 'const x=JSON.parse(process.env.HEALTH_JSON); if(x.status!=="ok" || x.checks?.database!=="ok") process.exit(1)'
-          curl --max-time 20 -fsS "$SMOKE_BASE_URL/login" >/dev/null
-          curl --max-time 20 -sS -D /tmp/google.headers -o /dev/null "$SMOKE_BASE_URL/auth/google?next=%2Fdashboard"
-          grep -Eqi '^location: https://accounts\.google\.com/' /tmp/google.headers
-          curl --max-time 20 -sS -D /tmp/linkedin.headers -o /dev/null "$SMOKE_BASE_URL/auth/linkedin?next=%2Fdashboard"
-          grep -Eqi '^location: https://www\.linkedin\.com/' /tmp/linkedin.headers
-
-      - name: Verify authenticated mutation harness contract
-        run: node --test tests/phase1-authenticated-harness.test.mjs
-
-      - name: Run authenticated-mutations.mjs against exact deployment
-        shell: bash
-        run: GITHUB_SHA="$TARGET_COMMIT" node scripts/phase5/authenticated-mutations.mjs
-
-      - name: Verify mutation matrix contract
-        run: node --test tests/phase3-mutation-matrix.test.mjs
-
-      - name: Run mutation-matrix.mjs against exact deployment
-        shell: bash
-        run: GITHUB_SHA="$TARGET_COMMIT" node scripts/phase5/mutation-matrix.mjs
-
-      - name: Verify closure contract
-        run: node --test tests/phase4-verification-closure.test.mjs
-
-      - name: Run verification-closure.mjs with remote D1 residue checks
-        shell: bash
-        run: GITHUB_SHA="$TARGET_COMMIT" node scripts/phase5/verification-closure.mjs
-
-      - name: Independent remote D1 integrity check after closure
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx wrangler d1 execute "$PHASE3_D1_DATABASE" --remote --command "PRAGMA foreign_key_check; SELECT COUNT(*) AS users FROM app_users;" > phase3-exact-commit-evidence/d1-after-closure.txt
-          if grep -Eq '^.*foreign_key_check.*[^[:space:]]' /dev/null; then exit 1; fi
-
-      - name: Re-prove Phase 4 migration invariants before final backup
+      - name: Re-prove Phase 4 migration invariants
         run: |
           npm run test:cloudflare-phase4
           npm run d1:phase4:validate
 
-      - name: Create final Supabase logical backup
-        shell: bash
-        run: GITHUB_SHA="$TARGET_COMMIT" node scripts/phase5/final-backup.mjs
-
-      - name: Apply final production delta and full reconciliation
+      - name: Apply final production delta with fresh checkpoint and reconcile
         shell: bash
         run: GITHUB_SHA="$TARGET_COMMIT" node scripts/phase4/production-shadow.mjs
 
-      - name: Promote final reconciliation report to Phase 3 retirement evidence
+      - name: Require fully reconciled final-delta report
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p phase3-final-reconciliation
           node --input-type=module <<'EOF'
           import { readFileSync, writeFileSync } from 'node:fs';
           const report = JSON.parse(readFileSync('phase4-report.json', 'utf8'));
-          const backup = JSON.parse(readFileSync('phase5-backup/manifest.json', 'utf8'));
-          report.phase = 5;
-          report.mode = 'final-delta-reconciliation';
-          report.phase4BaselineRunId = 'phase4-production-shadow-v1';
-          report.phase5RunId = process.env.PHASE4_RUN_ID;
-          report.verifiedRuntimeCommit = process.env.TARGET_COMMIT;
-          report.finalBackup = backup;
-          report.cutoverCandidate = report.status === 'reconciled' && report.failures.length === 0 && report.discrepancies.length === 0 && report.foreignKeyViolations === 0;
-          writeFileSync('phase5-report.json', JSON.stringify(report, null, 2));
-          if (!report.cutoverCandidate) process.exit(1);
+          const ok = report.status === 'reconciled' &&
+            Array.isArray(report.failures) && report.failures.length === 0 &&
+            Array.isArray(report.discrepancies) && report.discrepancies.length === 0 &&
+            Number(report.foreignKeyViolations || 0) === 0;
+          const summary = {
+            schemaVersion: 1,
+            phase: 'phase-3-supabase-retirement-final-delta',
+            verifiedRuntimeCommit: process.env.TARGET_COMMIT,
+            reconciliationRunId: process.env.PHASE4_RUN_ID,
+            status: ok ? 'passed' : 'failed',
+            sourceStatus: report.status,
+            failures: report.failures?.length ?? null,
+            discrepancies: report.discrepancies?.length ?? null,
+            foreignKeyViolations: report.foreignKeyViolations ?? null,
+            sourceFingerprint: report.sourceFingerprint ?? null,
+            targetFingerprint: report.targetFingerprint ?? null,
+          };
+          writeFileSync('phase3-final-reconciliation/status.json', JSON.stringify(summary, null, 2));
+          if (!ok) process.exit(1);
           EOF
 
-      - name: Final remote D1 integrity check
+      - name: Verify remote D1 integrity after final delta
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 execute "$PHASE3_D1_DATABASE" --remote --command "PRAGMA foreign_key_check; SELECT COUNT(*) AS users FROM app_users;" > phase3-exact-commit-evidence/d1-after-final-delta.txt
+          npx wrangler d1 execute "$PHASE4_D1_NAME" --remote --json --config wrangler.web.jsonc --command "PRAGMA foreign_key_check;" > phase3-final-reconciliation/foreign-key-check.json
+          node --input-type=module <<'EOF'
+          import { readFileSync } from 'node:fs';
+          const payload = JSON.parse(readFileSync('phase3-final-reconciliation/foreign-key-check.json', 'utf8'));
+          const result = Array.isArray(payload) ? payload[0] : payload;
+          if (!result?.success || !Array.isArray(result.results) || result.results.length !== 0) {
+            console.error('Remote D1 foreign-key integrity check failed.');
+            process.exit(1);
+          }
+          EOF
 
-      - name: Remove ephemeral secret files
-        if: always()
+      - name: Verify production health after final delta
         shell: bash
-        run: rm -f /tmp/ca-billing-secrets.json
+        run: |
+          set -euo pipefail
+          health="$(curl --max-time 20 -fsS "$SMOKE_BASE_URL/api/health")"
+          HEALTH_JSON="$health" node -e 'const x=JSON.parse(process.env.HEALTH_JSON); if(x.status!=="ok" || x.checks?.database!=="ok") process.exit(1)'
+          curl --max-time 20 -fsS "$SMOKE_BASE_URL/login" >/dev/null
 
-      - name: Upload Phase 3 exact-commit closure evidence
+      - name: Upload final reconciliation evidence
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: phase3-exact-commit-retirement-closure-${{ github.run_id }}
+          name: phase3-final-delta-reconciliation-${{ github.run_id }}
           retention-days: 30
-          if-no-files-found: warn
+          if-no-files-found: error
           path: |
-            phase1-report/
-            phase3-report/
-            phase4-report/
-            phase5-backup/
             phase4-report.json
-            phase5-report.json
-            phase3-exact-commit-evidence/
+            phase3-final-reconciliation/
