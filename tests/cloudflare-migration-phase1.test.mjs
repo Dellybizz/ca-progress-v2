@@ -56,7 +56,7 @@ test("current Cloudflare bindings remain documented through the rollback-safe Ph
   }
 });
 
-test("feature routes and Community UI use provider-neutral migration boundaries", () => {
+test("feature routes and Community UI keep provider-neutral boundaries while current auth and profile services are Cloudflare-only", () => {
   const featureFiles = [
     "app/auth/google/route.ts",
     "app/auth/linkedin/route.ts",
@@ -68,8 +68,17 @@ test("feature routes and Community UI use provider-neutral migration boundaries"
     "components/community/community-chat.tsx",
   ];
   for (const path of featureFiles) assert.doesNotMatch(read(path), /@\/lib\/supabase\//, `${path} still creates a Supabase dependency directly`);
-  assert.match(read("lib/auth/provider.ts"), /createServerSupabaseClient/);
-  assert.match(read("lib/profile/service.ts"), /createServerSupabaseClient/);
+
+  const authProvider = read("lib/auth/provider.ts");
+  assert.match(authProvider, /getCloudflareRequestAuth/);
+  assert.match(authProvider, /startCloudflareOAuth/);
+  assert.doesNotMatch(authProvider, /createServerSupabaseClient|@\/lib\/supabase\//);
+
+  const profile = read("lib/profile/service.ts");
+  assert.match(profile, /saveCloudflareProfilePatch/);
+  assert.match(profile, /putAvatarObject/);
+  assert.doesNotMatch(profile, /createServerSupabaseClient|storage\.from|@\/lib\/supabase\//);
+
   const realtime = read("lib/community/realtime-provider.ts");
   assert.match(realtime, /subscribeToCommunityRealtime/);
   assert.match(realtime, /window\.setInterval/);
