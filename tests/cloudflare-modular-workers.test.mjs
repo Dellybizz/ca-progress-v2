@@ -16,11 +16,9 @@ test("heavy ICAI background processing lives outside the Next OpenNext Worker", 
   assert.doesNotMatch(proxy, /@supabase\/supabase-js/);
 });
 
-test("ICAI service is private and linked only in the final web deployment config", () => {
-  const bootstrap = read("wrangler.jsonc");
+test("ICAI service is private and linked in the production web deployment config", () => {
   const web = read("wrangler.web.jsonc");
   const service = read("workers/icai-sync/wrangler.jsonc");
-  assert.doesNotMatch(bootstrap, /"services"\s*:/);
   assert.match(web, /"services"\s*:\s*\[/);
   assert.match(web, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(web, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);

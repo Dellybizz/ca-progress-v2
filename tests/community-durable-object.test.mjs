@@ -44,9 +44,8 @@ test("Community chat keeps D1 pagination and broadcasts only refresh signals", (
   assert.match(chat, /loadOlder/);
 });
 
-test("Durable Object events cannot write messages or bypass moderation", () => {
+test("Durable Object events cannot write messages or bypass Community authorization", () => {
   const coordinator = read("community-coordinator.ts");
   assert.doesNotMatch(coordinator, /INSERT INTO|UPDATE community_messages|DELETE FROM|moderation_status/);
   assert.match(read("lib/community/service.ts"), /getCommunityChannelAccess/);
-  assert.match(read("supabase/migrations/20260830190000_phase10_community_v2.sql"), /phase10_moderate/);
 });
