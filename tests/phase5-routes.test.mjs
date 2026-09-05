@@ -19,8 +19,9 @@ test("progress mutations require server-readable authentication", () => {
   const api = read("app/api/progress/route.ts");
   assert.match(api, /optionalUser\(\)/);
   assert.match(api, /status: 401/);
-  assert.match(api, /progress_set_stage/);
-  assert.match(api, /progress_undo_event/);
+  assert.match(api, /setHotProgressStage/);
+  assert.match(api, /undoHotProgressEvent/);
+  assert.doesNotMatch(api, /\.rpc\("progress_/);
 });
 
 test("progress private surfaces include loading and error states", () => {

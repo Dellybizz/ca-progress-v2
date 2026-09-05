@@ -22,6 +22,7 @@ test("reported Community resources are hidden and return to moderator review", (
   assert.match(sql, /Only approved shared notes can be reported/);
   assert.match(sql, /set moderation_status = 'reported'/);
   assert.match(sql, /set moderation_status = 'reported'/);
-  assert.match(report, /phase7_report_resource/);
+  assert.match(report, /reportHotResource/);
+  assert.doesNotMatch(report, /\.rpc\("phase7_report_resource"/);
   assert.match(admin, /Resource moderation/);
 });

@@ -58,9 +58,11 @@ test("progress surfaces are real routes with optimistic autosave and normalized 
   assert.match(client, /Saving automatically/);
   assert.match(client, /action: "set_stage"/);
   assert.match(client, /Undo last change/);
-  assert.match(service, /from\("chapter_progress"\)/);
-  assert.match(service, /from\("progress_events"\)/);
-  assert.match(service, /gte\("created_at", sevenDaysAgo\)/);
+  assert.match(service, /getHotProgressRows/);
+  assert.match(service, /getHotDashboardProgress/);
+  assert.match(service, /getHotProgressRows\(identity\.id, chapterIds, sevenDaysAgo\)/);
+  assert.match(service, /hot\.weeklyEvents/);
+  assert.match(service, /hot\.events/);
   assert.match(analytics, /No manually maintained totals are used/);
   assert.match(analytics, /Nothing to analyse yet/);
   assert.match(subject, /getProgressPageModel\(subjectSlug\)/);

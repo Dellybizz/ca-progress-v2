@@ -23,7 +23,8 @@ test("finishing a timer immediately feeds analytics from study_sessions", () => 
   const studyService = read("lib/study/service.ts");
   const analyticsPage = read("app/(student)/analytics/page.tsx");
   assert.match(timerSql, /insert into public\.study_sessions/);
-  assert.match(studyService, /from\("study_sessions"\)/);
+  assert.match(studyService, /getHotStudySessions/);
+  assert.match(studyService, /getHotStudySessions\(userId, since\)/);
   assert.match(analyticsPage, /getStudyPageModel/);
   assert.match(analyticsPage, /Recent study sessions/);
   assert.match(analyticsPage, /No manual studyHours array/);

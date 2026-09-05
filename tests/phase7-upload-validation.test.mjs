@@ -27,13 +27,15 @@ test("Phase 7 validates descriptors server-side and uses direct private R2 URLs"
 test("Phase 7 R2 upload persists metadata through the server-only D1 quota service", () => {
   const route = read("app/api/resources/upload-complete/route.ts");
   const billingService = read("lib/billing/service.ts");
-  assert.match(route, /getSupabaseAdminRuntimeConfig\(\)/);
+  assert.match(route, /getHotD1Database/);
+  assert.match(route, /getResourceR2Bucket/);
   assert.match(route, /createResourceMetadataWithinQuota/);
   assert.match(billingService, /import "server-only"/);
   assert.match(billingService, /createD1AdminCompatClient/);
   assert.match(billingService, /client\.from\("uploaded_resources"\)/);
-  assert.match(route, /METADATA_SERVICE_NOT_CONFIGURED/);
-  assert.doesNotMatch(route, /getSupabaseAdminConfig\(\)/);
+  assert.match(route, /R2_NOT_CONFIGURED/);
+  assert.match(route, /RESOURCE_METADATA_FAILED/);
+  assert.doesNotMatch(route, /getSupabaseAdminRuntimeConfig|getSupabaseAdminConfig|@\/lib\/supabase\/admin/);
 });
 
 test("Phase 7 upload API returns stable JSON errors and checks direct-upload readiness", () => {

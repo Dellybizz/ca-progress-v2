@@ -26,11 +26,12 @@ test("Phase 9 planner tables expose own-user reads but no direct authenticated w
   assert.match(sql, /grant select[\s\S]*to authenticated/);
 });
 
-test("Phase 9 uses the existing server credential after request authorization and introduces no Phase 9-specific secret", () => {
+test("Phase 9 uses server-side D1 clients after request authorization and introduces no Phase 9-specific secret", () => {
   const service = read("lib/smart-planner/service.ts");
   const env = read(".env.example");
   assert.match(service, /optionalUser\(\)/);
-  assert.match(service, /createAdminSupabaseClient/);
-  assert.match(env, /SUPABASE_SERVICE_ROLE_KEY=/);
+  assert.match(service, /createD1AdminClient/);
+  assert.match(service, /createD1ServerClient/);
+  assert.doesNotMatch(service, /createAdminSupabaseClient|@\/lib\/supabase\/admin/);
   assert.doesNotMatch(env, /PHASE9_[A-Z_]+=|OPENAI_API_KEY|ANTHROPIC_API_KEY/);
 });

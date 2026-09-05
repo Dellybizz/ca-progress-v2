@@ -52,6 +52,8 @@ test("study UI exposes subject chapter selection and Pomodoro presets without a 
   assert.match(client, /action: "pause"/);
   assert.match(client, /action: "resume"/);
   assert.match(client, /action: "finish"/);
-  assert.match(service, /from\("study_sessions"\)/);
+  assert.match(service, /getHotStudySessions/);
+  assert.match(service, /getHotStudyTimer/);
+  assert.match(service, /getHotStudySessions\(userId, since\)/);
   assert.doesNotMatch(`${client}\n${service}`, /studyHours\s*[:=]/);
 });

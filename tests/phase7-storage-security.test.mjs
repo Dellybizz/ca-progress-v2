@@ -32,20 +32,19 @@ test("Phase 7 resource metadata stays server-only with D1 quota enforcement", ()
   assert.match(upload, /createResourceMetadataWithinQuota/);
   assert.match(billingService, /import "server-only"/);
   assert.match(billingService, /createD1AdminCompatClient/);
-  assert.match(upload, /getSupabaseAdminRuntimeConfig\(\)/);
-  assert.doesNotMatch(upload, /admin\.storage|\.storage\.from\(/);
+  assert.match(upload, /getHotD1Database/);
+  assert.match(upload, /getResourceR2Bucket/);
+  assert.doesNotMatch(upload, /getSupabaseAdminRuntimeConfig|getSupabaseAdminConfig|@\/lib\/supabase\/admin|admin\.storage|\.storage\.from\(/);
 });
 
-test("server-only Supabase credentials resolve from Cloudflare runtime bindings", () => {
+test("active R2 upload no longer depends on Supabase server credentials", () => {
   const runtimeEnv = read("lib/cloudflare/runtime-env.ts");
-  const admin = read("lib/supabase/admin.ts");
   const upload = read("app/api/resources/upload-complete/route.ts");
   assert.match(runtimeEnv, /getCloudflareContext/);
   assert.match(runtimeEnv, /process\.env\[name\]/);
-  assert.match(admin, /getServerRuntimeValue\("SUPABASE_SERVICE_ROLE_KEY"\)/);
-  assert.match(admin, /getSupabaseAdminRuntimeConfig/);
-  assert.match(upload, /getSupabaseAdminRuntimeConfig\(\)/);
-  assert.doesNotMatch(upload, /getSupabaseAdminConfig/);
+  assert.match(upload, /getHotD1Database/);
+  assert.match(upload, /getResourceR2Bucket/);
+  assert.doesNotMatch(upload, /SUPABASE_SERVICE_ROLE_KEY|getSupabaseAdminRuntimeConfig|getSupabaseAdminConfig|@\/lib\/supabase\/admin/);
 });
 
 test("legacy Supabase Storage policies remain non-public during transition", () => {
