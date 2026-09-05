@@ -1,45 +1,33 @@
-name: Supabase Retirement Stage 2 Recovery Export
+name: Supabase Retirement Stage 2 Recovery Inspect
 
 on:
   push:
     branches: [stage2-recovery-temp]
     paths:
       - .github/workflows/supabase-retirement-stage2-apply-blob.yml
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  export-stage2:
+  inspect-stage2:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       STAGE2_BUNDLE_BLOB: b40e0f8dd3e0ea1cac0f064913f3677d101ebede
     steps:
       - uses: actions/checkout@v5
-      - name: Recover prepared Stage 2 source bundle
+      - name: Inspect prepared blob encoding
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p .stage2/recovered
-          gh api "repos/${GITHUB_REPOSITORY}/git/blobs/${STAGE2_BUNDLE_BLOB}" --jq .content | tr -d '\n' | base64 -d > .stage2/stage2-changes.tar.gz
-          tar -tzf .stage2/stage2-changes.tar.gz > .stage2/manifest.txt
-          if grep -Eq '(^/|(^|/)\.\.(/|$))' .stage2/manifest.txt; then
-            echo '::error::Unsafe path found in recovery archive'
-            exit 1
-          fi
-          tar -xzf .stage2/stage2-changes.tar.gz -C .stage2/recovered
-          echo "Recovered $(wc -l < .stage2/manifest.txt) prepared files"
-      - name: Upload recovered source files
-        uses: actions/upload-artifact@v4
-        with:
-          name: stage2-recovered-source
-          path: |
-            .stage2/recovered
-            .stage2/manifest.txt
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 1
+          mkdir -p .stage2
+          gh api "repos/${GITHUB_REPOSITORY}/git/blobs/${STAGE2_BUNDLE_BLOB}" --jq .content | tr -d '\n' | base64 -d > .stage2/blob.bin
+          echo "bytes=$(wc -c < .stage2/blob.bin)"
+          file .stage2/blob.bin || true
+          echo "first64="
+          xxd -l 64 -g 1 .stage2/blob.bin
+          echo "strings="
+          strings -n 8 .stage2/blob.bin | head -40 || true
