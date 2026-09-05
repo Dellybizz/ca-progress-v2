@@ -28,10 +28,10 @@ These values match the retained final retirement evidence for the migrated CA Pr
 
 The Supabase project `CA Progress V2` (`wgdhpzbgyjqjlgntibqg`) was paused through the connected Supabase administration action.
 
-Result returned by the administration API:
+Final observed administration state:
 
 - pause request: **success**
-- observed post-request state: `PAUSING`
+- project status: **`INACTIVE`**
 
 No data was copied back to D1 and no Cloudflare/D1-native rows were changed.
 
@@ -53,7 +53,7 @@ The permanent repository verifier from Phase 6 remains active and blocks reintro
 
 ### 1. Supabase project deletion
 
-The connected Supabase administration surface exposes project pause/restore but does **not** expose a `delete_project` action. Therefore the project could be disabled but not permanently deleted through this session.
+The connected Supabase administration surface exposes project pause/restore but does **not** expose a `delete_project` action. Therefore the project has been disabled and is `INACTIVE`, but cannot be permanently deleted through this session.
 
 ### 2. GitHub Actions secret deletion
 
@@ -73,7 +73,7 @@ Because of this, any stale Supabase secrets that may still exist in GitHub repos
 
 ## Remaining manual external actions required for absolute Phase 7 closure
 
-1. Permanently delete the paused Supabase project `CA Progress V2` (`wgdhpzbgyjqjlgntibqg`) in the Supabase dashboard if permanent deletion is desired rather than paused retention.
+1. Permanently delete the inactive Supabase project `CA Progress V2` (`wgdhpzbgyjqjlgntibqg`) in the Supabase dashboard if permanent deletion is desired rather than inactive retention.
 2. In GitHub repository/environment Actions secrets, remove any stale Supabase migration/runtime secrets if they still exist (for example old Supabase URL, anon/publishable key, service-role key, migration access token, or database password entries).
 3. If any equivalent Supabase secrets were stored in another external secret manager, rotate/delete them there as well.
 
@@ -85,7 +85,8 @@ What is complete from this session:
 
 - exact legacy Supabase project identified safely
 - backup signature re-verified before shutdown
-- project pause initiated successfully
+- project pause completed successfully
+- final target state confirmed as `INACTIVE`
 - no branches or Edge Functions remain
 - storage source confirmed empty
 - surviving repository workflows confirmed free of Supabase secret/project references
