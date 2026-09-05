@@ -1,0 +1,133 @@
+name: Supabase Retirement Stage 2 Closure
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/supabase-retirement-stage2-closure.yml
+      - .github/workflows/supabase-retirement-stage2-final.yml
+      - scripts/phase5/retirement-stage2-scan.mjs
+      - tests/retirement-stage2.test.mjs
+      - app/**
+      - components/**
+      - lib/**
+      - server/**
+      - workers/**
+      - proxy.ts
+      - package.json
+      - package-lock.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  STAGE2_ENFORCE: "1"
+  CA_AUTH_RUNTIME: cloudflare
+  CA_DATA_RUNTIME: cloudflare
+
+jobs:
+  close-stage2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Enforce zero active Supabase runtime fallbacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/phase5/retirement-stage2-scan.mjs | tee stage2-scan.txt
+          grep -Eq '0 (blocking|blocked|forbidden)|blocking[^0-9]*0|violations[^0-9]*0' stage2-scan.txt || {
+            echo '::error::Stage 2 scanner did not report a zero-blocker result'
+            cat stage2-scan.txt
+            exit 1
+          }
+
+      - name: Verify Stage 2 regression contract
+        run: node --test tests/retirement-stage2.test.mjs
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Repository tests
+        run: npm test
+
+      - name: Next production build
+        run: npm run build
+
+      - name: OpenNext Cloudflare build
+        run: npx opennextjs-cloudflare build
+
+      - name: Web Worker dry-run
+        run: npx wrangler deploy --dry-run --config wrangler.web.jsonc
+
+      - name: Re-scan built application sources
+        run: node scripts/phase5/retirement-stage2-scan.mjs
+
+      - name: Record Stage 2 completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > SUPABASE_RETIREMENT_STAGE2.md <<EOF
+          # Supabase Retirement Stage 2 — Runtime Fallback Removal
+
+          Status: **COMPLETE**
+
+          - Branch: \`phase-12-operations-admin-platform\`
+          - Validated commit: \`${GITHUB_SHA}\`
+          - Closure workflow run: \`${GITHUB_RUN_ID}\`
+          - Authentication runtime: Cloudflare Worker only
+          - Application database runtime: Cloudflare D1 only
+          - Object-storage runtime: Cloudflare R2 only
+
+          ## Closure evidence
+
+          - Strict active-runtime Supabase fallback scan: **PASS — zero blockers**
+          - Stage 2 regression contract: **PASS**
+          - Typecheck: **PASS**
+          - Lint: **PASS**
+          - Repository tests: **PASS**
+          - Next.js production build: **PASS**
+          - OpenNext Cloudflare build: **PASS**
+          - Web Worker Wrangler dry-run: **PASS**
+
+          ## Removed runtime paths
+
+          - Supabase OAuth/session fallback branches are no longer reachable from application auth.
+          - Active server/admin data callers are D1-backed only.
+          - Runtime resource/avatar object access is R2-backed only.
+          - No active application/Worker source creates a real Supabase client, calls Supabase Auth, calls Supabase Storage, or contacts a Supabase host.
+
+          ## Deliberately retained for Stage 3 / rollback provenance
+
+          Supabase SDK packages, legacy \`lib/supabase/**\` files with zero active callers, generated Supabase-named database types, migration-only scripts/workflows, and Supabase environment/secrets are not removed in Stage 2. Stage 3 will remove that compatibility/configuration surface after this runtime gate is closed.
+
+          No merge to \`main\` was performed. The Supabase project remains frozen and intact. Stage 3 has not been started by this workflow.
+          EOF
+
+          rm -f .github/workflows/supabase-retirement-stage2-apply-blob.yml
+          rm -f .github/workflows/supabase-retirement-stage2-workspace.yml
+          rm -f .github/workflows/supabase-retirement-stage2-inventory.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add SUPABASE_RETIREMENT_STAGE2.md .github/workflows
+          if git diff --cached --quiet; then
+            echo 'Stage 2 completion record already current.'
+            exit 0
+          fi
+          git commit -m "Record Supabase retirement Stage 2 completion"
+          git push origin HEAD:phase-12-operations-admin-platform
