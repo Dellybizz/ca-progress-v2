@@ -1,82 +1,45 @@
-name: Supabase Retirement Stage 2 Apply Bundle
+name: Supabase Retirement Stage 2 Recovery Export
 
 on:
   push:
-    branches: [phase-12-operations-admin-platform]
+    branches: [stage2-recovery-temp]
     paths:
       - .github/workflows/supabase-retirement-stage2-apply-blob.yml
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply-stage2:
+  export-stage2:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     env:
       STAGE2_BUNDLE_BLOB: b40e0f8dd3e0ea1cac0f064913f3677d101ebede
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-      - name: Download prepared Stage 2 bundle from Git object store
+      - name: Recover prepared Stage 2 source bundle
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mkdir -p .stage2
+          mkdir -p .stage2/recovered
           gh api "repos/${GITHUB_REPOSITORY}/git/blobs/${STAGE2_BUNDLE_BLOB}" --jq .content | tr -d '\n' | base64 -d > .stage2/stage2-changes.tar.gz
-          test -s .stage2/stage2-changes.tar.gz
-      - name: Validate Stage 2 bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          tar -tzf .stage2/stage2-changes.tar.gz > /tmp/stage2-files.txt
-          if grep -Eq '(^/|(^|/)\.\.(/|$))' /tmp/stage2-files.txt; then
-            echo '::error::Unsafe path found in Stage 2 archive'
+          tar -tzf .stage2/stage2-changes.tar.gz > .stage2/manifest.txt
+          if grep -Eq '(^/|(^|/)\.\.(/|$))' .stage2/manifest.txt; then
+            echo '::error::Unsafe path found in recovery archive'
             exit 1
           fi
-          for required in lib/auth/provider.ts lib/data/d1/client.ts scripts/phase5/retirement-stage2-scan.mjs tests/retirement-stage2.test.mjs .github/workflows/supabase-retirement-stage2-closure.yml; do
-            grep -Fxq "$required" /tmp/stage2-files.txt || { echo "::error::Stage 2 archive is missing $required"; exit 1; }
-          done
-          echo "Stage 2 bundle contains $(wc -l < /tmp/stage2-files.txt) files"
-      - name: Apply Stage 2 semantic refactor
-        shell: bash
-        run: |
-          set -euo pipefail
-          tar -xzf .stage2/stage2-changes.tar.gz -C .
-          rm -rf .stage2
-          rm -f lib/supabase/browser.ts
-          rm -f lib/supabase/proxy.ts
-          rm -f .github/workflows/supabase-retirement-stage2-inventory.yml
-          rm -f .github/workflows/supabase-retirement-stage2-workspace.yml
-          rm -f .github/workflows/supabase-retirement-stage2-apply-blob.yml
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Enforce zero active Supabase runtime fallbacks
-        env:
-          STAGE2_ENFORCE: "1"
-        run: node scripts/phase5/retirement-stage2-scan.mjs
-      - name: Verify Stage 2 contract
-        run: node --test tests/retirement-stage2.test.mjs
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Repository tests
-        run: npm test
-      - name: Commit Stage 2 runtime retirement
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then echo '::error::Stage 2 bundle produced no changes'; exit 1; fi
-          git commit -m "Remove active Supabase runtime fallbacks"
-          git push origin HEAD:phase-12-operations-admin-platform
+          tar -xzf .stage2/stage2-changes.tar.gz -C .stage2/recovered
+          echo "Recovered $(wc -l < .stage2/manifest.txt) prepared files"
+      - name: Upload recovered source files
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage2-recovered-source
+          path: |
+            .stage2/recovered
+            .stage2/manifest.txt
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
