@@ -28,10 +28,12 @@ test("Stage 2 scanner reports zero active Supabase runtime blockers", () => {
   assert.match(output, /PASS — zero active Supabase runtime blockers/);
 });
 
-test("scanner blocks Supabase SDK, runtime modules, selectors, hosts, secrets and client usage", () => {
+test("scanner blocks Supabase SDK, runtime modules, compatibility architecture, selectors, hosts, secrets and client usage", () => {
   const fixture = [
     'import { createClient } from "@supabase/supabase-js";',
-    'import { createServerSupabaseClient } from "@/lib/supabase/server";',
+    'import type { Database } from "@/lib/supabase/database.types";',
+    'import { createD1ServerCompatClient } from "@/lib/data/d1/supabase-compat";',
+    'const legacyClient = new D1SupabaseCompatClient(db);',
     'const runtime = CA_DATA_RUNTIME;',
     'const endpoint = "https://example.supabase.co";',
     'const retiredKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;',
@@ -41,15 +43,18 @@ test("scanner blocks Supabase SDK, runtime modules, selectors, hosts, secrets an
   const rules = new Set(blockers.map((blocker) => blocker.rule));
   assert.ok(rules.has("supabase-sdk-import"));
   assert.ok(rules.has("supabase-runtime-module"));
-  assert.ok(rules.has("supabase-client-constructor"));
+  assert.ok(rules.has("supabase-compatibility-module"));
+  assert.ok(rules.has("supabase-compatibility-symbol"));
   assert.ok(rules.has("runtime-selector"));
   assert.ok(rules.has("supabase-runtime-secret-or-host"));
   assert.ok(rules.has("supabase-runtime-client-usage"));
 });
 
-test("scanner permits generated Supabase-named database types with no runtime client", () => {
+test("provider-neutral database types replace the Supabase-named type boundary", () => {
+  assert.equal(fs.existsSync(path.join(repoRoot, "lib/data/database.types.ts")), true);
+  assert.equal(fs.existsSync(path.join(repoRoot, "lib/supabase/database.types.ts")), false);
   const fixture = 'import type { Database } from "@/lib/supabase/database.types";\ntype Row = Database["public"];';
-  assert.deepEqual(scanText(fixture, "types-only.ts"), []);
+  assert.ok(scanText(fixture, "types-only.ts").some((blocker) => blocker.rule === "supabase-runtime-module"));
 });
 
 test("application auth provider is Cloudflare-only", () => {
@@ -67,6 +72,7 @@ test("canonical application database runtime is D1", () => {
   assert.match(source, /Cloudflare D1 DB binding is required/);
   assert.match(source, /createD1ServerClient/);
   assert.match(source, /createD1AdminClient/);
+  assert.doesNotMatch(source, /D1SupabaseCompatClient|createD1ServerCompatClient|createD1AdminCompatClient/);
   assert.deepEqual(scanText(source, "lib/data/d1/client.ts"), []);
 });
 
