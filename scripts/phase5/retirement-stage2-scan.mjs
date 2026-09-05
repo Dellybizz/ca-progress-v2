@@ -15,8 +15,18 @@ export const FORBIDDEN_PATTERNS = [
   },
   {
     id: "supabase-runtime-module",
-    label: "Supabase runtime module import",
-    pattern: /["']@\/lib\/supabase\/(?:server|admin|client|browser|proxy)["']/g,
+    label: "Supabase runtime/module import",
+    pattern: /["']@\/lib\/supabase(?:\/[^"']*)?["']/g,
+  },
+  {
+    id: "supabase-compatibility-module",
+    label: "Retired Supabase compatibility module",
+    pattern: /\bsupabase-compat\b/g,
+  },
+  {
+    id: "supabase-compatibility-symbol",
+    label: "Retired Supabase compatibility symbol",
+    pattern: /\b(?:D1SupabaseCompatClient|createD1ServerCompatClient|createD1AdminCompatClient)\b/g,
   },
   {
     id: "supabase-client-constructor",
