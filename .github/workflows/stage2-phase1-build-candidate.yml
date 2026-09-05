@@ -2,154 +2,77 @@ name: Stage 2 Phase 1 Fix And Validate Candidate
 
 on:
   push:
-    branches: [stage2-phase1-inventory-temp]
+    branches:
+      - stage2-phase1-inventory-temp
     paths:
       - .github/workflows/stage2-phase1-build-candidate.yml
+      - scripts/phase5/temp-stage2-phase1-type-fixes.py
   workflow_dispatch:
 
 permissions:
   contents: write
 
-env:
-  CANDIDATE_BRANCH: stage2-phase1-runtime-candidate
-
 jobs:
-  fix-validate-candidate:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ env.CANDIDATE_BRANCH }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v5
         with:
           node-version: 22
 
-      - name: Apply strict TypeScript row-shape fixes
+      - name: Switch to semantic candidate and apply fixes
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          import re
+          cp scripts/phase5/temp-stage2-phase1-type-fixes.py /tmp/stage2-type-fixes.py
+          git checkout -B stage2-phase1-runtime-candidate origin/stage2-phase1-runtime-candidate
+          python /tmp/stage2-type-fixes.py
+          git diff --check
+          git status --short
 
-          def sub(path, pattern, replacement, flags=0):
-              p = Path(path)
-              text = p.read_text()
-              next_text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
-              if count != 1:
-                  raise SystemExit(f"pattern count {count} in {path}: {pattern[:100]!r}")
-              p.write_text(next_text)
-
-          sub('app/api/planner/today/order/route.ts',
-              r'  if \(rows\.error \|\| !rows\.data \|\| rows\.data\.length !== itemIds\.length\) \{.*?  const planIds = new Set\(rows\.data\.map\(\(row\) => row\.plan_id\)\);',
-              '''  const rowData = (rows.data ?? []) as Array<{ id: string; plan_id: string; user_id: string }>;
-  if (rows.error || rowData.length !== itemIds.length) {
-    return NextResponse.json({ error: "One or more plan items could not be organised." }, { status: 409 });
-  }
-
-  const planId = rowData[0]?.plan_id;
-  const planIds = new Set(rowData.map((row) => row.plan_id));''', re.S)
-
-          sub('lib/auth/server.ts',
-              r'  if \(attempts\.error \|\| levels\.error \|\| !attempts\.data\?\.length\).*?  for \(const row of attempts\.data\) \{',
-              '''  const attemptRows = (attempts.data ?? []) as Array<{ attempt_key: string; label: string; level_id: string }>;
-  const levelRows = (levels.data ?? []) as Array<{ id: string; code: CALevel }>;
-  if (attempts.error || levels.error || !attemptRows.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
-  const levelById = new Map<string, CALevel>(levelRows.map((level) => [level.id, level.code]));
-  const grouped = new Map<string, { label: string; levels: Set<CALevel> }>();
-  for (const row of attemptRows) {''', re.S)
-
-          sub('lib/community/service.ts',
-              r'members: \(memberResult\.data \?\? \[\]\)\.filter\(\(row\) => row\.user_id !== context\.identity\.id\)\.map\(\(row\) => \(\{ userId: row\.user_id, label: row\.label \}\)\),',
-              'members: ((memberResult.data ?? []) as Array<{ user_id: string; label: string }>).filter((row) => row.user_id !== context.identity.id).map((row) => ({ userId: row.user_id, label: row.label })),')
-
-          sub('lib/dashboard/reference.ts',
-              r'type ResourceSubjectRow = Database\["public"\]\["Tables"\]\["resource_subject_map"\]\["Row"\];',
-              'type ResourceSubjectRow = Database["public"]["Tables"]["resource_subject_map"]["Row"];\ntype EventRow = Database["public"]["Tables"]["exam_events"]["Row"];')
-          sub('lib/dashboard/reference.ts',
-              r'const examEvents = \(eventResponse\.data \?\? \[\]\)\.filter\(\(event\) =>',
-              'const examEvents = ((eventResponse.data ?? []) as EventRow[]).filter((event) =>')
-
-          sub('lib/icai/query.ts',
-              r'type EventRow = Database\["public"\]\["Tables"\]\["exam_events"\]\["Row"\];',
-              'type EventRow = Database["public"]["Tables"]["exam_events"]["Row"];\ntype SyncRunRow = Database["public"]["Tables"]["icai_sync_runs"]["Row"];\ntype ReviewRow = Database["public"]["Tables"]["icai_review_queue"]["Row"];\ntype ChangeRow = Database["public"]["Tables"]["icai_change_events"]["Row"];')
-          substitutions = {
-              '  const levels = levelsResponse.data ?? [];': '  const levels = (levelsResponse.data ?? []) as LevelRow[];',
-              '  const attempts = attemptsResponse.data ?? [];': '  const attempts = (attemptsResponse.data ?? []) as AttemptRow[];',
-              '  const resources = resourcesResponse.data ?? [];': '  const resources = (resourcesResponse.data ?? []) as ResourceRow[];',
-              '  const sources = sourcesResponse.data ?? [];': '  const sources = (sourcesResponse.data ?? []) as SourceRow[];',
-              '  const subjects = subjectsResponse.data ?? [];': '  const subjects = (subjectsResponse.data ?? []) as SubjectRow[];',
-              '  const attemptMaps = attemptMapResponse.data ?? [];': '  const attemptMaps = (attemptMapResponse.data ?? []) as AttemptMapRow[];',
-              '  const subjectMaps = subjectMapResponse.data ?? [];': '  const subjectMaps = (subjectMapResponse.data ?? []) as SubjectMapRow[];',
-              '  const events = eventsResponse.data ?? [];': '  const events = (eventsResponse.data ?? []) as EventRow[];',
-              '  const sources = sourceResponse.data ?? [];': '  const sources = (sourceResponse.data ?? []) as SourceRow[];',
-              '  const run = runResponse.data;': '  const run = runResponse.data as SyncRunRow | null;',
-              '    reviews: (reviewResponse.data ?? []).map((review) => {': '    reviews: ((reviewResponse.data ?? []) as ReviewRow[]).map((review) => {',
-              '    recentChanges: (changeResponse.data ?? []).map((change) => ({': '    recentChanges: ((changeResponse.data ?? []) as ChangeRow[]).map((change) => ({',
-          }
-          p = Path('lib/icai/query.ts'); text = p.read_text()
-          for old, new in substitutions.items():
-              if old not in text:
-                  raise SystemExit(f"missing ICAI pattern: {old}")
-              text = text.replace(old, new, 1)
-          p.write_text(text)
-
-          sub('lib/planner/service.ts', r'const userEvents = calendar\.events;', 'const userEvents = calendar.events as unknown as EventRow[];')
-          sub('lib/planner/service.ts',
-              r'  const \{ sessions, progress, error \} = await loadActivityRows\(identity\.id\);\n  if \(error\) throw new Error\(`Activity could not be loaded: \$\{error\.message\}`\);',
-              '  const { sessions, progress } = await loadActivityRows(identity.id);')
-
-          sub('lib/resources/service.ts',
-              r'type ReportRow = Database\["public"\]\["Tables"\]\["resource_reports"\]\["Row"\];',
-              'type ReportRow = Database["public"]["Tables"]["resource_reports"]["Row"];\ntype NamedRow = { id: string; title: string };')
-          sub('lib/resources/service.ts',
-              r'subjects: new Map\(\(subjects\.data \?\? \[\]\)\.map\(\(row\) => \[row\.id, row\.title\]\)\),',
-              'subjects: new Map(((subjects.data ?? []) as NamedRow[]).map((row) => [row.id, row.title])),')
-          sub('lib/resources/service.ts',
-              r'chapters: new Map\(\(chapters\.data \?\? \[\]\)\.map\(\(row\) => \[row\.id, row\.title\]\)\),',
-              'chapters: new Map(((chapters.data ?? []) as NamedRow[]).map((row) => [row.id, row.title])),')
-          PY
-
-      - name: Enforce zero active Supabase runtime blockers
+      - name: Scan active runtime
         shell: bash
         run: |
           set -euo pipefail
           bad=0
-          check() {
-            label="$1"; pattern="$2"
-            hits="$(grep -RInE --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' --exclude='env.ts' --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=supabase "${pattern}" app components lib server workers proxy.ts 2>/dev/null || true)"
-            if [ -n "${hits}" ]; then
-              echo "::error title=${label}::Forbidden active-runtime reference found"
-              echo "${hits}"
+          scan() {
+            hits="$(grep -RInE --include='*.ts' --include='*.tsx' --include='*.js' --include='*.mjs' --exclude='env.ts' --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.git --exclude-dir=supabase "$1" app components lib server workers proxy.ts 2>/dev/null || true)"
+            if [ -n "$hits" ]; then
+              echo "$hits"
               bad=1
             fi
           }
-          check 'Supabase package import' '@supabase/(supabase-js|ssr)'
-          check 'Supabase runtime module import' '@/lib/supabase/(server|admin|client|browser|proxy)'
-          check 'Supabase client constructor' 'create(Server|Admin)SupabaseClient'
-          check 'Active runtime selector' '(CA_DATA_RUNTIME|CA_AUTH_RUNTIME|isCloudflareDataRuntime|isCloudflareAuthRuntime|isD1Runtime)'
-          check 'Supabase host/API runtime' '(supabase\.co|SUPABASE_SERVICE_ROLE|NEXT_PUBLIC_SUPABASE)'
-          test "${bad}" -eq 0
+          scan '@supabase/(supabase-js|ssr)'
+          scan '@/lib/supabase/(server|admin|client|browser|proxy)'
+          scan 'create(Server|Admin)SupabaseClient'
+          scan '(CA_DATA_RUNTIME|CA_AUTH_RUNTIME|isCloudflareDataRuntime|isCloudflareAuthRuntime|isD1Runtime)'
+          scan '(supabase\.co|SUPABASE_SERVICE_ROLE|NEXT_PUBLIC_SUPABASE)'
+          test "$bad" -eq 0
           echo 'Active runtime reference scan: 0 blockers'
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Typecheck candidate
+      - name: Typecheck
         run: npm run typecheck
 
-      - name: Lint candidate
+      - name: Lint
         run: npm run lint
 
-      - name: Commit validated fixes
+      - name: Commit validated candidate fixes
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app/api/planner/today/order/route.ts lib/auth/server.ts lib/community/service.ts lib/dashboard/reference.ts lib/icai/query.ts lib/planner/service.ts lib/resources/service.ts
-          git commit -m 'Fix Stage 2 D1 runtime typing'
-          git push origin HEAD:${CANDIDATE_BRANCH}
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix Stage 2 D1 runtime typing'
+            git push origin HEAD:stage2-phase1-runtime-candidate
+          fi
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
