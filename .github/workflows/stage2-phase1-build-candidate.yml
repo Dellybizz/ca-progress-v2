@@ -1,4 +1,4 @@
-name: Stage 2 Phase 1 Build Candidate
+name: Stage 2 Phase 1 Validate Candidate
 
 on:
   push:
@@ -8,42 +8,24 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
-  TARGET_BASE_SHA: e534cea99fb518f4e990def3fa44b9ecd5628752
-  KNOWN_GOOD_PAYLOAD_COMMIT: 495008a8637ecd85b5b0f44e93e204dedd3353f6
   CANDIDATE_BRANCH: stage2-phase1-runtime-candidate
 
 jobs:
-  build-candidate:
+  validate-candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ env.CANDIDATE_BRANCH }}
           fetch-depth: 0
 
-      - name: Reconstruct known-good semantic patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          for part in 00 01 02 03; do
-            git show "${KNOWN_GOOD_PAYLOAD_COMMIT}:.stage2/phase1.patch.gz.b64.${part}"
-          done | base64 -d | gzip -d > /tmp/phase1.patch
-          test -s /tmp/phase1.patch
-          sha256sum /tmp/phase1.patch
-
-      - name: Apply patch to exact target base
-        shell: bash
-        run: |
-          set -euo pipefail
-          git checkout --detach "${TARGET_BASE_SHA}"
-          patch -p1 < /tmp/phase1.patch
-          test -f lib/data/d1/client.ts
-          git status --short
-          changed="$(git status --short | wc -l | tr -d ' ')"
-          test "${changed}" -eq 41
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
 
       - name: Enforce zero active Supabase runtime blockers
         shell: bash
@@ -67,13 +49,11 @@ jobs:
           test "${bad}" -eq 0
           echo 'Active runtime reference scan: 0 blockers'
 
-      - name: Commit raw semantic candidate
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app components lib server workers proxy.ts
-          git commit -m 'Retire active Supabase runtime fallbacks'
-          git push origin "HEAD:refs/heads/${CANDIDATE_BRANCH}" --force
-          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck candidate
+        run: npm run typecheck
+
+      - name: Lint candidate
+        run: npm run lint
