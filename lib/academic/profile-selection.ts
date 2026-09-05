@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import type { AcademicSelection } from "./types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
