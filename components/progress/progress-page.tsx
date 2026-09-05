@@ -7,7 +7,13 @@ import type { ProgressPageModel } from "@/lib/progress/types";
 import { ProgressTracker } from "./progress-tracker";
 
 export function ProgressPage({ model, subjectLocked = false, next = "/progress" }: { model: ProgressPageModel; subjectLocked?: boolean; next?: string }) {
-  if (model.mode === "guest") return <div className="progress-page"><LoginRequired next={next} title="Sign in to track chapter progress" /></div>;
+  if (model.mode === "guest") return (
+    <div className="progress-page">
+      <PageHeader preview={false} eyebrow="Progress tracker" title="Track every chapter without losing history." description="Browse how chapter tracking works. Sign in only when you want to save your own completed, revision or test stages." />
+      <Card><CardBody><div className="progress-empty"><Icon name="chart"/><h2>Read-only preview</h2><p>Guest mode can view the tracker, but progress changes are saved only to a signed-in account.</p></div></CardBody></Card>
+      <LoginRequired next={next} title="Sign in to update your progress" />
+    </div>
+  );
   if (model.mode === "setup") return (
     <div className="progress-page">
       <PageHeader preview={false} eyebrow="Progress" title={`Finish your academic setup, ${model.viewerName}.`} description="Progress is stored against the chapters applicable to your level, group and verified attempt." />

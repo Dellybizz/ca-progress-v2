@@ -4,22 +4,12 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("../", import.meta.url).pathname;
-const required = [
-  "app/(student)/dashboard/page.tsx",
-  "app/(public)/login/page.tsx",
-  "app/(public)/onboarding/page.tsx",
-  "app/(admin)/admin/page.tsx",
-  "app/api/health/route.ts",
-  "lib/supabase/browser.ts",
-  "lib/supabase/server.ts",
-  "lib/supabase/admin.ts",
-  "supabase/migrations/20260830000100_phase0_core.sql",
-  "wrangler.jsonc",
-  "open-next.config.ts",
-];
+const required = ["app/(student)/dashboard/page.tsx", "app/(public)/login/page.tsx", "app/(public)/onboarding/page.tsx", "app/(admin)/admin/page.tsx", "app/api/health/route.ts", "lib/auth/provider.ts", "lib/auth/server.ts", "lib/auth/proxy.ts", "lib/data/d1/client.ts", "d1/migrations/0001_phase2_platform.sql", "wrangler.web.jsonc", "open-next.config.ts", "scripts/verify-supabase-retired.mjs"];
 
-test("Phase 0 required boundaries exist", () => {
+test("post-retirement application boundaries exist", () => {
   for (const file of required) assert.equal(existsSync(join(root, file)), true, `missing ${file}`);
+  assert.equal(existsSync(join(root, "supabase")), false);
+  assert.equal(existsSync(join(root, "wrangler.jsonc")), false);
 });
 
 test("legacy monolith names are absent", () => {

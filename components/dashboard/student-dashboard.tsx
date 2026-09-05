@@ -1,29 +1,307 @@
 import Link from "next/link";
 import { DashboardQuickActions, DashboardViewTracker } from "./dashboard-interactions";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import type { DashboardPageModel, DashboardReadyModel } from "@/lib/dashboard/types";
 
-function formatDate(value: string | null) { if (!value) return "Not published yet"; const date = new Date(`${value}T00:00:00Z`); if (Number.isNaN(date.valueOf())) return value; return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date); }
-function formatVerifiedAt(value: string | null) { if (!value) return "Awaiting first verified sync"; const date = new Date(value); if (Number.isNaN(date.valueOf())) return "Verified by ICAI source"; return `Verified ${new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }).format(date)} IST`; }
-function formatMinutes(value: number) { const hours = Math.floor(value / 60); const minutes = value % 60; if (!hours) return `${minutes}m`; return minutes ? `${hours}h ${minutes}m` : `${hours}h`; }
-function TodayMetric({ value, label, detail }: { value: number; label: string; detail: string }) { return <div className="dashboard-future-metric"><strong>{value}</strong><span>{label}</span><small>{detail}</small></div>; }
-function TrackedProgress({ label, chapters, percent }: { label: string; chapters: number; percent: number }) { return <div className="dashboard-progress-row"><div><strong>{label}</strong><span>{chapters} {chapters === 1 ? "chapter" : "chapters"}</span></div><div className="dashboard-progress-unknown" aria-label={`${label} ${percent}% overall progress`}><span style={{ width: `${percent}%`, opacity: 1 }}/></div><small>{percent}%</small></div>; }
-function GuestDashboard() { return <div className="student-dashboard"><PageHeader preview={false} eyebrow="Student home" title="Your study dashboard starts with your course selection." description="Sign in to connect your CA level, group and verified attempt. Guest mode stays local and does not create private dashboard records."/><Card className="dashboard-access-card"><CardBody><span className="dashboard-access-card__icon"><Icon name="shield" size={24}/></span><div><Badge tone="info">Guest mode</Badge><h2>Sign in for a personalized dashboard</h2><p>Your verified attempt, applicable subjects, official ICAI changes and study target are tied to your account profile.</p></div><Link className="dashboard-primary-link" href="/login?next=%2Fdashboard">Continue to sign in <Icon name="arrow" size={16}/></Link></CardBody></Card></div>; }
-function OnboardingDashboard({ displayName }: { displayName: string }) { return <div className="student-dashboard"><PageHeader preview={false} eyebrow="Student home" title={`Finish your setup, ${displayName}.`} description="The dashboard needs your level, group and a verified attempt before it can safely scope academic and ICAI information."/><Card className="dashboard-access-card"><CardBody><span className="dashboard-access-card__icon"><Icon name="target" size={24}/></span><div><Badge tone="warning">Setup incomplete</Badge><h2>Review your academic profile</h2><p>Choose a verified attempt and confirm your CA level/group. New users will be routed through onboarding automatically.</p></div><Link className="dashboard-primary-link" href="/settings/profile">Review academic profile <Icon name="arrow" size={16}/></Link></CardBody></Card></div>; }
-function CountdownHero({ model }: { model: DashboardReadyModel }) { const countLabel = model.countdown.status === "awaiting_verified_date" ? "Date pending" : model.countdown.status === "past" ? "Attempt completed" : `${model.countdown.daysRemaining ?? "—"} days`; return <section className="smart-dashboard-hero" aria-labelledby="attempt-countdown-title"><div className="smart-dashboard-hero__content"><div className="smart-dashboard-hero__badges"><Badge tone="success"><Icon name="shield" size={13}/> Verified attempt</Badge><span>{model.context.levelName} · {model.context.groupLabel}</span></div><p className="smart-dashboard-hero__eyebrow">{model.context.attemptLabel}</p><h2 id="attempt-countdown-title">{countLabel}</h2><p>{model.countdown.targetDate ? `${formatDate(model.countdown.targetDate)} · ${model.countdown.title}` : "A verified examination date has not been published into the Phase 8 dataset yet. The dashboard will update automatically when it is."}</p><div className="smart-dashboard-hero__meta"><span><Icon name="clock" size={15}/> {formatVerifiedAt(model.countdown.lastVerifiedAt)}</span>{model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={14}/></a> : null}</div></div><div className="smart-dashboard-hero__summary" aria-label="Academic selection summary"><div><strong>{model.context.subjectCount}</strong><span>subjects</span></div><div><strong>{model.context.chapterCount}</strong><span>chapters</span></div><div><strong>{model.context.groupLabel}</strong><span>selection</span></div></div></section>; }
+function formatDate(value: string | null) {
+  if (!value) return "Date pending";
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.valueOf())) return value;
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+}
+
+function formatVerifiedAt(value: string | null) {
+  if (!value) return "Awaiting verification";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "Officially verified";
+  return `Verified ${new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }).format(date)}`;
+}
+
+function formatMinutes(value: number) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  if (!hours) return `${minutes}m`;
+  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+function GuestDashboard() {
+  return (
+    <div className="student-dashboard student-dashboard--home">
+      <PageHeader
+        preview={false}
+        eyebrow="Dashboard"
+        title="Explore your CA study workspace."
+        description="Browse the study tools now. Sign in to personalize your dashboard and save your own course, plan and progress."
+      />
+
+      <section className="dashboard-overview-grid" aria-label="Study overview">
+        <Link href="/subjects" className="dashboard-overview-card" aria-label="Browse subjects">
+          <header className="dashboard-overview-card__header">
+            <span className="dashboard-overview-card__icon"><Icon name="book" size={17}/></span>
+            <div><strong>Subjects</strong><small>Explore the syllabus</small></div>
+            <Icon name="chevron" size={14}/>
+          </header>
+          <div className="dashboard-overview-card__primary">
+            <strong>Browse</strong><span>the course</span><small>Choose a subject to begin</small>
+          </div>
+          <div className="dashboard-overview-card__metrics">
+            <span><b>Public</b> syllabus</span>
+            <span><b>Free</b> to explore</span>
+          </div>
+        </Link>
+
+        <Link href="/study" className="dashboard-overview-card" aria-label="Open study mode">
+          <header className="dashboard-overview-card__header">
+            <span className="dashboard-overview-card__icon"><Icon name="timer" size={17}/></span>
+            <div><strong>Study</strong><small>Try focus mode</small></div>
+            <Icon name="chevron" size={14}/>
+          </header>
+          <div className="dashboard-overview-card__primary">
+            <strong>Start</strong><span>a session</span><small>Sign in to save study time</small>
+          </div>
+          <div className="dashboard-overview-card__metrics dashboard-overview-card__metrics--three">
+            <span><b>Focus</b> mode</span>
+            <span><b>Save</b> your history</span>
+          </div>
+        </Link>
+
+        <Link href="/progress" className="dashboard-overview-card dashboard-overview-card--progress" aria-label="Explore progress tracking">
+          <header className="dashboard-overview-card__header">
+            <span className="dashboard-overview-card__icon"><Icon name="chart" size={17}/></span>
+            <div><strong>Progress</strong><small>See how tracking works</small></div>
+            <Icon name="chevron" size={14}/>
+          </header>
+          <div className="dashboard-overview-card__primary">
+            <strong>Track</strong><span>your syllabus</span><small>Sign in to keep your progress</small>
+          </div>
+          <div className="dashboard-overview-progress">
+            <div><span>Course progress</span><i aria-hidden="true"><b style={{ width: "0%" }}/></i><small>—</small></div>
+          </div>
+        </Link>
+      </section>
+
+      <section className="dashboard-home-grid">
+        <Card className="dashboard-next-card">
+          <CardHeader title="Get started" />
+          <CardBody>
+            <div className="dashboard-next-card__row">
+              <span className="dashboard-next-card__icon"><Icon name="sparkles" size={18}/></span>
+              <div><strong>Choose a subject to explore</strong><p>Review the public syllabus first, then sign in when you want a personal study plan.</p></div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="dashboard-actions-card">
+          <CardHeader title="Quick actions"/>
+          <CardBody>
+            <div className="dashboard-quick-actions">
+              <Link href="/subjects" className="dashboard-quick-action"><span><Icon name="book" size={16}/></span><strong>Browse Subjects</strong><small>Explore the syllabus</small></Link>
+              <Link href="/updates" className="dashboard-quick-action"><span><Icon name="bell" size={16}/></span><strong>ICAI Updates</strong><small>View official updates</small></Link>
+              <Link href="/login?next=%2Fdashboard" className="dashboard-quick-action"><span><Icon name="arrow" size={16}/></span><strong>Sign In</strong><small>Save your workspace</small></Link>
+            </div>
+          </CardBody>
+        </Card>
+      </section>
+
+      <Card className="dashboard-icai-compact">
+        <CardHeader title="ICAI updates" action={<Link className="ui-text-link" href="/updates">View all <Icon name="arrow" size={13}/></Link>}/>
+        <CardBody>
+          <div className="dashboard-no-update">
+            <span><Icon name="book" size={16}/></span>
+            <div><strong>Official updates are available</strong><p>Open the updates page to see the latest verified ICAI notices.</p></div>
+          </div>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function OnboardingDashboard({ displayName }: { displayName: string }) {
+  return (
+    <div className="student-dashboard student-dashboard--simple-state">
+      <PageHeader
+        preview={false}
+        eyebrow="Dashboard"
+        title={`Finish your setup, ${displayName}.`}
+        description="Choose your level, group, attempt and study target to personalize CA Progress."
+      />
+      <Card className="dashboard-access-card">
+        <CardBody>
+          <span className="dashboard-access-card__icon"><Icon name="target" size={22}/></span>
+          <div><h2>Complete your academic setup</h2><p>It only takes a moment.</p></div>
+          <Link className="dashboard-primary-link" href="/onboarding">Continue setup <Icon name="arrow" size={15}/></Link>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function AttemptStrip({ model }: { model: DashboardReadyModel }) {
+  const pending = model.countdown.status === "awaiting_verified_date";
+  const status = pending
+    ? "Countdown coming soon"
+    : model.countdown.status === "past"
+      ? "Attempt completed"
+      : `${model.countdown.daysRemaining ?? "—"} days to go`;
+  const date = model.countdown.targetDate ? formatDate(model.countdown.targetDate) : null;
+
+  return (
+    <section className="dashboard-attempt-strip dashboard-attempt-card" aria-label="Current attempt">
+      <div className="dashboard-attempt-card__main">
+        <div className="dashboard-attempt-card__badges">
+          <span className="dashboard-attempt-card__verified"><Icon name="shield" size={13}/> Verified attempt</span>
+          <span>{model.context.levelName} · {model.context.groupLabel}</span>
+        </div>
+        <span className="dashboard-attempt-card__eyebrow">{model.context.attemptLabel}</span>
+        <h2>{status}</h2>
+        <p>
+          {pending
+            ? `Your ${model.context.attemptLabel} attempt is selected. The countdown will begin as soon as the official exam date is confirmed.`
+            : date
+              ? `${date} · Keep your study plan aligned with your selected attempt.`
+              : "Keep your study plan aligned with your selected attempt."}
+        </p>
+        <div className="dashboard-attempt-card__meta">
+          <span><Icon name="clock" size={13}/>{formatVerifiedAt(model.countdown.lastVerifiedAt)}</span>
+          {model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={13}/></a> : null}
+        </div>
+      </div>
+
+      <div className="dashboard-attempt-card__summary" aria-label="Academic selection">
+        <div><strong>{model.context.subjectCount}</strong><span>Subjects</span></div>
+        <div><strong>{model.context.chapterCount}</strong><span>Chapters</span></div>
+        <div><strong>{model.context.groupLabel}</strong><span>Selection</span></div>
+      </div>
+    </section>
+  );
+}
+
+function TodayOverview({ model }: { model: DashboardReadyModel }) {
+  return (
+    <Link href="/planner/today" className="dashboard-overview-card" aria-label="Open today plan">
+      <header className="dashboard-overview-card__header">
+        <span className="dashboard-overview-card__icon"><Icon name="sparkles" size={17}/></span>
+        <div><strong>Today</strong><small>Your study plan</small></div>
+        <Icon name="chevron" size={14}/>
+      </header>
+      <div className="dashboard-overview-card__primary">
+        <strong>{model.today.tasks}</strong><span>tasks</span><small>{model.today.estimatedMinutes} min planned</small>
+      </div>
+      <div className="dashboard-overview-card__metrics">
+        <span><b>{model.today.revisions}</b> revisions</span>
+        <span><b>{model.today.tests}</b> tests</span>
+      </div>
+    </Link>
+  );
+}
+
+function StudyOverview({ model }: { model: DashboardReadyModel }) {
+  return (
+    <Link href="/study" className="dashboard-overview-card" aria-label="Open study mode">
+      <header className="dashboard-overview-card__header">
+        <span className="dashboard-overview-card__icon"><Icon name="timer" size={17}/></span>
+        <div><strong>Study</strong><small>Time & consistency</small></div>
+        <Icon name="chevron" size={14}/>
+      </header>
+      <div className="dashboard-overview-card__primary">
+        <strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><span>this week</span><small>{formatMinutes(model.study.dailyTargetMinutes)} daily target</small>
+      </div>
+      <div className="dashboard-overview-card__metrics dashboard-overview-card__metrics--three">
+        <span><b>{formatMinutes(model.study.weeklyTargetMinutes)}</b> weekly</span>
+        <span><b>{model.study.streakDays}</b> day{model.study.streakDays === 1 ? "" : "s"} streak</span>
+      </div>
+    </Link>
+  );
+}
+
+function ProgressOverview({ model }: { model: DashboardReadyModel }) {
+  return (
+    <Link href="/progress" className="dashboard-overview-card dashboard-overview-card--progress" aria-label="Open progress tracker">
+      <header className="dashboard-overview-card__header">
+        <span className="dashboard-overview-card__icon"><Icon name="chart" size={17}/></span>
+        <div><strong>Progress</strong><small>Your syllabus progress</small></div>
+        <Icon name="chevron" size={14}/>
+      </header>
+      <div className="dashboard-overview-card__primary">
+        <strong>{model.progress.overallPercent}%</strong><span>overall</span><small>{model.context.chapterCount} chapters tracked</small>
+      </div>
+      <div className="dashboard-overview-progress">
+        {model.progress.groups.slice(0, 2).map((group) => (
+          <div key={group.code}>
+            <span>{group.name}</span>
+            <i aria-hidden="true"><b style={{ width: `${group.percent}%` }}/></i>
+            <small>{group.percent}%</small>
+          </div>
+        ))}
+      </div>
+    </Link>
+  );
+}
 
 function ReadyDashboard({ model }: { model: DashboardReadyModel }) {
-  return <div className="student-dashboard"><DashboardViewTracker/><PageHeader preview={false} eyebrow="Today" title={`Welcome back, ${model.viewer.displayName}.`} description={`${model.context.levelName} · ${model.context.groupLabel} · ${model.context.attemptLabel}. Your home is assembled server-side from profile, verified reference data, progress, planner and study-session rows.`} actions={<Link className="dashboard-header-link" href="/settings/profile">Edit academic profile</Link>}/><CountdownHero model={model}/>
-    <section className="smart-dashboard-grid smart-dashboard-grid--top">
-      <Card className="dashboard-today-card"><CardHeader title="Today" description="Your Phase 6 scheduled tasks. Phase 9 smart due-revision generation remains separate." action={<Link className="ui-text-link" href="/planner">Open planner <Icon name="arrow" size={14}/></Link>}/><CardBody><div className="dashboard-today-metrics"><TodayMetric value={model.today.tasks} label="Tasks" detail={`${model.today.estimatedMinutes} min planned`}/><TodayMetric value={model.today.revisions} label="Revision tasks" detail="Student-planned"/><TodayMetric value={model.today.tests} label="Test tasks" detail="Student-planned"/></div><div className="dashboard-readiness-note"><Icon name="sparkles" size={17}/><p>These totals come only from your normalized Phase 6 task rows. Generated due revisions and smart priorities remain Phase 9 work.</p></div></CardBody></Card>
-      <Card className="dashboard-study-card"><CardHeader title="Study target" description="Your onboarding target compared with completed Phase 6 study sessions." action={<Link className="ui-text-link" href="/study">Start study <Icon name="arrow" size={14}/></Link>}/><CardBody><div className="dashboard-study-target"><div><strong>{formatMinutes(model.study.dailyTargetMinutes)}</strong><span>daily target</span></div><div><strong>{formatMinutes(model.study.weeklyTargetMinutes)}</strong><span>weekly target</span></div></div><div className="dashboard-study-secondary"><span><Icon name="clock" size={16}/> Studied this week <strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong></span><span><Icon name="sparkles" size={16}/> Streak <strong>{model.study.streakDays} day{model.study.streakDays === 1 ? "" : "s"}</strong></span></div></CardBody></Card>
-    </section>
-    <section className="smart-dashboard-grid smart-dashboard-grid--main"><Card className="dashboard-progress-card"><CardHeader title="Progress" description="Live Phase 5 percentages derived from normalized chapter stage rows." action={<Link className="ui-text-link" href="/progress">Open progress <Icon name="arrow" size={14}/></Link>}/><CardBody><div className="dashboard-overall-progress"><div><strong>Overall stage progress</strong><span>{model.context.chapterCount} applicable chapters · five stages per chapter</span></div><Badge tone="brand">{model.progress.overallPercent}%</Badge></div><div className="dashboard-progress-groups">{model.progress.groups.map((group) => <TrackedProgress key={group.code} label={group.name} chapters={group.chapterCount} percent={group.percent}/>)}</div><div className="dashboard-subject-grid">{model.progress.subjects.slice(0,6).map((subject) => <Link key={subject.id} href={`/subjects/${subject.slug}/progress`} className="dashboard-subject-card"><span>{subject.groupName}</span><strong>{subject.title}</strong><small>{subject.chapterCount} chapters · {subject.percent}% overall</small></Link>)}</div></CardBody></Card><div className="dashboard-side-stack"><Card className="dashboard-recommendation-card"><CardHeader title="What to study next" description="One explainable fallback slot, ready for Phase 9 ranking." action={<Badge tone="info">Phase 9 ready</Badge>}/><CardBody><span className="dashboard-recommendation-card__icon"><Icon name="target" size={22}/></span><h3>{model.recommendation.title}</h3><p>{model.recommendation.description}</p><Link className="dashboard-primary-link" href={model.recommendation.href}>Open recommendation <Icon name="arrow" size={15}/></Link></CardBody></Card><Card><CardHeader title="Quick actions" description="Jump directly into common study workflows."/><CardBody><DashboardQuickActions actions={model.quickActions}/></CardBody></Card></div></section>
-    <section className="smart-dashboard-grid smart-dashboard-grid--updates"><Card className="dashboard-icai-card"><CardHeader title="Latest ICAI changes" description="Scoped to your level, verified attempt and applicable subjects. Refreshes from live Phase 8 data without a code deploy." action={<Link className="ui-text-link" href="/updates">All updates <Icon name="arrow" size={14}/></Link>}/><CardBody>{model.icai.updates.length ? <div className="dashboard-update-list">{model.icai.updates.map((update) => <article className="dashboard-update-item" key={update.id}><div><Badge tone="success">Official</Badge><Badge tone="neutral">{update.type.replaceAll("_"," ")}</Badge></div><h3>{update.title}</h3>{update.summary ? <p>{update.summary}</p> : null}<footer><span>{update.publishedOn ? formatDate(update.publishedOn) : formatVerifiedAt(update.lastVerifiedAt)}</span><a href={update.officialUrl} target="_blank" rel="noreferrer">Open on ICAI <Icon name="arrow" size={13}/></a></footer></article>)}</div> : <EmptyState compact icon="book" title="No matching ICAI updates yet" description="The verified Phase 8 feed currently has no active item matching your level, attempt and subjects. New verified items will appear here without a deployment."/>}<p className="dashboard-verification-footer"><Icon name="shield" size={14}/> {formatVerifiedAt(model.icai.verifiedAt)}</p></CardBody></Card><Card className="dashboard-alert-card"><CardHeader title="Alerts & consistency" description="Every status below names its real source or future owner."/><CardBody><div className="dashboard-alert-list">{model.alerts.map((alert) => <div key={alert.kind} className="dashboard-alert-item"><span><Icon name={alert.kind === "test" ? "tests" : alert.kind === "streak" ? "sparkles" : "layers"} size={17}/></span><div><strong>{alert.title}</strong><p>{alert.description}</p></div><Badge tone="neutral">Phase {alert.phase}</Badge></div>)}</div></CardBody></Card></section>
-  </div>;
+  const latestUpdate = model.icai.updates[0] ?? null;
+
+  return (
+    <div className="student-dashboard student-dashboard--home">
+      <DashboardViewTracker/>
+      <PageHeader
+        preview={false}
+        eyebrow="Dashboard"
+        title={`Welcome back, ${model.viewer.displayName}.`}
+        description={`${model.context.levelName} · ${model.context.groupLabel} · ${model.context.attemptLabel}`}
+      />
+
+      <AttemptStrip model={model}/>
+
+      <section className="dashboard-overview-grid" aria-label="Study overview">
+        <TodayOverview model={model}/>
+        <StudyOverview model={model}/>
+        <ProgressOverview model={model}/>
+      </section>
+
+      <section className="dashboard-home-grid">
+        <Card className="dashboard-next-card">
+          <CardHeader title="Next up" action={<Link className="ui-text-link" href={model.recommendation.href}>Open <Icon name="arrow" size={13}/></Link>}/>
+          <CardBody>
+            <div className="dashboard-next-card__row">
+              <span className="dashboard-next-card__icon"><Icon name="target" size={18}/></span>
+              <div><strong>{model.recommendation.title}</strong><p>{model.recommendation.description}</p></div>
+            </div>
+          </CardBody>
+        </Card>
+
+        <Card className="dashboard-actions-card">
+          <CardHeader title="Quick actions"/>
+          <CardBody><DashboardQuickActions actions={model.quickActions}/></CardBody>
+        </Card>
+      </section>
+
+      <Card className="dashboard-icai-compact">
+        <CardHeader title="ICAI updates" action={<Link className="ui-text-link" href="/updates">View all <Icon name="arrow" size={13}/></Link>}/>
+        <CardBody>
+          {latestUpdate ? (
+            <article className="dashboard-latest-update">
+              <span className="dashboard-latest-update__icon"><Icon name="book" size={17}/></span>
+              <div><strong>{latestUpdate.title}</strong><p>{latestUpdate.summary || "Official update for your selected course and attempt."}</p></div>
+              <a href={latestUpdate.officialUrl} target="_blank" rel="noreferrer">ICAI <Icon name="arrow" size={12}/></a>
+            </article>
+          ) : (
+            <div className="dashboard-no-update">
+              <span><Icon name="check" size={16}/></span>
+              <div><strong>No new updates</strong><p>There are no current ICAI changes matching your selection.</p></div>
+              <small>{formatVerifiedAt(model.icai.verifiedAt)}</small>
+            </div>
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
 }
-export function StudentDashboard({ model }: { model: DashboardPageModel }) { if (model.mode === "guest") return <GuestDashboard/>; if (model.mode === "onboarding") return <OnboardingDashboard displayName={model.viewer.displayName}/>; return <ReadyDashboard model={model}/>; }
+
+export function StudentDashboard({ model }: { model: DashboardPageModel }) {
+  if (model.mode === "guest") return <GuestDashboard/>;
+  if (model.mode === "onboarding") return <OnboardingDashboard displayName={model.viewer.displayName}/>;
+  return <ReadyDashboard model={model}/>;
+}

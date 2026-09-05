@@ -73,6 +73,12 @@ export type TodayPlanItem = {
   subjectTitle: string | null;
   chapterTitle: string | null;
   overdueDays: number;
+  displayTitle?: string;
+  chapterDisplayTitle?: string | null;
+  scheduleState?: "overdue" | "fixed" | "planned" | null;
+  plannedStartAt?: string | null;
+  plannedEndAt?: string | null;
+  startedAt?: string | null;
 };
 
 export type TodayPlanReadyModel = {
@@ -90,6 +96,7 @@ export type TodayPlanReadyModel = {
   warnings: string[];
   weakSubjects: WeakSubjectWarning[];
   forecast: ForecastSummary;
+  canUndo?: boolean;
 };
 
 export type TodayPlanPageModel =
@@ -138,3 +145,9 @@ export type TodayPlanAction =
   | { action: "skip"; itemId: string }
   | { action: "snooze"; itemId: string; minutes: number }
   | { action: "reschedule"; itemId: string; date: string };
+
+export type TodayPlanInteractionAction =
+  | TodayPlanAction
+  | { action: "start"; itemId: string }
+  | { action: "reorder"; itemIds: string[] }
+  | { action: "undo" };

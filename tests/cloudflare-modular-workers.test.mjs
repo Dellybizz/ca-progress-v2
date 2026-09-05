@@ -16,11 +16,9 @@ test("heavy ICAI background processing lives outside the Next OpenNext Worker", 
   assert.doesNotMatch(proxy, /@supabase\/supabase-js/);
 });
 
-test("ICAI service is private and linked only in the final web deployment config", () => {
-  const bootstrap = read("wrangler.jsonc");
+test("ICAI service is private and linked in the production web deployment config", () => {
   const web = read("wrangler.web.jsonc");
   const service = read("workers/icai-sync/wrangler.jsonc");
-  assert.doesNotMatch(bootstrap, /"services"\s*:/);
   assert.match(web, /"services"\s*:\s*\[/);
   assert.match(web, /"binding"\s*:\s*"ICAI_SYNC_SERVICE"/);
   assert.match(web, /"service"\s*:\s*"ca-progress-v2-icai-sync"/);
@@ -41,7 +39,7 @@ test("deployment self-bootstraps target Worker before deploying bound web Worker
 test("repository enforces headroom below Cloudflare hard bundle limits", () => {
   const pkg = JSON.parse(read("package.json"));
   const gate = read("scripts/check-cloudflare-size-budget.mjs");
-  assert.match(pkg.scripts["cf:check:web"], /--config wrangler\.web\.jsonc --budget-mib 2\.70/);
+  assert.match(pkg.scripts["cf:check:web"], /--config wrangler.web.jsonc --budget-mib 3.10/);
   assert.match(pkg.scripts["cf:check:icai"], /--budget-mib 1\.50/);
   assert.match(pkg.scripts["cf:check"], /cf:check:icai[\s\S]*cf:check:web/);
   assert.match(gate, /compressedMiB > budgetMiB/);

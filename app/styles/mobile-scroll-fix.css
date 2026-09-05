@@ -1,0 +1,74 @@
+/* Global mobile scroll normalization.
+   Keep document height content-driven and stop iOS/Safari rubber-band scrolling
+   once the real page content reaches its top or bottom boundary. */
+
+@media (max-width: 899px) {
+  html,
+  body {
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: none;
+  }
+
+  html {
+    overflow-x: clip;
+    overflow-y: auto;
+  }
+
+  body {
+    position: static !important;
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .app-shell,
+  .app-main,
+  .content-wrap {
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    box-sizing: border-box;
+  }
+
+  .app-shell,
+  .app-main {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .app-main,
+  .content-wrap {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  /* Reserve only enough room for the fixed mobile navigation. */
+  .content-wrap {
+    margin: 0 auto;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .content-wrap > [class*="-page"],
+  .content-wrap > .student-dashboard--home,
+  .content-wrap > .student-dashboard--simple-state {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding-bottom: 16px !important;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed !important;
+    z-index: 60 !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+}

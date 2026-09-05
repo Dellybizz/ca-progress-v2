@@ -16,7 +16,11 @@ function studyTime(seconds: number) { const minutes = Math.round(seconds / 60); 
 
 export default async function AnalyticsPage() {
   const [model, study] = await Promise.all([getProgressPageModel(), getStudyPageModel()]);
-  if (model.mode === "guest") return <div className="progress-page"><LoginRequired next="/analytics" title="Sign in to view private analytics"/></div>;
+  if (model.mode === "guest") return <div className="progress-page">
+    <PageHeader preview={false} eyebrow="Analytics" title="Study and progress analytics." description="Browse the analytics layout as a guest. Personal charts and totals are available after sign-in." actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link></div>}/>
+    <Card><CardBody><div className="phase6-empty"><Icon name="chart"/><strong>Analytics preview</strong><p>Guest mode does not create personal analytics. Sign in to record and analyse your own activity.</p></div></CardBody></Card>
+    <LoginRequired next="/analytics" title="Sign in to view private analytics"/>
+  </div>;
   if (model.mode === "setup") return <div className="progress-page"><PageHeader preview={false} eyebrow="Analytics" title="Complete your academic profile first." description="Analytics are scoped to your applicable chapters, verified attempt and completed study sessions."/><Link className="ui-button ui-button--primary" href="/settings/profile">Review profile</Link></div>;
   const studyAnalytics = study.mode === "ready" ? study.analytics : null;
   const analytics = model.analytics;

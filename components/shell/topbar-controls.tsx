@@ -8,12 +8,70 @@ import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { Drawer, Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { Viewer } from "@/lib/auth/server";
+import { useViewer } from "./viewer-client";
 
-const quickLinks = [["Dashboard", "/dashboard"], ["Planner", "/planner"], ["Progress", "/progress"], ["Study", "/study"], ["Notes", "/notes"], ["Settings", "/settings"]];
-export function TopbarControls({ viewer }: { viewer: Viewer }) {
+const quickLinks = [
+  ["Dashboard", "/dashboard"],
+  ["Study", "/study"],
+  ["Progress", "/progress"],
+  ["Resources", "/resources"],
+  ["Community", "/community"],
+];
+
+const accountLinks = [
+  ["Profile", "/settings/profile"],
+  ["Settings", "/settings"],
+  ["Pricing", "/pricing"],
+  ["Billing", "/billing"],
+];
+
+export function TopbarControls() {
   const pathname = usePathname();
-  const [commandOpen, setCommandOpen] = useState(false); const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const accountHref = viewer.authenticated ? "/settings/profile" : `/login?next=${encodeURIComponent(pathname || "/dashboard")}`;
-  return <><div className="topbar-controls"><button className="command-trigger" onClick={() => setCommandOpen(true)} aria-label="Open command search"><Icon name="search" size={18}/><span>Search anything</span><kbd>⌘ K</kbd></button><button className="ui-icon-button notification-button" onClick={() => setNotificationsOpen(true)} aria-label="Open notifications"><Icon name="bell" size={19}/><i aria-hidden="true"/></button><Link href={accountHref} className="profile-avatar" aria-label={viewer.authenticated ? "Open profile" : "Sign in"}>{viewer.initial}</Link></div><Modal open={commandOpen} onClose={() => setCommandOpen(false)} title="Command center"><Input autoFocus placeholder="Search pages, actions and future resources…" leading={<Icon name="search" size={17}/>} label="Search"/><div className="command-links" aria-label="Quick navigation">{quickLinks.map(([label, href]) => <Link key={href} href={href} onClick={() => setCommandOpen(false)}><span>{label}</span><Icon name="arrow" size={16}/></Link>)}</div><p className="overlay-footnote">Global data search remains assigned to a later phase.</p></Modal><Drawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Notifications"><EmptyState icon="bell" title="Notification surface is ready" description="Real ICAI alerts, study reminders and community notifications arrive in their assigned later phases." action={<Button variant="secondary" onClick={() => setNotificationsOpen(false)}>Got it</Button>}/></Drawer></>;
+  const viewer = useViewer();
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const loginHref = `/login?next=${encodeURIComponent(pathname || "/dashboard")}`;
+
+  return (
+    <>
+      <div className="topbar-controls">
+        <button className="command-trigger" onClick={() => setCommandOpen(true)} aria-label="Open search">
+          <Icon name="search" size={18}/><span>Search</span><kbd>⌘ K</kbd>
+        </button>
+        <button className="ui-icon-button notification-button" onClick={() => setNotificationsOpen(true)} aria-label="Open notifications">
+          <Icon name="bell" size={19}/><i aria-hidden="true"/></button>
+        {viewer.authenticated ? (
+          <details className="profile-menu">
+            <summary className="profile-avatar" aria-label="Open account menu">{viewer.initial}</summary>
+            <div className="profile-menu__panel" role="menu">
+              <div className="profile-menu__identity"><strong>{viewer.label}</strong><span>Account</span></div>
+              <div className="profile-menu__links">
+                {accountLinks.map(([label, href]) => (
+                  <Link prefetch={true} key={href} href={href} role="menuitem"><span>{label}</span><Icon name="chevron" size={14}/></Link>
+                ))}
+              </div>
+            </div>
+          </details>
+        ) : (
+          <Link prefetch={true} href={loginHref} className="profile-avatar" aria-label="Sign in">{viewer.initial}</Link>
+        )}
+      </div>
+
+      <Modal open={commandOpen} onClose={() => setCommandOpen(false)} title="Search CA Progress">
+        <Input autoFocus placeholder="Search pages and tools…" leading={<Icon name="search" size={17}/>} label="Search"/>
+        <div className="command-links" aria-label="Quick navigation">
+          {quickLinks.map(([label, href]) => <Link prefetch={true} key={href} href={href} onClick={() => setCommandOpen(false)}><span>{label}</span><Icon name="arrow" size={16}/></Link>)}
+        </div>
+      </Modal>
+
+      <Drawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Notifications">
+        <EmptyState
+          icon="bell"
+          title="You’re all caught up"
+          description="Study reminders, ICAI updates and community activity will appear here when available."
+          action={<Button variant="secondary" onClick={() => setNotificationsOpen(false)}>Done</Button>}
+        />
+      </Drawer>
+    </>
+  );
 }

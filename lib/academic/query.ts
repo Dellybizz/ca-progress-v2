@@ -1,7 +1,8 @@
 import "server-only";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
+import { createD1ServerClient } from "@/lib/data/d1/client";
+import { getSharedPublicJson } from "@/lib/cache/public";
+import type { Database } from "@/lib/data/database.types";
 import {
   AcademicDataError,
   type AcademicCatalog,
@@ -34,19 +35,23 @@ function versionDto(row: VersionRow): AcademicVersion {
 }
 
 async function loadRawAcademic(): Promise<RawAcademic> {
-  const supabase = await createServerSupabaseClient();
+  const client = await createD1ServerClient();
   const [levels, groups, subjects, versions, chapters, topics, attemptMap] = await Promise.all([
-    supabase.from("course_levels").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("course_groups").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("subjects").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("syllabus_versions").select("*").order("effective_from", { ascending: false }),
-    supabase.from("chapters").select("*").order("sort_order"),
-    supabase.from("topics").select("*").order("sort_order"),
-    supabase.from("attempt_syllabus_map").select("*").order("attempt_key"),
+    client.from("course_levels").select("id,code,name,sort_order,is_active,created_at,updated_at").eq("is_active", true).order("sort_order"),
+    client.from("course_groups").select("id,level_id,code,name,sort_order,is_default,is_active,created_at,updated_at").eq("is_active", true).order("sort_order"),
+    client.from("subjects").select("id,code,slug,paper_label,title,subject_kind,level_id,group_id,source_url,is_active,sort_order,created_at,updated_at").eq("is_active", true).order("sort_order"),
+    client.from("syllabus_versions").select("id,version_key,title,status,effective_from,effective_to,supersedes_version_id,source_url,source_label,source_verified_at,subject_id,content_hash,created_at,updated_at,verification_method").order("effective_from", { ascending: false }),
+    client.from("chapters").select("id,stable_key,chapter_number,title,section_key,chapter_kind,syllabus_version_id,sort_order,slug,source_url,created_at,updated_at").order("sort_order"),
+    client.from("topics").select("id,stable_key,unit_number,title,topic_kind,chapter_id,sort_order,source_url,created_at,updated_at").order("sort_order"),
+    client.from("attempt_syllabus_map").select("id,level_id,attempt_key,group_id,subject_id,syllabus_version_id,created_at").order("attempt_key"),
   ]);
   const firstError = [levels.error, groups.error, subjects.error, versions.error, chapters.error, topics.error, attemptMap.error].find(Boolean);
   if (firstError) throw new AcademicDataError(firstError.message);
   return { levels: levels.data ?? [], groups: groups.data ?? [], subjects: subjects.data ?? [], versions: versions.data ?? [], chapters: chapters.data ?? [], topics: topics.data ?? [], attemptMap: attemptMap.data ?? [] };
+}
+
+async function getCachedRawAcademic() {
+  return getSharedPublicJson({ namespace: "academic", key: "catalog-v1", ttlSeconds: 3600, load: loadRawAcademic });
 }
 
 function versionForSubject(raw: RawAcademic, subjectId: string, attempt?: string | null) {
@@ -88,7 +93,7 @@ function allowedGroupIds(groups: GroupRow[], selectedGroup: string) {
 }
 
 export async function getAcademicCatalog(selection: AcademicSelection = {}): Promise<AcademicCatalog> {
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const normalized = normalizeSelection(raw, selection);
   const groups = normalized.groupsForLevel.map((group) => ({ id: group.id, code: group.code, name: group.name, sortOrder: group.sort_order, isDefault: group.is_default }));
   const groupIds = allowedGroupIds(normalized.groupsForLevel, normalized.selectedGroup);
@@ -109,7 +114,7 @@ export async function getAcademicCatalog(selection: AcademicSelection = {}): Pro
 }
 
 export async function getSubjectBySlug(slug: string, attempt?: string | null): Promise<AcademicSubject | null> {
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const subject = raw.subjects.find((item) => item.slug === slug);
   if (!subject) return null;
   const version = versionForSubject(raw, subject.id, attempt);
@@ -119,7 +124,7 @@ export async function getSubjectBySlug(slug: string, attempt?: string | null): P
 export async function searchAcademicCatalog(query: string, selection: AcademicSelection = {}, limit = 24): Promise<AcademicSearchResult[]> {
   const q = query.trim().toLocaleLowerCase();
   if (q.length < 2) return [];
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const normalized = normalizeSelection(raw, selection);
   const allowedGroups = allowedGroupIds(normalized.groupsForLevel, normalized.selectedGroup);
   const levelById = new Map(raw.levels.map((level) => [level.id, level]));
@@ -148,7 +153,7 @@ export async function searchAcademicCatalog(query: string, selection: AcademicSe
 }
 
 export async function getAcademicVersionPreview(): Promise<AcademicVersionPreview[]> {
-  const raw = await loadRawAcademic();
+  const raw = await getCachedRawAcademic();
   const subjectById = new Map(raw.subjects.map((subject) => [subject.id, subject]));
   const levelById = new Map(raw.levels.map((level) => [level.id, level]));
   const groupById = new Map(raw.groups.map((group) => [group.id, group]));

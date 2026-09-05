@@ -1,9 +1,10 @@
 import "server-only";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import type { Database } from "@/lib/supabase/database.types";
+import { createD1ServerClient } from "@/lib/data/d1/client";
+import { createD1AdminClient } from "@/lib/data/d1/client";
+import type { Database } from "@/lib/data/database.types";
 import type { IcaiAdminDashboard, IcaiPublicCatalog, IcaiPublicFilters, IcaiResourceCard, IcaiResourceType } from "./types";
+import { getSharedPublicJson } from "@/lib/cache/public";
 
 type LevelRow = Database["public"]["Tables"]["course_levels"]["Row"];
 type AttemptRow = Database["public"]["Tables"]["exam_attempts"]["Row"];
@@ -13,6 +14,9 @@ type SubjectRow = Database["public"]["Tables"]["subjects"]["Row"];
 type AttemptMapRow = Database["public"]["Tables"]["resource_attempt_map"]["Row"];
 type SubjectMapRow = Database["public"]["Tables"]["resource_subject_map"]["Row"];
 type EventRow = Database["public"]["Tables"]["exam_events"]["Row"];
+type SyncRunRow = Database["public"]["Tables"]["icai_sync_runs"]["Row"];
+type ReviewRow = Database["public"]["Tables"]["icai_review_queue"]["Row"];
+type ChangeRow = Database["public"]["Tables"]["icai_change_events"]["Row"];
 
 function cleanFilter(value: string | null | undefined) {
   const next = value?.trim() ?? "";
@@ -25,16 +29,22 @@ function dateSort(a: string | null, b: string | null) {
 }
 
 export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Promise<IcaiPublicCatalog> {
-  const supabase = await createServerSupabaseClient();
+  const key = ["catalog-v1", filters.level, filters.attempt, filters.subject, filters.type].map((value) => encodeURIComponent(value ?? "")).join(":");
+  return getSharedPublicJson({
+    namespace: "icai",
+    key,
+    ttlSeconds: 300,
+    load: async () => {
+      const client = await createD1ServerClient();
   const [levelsResponse, attemptsResponse, resourcesResponse, sourcesResponse, subjectsResponse, attemptMapResponse, subjectMapResponse, eventsResponse] = await Promise.all([
-    supabase.from("course_levels").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("exam_attempts").select("*").eq("verification_status", "verified").order("attempt_key", { ascending: false }),
-    supabase.from("icai_resources").select("*").eq("verification_status", "verified").eq("status", "active").order("last_seen_at", { ascending: false }).limit(500),
-    supabase.from("icai_sources").select("*").eq("is_active", true),
-    supabase.from("subjects").select("*").eq("is_active", true).order("sort_order"),
-    supabase.from("resource_attempt_map").select("*"),
-    supabase.from("resource_subject_map").select("*"),
-    supabase.from("exam_events").select("*").eq("verification_status", "verified").order("event_date").limit(150),
+    client.from("course_levels").select("*").eq("is_active", true).order("sort_order"),
+    client.from("exam_attempts").select("*").eq("verification_status", "verified").order("attempt_key", { ascending: false }),
+    client.from("icai_resources").select("*").eq("verification_status", "verified").eq("status", "active").order("last_seen_at", { ascending: false }).limit(500),
+    client.from("icai_sources").select("*").eq("is_active", true),
+    client.from("subjects").select("*").eq("is_active", true).order("sort_order"),
+    client.from("resource_attempt_map").select("*"),
+    client.from("resource_subject_map").select("*"),
+    client.from("exam_events").select("*").eq("verification_status", "verified").order("event_date").limit(150),
   ]);
 
   const firstError = [
@@ -49,14 +59,14 @@ export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Pro
   ].find(Boolean);
   if (firstError) throw firstError;
 
-  const levels = levelsResponse.data ?? [];
-  const attempts = attemptsResponse.data ?? [];
-  const resources = resourcesResponse.data ?? [];
-  const sources = sourcesResponse.data ?? [];
-  const subjects = subjectsResponse.data ?? [];
-  const attemptMaps = attemptMapResponse.data ?? [];
-  const subjectMaps = subjectMapResponse.data ?? [];
-  const events = eventsResponse.data ?? [];
+  const levels = (levelsResponse.data ?? []) as LevelRow[];
+  const attempts = (attemptsResponse.data ?? []) as AttemptRow[];
+  const resources = (resourcesResponse.data ?? []) as ResourceRow[];
+  const sources = (sourcesResponse.data ?? []) as SourceRow[];
+  const subjects = (subjectsResponse.data ?? []) as SubjectRow[];
+  const attemptMaps = (attemptMapResponse.data ?? []) as AttemptMapRow[];
+  const subjectMaps = (subjectMapResponse.data ?? []) as SubjectMapRow[];
+  const events = (eventsResponse.data ?? []) as EventRow[];
 
   const selected = {
     level: cleanFilter(filters.level),
@@ -166,24 +176,26 @@ export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Pro
     subjects: subjects.map((row: SubjectRow) => ({ id: row.id, title: row.title, levelCode: levelById.get(row.level_id)?.code ?? "" })),
     filters: selected,
     verifiedAt,
-  };
+      };
+    },
+  });
 }
 
 export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
-  const supabase = createAdminSupabaseClient();
+  const client = createD1AdminClient();
   const [runResponse, sourceResponse, reviewResponse, changeResponse] = await Promise.all([
-    supabase.from("icai_sync_runs").select("*").order("started_at", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("icai_sources").select("*").order("id"),
-    supabase.from("icai_review_queue").select("*").eq("status", "pending").order("created_at").limit(100),
-    supabase.from("icai_change_events").select("*").order("detected_at", { ascending: false }).limit(100),
+    client.from("icai_sync_runs").select("*").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+    client.from("icai_sources").select("*").order("id"),
+    client.from("icai_review_queue").select("*").eq("status", "pending").order("created_at").limit(100),
+    client.from("icai_change_events").select("*").order("detected_at", { ascending: false }).limit(100),
   ]);
 
   const firstError = [runResponse.error, sourceResponse.error, reviewResponse.error, changeResponse.error].find(Boolean);
   if (firstError) throw firstError;
 
-  const sources = sourceResponse.data ?? [];
+  const sources = (sourceResponse.data ?? []) as SourceRow[];
   const sourceById = new Map(sources.map((source) => [source.id, source]));
-  const run = runResponse.data;
+  const run = runResponse.data as SyncRunRow | null;
 
   return {
     latestRun: run ? {
@@ -217,7 +229,7 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
       authoritativeListing: source.authoritative_listing,
       isActive: source.is_active,
     })),
-    reviews: (reviewResponse.data ?? []).map((review) => {
+    reviews: ((reviewResponse.data ?? []) as ReviewRow[]).map((review) => {
       const source = sourceById.get(review.source_id);
       return {
         id: review.id,
@@ -231,7 +243,7 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
         createdAt: review.created_at,
       };
     }),
-    recentChanges: (changeResponse.data ?? []).map((change) => ({
+    recentChanges: ((changeResponse.data ?? []) as ChangeRow[]).map((change) => ({
       id: change.id,
       entityType: change.entity_type,
       entityId: change.entity_id,

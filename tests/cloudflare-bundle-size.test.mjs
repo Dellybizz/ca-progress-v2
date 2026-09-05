@@ -36,9 +36,11 @@ test("Cloudflare builds strip the unused Vercel OG runtime without creating reje
   assert.doesNotMatch(patch, /const replacement\s*=\s*["']Promise\.reject/);
 });
 
-test("shared shell degrades to guest rendering instead of returning a Worker-level 500 when viewer lookup fails", () => {
+test("shared shell renders without a viewer lookup and hydrates viewer status separately", () => {
   const shell = read("components/shell/app-shell.tsx");
-  assert.match(shell, /try\s*\{[\s\S]*viewer\s*=\s*await loadViewer\(\)/);
-  assert.match(shell, /catch\s*\(error\)/);
-  assert.match(shell, /viewer\s*=\s*guestViewer/);
+  assert.doesNotMatch(shell, /await loadViewer\(\)/);
+  assert.match(shell, /<ViewerStatus\/>/);
+  assert.match(shell, /<TopbarControls\/>/);
+  assert.match(read("app/api/auth/viewer/route.ts"), /loadViewer/);
+  assert.match(read("components/shell/viewer-client.ts"), /useSyncExternalStore/);
 });

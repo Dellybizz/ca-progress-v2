@@ -1,0 +1,4 @@
+.app-navigation-progress{position:fixed;inset:0 0 auto;z-index:1000;height:3px;overflow:hidden;background:transparent;pointer-events:none}
+.app-navigation-progress::after{content:"";display:block;width:42%;height:100%;border-radius:999px;background:var(--accent,#5b5ce2);animation:app-navigation-progress 1.1s ease-in-out infinite}
+@keyframes app-navigation-progress{0%{transform:translateX(-110%)}60%{transform:translateX(210%)}100%{transform:translateX(260%)}}
+@media(prefers-reduced-motion:reduce){.app-navigation-progress::after{animation:none;width:100%}}

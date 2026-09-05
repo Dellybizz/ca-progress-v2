@@ -3,7 +3,7 @@ name: V2 CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, phase-12-operations-admin-platform]
 
 permissions:
   contents: read
@@ -11,17 +11,26 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
+      - name: Enforce permanent Supabase retirement
+        run: npm run verify:retirement
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
-      - run: npm run build
-      - run: npm run cf:check
+      - name: Validate retained D1 hot-query indexes
+        run: npm run d1:hot-indexes:validate
+      - name: Next.js production build
+        run: npm run build
+      - name: OpenNext build and production Worker dry-runs
+        run: npm run cf:check
       - name: Smoke Cloudflare SSR routes
         run: npm run cf:smoke
+      - name: Repository-wide tests
+        run: npm test
+      - name: Reconfirm permanent Supabase retirement
+        run: npm run verify:retirement

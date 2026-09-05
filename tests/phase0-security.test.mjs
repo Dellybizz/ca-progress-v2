@@ -6,21 +6,16 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 const read = (p) => readFileSync(join(root, p), "utf8");
 
-test("service role is isolated to server-only client", () => {
-  const browser = read("lib/supabase/browser.ts");
-  const admin = read("lib/supabase/admin.ts");
-  assert.equal(browser.includes("SUPABASE_SERVICE_ROLE_KEY"), false);
-  assert.match(admin, /import "server-only"/);
-  assert.match(admin, /createAdminSupabaseClient/);
-});
-
-test("Phase 0 migration enables RLS on every table", () => {
-  const sql = read("supabase/migrations/20260830000100_phase0_core.sql");
-  for (const table of ["profiles", "app_settings", "system_health_log"]) {
-    assert.match(sql, new RegExp(`alter table public\\.${table} enable row level security`, "i"));
-  }
-  assert.match(sql, /profiles_select_own/);
-  assert.match(sql, /app_settings_read_public/);
+test("active runtime is Cloudflare-only and has no Supabase SDK configuration", () => {
+  const pkg = JSON.parse(read("package.json"));
+  const dependencies = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  assert.equal(dependencies["@supabase/ssr"], undefined);
+  assert.equal(dependencies["@supabase/supabase-js"], undefined);
+  const env = read(".env.example");
+  assert.doesNotMatch(env, /NEXT_PUBLIC_SUPABASE_|SUPABASE_SERVICE_ROLE_KEY/);
+  const provider = read("lib/auth/provider.ts");
+  assert.match(provider, /startCloudflareOAuth/);
+  assert.match(provider, /getCloudflareRequestAuth/);
 });
 
 test("staging metadata opts out of search indexing", () => {

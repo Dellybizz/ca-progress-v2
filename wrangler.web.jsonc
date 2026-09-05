@@ -6,18 +6,43 @@
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
-  "secrets": { "required": ["SUPABASE_SERVICE_ROLE_KEY"] },
   "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "ca-progress-v2-phase4-shadow",
+    "database_id": "6f002cbe-fe40-4d1b-9cf4-df6faaf52350",
+    "migrations_dir": "d1/migrations",
+    "migrations_table": "d1_migrations"
+  }],
   "r2_buckets": [{ "binding": "USER_RESOURCES_R2", "bucket_name": "ca-progress-v2-staging-user-resources" }],
   "services": [
     { "binding": "ICAI_SYNC_SERVICE", "service": "ca-progress-v2-icai-sync" },
     { "binding": "BILLING_SERVICE", "service": "ca-progress-v2-billing" }
   ],
-  "triggers": { "crons": ["30 0 * * *"] },
+  "queues": {
+    "producers": [{ "binding": "BACKGROUND_JOBS", "queue": "ca-progress-v2-phase3-background" }],
+    "consumers": [{
+      "queue": "ca-progress-v2-phase3-background",
+      "max_batch_size": 10,
+      "max_batch_timeout": 5,
+      "max_retries": 5,
+      "dead_letter_queue": "ca-progress-v2-phase3-background-dlq"
+    }]
+  },
+  "durable_objects": { "bindings": [{ "name": "COMMUNITY_COORDINATORS", "class_name": "CommunityChannelCoordinator" }] },
+  "migrations": [{ "tag": "community-coordinators-v1", "new_sqlite_classes": ["CommunityChannelCoordinator"] }],
+  "triggers": { "crons": ["30 0 * * *", "0 * * * *"] },
   "vars": {
     "NEXT_PUBLIC_APP_NAME": "CA Progress",
-    "NEXT_PUBLIC_APP_ENV": "staging",
-    "NEXT_PUBLIC_APP_VERSION": "phase-11"
+    "NEXT_PUBLIC_APP_ENV": "production",
+    "NEXT_PUBLIC_APP_VERSION": "cloudflare-retired",
+    "CA_AUTH_RUNTIME": "cloudflare",
+    "CA_DATA_RUNTIME": "cloudflare",
+    "CA_GUEST_TEST_MODE": "true",
+    "CA_PERF_LOGGING": "true",
+    "ICAI_SYNC_ENABLED": "true",
+    "ICAI_SYNC_USER_AGENT": "CA Progress V2 Official ICAI Monitor/phase8"
   },
+  "limits": { "cpu_ms": 30000 },
   "observability": { "enabled": true }
 }

@@ -19,8 +19,8 @@ test("Today Plan exposes complete, skip, snooze and reschedule controls plus emp
   assert.match(ui, /action: "skip"/);
   assert.match(ui, /action: "snooze"/);
   assert.match(ui, /action: "reschedule"/);
-  assert.match(ui, /Nothing urgent is scheduled today/);
-  assert.match(ui, /Regenerate around my changes/);
+  assert.match(ui, /Your plan is clear/);
+  assert.match(ui, /Refresh plan/);
 });
 
 test("Phase 9 surfaces have tablet and mobile responsive breakpoints", () => {

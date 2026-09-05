@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "Privacy policy for CA Progress, including Google and LinkedIn sign-in, guest mode, profile data, and service providers.",
 };
 
-const effectiveDate = "30 August 2026";
+const effectiveDate = "6 September 2026";
 
 export default function PrivacyPage() {
   return (
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
       <section>
         <h2>5. Service providers</h2>
         <p>
-          CA Progress relies on third-party infrastructure providers to operate the service. These currently include <strong>Supabase</strong> for authentication, database, and storage services and <strong>Cloudflare</strong> for application hosting, delivery, and security. Google and LinkedIn are used when you choose their respective sign-in options.
+          CA Progress uses <strong>Cloudflare</strong> infrastructure for application hosting and delivery, authentication/session processing, application data storage through D1, private file storage through R2, and related security and background services. Google and LinkedIn are used when you choose their respective sign-in options.
         </p>
         <p>These providers may process information on our behalf according to their own contractual and privacy obligations.</p>
       </section>

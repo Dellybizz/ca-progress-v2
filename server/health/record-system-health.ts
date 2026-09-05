@@ -1,7 +1,7 @@
 import "server-only";
 
-import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import type { Json } from "@/lib/supabase/database.types";
+import { createD1AdminClient } from "@/lib/data/d1/client";
+import type { Json } from "@/lib/data/database.types";
 
 export async function recordSystemHealth(input: {
   component: string;
@@ -9,7 +9,7 @@ export async function recordSystemHealth(input: {
   details?: Json;
   correlationId?: string;
 }) {
-  const client = createAdminSupabaseClient();
+  const client = createD1AdminClient();
   const { error } = await client.from("system_health_log").insert({
     component: input.component,
     status: input.status,

@@ -19,3 +19,23 @@ export function getServerRuntimeValue(name: string): string {
     return "";
   }
 }
+
+
+export function performanceLoggingEnabled() {
+  return getServerRuntimeValue("CA_PERF_LOGGING").toLowerCase() === "true";
+}
+
+export function logServerPerformance(name: string, startedAt: number, metadata: Record<string, string | number | boolean | null> = {}) {
+  if (!performanceLoggingEnabled()) return;
+  const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+  console.info("[ca-span]", JSON.stringify({ type: "latency_span", name, duration_ms: durationMs, ...metadata }));
+}
+
+export async function measureServerPerformance<T>(name: string, operation: () => Promise<T>, metadata: Record<string, string | number | boolean | null> = {}) {
+  const startedAt = performance.now();
+  try {
+    return await operation();
+  } finally {
+    logServerPerformance(name, startedAt, metadata);
+  }
+}

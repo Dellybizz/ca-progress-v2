@@ -15,3 +15,19 @@
 @import "./styles/phase10.css";
 @import "./styles/phase11.css";
 @import "./styles/phase11-lock.css";
+@import "./styles/dashboard-clean.css";
+@import "./styles/dashboard-clarity.css";
+@import "./styles/dashboard-balanced.css";
+@import "./styles/dashboard-character.css";
+@import "./styles/study-clarity.css";
+@import "./styles/study-layout-refine.css";
+@import "./styles/planner-clarity.css";
+@import "./styles/planner-mobile-final.css";
+@import "./styles/mobile-scroll-fix.css";
+@import "./styles/planner-desktop-layout-fix.css";
+@import "./styles/today-plan-clarity.css";
+@import "./styles/today-plan-schedule.css";
+@import "./styles/today-plan-interactions.css";
+@import "./styles/today-plan-interaction-refine.css";
+
+@import "./styles/navigation-progress.css";

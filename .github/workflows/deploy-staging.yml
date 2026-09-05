@@ -1,7 +1,19 @@
-name: Deploy V2 Staging to Cloudflare
+name: Cloudflare V2 Deploy
 
 on:
   workflow_dispatch:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/deploy-staging.yml
+      - app/**
+      - components/**
+      - lib/**
+      - server/**
+      - workers/**
+      - custom-worker.ts
+      - wrangler.web.jsonc
+      - package.json
 
 permissions:
   contents: read
@@ -10,28 +22,118 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: v2-staging
-    timeout-minutes: 25
+    timeout-minutes: 55
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-      NEXT_PUBLIC_APP_ENV: staging
+      CA_AUTH_SESSION_SECRET: ${{ secrets.CA_AUTH_SESSION_SECRET }}
+      GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+      LINKEDIN_OIDC_CLIENT_ID: ${{ secrets.LINKEDIN_OIDC_CLIENT_ID }}
+      LINKEDIN_OIDC_CLIENT_SECRET: ${{ secrets.LINKEDIN_OIDC_CLIENT_SECRET }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+      SMOKE_AUTH_COOKIE: ${{ secrets.SMOKE_AUTH_COOKIE }}
+      NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_APP_NAME: CA Progress
-      NEXT_PUBLIC_APP_VERSION: phase-11
+      NEXT_PUBLIC_APP_VERSION: cloudflare-retired
+      DEPLOY_BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
-      - run: npm run cf:deploy
+      - name: Enforce permanent Supabase retirement
+        run: npm run verify:retirement
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Validate retained D1 hot-query indexes
+        run: npm run d1:hot-indexes:validate
+      - name: Repository tests
+        run: npm test
+      - name: Next.js production build
+        run: npm run build
+      - name: OpenNext build and production Worker dry-runs
+        run: npm run cf:check
+      - name: Smoke generated Cloudflare SSR routes
+        run: npm run cf:smoke
 
-# Runtime secrets remain dashboard-managed and are preserved with keep_vars=true.
-# Phase 11 deploy order creates/updates private ICAI and Billing Workers before the web Worker.
-# Add RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET as secrets on
-# ca-progress-v2-billing. Until configured, paid checkout fails closed without changing plans.
-# Phase 7 resource bytes remain private in USER_RESOURCES_R2.
+      - name: Capture pre-deploy evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p deployment-evidence
+          npx wrangler deployments list --name ca-progress-v2 --json > deployment-evidence/web-before.json
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > deployment-evidence/d1-before.txt
+
+      - name: Prepare Billing Worker secret file
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          node - <<'NODE'
+          const fs = require('fs');
+          const required = (name) => {
+            const value = process.env[name];
+            if (!value) throw new Error(`${name} is required for deployment.`);
+            return value;
+          };
+          fs.writeFileSync('/tmp/ca-billing-secrets.json', JSON.stringify({
+            RAZORPAY_KEY_ID: required('RAZORPAY_KEY_ID'),
+            RAZORPAY_KEY_SECRET: required('RAZORPAY_KEY_SECRET'),
+            RAZORPAY_WEBHOOK_SECRET: required('RAZORPAY_WEBHOOK_SECRET'),
+          }));
+          NODE
+
+      - name: Deploy ICAI service
+        run: npx wrangler deploy --config=workers/icai-sync/wrangler.jsonc --name=ca-progress-v2-icai-sync
+
+      - name: Deploy Billing service
+        run: npx wrangler deploy --config=workers/billing/wrangler.jsonc --secrets-file /tmp/ca-billing-secrets.json
+
+      - name: Verify existing web Worker secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler secret list --config wrangler.web.jsonc > deployment-evidence/web-secrets.json
+          for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
+            grep -q "\"name\": \"$name\"" deployment-evidence/web-secrets.json || { echo "::error::$name is missing from web Worker"; exit 1; }
+          done
+
+      - name: Deploy web runtime
+        run: npm run cf:deploy:web
+
+      - name: Verify deployment and rollback web runtime on failure
+        shell: bash
+        run: |
+          set +e
+          failed=0
+          base="$DEPLOY_BASE_URL"
+          SMOKE_BASE_URL="$base" SMOKE_AUTH_COOKIE="${SMOKE_AUTH_COOKIE:-}" npm run cf:smoke || failed=1
+          health="$(curl --max-time 20 -fsS "$base/api/health" 2>/dev/null)" || failed=1
+          if [ -n "$health" ]; then
+            HEALTH_JSON="$health" node -e 'const x=JSON.parse(process.env.HEALTH_JSON); if(x.status!=="ok" || x.checks?.database!=="ok") process.exit(1)' || failed=1
+          fi
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > deployment-evidence/d1-after.txt || failed=1
+          npx wrangler deployments list --name ca-progress-v2 --json > deployment-evidence/web-after.json || failed=1
+          if [ "$failed" -ne 0 ]; then
+            npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after failed deployment smoke" || true
+            exit 1
+          fi
+          echo "Cloudflare deployment verification PASS."
+
+      - name: Remove ephemeral secret file
+        if: always()
+        run: rm -f /tmp/ca-billing-secrets.json
+
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: cloudflare-deployment-${{ github.run_id }}
+          retention-days: 30
+          path: deployment-evidence/
