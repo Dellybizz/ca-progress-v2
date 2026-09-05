@@ -5,7 +5,7 @@ import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { getHotActivityRows, getHotCalendarRows, getHotPlannerRows, getHotExamEvents } from "@/lib/data/d1/hot-screens";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import type { StudySubjectOption } from "@/lib/study/types";
 import type { ActivityItem, ActivityPageModel, CalendarItem, CalendarPageModel, GoalsPageModel, PlannerGoal, PlannerPageModel, PlannerTask } from "./types";
 
