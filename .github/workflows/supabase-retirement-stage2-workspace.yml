@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Package repository source for Stage 2 refactor
-        run: tar --exclude=.git --exclude=node_modules --exclude=.next --exclude=.open-next -czf stage2-workspace.tar.gz .
+        run: git archive --format=tar.gz --output=stage2-workspace.tar.gz HEAD
       - uses: actions/upload-artifact@v5
         with:
           name: supabase-retirement-stage2-workspace-${{ github.run_id }}
