@@ -2,7 +2,7 @@ import "server-only";
 
 import { createD1ServerClient } from "@/lib/data/d1/client";
 import { getSharedPublicJson } from "@/lib/cache/public";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import {
   AcademicDataError,
   type AcademicCatalog,
