@@ -2,6 +2,22 @@ name: Supabase Retirement Stage 2 Static Validation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - phase-12-operations-admin-platform
+    paths:
+      - app/**
+      - components/**
+      - lib/**
+      - server/**
+      - workers/**
+      - proxy.ts
+      - package.json
+      - package-lock.json
+      - wrangler.web.jsonc
+      - scripts/phase5/retirement-stage2-scan.mjs
+      - tests/retirement-stage2.test.mjs
+      - .github/workflows/supabase-retirement-stage2-closure.yml
 
 permissions:
   contents: read
