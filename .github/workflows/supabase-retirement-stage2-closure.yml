@@ -19,7 +19,7 @@ on:
       - wrangler.phase4.jsonc
       - scripts/**
       - tests/**
-      - .github/workflows/supabase-retirement-stage2-closure.yml
+      - .github/workflows/**
 
 permissions:
   contents: read
@@ -42,6 +42,17 @@ jobs:
 
       - name: Enforce zero active Supabase runtime blockers
         run: node scripts/phase5/retirement-stage2-scan.mjs
+
+      - name: Enforce read-only migration-era CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e .github/workflows/phase5-source-patch.yml
+          test ! -e .github/workflows/phase5-lint-patch.yml
+          if rg -n 'contents:\s*write|git\s+commit|git\s+push' .github/workflows/phase5-inventory.yml; then
+            echo 'phase5-inventory.yml must remain validation-only and read-only.'
+            exit 1
+          fi
 
       - name: Verify Stage 2 regression contract
         run: node --test tests/retirement-stage2.test.mjs
