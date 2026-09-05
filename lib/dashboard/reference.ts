@@ -3,7 +3,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { getHotAcademicReference } from "@/lib/data/d1/hot-screens";
 import { createD1AdminClient } from "@/lib/data/d1/client";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/data/database.types";
 import type { DashboardAcademicReference, DashboardAcademicSubject, DashboardIcaiUpdate, DashboardLiveReference } from "./types";
 
 type ResourceRow = Database["public"]["Tables"]["icai_resources"]["Row"];
