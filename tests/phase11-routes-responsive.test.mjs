@@ -68,7 +68,7 @@ test("server-side entitlement checks cover protected Phase 11 integrations", () 
   assert.match(read("lib/billing/service.ts"), /resources\.storage/);
 });
 
-test("earlier completed phase regression suites remain in the repository", () => {
+test("retained current regression suites remain in the repository", () => {
   const representatives = [
     "phase2-auth.test.mjs",
     "phase3-academic.test.mjs",
@@ -78,7 +78,7 @@ test("earlier completed phase regression suites remain in the repository", () =>
     "phase7-storage-security.test.mjs",
     "phase8-engine.test.mjs",
     "phase9-planner-engine.test.mjs",
-    "phase10-schema-security.test.mjs",
+    "phase10-moderation-realtime-mobile.test.mjs",
   ];
   for (const file of representatives) {
     assert.equal(existsSync(join(root, "tests", file)), true, `${file} should remain`);
