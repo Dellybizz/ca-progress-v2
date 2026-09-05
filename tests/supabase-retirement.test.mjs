@@ -30,7 +30,11 @@ test("active runtime and CI have no Supabase SDK, env, client or compat blockers
 test("package scripts expose only post-retirement Cloudflare validation paths", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(pkg.scripts["verify:retirement"], "node scripts/verify-supabase-retired.mjs");
+  assert.match(pkg.scripts["cf:build"], /--skipWranglerConfigCheck/);
   assert.match(pkg.scripts["cf:check"], /cf:check:web/);
+  assert.match(pkg.scripts["cf:check:web"], /wrangler\.web\.jsonc/);
+  assert.match(pkg.scripts["cf:deploy:web"], /wrangler\.web\.jsonc/);
+  assert.equal(existsSync(path.join(root, "wrangler.jsonc")), false);
   for (const name of ["phase4:shadow", "phase4:reconcile", "phase4:rollback", "cf:check:phase3", "cf:check:phase4"]) assert.equal(pkg.scripts[name], undefined);
 });
 
