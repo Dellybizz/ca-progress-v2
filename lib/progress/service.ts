@@ -4,7 +4,7 @@ import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
 import { getHotProgressRows, getHotDashboardProgress } from "@/lib/data/d1/hot-screens";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/data/database.types";
 import type {
   ProgressAnalytics,
   ProgressChapter,
