@@ -2,7 +2,7 @@ import "server-only";
 
 import { optionalUser } from "@/lib/auth/server";
 import { createD1AdminClient } from "@/lib/data/d1/client";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/data/database.types";
 import { getTodayPlanPageModel, performTodayPlanAction } from "./service";
 import type { TodayPlanInteractionAction } from "./types";
 
