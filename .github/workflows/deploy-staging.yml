@@ -74,12 +74,17 @@ jobs:
           npx wrangler deployments list --name ca-progress-v2 --json > deployment-evidence/web-before.json
           npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --command "SELECT COUNT(*) AS users FROM app_users; PRAGMA foreign_key_check;" > deployment-evidence/d1-before.txt
 
-      - name: Apply retained D1 migrations
+      # The retained production D1 predates Wrangler's migration journal and already
+      # contains historical 0003-0011 schema changes. Replaying that journal would
+      # fail on existing columns/tables. Fresh/local databases still validate the
+      # complete ordered migration chain above; production applies the new Phase 0
+      # migration directly because it is intentionally idempotent.
+      - name: Apply Product Phase 0 D1 migration
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 migrations apply ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc
-          npx wrangler d1 migrations list ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc > deployment-evidence/d1-migrations.txt
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --file=d1/migrations/0012_product_phase0_autofetch_contracts.sql
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --command "SELECT version,description FROM _ca_schema_migrations WHERE version='0012'; SELECT COUNT(*) AS autofetch_targets FROM autofetch_content_targets; SELECT COUNT(*) AS autofetch_sources FROM autofetch_source_registry; SELECT COUNT(*) AS autofetch_resources FROM autofetch_resource_records; PRAGMA foreign_key_check;" > deployment-evidence/d1-product-phase0.txt
 
       - name: Prepare Billing Worker secret file
         shell: bash
