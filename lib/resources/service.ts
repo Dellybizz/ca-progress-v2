@@ -1,15 +1,15 @@
 import "server-only";
 
-import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { getServerAppRole } from "@/lib/authorization/server";
 import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { getIcaiPublicCatalog } from "@/lib/icai/query";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
+import { isCALevel } from "@/lib/profile/validation";
 import { createD1AdminClient, createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/data/database.types";
 import { getHotResourceLibraryRows, getHotResourceDetail } from "@/lib/data/d1/hot-screens";
-import type { StudySubjectOption } from "@/lib/study/types";
+import { getPhase6AcademicOptions, getPhase6NoteExtras } from "@/lib/notes/phase6";
+import type { NotePhase6Extra } from "@/lib/notes/types";
 import type { ModerationPageModel, ModerationQueueItem, ModerationReport, NoteCard, NoteDetailModel, OfficialResourceCard, ResourceDetailModel, ResourceLibraryModel, UploadCard } from "./types";
 
 type NoteRow = Database["public"]["Tables"]["notes"]["Row"];
@@ -24,18 +24,7 @@ function viewerLabel(name: string | null, email: string | null, phone: string | 
 }
 
 function profileReady(profile: Awaited<ReturnType<typeof getProfileForUser>>) {
-  return Boolean(profile?.onboarding_completed_at && isCALevel(profile.ca_level) && isGroupChoice(profile.group_choice) && profile.attempt_key && profile.attempt_key !== "undecided");
-}
-
-async function academicOptions(profile: Awaited<ReturnType<typeof getProfileForUser>>) {
-  if (!profile || !profileReady(profile) || !isCALevel(profile.ca_level) || !isGroupChoice(profile.group_choice) || !profile.attempt_key) return [] as StudySubjectOption[];
-  const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
-  return catalog.subjects.map((subject) => ({
-    id: subject.id,
-    slug: subject.slug,
-    title: subject.title,
-    chapters: subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title })),
-  }));
+  return Boolean(profile?.onboarding_completed_at && isCALevel(profile.ca_level) && profile.attempt_key && profile.attempt_key !== "undecided");
 }
 
 function excerpt(text: string) {
@@ -69,7 +58,7 @@ async function nameMaps(client: Awaited<ReturnType<typeof createD1ServerClient>>
   };
 }
 
-function noteDto(row: NoteRow, names: Awaited<ReturnType<typeof nameMaps>>, tags: string[], viewerId: string): NoteCard {
+function noteDto(row: NoteRow, names: Awaited<ReturnType<typeof nameMaps>>, tags: string[], viewerId: string, extra?: NotePhase6Extra): NoteCard {
   return {
     id: row.id,
     title: row.title,
@@ -77,9 +66,13 @@ function noteDto(row: NoteRow, names: Awaited<ReturnType<typeof nameMaps>>, tags
     bodyHtml: row.body_html,
     subjectId: row.subject_id,
     chapterId: row.chapter_id,
+    topicId: extra?.topicId ?? null,
     subjectTitle: row.subject_id ? names.subjects.get(row.subject_id) ?? null : null,
     chapterTitle: row.chapter_id ? names.chapters.get(row.chapter_id) ?? null : null,
+    topicTitle: extra?.topicTitle ?? null,
     tags,
+    resourceIds: extra?.resourceIds ?? [],
+    source: extra?.source ?? null,
     visibility: row.visibility as NoteCard["visibility"],
     moderationStatus: row.moderation_status as NoteCard["moderationStatus"],
     ownerLabel: row.owner_label,
@@ -140,15 +133,17 @@ export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
     nameMaps(client),
     tagsForOwnNotes(client, identity.id),
     getHotResourceLibraryRows(identity.id),
-    academicOptions(profile),
+    getPhase6AcademicOptions(identity.id),
   ]);
+  const allNoteIds = [...rows.ownNotes, ...rows.sharedNotes].map((row) => row.id);
+  const extras = await getPhase6NoteExtras(allNoteIds, identity.id);
   return {
     mode: "ready",
     viewerName: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
     subjects,
-    myNotes: rows.ownNotes.map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id)),
+    myNotes: rows.ownNotes.map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id, extras.get(row.id))),
     myUploads: rows.ownUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
-    sharedNotes: rows.sharedNotes.map((row) => noteDto(row as NoteRow, names, [], identity.id)),
+    sharedNotes: rows.sharedNotes.map((row) => noteDto(row as NoteRow, names, [], identity.id, extras.get(row.id))),
     sharedUploads: rows.sharedUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
     officialResources,
   };
@@ -162,14 +157,23 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
   if (noteResponse.error) throw new Error(`Note could not be loaded: ${noteResponse.error.message}`);
   if (!noteResponse.data) return { mode: "missing" };
   const row = noteResponse.data as NoteRow;
-  const [names, tagsByNote, profile] = await Promise.all([nameMaps(client), tagsForOwnNotes(client, identity.id), getProfileForUser(identity.id)]);
   const canManage = row.user_id === identity.id;
+  if (!canManage && !(row.visibility === "shared" && row.moderation_status === "approved")) return { mode: "missing" };
+
+  const [names, tagsByNote, subjects, extras, ownedRows] = await Promise.all([
+    nameMaps(client),
+    tagsForOwnNotes(client, identity.id),
+    canManage ? getPhase6AcademicOptions(identity.id) : Promise.resolve([]),
+    getPhase6NoteExtras([row.id], identity.id),
+    canManage ? getHotResourceLibraryRows(identity.id) : Promise.resolve({ ownUploads: [] as unknown[], ownNotes: [], sharedNotes: [], sharedUploads: [] }),
+  ]);
   return {
     mode: "ready",
-    note: noteDto(row, names, canManage ? tagsByNote.get(row.id) ?? [] : [], identity.id),
-    subjects: canManage ? await academicOptions(profile) : [],
+    note: noteDto(row, names, canManage ? tagsByNote.get(row.id) ?? [] : [], identity.id, extras.get(row.id)),
+    subjects,
+    availableUploads: canManage ? ownedRows.ownUploads.map((upload) => uploadDto(upload as UploadRow, names, identity.id)) : [],
     canManage,
-    canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved",
+    canReport: !canManage,
   };
 }
 
