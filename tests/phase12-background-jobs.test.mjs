@@ -19,14 +19,14 @@ test("Phase 12 has durable queue job types and dead-letter persistence", () => {
   assert.match(worker, /message\.retry\(\)/);
 });
 
-test("dashboard and planner use persisted plans without doing AI work in page request", () => {
+test("dashboard and planner use persisted data without doing AI work in page requests", () => {
   const dashboard = read("lib/dashboard/service.ts");
   const planner = read("lib/planner/dashboard.ts");
   const route = read("app/api/planner/today/route.ts");
   assert.match(dashboard, /getLatestStoredPlanRecommendation/);
   assert.match(planner, /daily_plan_items/);
-  assert.match(route, /type: "ai-plan-generation"/);
-  assert.match(route, /latest saved plan remains available/);
+  assert.match(route, /performTodayPlanInteraction/);
+  assert.doesNotMatch(route, /type: "ai-plan-generation"|enqueueBackgroundJob/);
 });
 
 test("uploads enqueue attachment processing after durable metadata commit", () => {
