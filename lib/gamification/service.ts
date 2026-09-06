@@ -18,7 +18,7 @@ import {
 } from "./policy.mjs";
 
 type SessionRow = { id: string; duration_seconds: number; ended_at: string; timezone: string };
-type TodayRow = { id: string; scheduled_for: string; completed_at: string; timezone: string };
+type TodayRow = { id: string; scheduled_for: string; completed_at: string; timezone: string; estimated_minutes: number };
 type ProgressRow = { chapter_id: string; completed_at: string | null; revision_1_at: string | null; revision_2_at: string | null };
 type TestRow = { id: string; chapter_id: string; test_stage: string; attempt_number: number; completed_at: string };
 type ReflectionRow = { session_id: string; reflection_saved_at: string };
@@ -31,7 +31,7 @@ type AchievementRow = { achievement_key: string; unlocked_at: string };
 
 type XpCandidate = {
   eventKey: string;
-  eventType: keyof typeof import("./policy.mjs").XP_RULES | string;
+  eventType: string;
   sourceType: string;
   sourceId: string;
   xp: number;
@@ -105,9 +105,9 @@ async function loadCanonicalSources(userId: string) {
     db.prepare(`SELECT id,duration_seconds,ended_at,timezone FROM study_sessions
       WHERE user_id=?1 AND duration_seconds>=?2
       ORDER BY ended_at ASC,id ASC LIMIT 5000`).bind(userId, MEANINGFUL_STUDY_SECONDS).all<SessionRow>(),
-    db.prepare(`SELECT i.id,i.scheduled_for,i.completed_at,p.timezone FROM daily_plan_items i
+    db.prepare(`SELECT i.id,i.scheduled_for,i.completed_at,i.estimated_minutes,p.timezone FROM daily_plan_items i
       JOIN daily_plans p ON p.id=i.plan_id AND p.user_id=i.user_id
-      WHERE i.user_id=?1 AND i.completed_at IS NOT NULL
+      WHERE i.user_id=?1 AND i.completed_at IS NOT NULL AND i.estimated_minutes>=10
       ORDER BY i.scheduled_for ASC,i.completed_at ASC,i.id ASC LIMIT 5000`).bind(userId).all<TodayRow>(),
     db.prepare(`SELECT chapter_id,completed_at,revision_1_at,revision_2_at FROM chapter_progress
       WHERE user_id=?1 AND (completed_at IS NOT NULL OR revision_1_at IS NOT NULL OR revision_2_at IS NOT NULL)
@@ -190,7 +190,7 @@ function candidatesFromSources(sources: Awaited<ReturnType<typeof loadCanonicalS
         sourceId: row.id,
         xp: xpForEvent("today_task"),
         occurredAt: row.completed_at,
-        metadata: { localDate: item.localDate },
+        metadata: { localDate: item.localDate, estimatedMinutes: row.estimated_minutes },
       });
     }
     streakEvidence.push({
