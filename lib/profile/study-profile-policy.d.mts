@@ -1,7 +1,7 @@
 export type StudyProfileVisibility = "private" | "buddies" | "public";
 export type StudyProfileRelationship = "owner" | "buddy" | "public";
 
-export const STUDY_PROFILE_VISIBILITIES: readonly StudyProfileVisibility[];
+export const STUDY_PROFILE_VISIBILITIES: readonly string[];
 export const PRIVATE_STUDY_PROFILE_DEFAULTS: Readonly<{
   profileVisibility: "private";
   progressVisibility: "private";
