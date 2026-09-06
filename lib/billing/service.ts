@@ -5,6 +5,7 @@ import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
 import { createD1AdminClient } from "@/lib/data/d1/client";
 import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
+import { getActiveLeaderboardRewardPlan } from "@/lib/gamification/phase13-service";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -56,13 +57,42 @@ export async function listPlanEntitlements(): Promise<PlanEntitlement[]> {
 async function currentPlanId(userId: string) {
   const client = db();
   const now = new Date();
-  const current = await client.from("user_subscriptions").select("plan_id,ends_at,starts_at").eq("user_id", userId).eq("status", "active").lte("starts_at", now.toISOString()).order("starts_at", { ascending: false });
+  const [current, reward, plans] = await Promise.all([
+    client.from("user_subscriptions").select("plan_id,ends_at,starts_at").eq("user_id", userId).eq("status", "active").lte("starts_at", now.toISOString()).order("starts_at", { ascending: false }),
+    getActiveLeaderboardRewardPlan(userId, now),
+    listPlans(),
+  ]);
   if (current.error) throw new Error(current.error.message);
   const active = asRows<CurrentPlanRow>(current.data).find((item) => !item.ends_at || new Date(item.ends_at) > now);
+  const activeRank = plans.find((plan) => plan.id === active?.plan_id)?.rank ?? -1;
+  if (reward && reward.rank > activeRank) return reward.planId;
   if (active?.plan_id) return active.plan_id;
-  const free = await client.from("subscription_plans").select("id").eq("tier_key", "free").eq("billing_cycle", "free").eq("active", true).order("sort_order").limit(1).maybeSingle();
-  if (free.error) throw new Error(free.error.message);
-  return asRow<IdRow>(free.data)?.id ?? null;
+  const free = plans.find((plan) => plan.tier_key === "free" && plan.billing_cycle === "free");
+  return free?.id ?? null;
+}
+
+async function rewardEntitlementOverride(userId: string, featureKey: string, current: Entitlement | null) {
+  const reward = await getActiveLeaderboardRewardPlan(userId);
+  if (!reward) return current;
+  const plans = await listPlans();
+  const currentRank = plans.find((plan) => plan.id === current?.planId)?.rank ?? -1;
+  if (current && currentRank >= reward.rank) return current;
+  const plan = plans.find((item) => item.id === reward.planId);
+  if (!plan) return current;
+  const result = await db().from("plan_entitlements").select("plan_id,feature_key,enabled,limit_value,limit_unit,reset_period,upgrade_message").eq("plan_id", reward.planId).eq("feature_key", featureKey).maybeSingle();
+  if (result.error) throw new Error(result.error.message);
+  const entitlement = asRow<PlanEntitlement>(result.data);
+  return {
+    planId: plan.id,
+    tier: plan.tier_key,
+    planName: plan.name,
+    featureKey,
+    allowed: Boolean(entitlement?.enabled),
+    limitValue: entitlement?.limit_value ?? null,
+    limitUnit: entitlement?.limit_unit ?? "unlimited",
+    resetPeriod: entitlement?.reset_period ?? "never",
+    upgradeMessage: entitlement?.upgrade_message ?? "This feature is not available on your leaderboard reward plan.",
+  } satisfies Entitlement;
 }
 
 export async function getEntitlementForUser(userId: string, featureKey: string): Promise<Entitlement> {
@@ -71,14 +101,22 @@ export async function getEntitlementForUser(userId: string, featureKey: string):
     userId,
     featureKey,
     load: async () => {
+      let providerEntitlement: Entitlement | null = null;
       try {
         const response = await invokeBillingService({ path: "/entitlement", method: "GET", userId, query: `?featureKey=${encodeURIComponent(featureKey)}` });
         const payload = await response.json().catch(() => null) as Partial<Entitlement> | { error?: string } | null;
         if (!response.ok || !payload || typeof payload !== "object" || typeof (payload as Partial<Entitlement>).featureKey !== "string") throw new Error(typeof (payload as { error?: unknown } | null)?.error === "string" ? (payload as { error: string }).error : "Billing entitlement lookup failed.");
-        return payload as Entitlement;
+        providerEntitlement = payload as Entitlement;
       } catch {
-        return { planId: "", tier: "free", planName: "Free", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
+        providerEntitlement = null;
       }
+      try {
+        const effective = await rewardEntitlementOverride(userId, featureKey, providerEntitlement);
+        if (effective) return effective;
+      } catch {
+        if (providerEntitlement) return providerEntitlement;
+      }
+      return providerEntitlement ?? { planId: "", tier: "free", planName: "Free", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
     },
   });
 }
