@@ -16,10 +16,10 @@ Phase 6 retires the repository's executable Supabase migration/cutover machinery
 - Retained D1 validator decoupling commit: `8b24604b76663ddcb54cda148ff785bb989e1e58`
 - Historical test-retirement commit: `9a1369bb8fccdec24782a035b2a440030083ed32`
 - Final stale representative-test correction: `4a3b1d612a6d6a2e1996a67e68899779ee7564a6`
-- Rootless OpenNext build correction: `80fcafbf474ce173fb03d68487881627d6fe795a`
+- Rootless OpenNext build correction used at Phase 6 closure: `80fcafbf474ce173fb03d68487881627d6fe795a`
 - Final Phase 6 regression-guard / validated implementation SHA: `e28d8b48d3c05f71d3e98376bc63d7b92fe49445`
 
-Final green workflows on the validated implementation SHA:
+Final green workflows on the Phase 6 validated implementation SHA:
 
 - Supabase Retirement Permanent Closure: run `33999515933`, job `101395754846` — **PASS**
 - Independent V2 CI: run `33999515981`, job `101395755079` — **PASS**
@@ -37,12 +37,12 @@ Removed from the active repository surface:
 - `scripts/validate-d1-phase3.mjs`
 - `scripts/validate-d1-phase4.mjs`
 - migration-era data contracts/adapters that no longer had active callers
-- the obsolete root `wrangler.jsonc`
+- the obsolete migration-era root `wrangler.jsonc`
 - `wrangler.d1.phase2.jsonc`
 - `wrangler.phase3.jsonc`
 - `wrangler.phase4.jsonc`
 
-The root Wrangler file was intentionally not restored. OpenNext now builds with `--skipWranglerConfigCheck`; actual production validation/deployment remains explicitly bound to `wrangler.web.jsonc` and the dedicated ICAI/Billing Worker configs.
+At Phase 6 closure, OpenNext temporarily used `--skipWranglerConfigCheck` and the production web config lived at `wrangler.web.jsonc`. That was a post-retirement deployment-shape choice, not a Supabase dependency.
 
 ### Migration-era GitHub Actions workflows
 
@@ -58,11 +58,11 @@ V2 CI also enforces the permanent retirement contract.
 
 Tests whose only source of truth was deleted Supabase/Postgres SQL, RLS policy text, RPC definitions, or retired Wrangler files were removed. Mixed suites were rewritten to validate the current application behavior directly through D1/R2/Cloudflare code.
 
-The resulting repository suite contains **182 tests: 182 passed, 0 failed** on the validated implementation SHA.
+The resulting Phase 6 repository suite contained **182 tests: 182 passed, 0 failed** on the validated implementation SHA.
 
 ## Permanent retirement guard
 
-The repository now uses:
+The repository uses:
 
 - `scripts/verify-supabase-retired.mjs`
 - `tests/supabase-retirement.test.mjs`
@@ -79,7 +79,7 @@ The verifier permanently rejects:
 
 It also requires the retained post-retirement evidence and production Cloudflare/D1 configuration to remain present.
 
-Final verifier result on `e28d8b48d3c05f71d3e98376bc63d7b92fe49445`:
+Final Phase 6 verifier result on `e28d8b48d3c05f71d3e98376bc63d7b92fe49445`:
 
 - status: **pass**
 - scanned active files: **310**
@@ -93,9 +93,9 @@ Final result: **PASS**.
 
 No D1-native data was deleted or rewritten as part of Phase 6.
 
-## Final verification
+## Final Phase 6 verification
 
-Permanent Closure run `33999515933` passed every required gate:
+Permanent Closure run `33999515933` passed every required Phase 6 gate:
 
 - dependency install
 - permanent retirement enforcement
@@ -112,21 +112,47 @@ Permanent Closure run `33999515933` passed every required gate:
 - Cloudflare SSR smoke
 - final permanent retirement rescan
 
-Independent V2 CI run `33999515981` independently passed:
+Independent V2 CI run `33999515981` independently passed the same post-retirement runtime/build contract.
+
+## Post-retirement Cloudflare deployment correction
+
+After Phase 7 was closed, a Cloudflare native build surfaced a deployment-path mismatch: native Cloudflare deployment expected the standard root Wrangler configuration while repository CI was using the nonstandard `wrangler.web.jsonc` alias and an OpenNext root-config skip.
+
+This was corrected without restoring any Supabase-era configuration:
+
+- commit `514aac904a1e43876cc0718b546650df0fbbe7b3` introduced a new **Cloudflare-only** canonical root `wrangler.jsonc`, moved the current D1/R2/service/queue/Durable Object production bindings into it, removed `wrangler.web.jsonc`, and removed `--skipWranglerConfigCheck`
+- commit `b440874a8e85122a3b0bf5e14bee5b0169d22179` aligned the remaining Community/R2/ICAI regression assertions with the canonical root config
+- commit `4568e47f23b84bbb68fc6e97657e5a2c350b9ae8` explicitly documented the canonical config in the deploy workflow and triggered a real end-to-end deployment
+
+Exact-head verification on `4568e47f23b84bbb68fc6e97657e5a2c350b9ae8`:
+
+- V2 CI run `34001458622`, job `101400955541` — **PASS**
+- Supabase Retirement Permanent Closure run `34001458610`, job `101400955590` — **PASS**
+- Cloudflare V2 Deploy run `34001458660`, job `101400955677` — **PASS**
+
+The real deployment passed:
 
 - permanent retirement enforcement
-- typecheck
-- lint
-- retained D1 hot-query validation
-- Next.js production build
-- OpenNext/production Worker dry-runs
-- Cloudflare SSR smoke
-- repository-wide tests
-- final permanent retirement confirmation
+- typecheck/lint
+- retained D1 validation
+- complete repository tests
+- Next.js/OpenNext builds and Worker dry-runs
+- generated SSR smoke
+- remote pre-deploy D1 evidence
+- ICAI Worker deployment
+- Billing Worker deployment
+- existing web Worker secret validation
+- web Worker deployment using `wrangler.jsonc`
+- production health/SSR and remote D1 post-deploy verification
+- deployment evidence upload
+
+No rollback was triggered.
+
+The current root `wrangler.jsonc` is guarded by the retirement verifier and contains no Supabase SDK, URL, key, project reference, or runtime dependency. The historical migration-era root Wrangler file remains retired; only the filename was reused for the new canonical Cloudflare-only production config.
 
 ## Deliberately retained evidence and production state
 
-Phase 6 preserves:
+The current post-retirement repository preserves:
 
 - `docs/SUPABASE_RETIREMENT_PHASE3_STATUS.md`
 - `docs/SUPABASE_RETIREMENT_PHASE4_STATUS.md`
@@ -134,28 +160,21 @@ Phase 6 preserves:
 - final Phase 3 logical-backup/reconciliation facts and hashes recorded in the retirement evidence
 - `lib/data/database.types.ts`
 - `d1/migrations/`
-- `wrangler.web.jsonc`
+- canonical Cloudflare-only `wrangler.jsonc`
 - `workers/icai-sync/wrangler.jsonc`
 - `workers/billing/wrangler.jsonc`
 - the authoritative Cloudflare D1 database and all legitimate D1-native rows
 
-The final Phase 3 backup remains the retirement backup of record and was **not repeated** in Phase 6.
+The final Phase 3 backup remains the retirement backup of record and was **not repeated**.
 
 ## External boundary
 
-Phase 6 performs no irreversible external Supabase action.
-
-Still deferred to Phase 7 only:
-
-- removal/rotation of any remaining Supabase migration credentials or secrets in external systems
-- deletion/closure of the external Supabase project/account resources after the retention decision is explicitly approved
+Phase 6 itself performed no irreversible external Supabase action. Those actions were deferred to Phase 7, which has since been completed and is recorded in `docs/SUPABASE_RETIREMENT_PHASE7_STATUS.md`.
 
 No merge to `main` was performed.
 
 ## Exit decision
 
-**Supabase Retirement Phase 6: COMPLETE.**
+**Supabase Retirement Phase 6 remains COMPLETE.**
 
-Repository migration machinery is retired, the Cloudflare-only production architecture is protected by permanent CI, retained D1 migrations remain valid, and all final Phase 6 gates are green.
-
-Phase 7 has not been started.
+The post-retirement deployment correction changes only how the current Cloudflare-only configuration is discovered. It does not reopen or weaken any Supabase-retirement criterion.
