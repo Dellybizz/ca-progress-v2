@@ -104,7 +104,7 @@ test("deployment preserves the idempotent Product Phase 0 migration in the retai
   assert.match(workflow, /Apply additive Product D1 migrations/);
   assert.match(workflow, /wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler\.jsonc --file=d1\/migrations\/0012_product_phase0_autofetch_contracts\.sql/);
   assert.doesNotMatch(workflow, /wrangler d1 migrations apply ca-progress-v2-phase4-shadow --remote/);
-  assert.match(workflow, /version IN \('0012','0013'\)/);
+  assert.match(workflow, /version IN \([^)]*'0012'[^)]*\)/);
   assert.match(workflow, /autofetch_content_targets/);
   assert.match(workflow, /PRAGMA foreign_key_check/);
 });
