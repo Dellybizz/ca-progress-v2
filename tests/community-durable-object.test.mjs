@@ -8,7 +8,7 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 
 test("Community uses a per-channel Durable Object coordinator for ephemeral state", () => {
   const coordinator = read("community-coordinator.ts");
-  const config = read("wrangler.web.jsonc");
+  const config = read("wrangler.jsonc");
   const provider = read("lib/community/realtime-provider.ts");
   assert.match(coordinator, /class CommunityChannelCoordinator/);
   assert.match(coordinator, /getWebSockets/);
