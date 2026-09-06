@@ -12,7 +12,7 @@ const errors: Record<string, string> = {
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const next = sanitizeReturnPath(typeof params.next === "string" ? params.next : null);
+  const next = sanitizeReturnPath(typeof params.next === "string" ? params.next : null, "/planner/today");
   const errorKey = typeof params.error === "string" ? params.error : "";
   return <LoginPanel next={next} initialError={errors[errorKey] ?? null}/>;
 }
