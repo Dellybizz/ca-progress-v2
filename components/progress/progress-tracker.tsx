@@ -156,8 +156,8 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
       </div>
 
       {filtered.length ? <div className="progress-chapter-list">{filtered.map((chapter) => (
-        <article className="progress-chapter-card" key={chapter.id}>
-          <div className="progress-chapter-heading"><span>{chapter.subjectTitle}</span><h3><b>{chapter.number}</b>{chapter.title}</h3><small>{chapter.groupName}</small></div>
+        <article className="progress-chapter-card" key={chapter.id} data-canonical-chapter-id={chapter.id}>
+          <div className="progress-chapter-heading"><span>{chapter.subjectTitle}</span><h3><b>{chapter.number}</b>{chapter.title}</h3><small>{chapter.groupName}</small><Link className="progress-chapter-heading__hub" href={`/chapters/${chapter.id}`}>Open Chapter Hub <Icon name="arrow" size={11}/></Link></div>
           <div className="progress-stage-controls" role="group" aria-label={`${chapter.title} stages`}>
             {STAGES.map((stage) => {
               const active = stageEnabled(chapter.state, stage.key);
