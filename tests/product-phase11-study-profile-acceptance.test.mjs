@@ -16,6 +16,18 @@ test("buddy-visible Study Profile access resolves only from accepted Phase 11 re
   assert.doesNotMatch(resolver, /FROM study_profile_buddies/);
 });
 
+test("buddy-visible Study Profile fields also require the owner's directional Phase 11 sharing", () => {
+  const service = read("lib/profile/study-profile.ts");
+  const resolver = service.match(/async function relationshipForViewer[\s\S]*?\n}\n\nasync function acceptedStudyBuddyIds/)?.[0] ?? "";
+  assert.match(resolver, /LEFT JOIN study_buddy_sharing sh ON sh\.relationship_id=r\.id AND sh\.owner_user_id=\?1/);
+  assert.match(resolver, /COALESCE\(sh\.share_profile,0\) AS share_profile/);
+  assert.match(resolver, /COALESCE\(sh\.share_progress,0\) AS share_progress/);
+  assert.match(resolver, /COALESCE\(sh\.share_streak,0\) AS share_streak/);
+  assert.match(service, /settings\.profileVisibility === "buddies" && !access\.shareProfile/);
+  assert.match(service, /settings\.progressVisibility !== "buddies" \|\| access\.shareProgress/);
+  assert.match(service, /settings\.streakVisibility !== "buddies" \|\| access\.shareStreak/);
+});
+
 test("legacy Phase 10 ACL rows cannot create new buddy access without acceptance", () => {
   const service = read("lib/profile/study-profile.ts");
   const grant = service.match(/export async function grantStudyProfileBuddy[\s\S]*?\n}\n\nexport async function revokeStudyProfileBuddy/)?.[0] ?? "";
