@@ -2,13 +2,44 @@ import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
+import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { getHotStudySessions, getHotStudyTimer } from "@/lib/data/d1/hot-screens";
 import type { Database } from "@/lib/data/database.types";
-import type { StudyAnalytics, StudyPageModel, StudySessionItem, StudySubjectOption, StudyTimerSnapshot } from "./types";
+import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
+import { getPendingStudyReflection } from "./phase3";
+import type {
+  StudyAnalytics,
+  StudyPageModel,
+  StudyPendingReflection,
+  StudySessionItem,
+  StudySubjectOption,
+  StudyTaskOption,
+  StudyTimerSnapshot,
+} from "./types";
 
 type SessionRow = Database["public"]["Tables"]["study_sessions"]["Row"];
 type TimerRow = Database["public"]["Tables"]["study_timer_state"]["Row"];
+type SessionMetaRow = {
+  session_id: string;
+  task_id: string | null;
+  plan_item_id: string | null;
+  pause_count: number;
+  paused_seconds: number;
+  completion_state: "completed" | "recovered";
+  understanding_score: number | null;
+  focus_rating: "poor" | "okay" | "focused" | null;
+  reflection_saved_at: string | null;
+  intended_task_title: string | null;
+};
+type TimerMetaRow = {
+  task_id: string | null;
+  plan_item_id: string | null;
+  pause_count: number;
+  paused_seconds: number;
+  intended_task_title: string | null;
+};
+type TaskRow = { id: string; title: string; task_kind: string; subject_id: string | null; chapter_id: string | null; due_at: string };
+
 const DAY_MS = 86_400_000;
 
 function safeTimeZone(timezone: string | null | undefined) {
@@ -52,13 +83,36 @@ function streakDays(dayKeys: string[], today: string) {
   return streak;
 }
 
-function sessionItem(row: SessionRow, subjectNames: Map<string, string>, chapterNames: Map<string, string>): StudySessionItem {
+async function sessionMetadata(userId: string, sessionIds: string[]) {
+  if (!sessionIds.length) return new Map<string, SessionMetaRow>();
+  const db = getD1RuntimeDatabase();
+  const ids = sessionIds.slice(0, 600);
+  const placeholders = ids.map((_, index) => `?${index + 2}`).join(",");
+  const rows = await db.prepare(`SELECT x.session_id,x.task_id,x.plan_item_id,x.pause_count,x.paused_seconds,x.completion_state,x.understanding_score,x.focus_rating,x.reflection_saved_at,
+      COALESCE(t.title,dpi.title) AS intended_task_title
+    FROM study_session_phase3 x
+    LEFT JOIN tasks t ON t.id=x.task_id AND t.user_id=x.user_id
+    LEFT JOIN daily_plan_items dpi ON dpi.id=x.plan_item_id AND dpi.user_id=x.user_id
+    WHERE x.user_id=?1 AND x.session_id IN (${placeholders})`).bind(userId, ...ids).all<SessionMetaRow>();
+  return new Map((rows.results ?? []).map((row) => [row.session_id, row]));
+}
+
+function sessionItem(row: SessionRow, subjectNames: Map<string, string>, chapterNames: Map<string, string>, meta?: SessionMetaRow): StudySessionItem {
   return {
     id: row.id,
     subjectId: row.subject_id,
     chapterId: row.chapter_id,
     subjectTitle: row.subject_id ? subjectNames.get(row.subject_id) ?? null : null,
     chapterTitle: row.chapter_id ? chapterNames.get(row.chapter_id) ?? null : null,
+    taskId: meta?.task_id ?? null,
+    planItemId: meta?.plan_item_id ?? null,
+    intendedTaskTitle: meta?.intended_task_title ?? null,
+    pauseCount: Number(meta?.pause_count ?? 0),
+    pausedSeconds: Number(meta?.paused_seconds ?? 0),
+    completionState: meta?.completion_state ?? "completed",
+    understandingScore: meta?.understanding_score ?? null,
+    focusRating: meta?.focus_rating ?? null,
+    reflectionSavedAt: meta?.reflection_saved_at ?? null,
     startedAt: row.started_at,
     endedAt: row.ended_at,
     durationSeconds: row.duration_seconds,
@@ -71,6 +125,7 @@ export async function getStudyAnalytics(userId: string, options?: { now?: Date; 
   const now = options?.now ?? new Date();
   const since = new Date(now.valueOf() - 60 * DAY_MS).toISOString();
   const rows = (await getHotStudySessions(userId, since)) as SessionRow[];
+  const metadata = await sessionMetadata(userId, rows.map((row) => row.id));
   const subjectNames = options?.subjectNames ?? new Map<string, string>();
   const chapterNames = options?.chapterNames ?? new Map<string, string>();
   const timezone = safeTimeZone(options?.timezone ?? rows[0]?.timezone ?? "UTC");
@@ -90,11 +145,11 @@ export async function getStudyAnalytics(userId: string, options?: { now?: Date; 
     sessionCountLast7Days: last7.length,
     streakDays: streakDays(localKeys, today),
     daily,
-    recentSessions: rows.slice(0, 10).map((row) => sessionItem(row, subjectNames, chapterNames)),
+    recentSessions: rows.slice(0, 10).map((row) => sessionItem(row, subjectNames, chapterNames, metadata.get(row.id))),
   };
 }
 
-export async function getStudyPageModel(now = new Date()): Promise<StudyPageModel> {
+export async function getStudyPageModel(now = new Date(), preferredReflectionSessionId?: string | null): Promise<StudyPageModel> {
   const identity = await optionalUser();
   if (!identity) return { mode: "guest" };
   const profile = await getProfileForUser(identity.id);
@@ -105,8 +160,19 @@ export async function getStudyPageModel(now = new Date()): Promise<StudyPageMode
   const subjects: StudySubjectOption[] = catalog.subjects.map((subject) => ({ id: subject.id, slug: subject.slug, title: subject.title, chapters: subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title })) }));
   const subjectNames = new Map(subjects.map((subject) => [subject.id, subject.title]));
   const chapterNames = new Map(subjects.flatMap((subject) => subject.chapters.map((chapter) => [chapter.id, chapter.title] as const)));
-  const timerRow = (await getHotStudyTimer(identity.id)) as TimerRow | null;
+  const db = getD1RuntimeDatabase();
+  const [timerRowRaw, tasksResult, pendingRow] = await Promise.all([
+    getHotStudyTimer(identity.id),
+    db.prepare(`SELECT id,title,task_kind,subject_id,chapter_id,due_at FROM tasks WHERE user_id=?1 AND status='todo' ORDER BY due_at ASC LIMIT 160`).bind(identity.id).all<TaskRow>(),
+    getPendingStudyReflection(identity.id, preferredReflectionSessionId),
+  ]);
+  const timerRow = timerRowRaw as TimerRow | null;
   const analytics = await getStudyAnalytics(identity.id, { now, subjectNames, chapterNames, timezone: timerRow?.timezone });
+  const tasks: StudyTaskOption[] = (tasksResult.results ?? []).map((row) => ({ id: row.id, title: row.title, taskKind: row.task_kind, subjectId: row.subject_id, chapterId: row.chapter_id, dueAt: row.due_at }));
+
+  const timerMeta = timerRow ? await db.prepare(`SELECT x.task_id,x.plan_item_id,x.pause_count,x.paused_seconds,COALESCE(t.title,dpi.title) AS intended_task_title
+    FROM study_timer_phase3 x LEFT JOIN tasks t ON t.id=x.task_id AND t.user_id=x.user_id LEFT JOIN daily_plan_items dpi ON dpi.id=x.plan_item_id AND dpi.user_id=x.user_id
+    WHERE x.user_id=?1 LIMIT 1`).bind(identity.id).first<TimerMetaRow>() : null;
   const timer: StudyTimerSnapshot | null = timerRow ? {
     status: timerRow.status as StudyTimerSnapshot["status"],
     mode: timerRow.mode as StudyTimerSnapshot["mode"],
@@ -114,6 +180,11 @@ export async function getStudyPageModel(now = new Date()): Promise<StudyPageMode
     chapterId: timerRow.chapter_id,
     subjectTitle: timerRow.subject_id ? subjectNames.get(timerRow.subject_id) ?? null : null,
     chapterTitle: timerRow.chapter_id ? chapterNames.get(timerRow.chapter_id) ?? null : null,
+    taskId: timerMeta?.task_id ?? null,
+    planItemId: timerMeta?.plan_item_id ?? null,
+    intendedTaskTitle: timerMeta?.intended_task_title ?? null,
+    pauseCount: Number(timerMeta?.pause_count ?? 0),
+    pausedSeconds: Number(timerMeta?.paused_seconds ?? 0),
     focusTargetSeconds: timerRow.focus_target_seconds,
     breakTargetSeconds: timerRow.break_target_seconds,
     startedAt: timerRow.started_at,
@@ -122,9 +193,27 @@ export async function getStudyPageModel(now = new Date()): Promise<StudyPageMode
     pausedAt: timerRow.paused_at,
     timezone: timerRow.timezone,
     lastInteractionAt: timerRow.last_interaction_at,
-    abandoned: timerRow.status === "running" && now.valueOf() - Date.parse(timerRow.last_interaction_at) > 16 * 60 * 60 * 1000,
+    abandoned: elapsedTimer(timerRow, now) >= 43_200 || now.valueOf() - Date.parse(timerRow.last_interaction_at) > 16 * 60 * 60 * 1000,
   } : null;
-  return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, groupLabel: groupLabel(profile.group_choice, catalog.groups), attemptKey: profile.attempt_key, subjects, timer, analytics };
+
+  const pendingReflection: StudyPendingReflection | null = pendingRow ? {
+    sessionId: pendingRow.id,
+    subjectId: pendingRow.subject_id,
+    chapterId: pendingRow.chapter_id,
+    subjectTitle: pendingRow.subject_id ? subjectNames.get(pendingRow.subject_id) ?? null : null,
+    chapterTitle: pendingRow.chapter_id ? chapterNames.get(pendingRow.chapter_id) ?? null : null,
+    intendedTaskTitle: pendingRow.intended_task_title,
+    durationSeconds: Number(pendingRow.duration_seconds),
+    endedAt: pendingRow.ended_at,
+  } : null;
+
+  return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, groupLabel: groupLabel(profile.group_choice, catalog.groups), attemptKey: profile.attempt_key, subjects, tasks, timer, pendingReflection, analytics };
+}
+
+export async function getPendingStudyReflectionPrompt(preferredSessionId?: string | null) {
+  const identity = await optionalUser();
+  if (!identity) return null;
+  return getPendingStudyReflection(identity.id, preferredSessionId);
 }
 
 export async function getStudyDashboardSummary(userId: string, now = new Date()) {

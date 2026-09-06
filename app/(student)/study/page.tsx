@@ -14,5 +14,11 @@ function cleanId(value: string | string[] | undefined) {
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  return <StudyPage model={await getStudyPageModel()} initialSubjectId={cleanId(params.subjectId)} initialChapterId={cleanId(params.chapterId)}/>;
+  const reflect = cleanId(params.reflect);
+  return <StudyPage
+    model={await getStudyPageModel(new Date(), reflect)}
+    initialSubjectId={cleanId(params.subjectId)}
+    initialChapterId={cleanId(params.chapterId)}
+    initialTaskId={cleanId(params.taskId)}
+  />;
 }

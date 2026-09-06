@@ -3,6 +3,7 @@ import { LoginRequired } from "@/components/auth/login-required";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import type { StudyPageModel } from "@/lib/study/types";
+import { StudyReflection } from "./study-reflection";
 import { StudyTimer } from "./study-timer";
 
 function formatAttempt(value: string) {
@@ -14,7 +15,7 @@ function formatAttempt(value: string) {
   return new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
-export function StudyPage({ model, initialSubjectId = null, initialChapterId = null }: { model: StudyPageModel; initialSubjectId?: string | null; initialChapterId?: string | null }) {
+export function StudyPage({ model, initialSubjectId = null, initialChapterId = null, initialTaskId = null }: { model: StudyPageModel; initialSubjectId?: string | null; initialChapterId?: string | null; initialTaskId?: string | null }) {
   if (model.mode === "guest") {
     return (
       <div className="phase6-page study-page">
@@ -50,7 +51,8 @@ export function StudyPage({ model, initialSubjectId = null, initialChapterId = n
         </div>
       </header>
 
-      <StudyTimer key={timerKey} model={model} initialSubjectId={initialSubjectId ?? undefined} initialChapterId={initialChapterId ?? undefined}/>
+      {model.pendingReflection ? <StudyReflection session={model.pendingReflection}/> : null}
+      <div id="study-timer"><StudyTimer key={timerKey} model={model} initialSubjectId={initialSubjectId ?? undefined} initialChapterId={initialChapterId ?? undefined} initialTaskId={initialTaskId ?? undefined}/></div>
     </div>
   );
 }
