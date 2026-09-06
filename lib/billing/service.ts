@@ -5,7 +5,7 @@ import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
 import { createD1AdminClient } from "@/lib/data/d1/client";
 import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
-import { getActiveLeaderboardRewardPlan } from "@/lib/gamification/phase13-service";
+import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -59,7 +59,7 @@ async function currentPlanId(userId: string) {
   const now = new Date();
   const [current, reward, plans] = await Promise.all([
     client.from("user_subscriptions").select("plan_id,ends_at,starts_at").eq("user_id", userId).eq("status", "active").lte("starts_at", now.toISOString()).order("starts_at", { ascending: false }),
-    getActiveLeaderboardRewardPlan(userId, now),
+    getEligibleLeaderboardRewardPlan(userId, now),
     listPlans(),
   ]);
   if (current.error) throw new Error(current.error.message);
@@ -72,7 +72,7 @@ async function currentPlanId(userId: string) {
 }
 
 async function rewardEntitlementOverride(userId: string, featureKey: string, current: Entitlement | null) {
-  const reward = await getActiveLeaderboardRewardPlan(userId);
+  const reward = await getEligibleLeaderboardRewardPlan(userId);
   if (!reward) return current;
   const plans = await listPlans();
   const currentRank = plans.find((plan) => plan.id === current?.planId)?.rank ?? -1;
