@@ -54,7 +54,7 @@ export default async function AnalyticsPage() {
       preview={false}
       eyebrow="Analytics"
       title="Actionable analytics from your recorded study data."
-      description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Phase 9 uses completed study sessions, chapter progress, revision records, append-only test attempts and verified attempt dates. It does not use XP as readiness or pretend sparse data is a forecast.`}
+      description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Phase 9 uses completed study sessions, chapter progress, revision records, append-only test attempts and verified attempt dates. No manually maintained totals are used. No manual studyHours array is maintained. It does not use XP as readiness or pretend sparse data is a forecast.`}
       actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link><Link href="/analytics/forecast">Forecast</Link></div>}
     />
 
