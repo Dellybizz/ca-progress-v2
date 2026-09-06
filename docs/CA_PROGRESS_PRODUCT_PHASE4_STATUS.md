@@ -62,7 +62,7 @@
 
 ## Dedicated Phase 4 regression evidence
 
-Added `tests/product-phase4-progress-tests.test.mjs` with nine Product Phase 4 regression tests covering:
+Added `tests/product-phase4-progress-test-integration.test.mjs` with nine Product Phase 4 regression tests covering:
 
 1. One current Test 1/Test 2 marks record per chapter milestone.
 2. Progression-graph enforcement in both D1 and the service.
