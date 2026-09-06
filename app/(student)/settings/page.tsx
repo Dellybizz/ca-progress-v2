@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const billing = await getBillingModel();
-  const tier = billing.effectivePlan?.tier ?? billing.currentPlan?.tier ?? "free";
+  const tier = billing.currentPlan?.tier_key ?? "free";
   const planLabel = exportProductPlanLabel(tier);
-  const canExportProgress = billing.authenticated && canUseExport(tier, "progress_pdf");
+  const canExportProgress = billing.mode === "ready" && canUseExport(tier, "progress_pdf");
 
   return <div className="settings-v2-page">
     <Card className="settings-profile-entry"><CardBody><span className="settings-profile-entry__icon"><Icon name="shield"/></span><div><strong>Profile & onboarding settings</strong><p>Manage your display name, private avatar, CA level, group, attempt and daily target.</p></div><Link className="ui-button ui-button--secondary ui-button--md" href="/settings/profile"><span>Open profile</span><Icon name="arrow" size={16}/></Link></CardBody></Card>
