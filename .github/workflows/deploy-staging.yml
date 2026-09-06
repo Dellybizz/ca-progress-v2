@@ -12,6 +12,7 @@ on:
       - lib/**
       - server/**
       - workers/**
+      - scripts/**
       - custom-worker.ts
       - wrangler.jsonc
       - package.json
