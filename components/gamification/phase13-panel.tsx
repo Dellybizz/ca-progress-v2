@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Level = { name: string };
 type Reward = { id: string; competitionPeriod: string; rewardPeriod: string; rank: number; rewardTier: "premium" | "pro"; status: string; startsAt: string; endsAt: string };
@@ -102,6 +102,12 @@ export function Phase13Panel({ initial }: { initial: Phase13Model }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (model.referral.inbound) return;
+    const referral = new URLSearchParams(window.location.search).get("ref")?.trim().toUpperCase() ?? "";
+    if (/^[A-Z0-9]{8,32}$/.test(referral)) setReferralInput(referral);
+  }, [model.referral.inbound]);
+
   async function post(body: Record<string, unknown>) {
     setBusy(true);
     setMessage("");
@@ -153,6 +159,12 @@ export function Phase13Panel({ initial }: { initial: Phase13Model }) {
     setMessage("Referral code copied.");
   }
 
+  async function copyReferralLink() {
+    const referralLink = `${window.location.origin}/activity?ref=${encodeURIComponent(model.referral.code)}`;
+    await navigator.clipboard.writeText(referralLink);
+    setMessage("Referral link copied. Signup alone grants no XP; activation still requires qualifying study.");
+  }
+
   function shareWhatsApp(card: ShareCard) {
     window.open(`https://wa.me/?text=${encodeURIComponent(shareText(card))}`, "_blank", "noopener,noreferrer");
   }
@@ -176,7 +188,8 @@ export function Phase13Panel({ initial }: { initial: Phase13Model }) {
 
     <div style={boxStyle}>
       <div><strong>Activation-based referrals</strong><p>Signup alone earns no XP. Your referral becomes rewarding only after the friend records {model.referral.activationRequiredSessions} qualifying study sessions; then you receive +{model.referral.activationXp} XP once.</p></div>
-      <div style={rowStyle}><code>{model.referral.code}</code><button style={buttonStyle} onClick={copyReferral}>Copy my code</button></div>
+      <div style={rowStyle}><code>{model.referral.code}</code><button style={buttonStyle} onClick={copyReferral}>Copy my code</button><button style={buttonStyle} onClick={copyReferralLink}>Copy referral link</button></div>
+      <small>The referral link only prefills the code. The friend still chooses Apply code, and no reward exists until qualifying study activity is completed.</small>
       <small>{model.referral.outgoing.activated} activated · {model.referral.outgoing.pending} pending</small>
       {model.referral.inbound ? <small>Your referral activation: {model.referral.inbound.status} · {model.referral.inbound.qualifyingSessionCount}/{model.referral.activationRequiredSessions} qualifying sessions.</small> : <div style={rowStyle}>
         <input aria-label="Referral code" value={referralInput} maxLength={32} onChange={(event) => setReferralInput(event.target.value.toUpperCase())} placeholder="Referral code" style={{ padding: "8px 10px", borderRadius: 10, border: "1px solid var(--border, #d1d5db)" }}/>
@@ -192,7 +205,7 @@ export function Phase13Panel({ initial }: { initial: Phase13Model }) {
 
     <div style={boxStyle}>
       <div><strong>Share cards</strong><p>These cards contain only the summary shown here. Sharing is always initiated by you.</p></div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>{model.shareCards.map((card) => <div key={card.kind} style={{ ...boxStyle, padding: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12 }}>{model.shareCards.map((card) => <div key={`${card.kind}:${card.title}`} style={{ ...boxStyle, padding: 12 }}>
         <small>{card.title}</small><strong>{card.primary}</strong><span>{card.secondary}</span>
         <div style={rowStyle}><button style={buttonStyle} onClick={() => shareWhatsApp(card)}>WhatsApp</button><button style={buttonStyle} onClick={() => void shareInstagram(card).catch(() => setMessage("Instagram sharing is unavailable here; use Download instead."))}>Instagram</button><button style={buttonStyle} onClick={() => void downloadCard(card).catch(() => setMessage("Share card download failed."))}>Download</button></div>
       </div>)}</div>
