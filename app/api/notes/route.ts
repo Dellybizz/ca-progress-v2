@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
-import { saveHotNote } from "@/lib/data/d1/hot-screens";
+import { savePhase6Note } from "@/lib/notes/phase6";
 import { cleanText, normalizeTags, nullableId, richTextToPlainText, sanitizeRichTextHtml } from "@/lib/resources/validation";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,9 @@ export async function POST(request: Request) {
   const noteId = typeof body.id === "string" && /^[0-9a-f-]{36}$/i.test(body.id) ? body.id : null;
   const subjectId = nullableId(body.subjectId);
   const chapterId = nullableId(body.chapterId);
+  const topicId = nullableId(body.topicId);
+  const sourceMessageId = nullableId(body.sourceMessageId);
+  const resourceIds = Array.isArray(body.resourceIds) ? body.resourceIds.filter((value): value is string => typeof value === "string") : [];
   const tags = normalizeTags(body.tags);
 
   if (!title) return NextResponse.json({ error: "A note title is required." }, { status: 400 });
@@ -29,10 +32,23 @@ export async function POST(request: Request) {
 
   try {
     const profile = await getProfileForUser(identity.id);
-    const result = await saveHotNote({ id: noteId, userId: identity.id, ownerLabel: profile?.display_name?.trim() || "CA Progress student", title, bodyHtml, bodyText, subjectId, chapterId, tags, visibility });
-    return NextResponse.json({ id: result.id, status: result.status }, { status: noteId ? 200 : 201 });
+    const result = await savePhase6Note({
+      id: noteId,
+      userId: identity.id,
+      ownerLabel: profile?.display_name?.trim() || "CA Progress student",
+      title,
+      bodyHtml,
+      bodyText,
+      subjectId,
+      chapterId,
+      topicId,
+      tags,
+      visibility,
+      sourceMessageId,
+      resourceIds,
+    });
+    return NextResponse.json({ id: result.id, status: result.status, visibility: result.visibility }, { status: noteId ? 200 : 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Note could not be saved." }, { status: 400 });
   }
-
 }
