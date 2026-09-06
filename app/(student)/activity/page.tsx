@@ -44,6 +44,13 @@ async function ActivityContent() {
   const [gamification, phase13] = await Promise.all([getGamificationSummary(user.id), getPhase13UserModel(user.id)]);
   const effectiveLevel = phase13.effectiveLevel;
   const effectiveTotalXp = phase13.effectiveTotalXp;
+  const hundredHourShareCard = gamification.streak.meaningfulStudyMinutes >= 100 * 60
+    ? { kind: "milestone", title: "100h study milestone", primary: "100+ meaningful study hours", secondary: effectiveLevel.name }
+    : null;
+  const phase13ForUi = hundredHourShareCard
+    ? { ...phase13, shareCards: [...phase13.shareCards.filter((card) => card.kind !== "milestone"), hundredHourShareCard] }
+    : phase13;
+
   return <div className="phase6-page">
     <PageHeader preview={false} eyebrow="Activity" title="Preparation momentum and activity." description="XP, levels and achievements reward meaningful preparation only. They never change syllabus progress, revision readiness or test readiness." actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link></div>}/>
 
@@ -58,7 +65,7 @@ async function ActivityContent() {
       <p style={{ marginTop: 8 }}><small>Streak timezone: {gamification.streak.timezone}. Historical qualifying days keep the timezone recorded by their source activity.</small></p>
     </CardBody></Card>
 
-    <Card><CardBody><Phase13Panel initial={phase13}/></CardBody></Card>
+    <Card><CardBody><Phase13Panel initial={phase13ForUi}/></CardBody></Card>
 
     <Card><CardBody>
       <h3>Achievements</h3>
