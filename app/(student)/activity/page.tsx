@@ -29,16 +29,27 @@ const xpLabel = (eventType: string) => ({
   study_together: "Valid Study Together completion",
 }[eventType] ?? "Preparation activity");
 
-export default function ActivityPage() {
-  return <Suspense fallback={<Loading />}><ActivityContent /></Suspense>;
+type ActivitySearchParams = { ref?: string | string[] };
+
+function cleanReferralCode(value: unknown) {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const code = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+  return /^[A-Z0-9]{8,32}$/.test(code) ? code : "";
 }
 
-async function ActivityContent() {
+export default async function ActivityPage({ searchParams }: { searchParams?: Promise<ActivitySearchParams> }) {
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const initialReferralCode = cleanReferralCode(resolvedSearchParams.ref);
+  return <Suspense fallback={<Loading />}><ActivityContent initialReferralCode={initialReferralCode}/></Suspense>;
+}
+
+async function ActivityContent({ initialReferralCode }: { initialReferralCode: string }) {
   const [model, user] = await Promise.all([getActivityPageModel(), optionalUser()]);
+  const nextPath = initialReferralCode ? `/activity?ref=${encodeURIComponent(initialReferralCode)}` : "/activity";
   if (model.mode === "guest" || !user) return <div className="phase6-page">
     <PageHeader preview={false} eyebrow="Activity" title="Your study and progress history." description="Browse the activity page as a guest. Your personal timeline appears after sign-in." actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link></div>}/>
     <Card><CardBody><div className="phase6-empty"><Icon name="sparkles"/><strong>Activity preview</strong><p>There is no guest activity history. Sign in to record study and progress events.</p></div></CardBody></Card>
-    <LoginRequired next="/activity" title="Sign in to view your private activity"/>
+    <LoginRequired next={nextPath} title="Sign in to view your private activity"/>
   </div>;
 
   const [gamification, phase13] = await Promise.all([getGamificationSummary(user.id), getPhase13UserModel(user.id)]);
@@ -65,7 +76,7 @@ async function ActivityContent() {
       <p style={{ marginTop: 8 }}><small>Streak timezone: {gamification.streak.timezone}. Historical qualifying days keep the timezone recorded by their source activity.</small></p>
     </CardBody></Card>
 
-    <Card><CardBody><Phase13Panel initial={phase13ForUi}/></CardBody></Card>
+    <Card><CardBody><Phase13Panel initial={phase13ForUi} initialReferralCode={initialReferralCode}/></CardBody></Card>
 
     <Card><CardBody>
       <h3>Achievements</h3>
