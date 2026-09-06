@@ -98,11 +98,13 @@ test("stable resource open endpoint prefers the verified direct document and nev
   assert.doesNotMatch(route, /await fetch\(destination/);
 });
 
-test("deployment applies the retained D1 migration chain before Worker rollout", () => {
+test("deployment applies only the idempotent Product Phase 0 migration to the historically retained remote D1", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
   assert.match(workflow, /- d1\/\*\*/);
-  assert.match(workflow, /Apply retained D1 migrations/);
-  assert.match(workflow, /wrangler d1 migrations apply ca-progress-v2-phase4-shadow --remote --config=wrangler\.jsonc/);
+  assert.match(workflow, /Apply Product Phase 0 D1 migration/);
+  assert.match(workflow, /wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler\.jsonc --file=d1\/migrations\/0012_product_phase0_autofetch_contracts\.sql/);
+  assert.doesNotMatch(workflow, /wrangler d1 migrations apply ca-progress-v2-phase4-shadow --remote/);
+  assert.match(workflow, /WHERE version='0012'/);
   assert.match(workflow, /autofetch_content_targets/);
   assert.match(workflow, /PRAGMA foreign_key_check/);
 });
