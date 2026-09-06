@@ -1,5 +1,6 @@
 name: Cloudflare V2 Deploy
 
+# Canonical web Worker configuration: wrangler.jsonc
 on:
   workflow_dispatch:
   push:
