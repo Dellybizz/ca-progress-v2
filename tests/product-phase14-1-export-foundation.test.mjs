@@ -56,5 +56,5 @@ test("Progress PDF bytes are deterministic even when input rows arrive in a diff
 
 test("Progress PDF safely escapes PDF control characters in user-facing text", () => {
   const pdf = decoder.decode(buildProgressPdf({ profile: { displayName: "A (Student) \\ Test" }, rows: [] }));
-  assert.match(pdf, /A \\(Student\\) \\\\ Test/);
+  assert.ok(pdf.includes("A \\(Student\\) \\\\ Test"));
 });
