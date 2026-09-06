@@ -14,6 +14,7 @@ function cleanError(message: string) {
   if (message.includes("applicable")) return message;
   if (message.includes("newer change")) return message;
   if (message.includes("cannot be undone")) return message;
+  if (message.includes("Saved Test")) return message;
   return "Progress could not be saved. Refresh and try again.";
 }
 
@@ -30,7 +31,14 @@ export async function POST(request: Request) {
 
   try {
     if (body.action === "set_stage") {
-      if (!body.chapterId || !PROGRESS_STAGES.includes(body.stage) || typeof body.enabled !== "boolean") return NextResponse.json({ error: "Invalid progress stage request." }, { status: 400 });
+      if (!body.chapterId || !PROGRESS_STAGES.includes(body.stage) || typeof body.enabled !== "boolean") {
+        return NextResponse.json({ error: "Invalid progress stage request." }, { status: 400 });
+      }
+      if (body.stage === "test_1" || body.stage === "test_2") {
+        return NextResponse.json({
+          error: `Record ${body.stage === "test_1" ? "Test 1" : "Test 2"} marks in Tests. Progress updates automatically; no second checkbox is required.`,
+        }, { status: 409 });
+      }
       return NextResponse.json(await setHotProgressStage(user.id, body.chapterId, body.stage, body.enabled) as ProgressMutationResult);
     }
     if (body.action === "undo") {
@@ -42,5 +50,4 @@ export async function POST(request: Request) {
     const message = cleanError(error instanceof Error ? error.message : "Progress could not be saved.");
     return NextResponse.json({ error: message }, { status: /applicable|requires/.test(message) ? 403 : 409 });
   }
-
 }
