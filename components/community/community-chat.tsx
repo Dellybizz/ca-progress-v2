@@ -5,10 +5,14 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { subscribeToCommunityRealtime } from "@/lib/community/realtime-provider";
-import type { CommunityChannelModel, CommunityMessage, CommunityMessagePage, CommunityReactionEmoji } from "@/lib/community/types";
+import type { CommunityChannelModel, CommunityFeedFilter, CommunityMessage, CommunityMessagePage, CommunityReactionEmoji } from "@/lib/community/types";
 import { CommunityChannelList } from "./channel-list";
 
 const REACTIONS: CommunityReactionEmoji[] = ["👍", "❤️", "🎯", "👏", "💡", "✅"];
+const DEFAULT_FILTERS: ReadonlyArray<{ id: CommunityFeedFilter; label: string }> = [
+  { id: "all", label: "All" }, { id: "following", label: "Following" }, { id: "verified", label: "Verified" },
+  { id: "rankers", label: "Rankers" }, { id: "high_scorers", label: "High Scorers" }, { id: "saved", label: "Saved" },
+];
 
 type ReadyModel = Extract<CommunityChannelModel, { mode: "ready" }>;
 
@@ -42,23 +46,23 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
   const [mentionUserId, setMentionUserId] = useState("");
   const [query, setQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<CommunityFeedFilter>("all");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pinned, setPinned] = useState(model.pinned);
   const latestSequence = messages.at(-1)?.sequence ?? model.channel.latestSequence ?? 0;
   const isGuest = !model.viewerId;
+  const filters = model.feedFilters ?? DEFAULT_FILTERS;
 
   const markRead = useCallback(async (sequence: number) => {
     if (isGuest) return;
     await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/read`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sequence }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sequence }),
     }).catch(() => null);
   }, [isGuest, model.channel.slug]);
 
-  const refreshMessages = useCallback(async (search = activeQuery) => {
-    const params = new URLSearchParams();
+  const refreshMessages = useCallback(async (search = activeQuery, filter: CommunityFeedFilter = activeFilter) => {
+    const params = new URLSearchParams({ filter });
     if (search) params.set("q", search);
     const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/messages?${params.toString()}`, { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as CommunityMessagePage & { error?: string };
@@ -67,11 +71,9 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     setNextCursor(payload.nextCursor);
     const sequence = payload.messages.at(-1)?.sequence ?? 0;
     if (sequence && !isGuest) void markRead(sequence);
-  }, [activeQuery, isGuest, markRead, model.channel.slug]);
+  }, [activeFilter, activeQuery, isGuest, markRead, model.channel.slug]);
 
-  useEffect(() => {
-    if (latestSequence && !isGuest) void markRead(latestSequence);
-  }, [isGuest, latestSequence, markRead]);
+  useEffect(() => { if (latestSequence && !isGuest) void markRead(latestSequence); }, [isGuest, latestSequence, markRead]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -80,21 +82,12 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       timer = setTimeout(() => void refreshMessages().catch(() => undefined), 120);
     };
     const unsubscribe = subscribeToCommunityRealtime({
-      channelId: model.channel.id,
-      userId: model.viewerId || undefined,
-      channelSlug: model.channel.slug,
+      channelId: model.channel.id, userId: model.viewerId || undefined, channelSlug: model.channel.slug,
       onDataChanged: scheduleRefresh,
-      onPinnedChanged: () => {
-        scheduleRefresh();
-        router.refresh();
-      },
+      onPinnedChanged: () => { scheduleRefresh(); router.refresh(); },
     });
     realtimeRef.current = unsubscribe;
-    return () => {
-      if (timer) clearTimeout(timer);
-      realtimeRef.current = null;
-      unsubscribe();
-    };
+    return () => { if (timer) clearTimeout(timer); realtimeRef.current = null; unsubscribe(); };
   }, [model.channel.id, model.channel.slug, model.viewerId, refreshMessages, router]);
 
   useEffect(() => {
@@ -105,62 +98,72 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
 
   async function loadOlder() {
     if (!nextCursor) return;
-    setBusy("older");
-    setError(null);
+    setBusy("older"); setError(null);
     try {
-      const params = new URLSearchParams({ cursor: nextCursor });
+      const params = new URLSearchParams({ cursor: nextCursor, filter: activeFilter });
       if (activeQuery) params.set("q", activeQuery);
       const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/messages?${params.toString()}`, { cache: "no-store" });
       const payload = await response.json().catch(() => ({})) as CommunityMessagePage & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Older messages could not be loaded.");
       setMessages((current) => dedupeMessages([...payload.messages, ...current]));
       setNextCursor(payload.nextCursor);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Older messages could not be loaded.");
-    } finally {
-      setBusy(null);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Older messages could not be loaded."); }
+    finally { setBusy(null); }
   }
 
   async function send(event: FormEvent) {
     event.preventDefault();
     if (!body.trim() || !model.channel.canWrite || model.activeBlock) return;
-    setBusy("send");
-    setError(null);
+    setBusy("send"); setError(null);
     try {
       const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body, replyToId: replyTo?.id ?? null, resourceId: resourceId || null, mentionUserIds: mentionUserId ? [mentionUserId] : [] }),
       });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Message could not be sent.");
-      setBody("");
-      setReplyTo(null);
-      setResourceId("");
-      setMentionUserId("");
+      setBody(""); setReplyTo(null); setResourceId(""); setMentionUserId("");
       realtimeRef.current?.send({ type: "refresh", reason: "message" });
       await refreshMessages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Message could not be sent.");
-    } finally {
-      setBusy(null);
-    }
+    } catch (err) { setError(err instanceof Error ? err.message : "Message could not be sent."); }
+    finally { setBusy(null); }
   }
 
   async function react(messageId: string, emoji: CommunityReactionEmoji) {
     if (isGuest) return;
-    setBusy(`reaction:${messageId}:${emoji}`);
-    setError(null);
+    setBusy(`reaction:${messageId}:${emoji}`); setError(null);
     try {
       const response = await fetch(`/api/community/messages/${messageId}/reaction`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Reaction could not be updated.");
       realtimeRef.current?.send({ type: "refresh", reason: "reaction" });
       await refreshMessages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Reaction could not be updated.");
-    } finally { setBusy(null); }
+    } catch (err) { setError(err instanceof Error ? err.message : "Reaction could not be updated."); }
+    finally { setBusy(null); }
+  }
+
+  async function toggleSaved(message: CommunityMessage) {
+    if (isGuest) return;
+    setBusy(`save:${message.id}`); setError(null);
+    try {
+      const response = await fetch(`/api/community/messages/${message.id}/save`, { method: "POST" });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Message could not be saved.");
+      await refreshMessages();
+    } catch (err) { setError(err instanceof Error ? err.message : "Message could not be saved."); }
+    finally { setBusy(null); }
+  }
+
+  async function toggleFollow(message: CommunityMessage) {
+    if (isGuest || message.isOwn) return;
+    setBusy(`follow:${message.id}`); setError(null);
+    try {
+      const response = await fetch(`/api/community/messages/${message.id}/follow`, { method: "POST" });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Follow state could not be updated.");
+      await refreshMessages();
+    } catch (err) { setError(err instanceof Error ? err.message : "Follow state could not be updated."); }
+    finally { setBusy(null); }
   }
 
   async function report(message: CommunityMessage) {
@@ -168,45 +171,43 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     const reason = window.prompt("Report reason: spam, harassment, misinformation, off_topic or other", "spam")?.trim();
     if (!reason) return;
     const details = window.prompt("Optional details", "") ?? "";
-    setBusy(`report:${message.id}`);
-    setError(null);
+    setBusy(`report:${message.id}`); setError(null);
     try {
       const response = await fetch(`/api/community/messages/${message.id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason, details }) });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Message could not be reported.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Message could not be reported.");
-    } finally { setBusy(null); }
+    } catch (err) { setError(err instanceof Error ? err.message : "Message could not be reported."); }
+    finally { setBusy(null); }
   }
 
   async function moderate(action: string, message: CommunityMessage, durationMinutes?: number) {
     const reason = action === "pin" || action === "unpin" ? null : window.prompt("Moderation reason", action === "block" ? "Chat violation" : "Community moderation");
     if ((action === "delete_message" || action === "block") && reason === null) return;
-    setBusy(`moderate:${message.id}:${action}`);
-    setError(null);
+    setBusy(`moderate:${message.id}:${action}`); setError(null);
     try {
-      const response = await fetch("/api/admin/community/moderation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, messageId: message.id, channelId: model.channel.id, reason, durationMinutes }),
-      });
+      const response = await fetch("/api/admin/community/moderation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, messageId: message.id, channelId: model.channel.id, reason, durationMinutes }) });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Moderation action failed.");
       if (action === "pin") setPinned(message);
       if (action === "unpin") setPinned(null);
       await refreshMessages();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Moderation action failed.");
-    } finally { setBusy(null); }
+    } catch (err) { setError(err instanceof Error ? err.message : "Moderation action failed."); }
+    finally { setBusy(null); }
   }
 
   async function search(event: FormEvent) {
     event.preventDefault();
     const clean = query.trim().slice(0, 80);
-    setActiveQuery(clean);
-    setBusy("search");
-    setError(null);
-    try { await refreshMessages(clean); } catch (err) { setError(err instanceof Error ? err.message : "Search failed."); } finally { setBusy(null); }
+    setActiveQuery(clean); setBusy("search"); setError(null);
+    try { await refreshMessages(clean, activeFilter); } catch (err) { setError(err instanceof Error ? err.message : "Search failed."); }
+    finally { setBusy(null); }
+  }
+
+  async function applyFilter(filter: CommunityFeedFilter) {
+    setActiveFilter(filter); setBusy(`filter:${filter}`); setError(null);
+    try { await refreshMessages(activeQuery, filter); }
+    catch (err) { setError(err instanceof Error ? err.message : "Filter could not be applied."); }
+    finally { setBusy(null); }
   }
 
   const loadComposerOptions = useCallback(async () => {
@@ -214,11 +215,9 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/options`, { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as { members?: typeof members; resources?: typeof resources; error?: string };
     if (!response.ok) throw new Error(payload.error || "Composer options could not be loaded.");
-    setMembers(payload.members ?? []);
-    setResources(payload.resources ?? []);
-    setOptionsLoaded(true);
+    setMembers(payload.members ?? []); setResources(payload.resources ?? []); setOptionsLoaded(true);
   }, [isGuest, model.channel.slug, optionsLoaded]);
-  
+
   const mentionLabel = useMemo(() => members.find((member) => member.userId === mentionUserId)?.label ?? null, [mentionUserId, members]);
 
   return <div className="phase10-split-chat">
@@ -226,26 +225,37 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     <section className="phase10-chat-panel" aria-label={`${model.channel.title} chat`}>
       <header className="phase10-chat-header">
         <div><Link href="/community" className="phase10-mobile-back" aria-label="Back to channels">‹</Link><span className={`phase10-channel-icon phase10-channel-icon--${model.channel.kind}`}><Icon name={model.channel.kind === "announcements" ? "bell" : model.channel.kind === "resources" ? "book" : "community"} size={18}/></span><div><h1>{model.channel.title}</h1><p>{model.channel.description}</p></div></div>
-        <form onSubmit={search} className="phase10-chat-search"><Icon name="search" size={15}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search messages" maxLength={80}/>{activeQuery ? <button type="button" onClick={() => { setQuery(""); setActiveQuery(""); void refreshMessages(""); }} aria-label="Clear search"><Icon name="close" size={14}/></button> : null}</form>
+        <form onSubmit={search} className="phase10-chat-search"><Icon name="search" size={15}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search messages" maxLength={80}/>{activeQuery ? <button type="button" onClick={() => { setQuery(""); setActiveQuery(""); void refreshMessages("", activeFilter); }} aria-label="Clear search"><Icon name="close" size={14}/></button> : null}</form>
       </header>
+
+      <nav className="phase10-community-filters" aria-label="Community feed filters">{filters.map((filter) => <button key={filter.id} type="button" aria-pressed={activeFilter === filter.id} className={activeFilter === filter.id ? "is-active" : ""} disabled={Boolean(busy?.startsWith("filter:"))} onClick={() => void applyFilter(filter.id)}>{filter.label}</button>)}</nav>
+      <p className="phase10-verification-note">Verification badges reflect reviewed evidence about a member’s result or achievement. They do not mean an individual answer is correct.</p>
 
       {pinned ? <button className="phase10-pinned" type="button" onClick={() => document.getElementById(`message-${pinned.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}><Icon name="bell" size={16}/><span><strong>Pinned</strong>{shortBody(pinned.body)}</span></button> : null}
       {model.activeBlock ? <div className="phase10-block-notice"><Icon name="lock" size={17}/><span><strong>Chat access temporarily limited</strong>{model.activeBlock.reason} · until {new Date(model.activeBlock.endsAt).toLocaleString()}</span></div> : null}
       {error ? <div className="phase10-error" role="alert">{error}</div> : null}
 
       <div ref={listRef} className="phase10-message-scroll">
-        <div className="phase10-history-controls">{nextCursor ? <button type="button" disabled={busy === "older"} onClick={() => void loadOlder()}>{busy === "older" ? "Loading…" : "Load older messages"}</button> : <span>{activeQuery ? "Start of matching messages" : "Start of this channel"}</span>}</div>
+        <div className="phase10-history-controls">{nextCursor ? <button type="button" disabled={busy === "older"} onClick={() => void loadOlder()}>{busy === "older" ? "Loading…" : "Load older messages"}</button> : <span>{activeQuery || activeFilter !== "all" ? "Start of matching messages" : "Start of this channel"}</span>}</div>
         {messages.length ? <div className="phase10-messages">{messages.map((message) => <article id={`message-${message.id}`} key={message.id} className={`phase10-message ${message.isOwn ? "is-own" : ""} ${message.isPinned ? "is-pinned" : ""} ${message.moderationStatus !== "active" ? "is-moderated" : ""}`}>
           <div className="phase10-avatar" aria-hidden="true">{message.authorLabel.charAt(0).toUpperCase()}</div>
           <div className="phase10-message-body">
-            <div className="phase10-message-meta"><strong>{message.authorLabel}</strong><time>{timeLabel(message.createdAt)}</time>{message.isPinned ? <span>Pinned</span> : null}</div>
+            <div className="phase10-message-meta"><strong>{message.authorLabel}</strong>{message.verificationBadges?.map((badge) => <span key={badge.id} className="phase10-verification-badge" title={`Evidence reviewed: ${badge.evidenceSource}. This badge does not certify this answer.`}>{badge.label}</span>)}<time>{timeLabel(message.createdAt)}</time>{message.isPinned ? <span>Pinned</span> : null}</div>
+            {message.doubt ? <div className="phase10-doubt-context"><strong>Study session doubt</strong><span>{message.doubt.status}</span>{message.doubt.chapterId ? <Link href={`/chapters/${encodeURIComponent(message.doubt.chapterId)}`}>Open Chapter Hub</Link> : null}</div> : null}
             {message.replyTo ? <button className="phase10-reply-preview" type="button" onClick={() => document.getElementById(`message-${message.replyTo!.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}><strong>{message.replyTo.authorLabel}</strong><span>{shortBody(message.replyTo.body)}</span></button> : null}
             <p>{message.body}</p>
             {message.attachment ? <a className="phase10-attachment" href={`/resources/${message.attachment.id}`}><Icon name="book" size={16}/><span><strong>{message.attachment.title}</strong><small>{message.attachment.extension.toUpperCase()} · approved community resource</small></span></a> : null}
-            {message.moderationStatus === "active" ? <div className="phase10-message-actions">{model.viewerId ? <button type="button" onClick={() => setReplyTo(message)}>Reply</button> : null}{model.viewerId ? <Link href={`/notes?communityMessageId=${encodeURIComponent(message.id)}`}>Save to Notes</Link> : null}{model.viewerId && !message.isOwn ? <button type="button" disabled={busy === `report:${message.id}`} onClick={() => void report(message)}>Report</button> : null}{model.canModerate ? <><button type="button" onClick={() => void moderate(message.isPinned ? "unpin" : "pin", message)}>{message.isPinned ? "Unpin" : "Pin"}</button><button type="button" onClick={() => void moderate("delete_message", message)}>Remove</button>{!message.isOwn ? <select aria-label={`Block ${message.authorLabel}`} defaultValue="" onChange={(event) => { const minutes = Number(event.target.value); if (minutes) void moderate("block", message, minutes); event.currentTarget.value = ""; }}><option value="">Block…</option><option value="60">1 hour</option><option value="480">8 hours</option><option value="1440">24 hours</option><option value="2880">48 hours</option></select> : null}</> : null}</div> : null}
+            {message.moderationStatus === "active" ? <div className="phase10-message-actions">
+              {model.viewerId ? <button type="button" onClick={() => setReplyTo(message)}>Reply</button> : null}
+              {model.viewerId ? <button type="button" disabled={busy === `save:${message.id}`} onClick={() => void toggleSaved(message)}>{message.savedByViewer ? "Unsave" : "Save"}</button> : null}
+              {model.viewerId && !message.isOwn ? <button type="button" disabled={busy === `follow:${message.id}`} onClick={() => void toggleFollow(message)}>{message.followedByViewer ? "Unfollow" : "Follow"}</button> : null}
+              {model.viewerId ? <Link href={`/notes?communityMessageId=${encodeURIComponent(message.id)}`}>Save to Notes</Link> : null}
+              {model.viewerId && !message.isOwn ? <button type="button" disabled={busy === `report:${message.id}`} onClick={() => void report(message)}>Report</button> : null}
+              {model.canModerate ? <><button type="button" onClick={() => void moderate(message.isPinned ? "unpin" : "pin", message)}>{message.isPinned ? "Unpin" : "Pin"}</button><button type="button" onClick={() => void moderate("delete_message", message)}>Remove</button>{!message.isOwn ? <select aria-label={`Block ${message.authorLabel}`} defaultValue="" onChange={(event) => { const minutes = Number(event.target.value); if (minutes) void moderate("block", message, minutes); event.currentTarget.value = ""; }}><option value="">Block…</option><option value="60">1 hour</option><option value="480">8 hours</option><option value="1440">24 hours</option><option value="2880">48 hours</option></select> : null}</> : null}
+            </div> : null}
             {message.moderationStatus === "active" ? <div className="phase10-reactions">{message.reactions.map((reaction) => <button key={reaction.emoji} className={reaction.reactedByViewer ? "is-active" : ""} onClick={() => void react(message.id, reaction.emoji)} disabled={isGuest || busy === `reaction:${message.id}:${reaction.emoji}`}><span>{reaction.emoji}</span>{reaction.count}</button>)}{model.viewerId ? <details><summary aria-label="Add reaction">＋</summary><div>{REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={() => void react(message.id, emoji)}>{emoji}</button>)}</div></details> : null}</div> : null}
           </div>
-        </article>)}</div> : <div className="phase10-chat-empty"><Icon name="community" size={28}/><strong>{activeQuery ? "No matching messages" : "Start the conversation"}</strong><p>{activeQuery ? "Try a different search term." : model.channel.canWrite ? "Share a question, useful explanation or approved resource." : "This channel is currently read-only for your role."}</p></div>}
+        </article>)}</div> : <div className="phase10-chat-empty"><Icon name="community" size={28}/><strong>{activeQuery || activeFilter !== "all" ? "No matching messages" : "Start the conversation"}</strong><p>{activeQuery || activeFilter !== "all" ? "Try another filter or search term." : model.channel.canWrite ? "Share a question, useful explanation or approved resource." : "This channel is currently read-only for your role."}</p></div>}
       </div>
 
       <form className="phase10-composer" onSubmit={send}>
