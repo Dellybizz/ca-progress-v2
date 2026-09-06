@@ -6,12 +6,14 @@ import { Icon } from "@/components/ui/icon";
 import type { NoteCard } from "@/lib/resources/types";
 import type { StudySubjectOption } from "@/lib/study/types";
 
-export function NoteEditor({ note, subjects, compact = false, onSaved }: { note?: NoteCard | null; subjects: StudySubjectOption[]; compact?: boolean; onSaved?: () => void }) {
+export function NoteEditor({ note, subjects, compact = false, onSaved, initialSubjectId, initialChapterId }: { note?: NoteCard | null; subjects: StudySubjectOption[]; compact?: boolean; onSaved?: () => void; initialSubjectId?: string; initialChapterId?: string }) {
   const router = useRouter();
   const editorRef = useRef<HTMLDivElement>(null);
+  const safeInitialSubject = initialSubjectId ? subjects.find((subject) => subject.id === initialSubjectId) ?? null : null;
+  const safeInitialChapterId = safeInitialSubject && initialChapterId && safeInitialSubject.chapters.some((chapter) => chapter.id === initialChapterId) ? initialChapterId : "";
   const [title, setTitle] = useState(note?.title ?? "");
-  const [subjectId, setSubjectId] = useState(note?.subjectId ?? "");
-  const [chapterId, setChapterId] = useState(note?.chapterId ?? "");
+  const [subjectId, setSubjectId] = useState(note?.subjectId ?? safeInitialSubject?.id ?? "");
+  const [chapterId, setChapterId] = useState(note?.chapterId ?? safeInitialChapterId);
   const [tags, setTags] = useState(note?.tags.join(", ") ?? "");
   const [visibility, setVisibility] = useState<"private" | "shared">(note?.visibility ?? "private");
   const [busy, setBusy] = useState(false);
