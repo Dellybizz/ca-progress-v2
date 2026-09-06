@@ -48,6 +48,13 @@ type ProgressAggregate = {
 
 type SessionDateRow = { ended_at: string };
 
+type StudyProfileViewerAccess = {
+  relationship: StudyProfileRelationship;
+  shareProfile: boolean;
+  shareProgress: boolean;
+  shareStreak: boolean;
+};
+
 export class StudyProfileInputError extends Error {
   constructor(message: string) {
     super(message);
@@ -135,11 +142,19 @@ function streakSummary(rows: SessionDateRow[], timezone: string, now = new Date(
   return { currentStreakDays, activeDaysLast14 };
 }
 
-async function relationshipForViewer(targetUserId: string, viewerUserId: string | null): Promise<StudyProfileRelationship> {
-  if (viewerUserId === targetUserId) return "owner";
-  if (!viewerUserId) return "public";
-  const row = await getD1RuntimeDatabase().prepare(`SELECT 1 AS ok
+async function relationshipForViewer(targetUserId: string, viewerUserId: string | null): Promise<StudyProfileViewerAccess> {
+  if (viewerUserId === targetUserId) {
+    return { relationship: "owner", shareProfile: true, shareProgress: true, shareStreak: true };
+  }
+  if (!viewerUserId) {
+    return { relationship: "public", shareProfile: false, shareProgress: false, shareStreak: false };
+  }
+  const row = await getD1RuntimeDatabase().prepare(`SELECT
+      COALESCE(sh.share_profile,0) AS share_profile,
+      COALESCE(sh.share_progress,0) AS share_progress,
+      COALESCE(sh.share_streak,0) AS share_streak
     FROM study_buddy_relationships r
+    LEFT JOIN study_buddy_sharing sh ON sh.relationship_id=r.id AND sh.owner_user_id=?1
     WHERE r.status='accepted'
       AND ((r.member_a_user_id=?1 AND r.member_b_user_id=?2) OR (r.member_a_user_id=?2 AND r.member_b_user_id=?1))
       AND NOT EXISTS (
@@ -148,8 +163,14 @@ async function relationshipForViewer(targetUserId: string, viewerUserId: string 
           AND s.blocked=1
       )
     LIMIT 1`)
-    .bind(targetUserId, viewerUserId).first<{ ok: number }>();
-  return row ? "buddy" : "public";
+    .bind(targetUserId, viewerUserId).first<{ share_profile: number; share_progress: number; share_streak: number }>();
+  if (!row) return { relationship: "public", shareProfile: false, shareProgress: false, shareStreak: false };
+  return {
+    relationship: "buddy",
+    shareProfile: row.share_profile === 1,
+    shareProgress: row.share_progress === 1,
+    shareStreak: row.share_streak === 1,
+  };
 }
 
 async function acceptedStudyBuddyIds(userId: string) {
@@ -225,12 +246,15 @@ export async function getStudyProfileForViewer(targetUserId: string, viewerUserI
     WHERE p.user_id=?1 LIMIT 1`).bind(targetId).first<BaseProfileRow>();
   if (!row) return null;
 
-  const relationship = await relationshipForViewer(targetId, viewerUserId);
+  const access = await relationshipForViewer(targetId, viewerUserId);
+  const relationship = access.relationship;
   const settings = settingsFromRow(row);
   if (!canViewStudyProfileScope(settings.profileVisibility, relationship)) return null;
+  if (relationship === "buddy" && settings.profileVisibility === "buddies" && !access.shareProfile) return null;
 
   let progress: { firstCoveragePercent: number; revisionReadinessPercent: number; testingReadinessPercent: number } | undefined;
-  if (canViewStudyProfileScope(settings.progressVisibility, relationship)) {
+  const progressPermitted = relationship !== "buddy" || settings.progressVisibility !== "buddies" || access.shareProgress;
+  if (progressPermitted && canViewStudyProfileScope(settings.progressVisibility, relationship)) {
     const aggregate = await db.prepare(`SELECT COUNT(DISTINCT c.id) AS total_chapters,
         COUNT(DISTINCT CASE WHEN cp.completed_at IS NOT NULL THEN c.id END) AS completed_chapters,
         COUNT(DISTINCT CASE WHEN cp.revision_1_at IS NOT NULL THEN c.id END) AS revision_1_chapters,
@@ -253,7 +277,8 @@ export async function getStudyProfileForViewer(targetUserId: string, viewerUserI
   }
 
   let streak: { currentStreakDays: number; activeDaysLast14: number } | undefined;
-  if (canViewStudyProfileScope(settings.streakVisibility, relationship)) {
+  const streakPermitted = relationship !== "buddy" || settings.streakVisibility !== "buddies" || access.shareStreak;
+  if (streakPermitted && canViewStudyProfileScope(settings.streakVisibility, relationship)) {
     const sessions = await db.prepare("SELECT ended_at FROM study_sessions WHERE user_id=?1 AND ended_at>=datetime('now','-120 days') ORDER BY ended_at DESC LIMIT 2000")
       .bind(targetId).all<SessionDateRow>();
     streak = streakSummary(sessions.results ?? [], row.timezone ?? "Asia/Kolkata", now);
