@@ -4,6 +4,7 @@ import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/data/database.types";
+import { getSelectedAttemptCountdown, getTaskPlanningExtensions } from "./phase8";
 import type { CalendarItem, CalendarPageModel } from "./types";
 
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
@@ -29,21 +30,33 @@ export async function getCalendarPageModel(monthParam?: string | null): Promise<
   const startDate = `${month}-01`;
   const nextMonth = new Date(`${month}-01T12:00:00Z`); nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1); const endDate = nextMonth.toISOString().slice(0, 10);
   const client = await createD1ServerClient();
-  const [tasks, goals, userEvents, attempt] = await Promise.all([
+  const level = await client.from("course_levels").select("id").eq("code", profile.ca_level).limit(1).maybeSingle();
+  if (level.error) throw new Error(`Calendar level could not be loaded: ${level.error.message}`);
+  const [tasks, goals, userEvents, attempt, countdown] = await Promise.all([
     client.from("tasks").select("*").eq("user_id", identity.id).gte("due_at", window.start.toISOString()).lt("due_at", window.end.toISOString()).neq("status", "cancelled").order("due_at"),
     client.from("goals").select("*").eq("user_id", identity.id).gte("due_date", startDate).lt("due_date", endDate).neq("status", "cancelled").order("due_date"),
     client.from("user_calendar_events").select("*").eq("user_id", identity.id).gte("starts_at", window.start.toISOString()).lt("starts_at", window.end.toISOString()).order("starts_at"),
-    client.from("exam_attempts").select("id").eq("attempt_key", profile.attempt_key).eq("verification_status", "verified").limit(1).maybeSingle(),
+    level.data?.id ? client.from("exam_attempts").select("id").eq("level_id", level.data.id).eq("attempt_key", profile.attempt_key).eq("verification_status", "verified").limit(1).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    getSelectedAttemptCountdown(identity.id),
   ]);
   const error = tasks.error || goals.error || userEvents.error || attempt.error;
   if (error) throw new Error(`Calendar could not be loaded: ${error.message}`);
   const examEvents = attempt.data?.id ? await client.from("exam_events").select("*").eq("attempt_id", attempt.data.id).eq("verification_status", "verified").gte("event_date", startDate).lt("event_date", endDate).order("event_date") : { data: [], error: null };
   if (examEvents.error) throw new Error(`Official exam calendar could not be loaded: ${examEvents.error.message}`);
+  const taskRows = (tasks.data ?? []) as TaskRow[];
+  const extensions = await getTaskPlanningExtensions(identity.id, taskRows.map((row) => row.id));
   const items: CalendarItem[] = [];
-  for (const row of (tasks.data ?? []) as TaskRow[]) if (localMonthKey(new Date(row.due_at), timezone) === month) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes });
+  for (const row of taskRows) {
+    const extension = extensions.get(row.id);
+    if (extension?.schedule_mode === "flexible" && extension.target_date) {
+      if (extension.target_date.slice(0, 7) === month) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: `${extension.target_date}T12:00:00`, endsAt: null, allDay: true, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes, scheduleMode: "flexible" });
+    } else if (localMonthKey(new Date(row.due_at), timezone) === month) {
+      items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes, scheduleMode: "fixed" });
+    }
+  }
   for (const row of (goals.data ?? []) as GoalRow[]) items.push({ id: `goal:${row.id}`, source: "goal", kind: "goal", title: row.title, startsAt: `${row.due_date}T12:00:00`, endsAt: null, allDay: true, readOnly: false, status: row.status });
   for (const row of (userEvents.data ?? []) as EventRow[]) if (localMonthKey(new Date(row.starts_at), timezone) === month) items.push({ id: `user:${row.id}`, source: "user", kind: "personal", title: row.title, startsAt: row.starts_at, endsAt: row.ends_at, allDay: row.all_day, readOnly: false });
   for (const row of examEvents.data ?? []) items.push({ id: `icai:${row.id}`, source: "icai", kind: "exam", title: row.title, startsAt: `${row.event_date}T12:00:00`, endsAt: null, allDay: true, readOnly: true, status: "verified", sourceUrl: row.source_url });
   items.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  return { mode: "ready", viewerName: name, month, items };
+  return { mode: "ready", viewerName: name, month, timezone, countdown, items };
 }
