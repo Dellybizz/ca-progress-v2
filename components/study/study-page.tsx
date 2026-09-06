@@ -14,7 +14,7 @@ function formatAttempt(value: string) {
   return new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
-export function StudyPage({ model }: { model: StudyPageModel }) {
+export function StudyPage({ model, initialSubjectId = null, initialChapterId = null }: { model: StudyPageModel; initialSubjectId?: string | null; initialChapterId?: string | null }) {
   if (model.mode === "guest") {
     return (
       <div className="phase6-page study-page">
@@ -50,7 +50,7 @@ export function StudyPage({ model }: { model: StudyPageModel }) {
         </div>
       </header>
 
-      <StudyTimer key={timerKey} model={model}/>
+      <StudyTimer key={timerKey} model={model} initialSubjectId={initialSubjectId} initialChapterId={initialChapterId}/>
     </div>
   );
 }
