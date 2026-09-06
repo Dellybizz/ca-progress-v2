@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS user_achievements (
 CREATE INDEX IF NOT EXISTS idx_user_achievements_owner_recent
   ON user_achievements(user_id,unlocked_at DESC,achievement_key);
 
--- XP and achievement history are append-only through application runtime. Account
--- deletion still cascades through the parent app_users row.
+-- Gamification history is append-only through application runtime. Account deletion
+-- still cascades through the parent app_users row.
 CREATE TRIGGER IF NOT EXISTS trg_phase12_xp_ledger_no_update
 BEFORE UPDATE ON xp_ledger
 BEGIN
@@ -72,6 +72,17 @@ BEFORE DELETE ON xp_ledger
 WHEN EXISTS (SELECT 1 FROM app_users u WHERE u.user_id=OLD.user_id)
 BEGIN
   SELECT RAISE(ABORT,'XP ledger entries are append-only.');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_phase12_streak_day_no_update
+BEFORE UPDATE ON study_streak_days
+BEGIN
+  SELECT RAISE(ABORT,'Streak evidence is immutable.');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_phase12_streak_day_no_delete
+BEFORE DELETE ON study_streak_days
+WHEN EXISTS (SELECT 1 FROM app_users u WHERE u.user_id=OLD.user_id)
+BEGIN
+  SELECT RAISE(ABORT,'Streak evidence is append-only.');
 END;
 CREATE TRIGGER IF NOT EXISTS trg_phase12_achievement_no_update
 BEFORE UPDATE ON user_achievements
