@@ -1,5 +1,7 @@
 export const STUDY_BUDDY_NUDGE_WINDOW_MS: number;
 export const STUDY_BUDDY_NUDGE_LIMIT: number;
+export const STUDY_BUDDY_INVITE_WINDOW_MS: number;
+export const STUDY_BUDDY_INVITE_LIMIT: number;
 export const STUDY_BUDDY_MIN_VALID_SESSION_SECONDS: number;
 
 export function canAccessStudyBuddyData(status: string, blocked?: boolean): boolean;
@@ -8,6 +10,13 @@ export function canSendStudyBuddyNudge(input: {
   blocked?: boolean;
   mutedByRecipient?: boolean;
   recentCount?: number;
+}): boolean;
+export function canSendStudyTogetherInvite(input: {
+  status: string;
+  blocked?: boolean;
+  mutedByRecipient?: boolean;
+  recentCount?: number;
+  hasActive?: boolean;
 }): boolean;
 export function normalizeStudyBuddySharing(input?: Record<string, unknown>): {
   shareProfile: boolean;
