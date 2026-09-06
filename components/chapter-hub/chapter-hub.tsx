@@ -39,6 +39,7 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
   const { academic } = model;
   const progressCount = STAGES.filter((stage) => Boolean(model.progress[stage.field])).length;
   const chapterQuery = `chapterId=${encodeURIComponent(academic.chapterId)}&subjectId=${encodeURIComponent(academic.subjectId)}`;
+  const lastStudyAt = model.study.recentSessions[0]?.endedAt ?? null;
 
   return <div className="chapter-hub-page" data-canonical-chapter-id={academic.chapterId}>
     <nav className="chapter-hub-breadcrumb" aria-label="Chapter breadcrumb">
@@ -82,6 +83,7 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
       <Card className="chapter-hub-section"><CardBody>
         <SectionTitle icon="timer" eyebrow="Study history" title="Time spent here" action={<Link href={`/study?${chapterQuery}`} className="chapter-hub-text-link">Start studying <Icon name="arrow" size={13}/></Link>}/>
         <div className="chapter-hub-study-total"><strong>{durationLabel(model.study.totalSeconds)}</strong><span>across {model.study.sessionCount} saved session{model.study.sessionCount === 1 ? "" : "s"}</span></div>
+        <p className="chapter-hub-helper">Last studied: {dateLabel(lastStudyAt)}. Self-rated understanding will appear here once a study-session reflection has been recorded.</p>
         <div className="chapter-hub-list">{model.study.recentSessions.length ? model.study.recentSessions.slice(0, 4).map((session) => <div key={session.id}><span><Icon name="clock" size={14}/><strong>{durationLabel(session.durationSeconds)}</strong></span><small>{session.mode} · {dateLabel(session.endedAt)}</small></div>) : <p>No study sessions recorded for this chapter yet.</p>}</div>
       </CardBody></Card>
     </div>
@@ -93,7 +95,7 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
           <div className={model.progress.test_1_at ? "is-complete" : ""}><span>{model.progress.test_1_at ? <Icon name="check" size={15}/> : "T1"}</span><div><strong>Test 1</strong><small>{model.progress.test_1_at ? `Completed ${dateLabel(model.progress.test_1_at)}` : "Not completed"}</small></div></div>
           <div className={model.progress.test_2_at ? "is-complete" : ""}><span>{model.progress.test_2_at ? <Icon name="check" size={15}/> : "T2"}</span><div><strong>Test 2</strong><small>{model.progress.test_2_at ? `Completed ${dateLabel(model.progress.test_2_at)}` : "Not completed"}</small></div></div>
         </div>
-        <p className="chapter-hub-helper">Phase 1 reconciles the current test checkpoints instead of creating a competing test-results model.</p>
+        <p className="chapter-hub-helper">This hub uses the current test checkpoints and links into the test workspace without creating a second source of test results.</p>
       </CardBody></Card>
 
       <Card className="chapter-hub-section"><CardBody>
