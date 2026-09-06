@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS study_together_sessions (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_study_together_relationship ON study_together_sessions(relationship_id,status,started_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_study_together_one_active_relationship ON study_together_sessions(relationship_id) WHERE status='active';
+CREATE INDEX IF NOT EXISTS idx_study_together_invite_rate ON study_together_sessions(relationship_id,created_by_user_id,started_at DESC);
 
 CREATE TABLE IF NOT EXISTS study_together_participants (
   study_together_id TEXT NOT NULL REFERENCES study_together_sessions(id) ON DELETE CASCADE,
