@@ -32,9 +32,11 @@ test("Community realtime is authorized before the Durable Object is reached", ()
 
 test("Community chat keeps D1 pagination and broadcasts only refresh signals", () => {
   const messages = read("app/api/community/channels/[channel]/messages/route.ts");
+  const phase7 = read("lib/community/phase7.ts");
   const chat = read("components/community/community-chat.tsx");
-  assert.match(messages, /getCommunityMessagePage/);
-  assert.match(read("lib/community/service.ts"), /PAGE_SIZE = 30/);
+  assert.match(messages, /getPhase7CommunityMessagePage/);
+  assert.match(phase7, /PAGE_SIZE = 30/);
+  assert.match(phase7, /m\.sequence_id<\?/);
   assert.match(read("app/api/community/channels/[channel]/options/route.ts"), /private, no-store/);
   assert.match(messages, /Cache-Control.*private, no-store/);
   assert.match(chat, /channelSlug: model\.channel\.slug/);
