@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -48,14 +48,15 @@ export function TestProgressWorkspace({
     ? queryChapterId as string
     : initialChapters[0]?.id ?? "";
   const initialStage: TestProgressStage = queryStage === "test_2" ? "test_2" : "test_1";
+  const initialRecord = initialRecords.find((item) => item.chapterId === initialChapterId && item.stage === initialStage) ?? null;
 
   const [chapters, setChapters] = useState(initialChapters);
   const [records, setRecords] = useState(initialRecords);
   const [chapterId, setChapterId] = useState(initialChapterId);
   const [stage, setStage] = useState<TestProgressStage>(initialStage);
-  const [marksScored, setMarksScored] = useState("");
-  const [marksTotal, setMarksTotal] = useState("100");
-  const [completedOn, setCompletedOn] = useState(todayDate());
+  const [marksScored, setMarksScored] = useState(initialRecord ? String(initialRecord.marksScored) : "");
+  const [marksTotal, setMarksTotal] = useState(initialRecord ? String(initialRecord.marksTotal) : "100");
+  const [completedOn, setCompletedOn] = useState(initialRecord ? initialRecord.completedAt.slice(0, 10) : todayDate());
   const [busy, setBusy] = useState<"save" | "undo" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,19 +68,16 @@ export function TestProgressWorkspace({
     ? stage === "test_1" ? Boolean(chapter.state.completed_at) : Boolean(chapter.state.test_1_at)
     : false;
 
-  useEffect(() => {
-    if (existing) {
-      setMarksScored(String(existing.marksScored));
-      setMarksTotal(String(existing.marksTotal));
-      setCompletedOn(existing.completedAt.slice(0, 10));
-    } else {
-      setMarksScored("");
-      setMarksTotal("100");
-      setCompletedOn(todayDate());
-    }
+  function selectMilestone(nextChapterId: string, nextStage: TestProgressStage) {
+    const nextRecord = records.find((item) => item.chapterId === nextChapterId && item.stage === nextStage) ?? null;
+    setChapterId(nextChapterId);
+    setStage(nextStage);
+    setMarksScored(nextRecord ? String(nextRecord.marksScored) : "");
+    setMarksTotal(nextRecord ? String(nextRecord.marksTotal) : "100");
+    setCompletedOn(nextRecord ? nextRecord.completedAt.slice(0, 10) : todayDate());
     setMessage(null);
     setError(null);
-  }, [existing, chapterId, stage]);
+  }
 
   function updateChapterState(targetChapterId: string, state: ProgressState, savedAt: string) {
     setChapters((items) => items.map((item) => item.id === targetChapterId ? { ...item, state, updatedAt: savedAt } : item));
@@ -135,6 +133,9 @@ export function TestProgressWorkspace({
       if (!response.ok) throw new Error(payload.error || "Saved test could not be undone.");
       setRecords((items) => items.filter((item) => item.id !== existing.id));
       updateChapterState(payload.chapterId, payload.state, payload.savedAt);
+      setMarksScored("");
+      setMarksTotal("100");
+      setCompletedOn(todayDate());
       setMessage(payload.progressChanged
         ? `${stageLabel(stage)} save was recovered and the matching progress milestone was reverted.`
         : "The marks record was removed; existing legacy progress was left unchanged.");
@@ -157,10 +158,10 @@ export function TestProgressWorkspace({
       />
       <CardBody>
         <div className="planner-form-grid">
-          <label><span>Chapter</span><select value={chapterId} disabled={Boolean(busy)} onChange={(event) => setChapterId(event.target.value)}>
+          <label><span>Chapter</span><select value={chapterId} disabled={Boolean(busy)} onChange={(event) => selectMilestone(event.target.value, stage)}>
             {chapters.map((item) => <option key={item.id} value={item.id}>{item.subjectTitle} · {item.number} {item.title}</option>)}
           </select></label>
-          <label><span>Test milestone</span><select value={stage} disabled={Boolean(busy)} onChange={(event) => setStage(event.target.value as TestProgressStage)}>
+          <label><span>Test milestone</span><select value={stage} disabled={Boolean(busy)} onChange={(event) => selectMilestone(chapterId, event.target.value as TestProgressStage)}>
             <option value="test_1">Test 1</option>
             <option value="test_2">Test 2</option>
           </select></label>
