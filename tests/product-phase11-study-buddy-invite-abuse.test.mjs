@@ -40,3 +40,9 @@ test("invite guard checks accepted relationship, mute/block state, active invite
   assert.match(guard, /status='active' LIMIT 1/);
   assert.match(guard, /Study Together invitations to one buddy in 24 hours/);
 });
+
+test("D1 serializes active Study Together invitations for one relationship", () => {
+  const migration = read("d1/migrations/0021_product_phase11_study_buddy.sql");
+  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_study_together_one_active_relationship ON study_together_sessions\(relationship_id\) WHERE status='active'/);
+  assert.match(migration, /CREATE INDEX IF NOT EXISTS idx_study_together_invite_rate ON study_together_sessions\(relationship_id,created_by_user_id,started_at DESC\)/);
+});
