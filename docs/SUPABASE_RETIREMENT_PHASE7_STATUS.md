@@ -1,96 +1,117 @@
 # Supabase Retirement Phase 7 Status
 
-> This records Phase 7 of the Supabase-retirement plan. It is the external cleanup phase after the Cloudflare-only runtime and repository retirement were completed in Phases 1–6.
+> This records Phase 7 of the Supabase-retirement plan. It is the final external cleanup phase after the Cloudflare-only runtime and repository retirement were completed in Phases 1–6.
 
 ## Status
 
-**PARTIALLY COMPLETE / EXTERNAL TOOLING BLOCKED** — 6 September 2026 (Asia/Kolkata).
+**COMPLETE** — 6 September 2026 (Asia/Kolkata).
 
-The connected Supabase account was inspected and the exact legacy CA Progress V2 project was identified and disabled as far as the available Supabase actions permit. The repository no longer references Supabase runtime secrets or project configuration. Two final destructive-administration operations cannot be executed through the currently connected tools: deleting the Supabase project itself and enumerating/deleting GitHub Actions secrets.
+Phase 7 closes the external Supabase retirement boundary for CA Progress V2. The legacy Supabase project is no longer accessible, stale Supabase GitHub environment secrets were removed through the GitHub dashboard, and the surviving application/runtime configuration remains Cloudflare-only.
 
-## Target verification
+## Retirement target
 
-Supabase account contains two projects:
+The retired project was:
 
-- `ca project` — project ref `nmoxztfqjtcpmckjwvfg` — **not touched**
-- `CA Progress V2` — project ref `wgdhpzbgyjqjlgntibqg` — Phase 7 retirement target
+- Name: `CA Progress V2`
+- Project ref: `wgdhpzbgyjqjlgntibqg`
+- Region: `ap-south-1`
 
-The target was verified against the Phase 3 retirement backup signature before any external state change:
+Before any destructive external action, the project was verified against the retained Phase 3 retirement backup signature:
 
 - Auth users: **7**
 - Storage objects: **0**
 - Development branches: **0**
 - Edge Functions: **0**
 
-These values match the retained final retirement evidence for the migrated CA Progress V2 source.
+This matched the final migration/retirement evidence and confirmed the correct project before shutdown.
 
-## External action performed
+## External Supabase retirement
 
-The Supabase project `CA Progress V2` (`wgdhpzbgyjqjlgntibqg`) was paused through the connected Supabase administration action.
+The target project was first disabled through the connected Supabase administration API and reached final state `INACTIVE`.
 
-Final observed administration state:
+Permanent deletion was then completed manually in the Supabase dashboard because the connected Supabase tool exposes pause/restore but not project deletion.
 
-- pause request: **success**
-- project status: **`INACTIVE`**
+Post-deletion verification from the connected Supabase account:
 
-No data was copied back to D1 and no Cloudflare/D1-native rows were changed.
+- the organization `Web Portal` (`oyflrtyblwiseufzhpwr`) remains accessible
+- project listing returns **0 accessible projects**
+- the retired project ref `wgdhpzbgyjqjlgntibqg` is no longer accessible through project administration
 
-## Repository / CI secret boundary
+This is consistent with the retired CA Progress V2 Supabase project no longer being available to the connected account.
 
-The surviving workflows on `phase-12-operations-admin-platform` are:
+No data was copied back into D1 and no Cloudflare/D1-native rows were deleted or rewritten during Phase 7.
+
+## GitHub secret cleanup
+
+The final `v2-staging` environment was reviewed in the GitHub dashboard.
+
+The stale retirement-era secrets identified and removed were:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SMOKE_MODERATOR_AUTH_COOKIE`
+- `SMOKE_MUTATION_AUTH_COOKIE`
+
+The current secrets retained for the Cloudflare application are the Cloudflare account/token, Cloudflare auth-session secret, Google OAuth credentials, LinkedIn OIDC credentials, and Razorpay credentials.
+
+The connected GitHub integration intentionally does not expose Actions secret enumeration, so the deletion itself is recorded from the completed dashboard action. Independently, all surviving workflow source remains free of Supabase secret names and Supabase project configuration.
+
+## Surviving repository/runtime boundary
+
+The surviving workflows are:
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/deploy-staging.yml`
 - `.github/workflows/supabase-retirement-closure.yml`
 
-They contain no Supabase project ref, Supabase URL, Supabase service-role key, anon/publishable key, or other Supabase runtime secret reference.
+They contain no active Supabase SDK, URL, service-role key, anon/publishable key, project ref, database password, or migration-token dependency.
 
-The deployment workflow uses only the current Cloudflare/OAuth/Razorpay/smoke secret contract.
+The permanent repository retirement guard remains active and prevents reintroduction of:
 
-The permanent repository verifier from Phase 6 remains active and blocks reintroduction of Supabase SDKs, runtime env names, client modules, compatibility modules, migration tooling, and retired migration paths.
+- Supabase SDK packages
+- Supabase runtime environment names
+- `lib/supabase/*` runtime modules
+- Supabase compatibility modules/factories
+- retired migration/cutover scripts
+- retired Supabase migration paths
 
-## Tooling limitations preventing full destructive closure
+## Preserved Cloudflare production state
 
-### 1. Supabase project deletion
+Phase 7 did **not** modify:
 
-The connected Supabase administration surface exposes project pause/restore but does **not** expose a `delete_project` action. Therefore the project has been disabled and is `INACTIVE`, but cannot be permanently deleted through this session.
-
-### 2. GitHub Actions secret deletion
-
-The connected GitHub integration intentionally does not expose repository/environment Actions secret administration. It can inspect workflow source but cannot enumerate or delete stored secrets.
-
-Because of this, any stale Supabase secrets that may still exist in GitHub repository/environment settings cannot be verified or removed from this session, even though no surviving workflow references them.
-
-## Explicitly not touched
-
-- Supabase project `ca project` (`nmoxztfqjtcpmckjwvfg`)
 - Cloudflare D1 database `ca-progress-v2-phase4-shadow`
 - legitimate D1-native rows
 - R2 application objects
-- Cloudflare production Workers and bindings
-- retained Phase 3/4/5/6 retirement evidence
-- `main` branch
+- Cloudflare production Workers and service bindings
+- retained `d1/migrations/` history
+- Phase 3/4/5/6 retirement evidence
+- the final Phase 3 logical backup record
+- `main`
 
-## Remaining manual external actions required for absolute Phase 7 closure
+## Unrelated Supabase project observation
 
-1. Permanently delete the inactive Supabase project `CA Progress V2` (`wgdhpzbgyjqjlgntibqg`) in the Supabase dashboard if permanent deletion is desired rather than inactive retention.
-2. In GitHub repository/environment Actions secrets, remove any stale Supabase migration/runtime secrets if they still exist (for example old Supabase URL, anon/publishable key, service-role key, migration access token, or database password entries).
-3. If any equivalent Supabase secrets were stored in another external secret manager, rotate/delete them there as well.
+Earlier in Phase 7 the connected account also exposed a separate project:
+
+- `ca project` — project ref `nmoxztfqjtcpmckjwvfg`
+
+No ChatGPT action was performed against that project. At final post-deletion verification, however, the Supabase project listing returned zero accessible projects and this older ref was also no longer accessible through the connector.
+
+That observation is outside the CA Progress V2 retirement target. If the older project was expected to remain active, its account/project status should be reviewed separately in the Supabase dashboard.
 
 ## Exit decision
 
-**Phase 7 is not marked COMPLETE because the final destructive project deletion and external secret-store cleanup cannot be performed or verified with the connected administration capabilities.**
+**Supabase Retirement Phase 7: COMPLETE.**
 
-What is complete from this session:
+The CA Progress V2 migration/retirement program is now closed end-to-end:
 
-- exact legacy Supabase project identified safely
-- backup signature re-verified before shutdown
-- project pause completed successfully
-- final target state confirmed as `INACTIVE`
-- no branches or Edge Functions remain
-- storage source confirmed empty
-- surviving repository workflows confirmed free of Supabase secret/project references
-- unrelated Supabase project preserved
-- no merge to `main`
+- Phase 1 — complete
+- Phase 2 — complete
+- Phase 3 — complete
+- Phase 4 — complete
+- Phase 5 — complete
+- Phase 6 — complete
+- Phase 7 — complete
 
-Absolute Phase 7 closure now depends only on external dashboard/secret-store administration that is unavailable to the connected tools.
+The active CA Progress V2 architecture is Cloudflare-only for authentication/session handling, D1 application data, R2 file storage, Workers/services, queues/background processing, and deployment validation.
+
+No merge to `main` was performed.
