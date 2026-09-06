@@ -34,8 +34,8 @@ test("Product Phase 1 destinations consume and validate Chapter Hub academic con
 
   assert.match(studyRoute, /initialSubjectId=\{cleanId\(params\.subjectId\)\}/);
   assert.match(studyRoute, /initialChapterId=\{cleanId\(params\.chapterId\)\}/);
-  assert.match(studyPage, /initialSubjectId=\{initialSubjectId\}/);
-  assert.match(studyPage, /initialChapterId=\{initialChapterId\}/);
+  assert.match(studyPage, /initialSubjectId=\{initialSubjectId \?\? undefined\}/);
+  assert.match(studyPage, /initialChapterId=\{initialChapterId \?\? undefined\}/);
   assert.match(studyTimer, /model\.subjects\.find\(\(subject\) => subject\.id === initialSubjectId\)/);
   assert.match(studyTimer, /initialSubject\.chapters\.some\(\(chapter\) => chapter\.id === initialChapterId\)/);
 
