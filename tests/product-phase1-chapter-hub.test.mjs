@@ -60,18 +60,21 @@ test("Product Phase 1 destinations consume and validate Chapter Hub academic con
 test("Product Phase 1 Chapter Hub private data is cross-user scoped and academic lookup is cross-level scoped", () => {
   const service = read("lib/chapter-hub/service.ts");
 
-  assert.match(service, /WHERE c\.id = \?/);
-  assert.match(service, /l\.code = \?/);
-  assert.match(service, /s\.group_code = \?/);
-  assert.match(service, /a\.attempt_key = \?/);
-  assert.match(service, /a\.level_id = s\.level_id/);
-  assert.match(service, /aasv\.syllabus_version_id = s\.syllabus_version_id/);
+  assert.match(service, /WHERE c\.id=\?1/);
+  assert.match(service, /FROM attempt_syllabus_map asm/);
+  assert.match(service, /asm\.level_id=\?1/);
+  assert.match(service, /asm\.group_id=\?2/);
+  assert.match(service, /asm\.subject_id=\?3/);
+  assert.match(service, /asm\.syllabus_version_id=\?4/);
+  assert.match(service, /asm\.attempt_key=\?5/);
+  assert.match(service, /profile\.ca_level !== academicRow\.level_code/);
+  assert.match(service, /profile\.group_choice === academicRow\.group_code/);
 
-  assert.match(service, /FROM progress\s+WHERE user_id = \? AND chapter_id = \?/s);
-  assert.match(service, /FROM progress_events\s+WHERE user_id = \? AND chapter_id = \?/s);
-  assert.match(service, /FROM study_sessions\s+WHERE user_id = \? AND chapter_id = \?/s);
-  assert.match(service, /rn\.owner_user_id = \? AND rn\.chapter_id = \?/);
-  assert.match(service, /ru\.owner_user_id = \? AND ru\.chapter_id = \?/);
+  assert.match(service, /FROM chapter_progress WHERE user_id=\?1 AND chapter_id=\?2/);
+  assert.match(service, /FROM progress_events WHERE user_id=\?1 AND chapter_id=\?2/);
+  assert.match(service, /FROM study_sessions WHERE user_id=\?1 AND chapter_id=\?2/);
+  assert.match(service, /FROM notes WHERE user_id=\?1 AND chapter_id=\?2/);
+  assert.match(service, /FROM uploaded_resources WHERE owner_user_id=\?1 AND chapter_id=\?2/);
 });
 
 test("Product Phase 1 existing records stay linked by canonical academic IDs across metadata refreshes", () => {
@@ -80,13 +83,14 @@ test("Product Phase 1 existing records stay linked by canonical academic IDs acr
 
   assert.match(service, /c\.id AS chapter_id/);
   assert.match(service, /s\.id AS subject_id/);
-  assert.match(service, /WHERE c\.id = \?/);
-  assert.match(service, /chapter_id = \?/);
-  assert.match(service, /unit\.chapter_id = \?/);
+  assert.match(service, /c\.stable_key/);
+  assert.match(service, /WHERE c\.id=\?1/);
+  assert.match(service, /chapter_id=\?2/);
+  assert.match(service, /FROM topics WHERE chapter_id=\?1/);
   assert.match(hub, /data-canonical-chapter-id=\{academic\.chapterId\}/);
   assert.match(hub, /Stable chapter identity/);
 
-  const privateLinkage = service.match(/FROM (?:progress|progress_events|study_sessions|resource_notes rn|resource_uploads ru)[\s\S]{0,240}/g)?.join("\n") ?? "";
+  const privateLinkage = service.match(/FROM (?:chapter_progress|progress_events|study_sessions|notes|uploaded_resources)[\s\S]{0,220}/g)?.join("\n") ?? "";
   assert.doesNotMatch(privateLinkage, /chapter_name\s*=|chapter_title\s*=/);
 });
 
