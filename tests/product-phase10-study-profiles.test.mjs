@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   PRIVATE_STUDY_PROFILE_DEFAULTS,
@@ -139,11 +139,12 @@ test("Product Phase 10 owner UI exposes granular visibility and exact-ID buddy g
   assert.match(viewerPage, /getStudyProfileForViewer/);
 });
 
-test("Product Phase 10 deployment applies migration 0020 and Product Phase 11 is not started", () => {
+test("Product Phase 10 deployment remains additive after Study Buddy is introduced", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
+  const migration = read("d1/migrations/0020_product_phase10_study_profiles.sql");
   assert.match(workflow, /0020_product_phase10_study_profiles\.sql/);
   assert.match(workflow, /'0020'/);
   assert.match(workflow, /phase10_study_profiles/);
   assert.match(workflow, /phase10_study_profile_buddies/);
-  assert.equal(existsSync(join(root, "docs/CA_PROGRESS_PRODUCT_PHASE11_STATUS.md")), false);
+  assert.doesNotMatch(migration, /study_buddy_relationships|study_together_sessions|study_buddy_goals/);
 });
