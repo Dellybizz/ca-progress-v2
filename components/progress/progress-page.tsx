@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import type { ProgressPageModel } from "@/lib/progress/types";
 import { ProgressTracker } from "./progress-tracker";
 
-export function ProgressPage({ model, subjectLocked = false, next = "/progress" }: { model: ProgressPageModel; subjectLocked?: boolean; next?: string }) {
+export function ProgressPage({ model, subjectLocked = false, next = "/progress", initialChapterId }: { model: ProgressPageModel; subjectLocked?: boolean; next?: string; initialChapterId?: string }) {
   if (model.mode === "guest") return (
     <div className="progress-page">
       <PageHeader preview={false} eyebrow="Progress tracker" title="Track every chapter without losing history." description="Browse how chapter tracking works. Sign in only when you want to save your own completed, revision or test stages." />
@@ -31,7 +31,7 @@ export function ProgressPage({ model, subjectLocked = false, next = "/progress" 
         description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Stage changes save automatically and analytics are calculated from your normalized chapter rows.`}
         actions={<Link className="dashboard-header-link" href="/analytics">View analytics</Link>}
       />
-      {model.chapters.length ? <ProgressTracker model={model} subjectLocked={subjectLocked}/> : <Card><CardBody><div className="progress-empty"><Icon name="book"/><h2>No applicable chapters</h2><p>No chapter structure is currently mapped to this academic selection.</p><Link href="/settings/profile" className="ui-text-link">Review academic profile</Link></div></CardBody></Card>}
+      {model.chapters.length ? <ProgressTracker model={model} subjectLocked={subjectLocked} initialChapterId={initialChapterId}/> : <Card><CardBody><div className="progress-empty"><Icon name="book"/><h2>No applicable chapters</h2><p>No chapter structure is currently mapped to this academic selection.</p><Link href="/settings/profile" className="ui-text-link">Review academic profile</Link></div></CardBody></Card>}
     </div>
   );
 }
