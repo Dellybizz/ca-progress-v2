@@ -107,11 +107,29 @@ test("Product Phase 13 schema makes opt-in private-by-default and reward/referra
 test("Product Phase 13 subscription rewards overlay existing plan definitions without creating Phase 15 pricing", () => {
   const service = read("lib/gamification/phase13-service.ts");
   const billing = read("lib/billing/service.ts");
+  const eligibility = read("lib/gamification/phase13-reward-eligibility.ts");
   assert.match(service, /subscription_plans/);
   assert.match(service, /reward_tier/);
-  assert.match(service, /starts_at<=\?2 AND g\.ends_at>\?2/);
-  assert.match(billing, /getActiveLeaderboardRewardPlan/);
+  assert.match(billing, /getEligibleLeaderboardRewardPlan/);
   assert.match(billing, /reward\.rank > activeRank/);
+  assert.match(eligibility, /anti_cheat_flags/);
+  assert.match(eligibility, /status IN \('pending','upheld'\)/);
+  assert.match(eligibility, /SET status='withheld'/);
+  assert.match(eligibility, /SET status='scheduled'/);
+  assert.match(eligibility, /g\.starts_at<=\?2 AND g\.ends_at>\?2/);
   assert.doesNotMatch(service, /INSERT[^;]+INTO\s+user_subscriptions/i);
+  assert.doesNotMatch(eligibility, /(INSERT|UPDATE|DELETE)[^;]*user_subscriptions/i);
   assert.doesNotMatch(service, /price_subunits\s*=/i);
+});
+
+test("Product Phase 13 ships an activation referral link and the explicit 100-hour share milestone", () => {
+  const component = read("components/gamification/phase13-panel.tsx");
+  const activity = read("app/(student)/activity/page.tsx");
+  assert.match(component, /\/activity\?ref=/);
+  assert.match(component, /Copy referral link/);
+  assert.match(component, /only prefills the code/);
+  assert.match(component, /Apply code/);
+  assert.match(activity, /meaningfulStudyMinutes >= 100 \* 60/);
+  assert.match(activity, /100h study milestone/);
+  assert.match(activity, /100\+ meaningful study hours/);
 });
