@@ -104,6 +104,8 @@ test("Product Phase 12 reconciliation reads canonical academic evidence but writ
   assert.match(service, /INSERT OR IGNORE INTO xp_ledger/);
   assert.match(service, /INSERT OR IGNORE INTO study_streak_days/);
   assert.match(service, /INSERT OR IGNORE INTO user_achievements/);
+  assert.match(service, /duration_seconds>=\?2/);
+  assert.match(service, /estimated_minutes>=10/);
   assert.match(service, /attempt_number=1/);
   assert.match(service, /MAX_SESSION_XP_EVENTS_PER_LOCAL_DAY/);
   assert.match(service, /MAX_TODAY_XP_EVENTS_PER_LOCAL_DAY/);
