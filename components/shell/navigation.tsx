@@ -32,6 +32,7 @@ export const studentNavigation: NavItem[] = [
   { label: "Tests", href: "/tests", icon: "tests" },
   { label: "Notes", href: "/notes", icon: "notes" },
   { label: "Community", href: "/community", icon: "community" },
+  { label: "Study Buddy", href: "/study-buddy", icon: "community" },
   { label: "Pricing", href: "/pricing", icon: "sparkles" },
   { label: "Billing", href: "/billing", icon: "shield" },
   { label: "Settings", href: "/settings", icon: "settings" },
@@ -60,6 +61,7 @@ const studentGroups: StudentNavGroup[] = [
   ] },
   { key: "community", label: "Community", icon: "community", items: [
     { label: "Community", href: "/community", icon: "community" },
+    { label: "Study Buddy", href: "/study-buddy", icon: "community" },
     { label: "Activity", href: "/activity", icon: "sparkles" },
   ] },
   { key: "account", label: "Account", icon: "settings", items: [
