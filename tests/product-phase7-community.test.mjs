@@ -27,7 +27,7 @@ test("Product Phase 7 preserves the existing structured Community channel hierar
 });
 
 test("Product Phase 7 applies all six required filters on the server", () => {
-  for (const filter of ["all", "following", "verified", "rankers", "high_scorers", "saved"]) assert.match(phase7, new RegExp(`id: \\"${filter}\\"`));
+  for (const filter of ["all", "following", "verified", "rankers", "high_scorers", "saved"]) assert.match(phase7, new RegExp(`id: "${filter}"`));
   assert.match(phase7, /community_follows f/);
   assert.match(phase7, /community_saved_messages s/);
   assert.match(phase7, /community_verifications v/);
@@ -64,7 +64,7 @@ test("Product Phase 7 verification is evidence-backed and never presented as ans
 });
 
 test("Product Phase 7 grants and revokes verification only for admin owner and parent owner roles", () => {
-  for (const role of ["student", "moderator", "admin", "owner", "parent_owner"]) assert.match(roles, new RegExp(`\\"${role}\\"`));
+  for (const role of ["student", "moderator", "admin", "owner", "parent_owner"]) assert.match(roles, new RegExp(`"${role}"`));
   assert.match(phase7, /VERIFICATION_MANAGER_ROLES = new Set<AppRole>\(\["admin", "owner", "parent_owner"\]\)/);
   assert.match(phase7, /if \(!canManageVerification\(role\)\) throw new Error/);
   assert.match(verificationUi, /only admins\/owners can grant or revoke verification/);
