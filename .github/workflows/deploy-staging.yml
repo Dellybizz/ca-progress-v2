@@ -12,7 +12,7 @@ on:
       - server/**
       - workers/**
       - custom-worker.ts
-      - wrangler.web.jsonc
+      - wrangler.jsonc
       - package.json
 
 permissions:
@@ -99,7 +99,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler secret list --config wrangler.web.jsonc > deployment-evidence/web-secrets.json
+          npx wrangler secret list --config wrangler.jsonc > deployment-evidence/web-secrets.json
           for name in CA_AUTH_SESSION_SECRET GOOGLE_OAUTH_CLIENT_ID GOOGLE_OAUTH_CLIENT_SECRET LINKEDIN_OIDC_CLIENT_ID LINKEDIN_OIDC_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
             grep -q "\"name\": \"$name\"" deployment-evidence/web-secrets.json || { echo "::error::$name is missing from web Worker"; exit 1; }
           done

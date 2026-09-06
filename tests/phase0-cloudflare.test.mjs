@@ -6,8 +6,8 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 
 test("Cloudflare Workers is the configured deployment path", () => {
-  assert.equal(existsSync(join(root, "wrangler.web.jsonc")), true);
-  assert.equal(existsSync(join(root, "wrangler.jsonc")), false);
+  assert.equal(existsSync(join(root, "wrangler.jsonc")), true);
+  assert.equal(existsSync(join(root, "wrangler.web.jsonc")), false);
   assert.equal(existsSync(join(root, "open-next.config.ts")), true);
   assert.equal(existsSync(join(root, "vercel.json")), false);
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -16,7 +16,7 @@ test("Cloudflare Workers is the configured deployment path", () => {
 });
 
 test("production Worker is the Cloudflare-retired CA Progress V2 runtime", () => {
-  const wrangler = readFileSync(join(root, "wrangler.web.jsonc"), "utf8");
+  const wrangler = readFileSync(join(root, "wrangler.jsonc"), "utf8");
   assert.match(wrangler, /"name"\s*:\s*"ca-progress-v2"/);
   assert.match(wrangler, /"NEXT_PUBLIC_APP_ENV"\s*:\s*"production"/);
   assert.match(wrangler, /"NEXT_PUBLIC_APP_VERSION"\s*:\s*"cloudflare-retired"/);

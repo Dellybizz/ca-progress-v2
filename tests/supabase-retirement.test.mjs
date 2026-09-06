@@ -27,15 +27,23 @@ test("active runtime and CI have no Supabase SDK, env, client or compat blockers
   ]) assert.ok(scanText(fixture).length > 0, fixture);
 });
 
-test("package scripts expose only post-retirement Cloudflare validation paths", () => {
+test("package scripts expose one canonical post-retirement Cloudflare web config", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(pkg.scripts["verify:retirement"], "node scripts/verify-supabase-retired.mjs");
-  assert.match(pkg.scripts["cf:build"], /--skipWranglerConfigCheck/);
+  assert.doesNotMatch(pkg.scripts["cf:build"], /--skipWranglerConfigCheck/);
   assert.match(pkg.scripts["cf:check"], /cf:check:web/);
-  assert.match(pkg.scripts["cf:check:web"], /wrangler\.web\.jsonc/);
-  assert.match(pkg.scripts["cf:deploy:web"], /wrangler\.web\.jsonc/);
-  assert.equal(existsSync(path.join(root, "wrangler.jsonc")), false);
+  assert.match(pkg.scripts["cf:check:web"], /--config wrangler\.jsonc/);
+  assert.match(pkg.scripts["cf:deploy:web"], /--config=wrangler\.jsonc/);
+  assert.equal(existsSync(path.join(root, "wrangler.jsonc")), true);
+  assert.equal(existsSync(path.join(root, "wrangler.web.jsonc")), false);
   for (const name of ["phase4:shadow", "phase4:reconcile", "phase4:rollback", "cf:check:phase3", "cf:check:phase4"]) assert.equal(pkg.scripts[name], undefined);
+});
+
+test("canonical root Wrangler config remains Cloudflare-only", () => {
+  const wrangler = read("wrangler.jsonc");
+  assert.match(wrangler, /"name"\s*:\s*"ca-progress-v2"/);
+  assert.match(wrangler, /"database_name"\s*:\s*"ca-progress-v2-phase4-shadow"/);
+  assert.doesNotMatch(wrangler, /SUPABASE_SERVICE_ROLE_KEY|NEXT_PUBLIC_SUPABASE_|@supabase\//);
 });
 
 test("permanent closure and V2 CI enforce retirement before and after build validation", () => {
