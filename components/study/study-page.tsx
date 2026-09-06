@@ -50,7 +50,7 @@ export function StudyPage({ model, initialSubjectId = null, initialChapterId = n
         </div>
       </header>
 
-      <StudyTimer key={timerKey} model={model} initialSubjectId={initialSubjectId} initialChapterId={initialChapterId}/>
+      <StudyTimer key={timerKey} model={model} initialSubjectId={initialSubjectId ?? undefined} initialChapterId={initialChapterId ?? undefined}/>
     </div>
   );
 }
