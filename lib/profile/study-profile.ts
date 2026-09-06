@@ -138,21 +138,45 @@ function streakSummary(rows: SessionDateRow[], timezone: string, now = new Date(
 async function relationshipForViewer(targetUserId: string, viewerUserId: string | null): Promise<StudyProfileRelationship> {
   if (viewerUserId === targetUserId) return "owner";
   if (!viewerUserId) return "public";
-  const row = await getD1RuntimeDatabase().prepare(
-    "SELECT 1 AS ok FROM study_profile_buddies WHERE owner_user_id=?1 AND buddy_user_id=?2 LIMIT 1",
-  ).bind(targetUserId, viewerUserId).first<{ ok: number }>();
+  const row = await getD1RuntimeDatabase().prepare(`SELECT 1 AS ok
+    FROM study_buddy_relationships r
+    WHERE r.status='accepted'
+      AND ((r.member_a_user_id=?1 AND r.member_b_user_id=?2) OR (r.member_a_user_id=?2 AND r.member_b_user_id=?1))
+      AND NOT EXISTS (
+        SELECT 1 FROM study_buddy_safety s
+        WHERE ((s.owner_user_id=?1 AND s.target_user_id=?2) OR (s.owner_user_id=?2 AND s.target_user_id=?1))
+          AND s.blocked=1
+      )
+    LIMIT 1`)
+    .bind(targetUserId, viewerUserId).first<{ ok: number }>();
   return row ? "buddy" : "public";
+}
+
+async function acceptedStudyBuddyIds(userId: string) {
+  const rows = await getD1RuntimeDatabase().prepare(`SELECT
+      CASE WHEN r.member_a_user_id=?1 THEN r.member_b_user_id ELSE r.member_a_user_id END AS buddy_user_id
+    FROM study_buddy_relationships r
+    WHERE r.status='accepted'
+      AND (r.member_a_user_id=?1 OR r.member_b_user_id=?1)
+      AND NOT EXISTS (
+        SELECT 1 FROM study_buddy_safety s
+        WHERE ((s.owner_user_id=?1 AND s.target_user_id=CASE WHEN r.member_a_user_id=?1 THEN r.member_b_user_id ELSE r.member_a_user_id END)
+          OR (s.target_user_id=?1 AND s.owner_user_id=CASE WHEN r.member_a_user_id=?1 THEN r.member_b_user_id ELSE r.member_a_user_id END))
+          AND s.blocked=1
+      )
+    ORDER BY r.responded_at ASC,r.id ASC`)
+    .bind(userId).all<{ buddy_user_id: string }>();
+  return (rows.results ?? []).map((item) => item.buddy_user_id);
 }
 
 export async function getOwnerStudyProfileSettings(userId: string): Promise<OwnerStudyProfileSettings> {
   const db = getD1RuntimeDatabase();
-  const [row, buddies] = await Promise.all([
+  const [row, buddyUserIds] = await Promise.all([
     db.prepare("SELECT public_bio,profile_visibility,progress_visibility,streak_visibility,show_level,show_attempt FROM study_profiles WHERE user_id=?1 LIMIT 1")
       .bind(userId).first<SettingsRow>(),
-    db.prepare("SELECT buddy_user_id FROM study_profile_buddies WHERE owner_user_id=?1 ORDER BY created_at ASC,buddy_user_id ASC")
-      .bind(userId).all<{ buddy_user_id: string }>(),
+    acceptedStudyBuddyIds(userId),
   ]);
-  return { ...settingsFromRow(row), buddyUserIds: (buddies.results ?? []).map((item) => item.buddy_user_id) };
+  return { ...settingsFromRow(row), buddyUserIds };
 }
 
 export async function saveOwnerStudyProfileSettings(userId: string, input: Record<string, unknown>) {
@@ -175,12 +199,12 @@ export async function saveOwnerStudyProfileSettings(userId: string, input: Recor
 export async function grantStudyProfileBuddy(ownerUserId: string, rawBuddyUserId: unknown) {
   const buddyUserId = normalizeUserId(rawBuddyUserId);
   if (buddyUserId === ownerUserId) throw new StudyProfileInputError("You cannot add yourself as a study buddy.");
-  const db = getD1RuntimeDatabase();
-  const target = await db.prepare("SELECT user_id FROM app_users WHERE user_id=?1 AND account_state='active' LIMIT 1")
-    .bind(buddyUserId).first<{ user_id: string }>();
-  if (!target) throw new StudyProfileInputError("That study buddy account was not found.");
-  await db.prepare("INSERT OR IGNORE INTO study_profile_buddies(owner_user_id,buddy_user_id) VALUES(?1,?2)")
-    .bind(ownerUserId, buddyUserId).run();
+  const relationship = await getD1RuntimeDatabase().prepare(`SELECT 1 AS ok FROM study_buddy_relationships r
+    WHERE r.status='accepted'
+      AND ((r.member_a_user_id=?1 AND r.member_b_user_id=?2) OR (r.member_a_user_id=?2 AND r.member_b_user_id=?1))
+    LIMIT 1`)
+    .bind(ownerUserId, buddyUserId).first<{ ok: number }>();
+  if (!relationship) throw new StudyProfileInputError("Accept the Study Buddy request before buddy-visible profile access is available.");
   return getOwnerStudyProfileSettings(ownerUserId);
 }
 
