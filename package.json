@@ -17,6 +17,7 @@
     "d1:hot-indexes:validate": "node scripts/validate-d1-hot-indexes.mjs",
     "ci": "npm run verify:retirement && npm run typecheck && npm run lint && npm run test && npm run build",
     "cf:build": "opennextjs-cloudflare build && node scripts/patch-opennext-vercel-og.mjs",
+    "cf:ensure-build": "node scripts/ensure-opennext-build.mjs",
     "cf:preview": "npm run cf:build && opennextjs-cloudflare preview --config=wrangler.jsonc",
     "cf:preview:multi": "npm run cf:build && wrangler dev -c wrangler.jsonc -c workers/icai-sync/wrangler.jsonc -c workers/billing/wrangler.jsonc",
     "cf:deploy:icai": "wrangler deploy -c workers/icai-sync/wrangler.jsonc",
@@ -28,7 +29,7 @@
     "cf:check:icai": "node scripts/check-cloudflare-size-budget.mjs --config workers/icai-sync/wrangler.jsonc --budget-mib 1.50",
     "cf:check:billing": "node scripts/check-cloudflare-size-budget.mjs --config workers/billing/wrangler.jsonc --budget-mib 0.75",
     "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.jsonc --budget-mib 3.10",
-    "cf:check": "npm run cf:build && npm run cf:check:icai && npm run cf:check:billing && npm run cf:check:web",
+    "cf:check": "npm run cf:check:icai && npm run cf:check:billing && npm run cf:check:web",
     "cf:smoke": "node scripts/smoke-cloudflare-runtime.mjs"
   },
   "dependencies": {

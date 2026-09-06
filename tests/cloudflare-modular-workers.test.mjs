@@ -36,6 +36,20 @@ test("deployment self-bootstraps target Worker before deploying bound web Worker
   assert.match(pkg.scripts["cf:preview:multi"], /wrangler dev -c wrangler\.jsonc -c workers\/icai-sync\/wrangler\.jsonc/);
 });
 
+test("direct Wrangler deploy self-builds required OpenNext output", () => {
+  const pkg = JSON.parse(read("package.json"));
+  const wrangler = read("wrangler.jsonc");
+  const ensureBuild = read("scripts/ensure-opennext-build.mjs");
+  assert.equal(pkg.scripts["cf:ensure-build"], "node scripts/ensure-opennext-build.mjs");
+  assert.match(wrangler, /"build"\s*:\s*\{\s*"command"\s*:\s*"npm run cf:ensure-build"\s*\}/);
+  assert.match(wrangler, /"directory"\s*:\s*"\.open-next\/assets"/);
+  assert.match(ensureBuild, /\.open-next["',)]*[\s\S]*worker\.js/);
+  assert.match(ensureBuild, /\.open-next["',)]*[\s\S]*assets/);
+  assert.match(ensureBuild, /\["run", "cf:build"\]/);
+  assert.doesNotMatch(pkg.scripts["cf:check"], /^npm run cf:build/);
+  assert.match(pkg.scripts["cf:check"], /cf:check:web/);
+});
+
 test("repository enforces headroom below Cloudflare hard bundle limits", () => {
   const pkg = JSON.parse(read("package.json"));
   const gate = read("scripts/check-cloudflare-size-budget.mjs");
