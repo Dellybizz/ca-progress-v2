@@ -59,9 +59,10 @@ function summary(chapters: ProgressChapter[]) {
   };
 }
 
-export function ProgressTracker({ model, subjectLocked = false }: { model: ProgressReadyModel; subjectLocked?: boolean }) {
+export function ProgressTracker({ model, subjectLocked = false, initialChapterId }: { model: ProgressReadyModel; subjectLocked?: boolean; initialChapterId?: string }) {
+  const initialChapter = initialChapterId ? model.chapters.find((chapter) => chapter.id === initialChapterId) ?? null : null;
   const [chapters, setChapters] = useState(model.chapters);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialChapter ? `${initialChapter.number} ${initialChapter.title}` : "");
   const [subject, setSubject] = useState(subjectLocked && model.chapters[0] ? model.chapters[0].subjectId : "all");
   const [group, setGroup] = useState("all");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
