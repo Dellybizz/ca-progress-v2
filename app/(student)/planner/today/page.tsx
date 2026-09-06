@@ -25,6 +25,7 @@ export default async function TodayPlanPage() {
     <LoginRequired next="/planner/today" title="Sign in to open Today"/>
   </div>;
   if (model.mode === "setup") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Today" title="Finish the quick setup first." description="Choose your CA level, group, attempt and current preparation state. Detailed progress can be added later."/><Link href="/onboarding?next=%2Fplanner%2Ftoday" className="ui-button ui-button--primary">Continue setup</Link></div>;
+  if (!("evidenceMode" in model)) throw new Error("Today display model is incomplete.");
 
   return <div className="phase9-page today-plan-page">
     <PageHeader preview={false} eyebrow="Today" title="Today’s study plan" description={`${formatPlanDate(model.planDate)} · ${model.forecast.attemptLabel}`}/>
@@ -35,7 +36,7 @@ export default async function TodayPlanPage() {
       <Card><CardBody><Icon name="clock"/><div><span>Completed today</span><strong>{model.completedStudyMinutes}m</strong><small>from finished study sessions</small></div></CardBody></Card>
     </section>
 
-    {model.evidenceMode === "starter" ? <Card><CardBody><div className="phase9-warning"><Icon name="info" size={17}/><span><strong>Starter Today:</strong> this list is based on your selected attempt, unfinished syllabus and explicit planner items. CA Progress will not call a subject weak until recorded study or progress evidence exists.</span></div></CardBody></Card> : null}
+    {model.evidenceMode === "starter" ? <Card><CardBody><div className="phase9-warning"><Icon name="book" size={17}/><span><strong>Starter Today:</strong> this list is based on your selected attempt, unfinished syllabus and explicit planner items. CA Progress will not call a subject weak until recorded study or progress evidence exists.</span></div></CardBody></Card> : null}
 
     <div className="button-row" aria-label="Today actions">
       <Link href="/study" className="ui-button ui-button--primary">Start Study</Link>
