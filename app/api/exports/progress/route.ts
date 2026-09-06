@@ -21,7 +21,7 @@ export async function GET() {
   }
 
   const billing = await getBillingModel();
-  const tier = billing.effectivePlan?.tier ?? billing.currentPlan?.tier ?? "free";
+  const tier = billing.currentPlan?.tier_key ?? "free";
   if (!canUseExport(tier, "progress_pdf")) {
     return Response.json({ error: "Your current plan does not include this export." }, {
       status: 403,
