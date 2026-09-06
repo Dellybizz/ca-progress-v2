@@ -46,14 +46,16 @@ function StudySideRail({ model }: { model: StudyReadyModel }) {
   );
 }
 
-export function StudyTimer({ model }: { model: StudyReadyModel }) {
+export function StudyTimer({ model, initialSubjectId, initialChapterId }: { model: StudyReadyModel; initialSubjectId?: string; initialChapterId?: string }) {
   const router = useRouter();
   const timer = model.timer;
+  const initialSubject = !timer && initialSubjectId ? model.subjects.find((subject) => subject.id === initialSubjectId) ?? null : null;
+  const safeInitialChapterId = !timer && initialSubject && initialChapterId && initialSubject.chapters.some((chapter) => chapter.id === initialChapterId) ? initialChapterId : "";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(timer?.elapsedSeconds ?? 0);
-  const [subjectId, setSubjectId] = useState(timer?.subjectId ?? "");
-  const [chapterId, setChapterId] = useState(timer?.chapterId ?? "");
+  const [subjectId, setSubjectId] = useState(timer?.subjectId ?? initialSubject?.id ?? "");
+  const [chapterId, setChapterId] = useState(timer?.chapterId ?? safeInitialChapterId);
   const [mode, setMode] = useState<"stopwatch" | "pomodoro">(timer?.mode ?? "pomodoro");
   const [focusMinutes, setFocusMinutes] = useState(Math.round((timer?.focusTargetSeconds ?? 1500) / 60));
   const [breakMinutes, setBreakMinutes] = useState(Math.round((timer?.breakTargetSeconds ?? 300) / 60));
