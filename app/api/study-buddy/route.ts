@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { assertSameOriginMutation } from "@/lib/auth/csrf";
 import { optionalUser } from "@/lib/auth/server";
+import { StudyTogetherInviteError, assertStudyTogetherInviteAllowed } from "@/lib/study-buddy/invite-guard";
 import {
   StudyBuddyError,
   completeStudyTogether,
@@ -52,7 +53,11 @@ export async function POST(request: NextRequest) {
       case "nudge": result = await sendStudyBuddyNudge(user.id, body.buddyUserId, body.message); break;
       case "createGoal": result = await createSharedStudyGoal(user.id, body.buddyUserId, body); break;
       case "contributeGoal": result = await contributeStudySessionToGoal(user.id, body.goalId, body.studySessionId); break;
-      case "startTogether": result = await startStudyTogether(user.id, body.buddyUserId); break;
+      case "startTogether": {
+        await assertStudyTogetherInviteAllowed(user.id, body.buddyUserId);
+        result = await startStudyTogether(user.id, body.buddyUserId);
+        break;
+      }
       case "joinTogether": result = await joinStudyTogether(user.id, body.studyTogetherId); break;
       case "completeTogether": result = await completeStudyTogether(user.id, body.studyTogetherId, body.studySessionId); break;
       case "safety": result = await setStudyBuddySafety(user.id, body.buddyUserId, body.mode); break;
@@ -61,7 +66,9 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ ok: true, result }, { headers: privateHeaders });
   } catch (error) {
-    if (error instanceof StudyBuddyError) return NextResponse.json({ ok: false, error: error.message }, { status: error.status, headers: privateHeaders });
+    if (error instanceof StudyBuddyError || error instanceof StudyTogetherInviteError) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: error.status, headers: privateHeaders });
+    }
     return NextResponse.json({ ok: false, error: "Study Buddy could not be updated." }, { status: 500, headers: privateHeaders });
   }
 }
