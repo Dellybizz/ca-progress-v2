@@ -2,12 +2,11 @@
 
 **Phase:** 12 — Gamification: XP, levels, streaks and achievements  
 **Status:** COMPLETE  
-**Validated runtime SHA:** `fe64bc8176c11bf94fe2a20daee1e1a267bcdada`  
+**Validated runtime SHA:** `466ac4e2b9116d53330e1d778bd6e6fbd11d82e0`  
 **Working branch:** `phase-12-operations-admin-platform`  
-**Implementation PR:** `#21` — Product Phase 12: XP, streaks, levels and achievements  
-**Validated deploy run:** `34059944102`  
-**Validated CI run:** `34059944141`  
-**Supabase retirement closure run:** `34059944137`  
+**Validated deploy run:** `34060582805`  
+**Validated CI run:** `34060582774`  
+**Supabase retirement closure run:** `34060582796`  
 **Production D1:** `ca-progress-v2-phase4-shadow` (`6f002cbe-fe40-4d1b-9cf4-df6faaf52350`)  
 
 This record belongs to the revised CA Progress product roadmap. Phase 13 was not started.
@@ -16,48 +15,46 @@ This record belongs to the revised CA Progress product roadmap. Phase 13 was not
 
 Phase 12 adds professional motivation signals without changing academic truth:
 
-- append-only, idempotent XP ledger with a deterministic `(user_id,event_key)` uniqueness boundary;
-- fixed, bounded XP amounts instead of per-minute timer rewards;
-- canonical evidence reconciliation from completed preparation records;
-- fair streak evidence based on meaningful study rather than app opens;
+- append-only, idempotent XP ledger with deterministic `(user_id,event_key)` uniqueness;
+- fixed and bounded XP rather than per-minute timer rewards;
+- reconciliation from canonical preparation records only;
+- fair streak evidence based on meaningful study or meaningful completed Today work;
 - professional preparation levels derived only from total XP;
 - idempotent achievement unlocks;
 - private signed-in Activity/API surfaces for XP, level, streak and achievements;
 - additive D1 migration `0022_product_phase12_gamification.sql`;
-- replay, farming, timezone/DST, academic-independence and Phase 13 isolation regression coverage.
+- replay, abuse/farming, timezone/DST, academic-independence and Phase 13 isolation regression coverage.
 
 ## XP rules and abuse bounds
 
-XP is derived from canonical records and uses deterministic event keys. Re-reading, retrying, clearing/re-completing a source, or replaying the reconciliation path cannot mint the same event twice.
+XP is derived from canonical records and uses deterministic event keys. Retrying the API/reconciliation path cannot mint the same event twice.
 
-Current fixed awards:
-
-| Event | XP | Abuse boundary |
+| Event | XP | Phase 12 abuse boundary |
 |---|---:|---|
-| Meaningful study session | 12 | Minimum 20 minutes; maximum 6 awarded session events per local day |
-| Meaningful Today-plan item | 6 | Completed canonical item with at least 10 estimated minutes; maximum 8 awarded items per local day |
+| Meaningful study session | 12 | Minimum 20 minutes; maximum 6 awarded session events per source-local day |
+| Meaningful Today-plan item | 6 | Completed canonical item with at least 10 estimated minutes; actual completion date; maximum 8 awarded items per plan-timezone day |
 | Chapter first coverage | 40 | One deterministic event per chapter |
 | Revision 1 | 20 | One deterministic event per chapter/stage |
 | Revision 2 | 25 | One deterministic event per chapter/stage |
 | Test milestone | 30 | First recorded attempt only; retakes do not farm XP |
-| Daily study goal | 12 | One deterministic event per goal |
-| Weekly study goal | 30 | One deterministic event per goal |
-| Session reflection | 6 | One deterministic event per canonical session |
-| Resolved doubt | 10 | One deterministic event per doubt |
-| Valid Study Together completion | 8 | Requires completed two-participant Study Together evidence with canonical participant sessions |
+| Daily study goal | 12 | Maximum one awarded daily-study goal per profile-local day |
+| Weekly study goal | 30 | Maximum one awarded weekly-study goal per profile-local Monday week |
+| Session reflection | 6 | Requires a linked canonical session of at least 20 minutes; maximum 3 awarded reflections per source-local day |
+| Resolved doubt | 10 | Requires a linked canonical session of at least 20 minutes; maximum 3 awarded resolved doubts per source-local day |
+| Valid Study Together completion | 8 | Exactly two completed participants; both linked canonical sessions must be at least 20 minutes |
 
-The database additionally enforces `xp_amount BETWEEN 1 AND 100`. XP ledger rows are immutable/append-only through the application runtime.
+The database additionally enforces `xp_amount BETWEEN 1 AND 100`. XP ledger rows are immutable and append-only during normal application operation.
 
 ## Academic independence — PASS
 
-Gamification reads canonical academic/preparation evidence but does not write academic truth.
+Gamification reads academic/preparation evidence but does not write academic truth.
 
-- No Phase 12 migration alters `chapter_progress`, progress/readiness, test-stage or test-attempt academic tables.
+- No Phase 12 migration alters `chapter_progress`, readiness, test-stage or test-attempt academic tables.
 - The gamification service writes only `xp_ledger`, `study_streak_days` and `user_achievements`.
-- XP and level values are not inputs into syllabus completion, revision readiness, testing readiness or test scores.
-- Activity explicitly tells students that XP, levels and achievements do not change syllabus progress, revision readiness or test readiness.
+- XP, level, streak and achievements are never inputs into syllabus completion, revision readiness, testing readiness or test scores.
+- Syllabus completion is read only as evidence for the syllabus-complete achievement.
 
-This preserves the revised plan rule that gamification may motivate preparation but must never redefine academic state.
+This preserves the revised-plan rule that gamification may motivate preparation but cannot redefine academic state.
 
 ## Fair streaks — PASS
 
@@ -70,16 +67,16 @@ Streaks do not increase from logins, page views or timer minutes below the meani
 
 Timezone handling is deterministic:
 
-- session evidence is assigned to a local date using the timezone stored with that source session;
-- Today-plan evidence uses its canonical scheduled local date;
-- each historical streak day stores its source timezone so a later profile timezone change does not rewrite history;
+- study-session evidence uses the timezone stored on the source session;
+- Today-plan evidence uses the plan timezone but is assigned to the **actual completion timestamp**, preventing backdated scheduled items from manufacturing historical streak days;
+- historical streak evidence stores its source timezone and is append-only, so later profile-timezone changes cannot rewrite prior qualified days;
 - current-day evaluation uses the user's current valid profile timezone;
-- IANA timezone conversion is used for midnight and DST boundaries, with deterministic fallback to `Asia/Kolkata` for invalid timezone input;
-- the current streak can legitimately end on yesterday while the current day is still open, avoiding premature morning streak breaks.
+- IANA timezone conversion covers midnight and DST boundaries with deterministic fallback to `Asia/Kolkata` for invalid timezone input;
+- duplicate same-day evidence collapses to one `(user_id,local_date)` streak day.
 
 ## Professional levels — PASS
 
-Levels are derived only from total XP and are intentionally professional rather than game-rank labels:
+Levels are derived only from total XP and use professional preparation labels:
 
 | Level | Minimum XP |
 |---|---:|
@@ -90,7 +87,7 @@ Levels are derived only from total XP and are intentionally professional rather 
 | Exam-Ready Candidate | 3,000 |
 | Distinguished Candidate | 5,000 |
 
-Progress to the next level is presentation-only and does not affect academic readiness.
+Level progress is presentation-only and cannot change academic readiness.
 
 ## Achievements — PASS
 
@@ -103,63 +100,65 @@ Implemented achievement families include:
 - 7-day and 30-day consistency streaks;
 - first-coverage syllabus completion.
 
-Unlocks are stored under primary key `(user_id,achievement_key)` and inserted with `INSERT OR IGNORE`, so repeated evaluation is idempotent. Achievement eligibility is calculated from canonical preparation evidence, not from XP totals.
+Unlocks use primary key `(user_id,achievement_key)` plus `INSERT OR IGNORE`; rows are immutable/append-only during normal runtime, so repeated evaluation cannot duplicate or rewrite an unlock. Eligibility is calculated from canonical preparation evidence, not XP totals.
 
 ## Streak Freeze scope decision
 
-The revised plan describes one monthly Pro/Premium Streak Freeze only conditionally, **if retained in monetisation**. No existing Streak Freeze entitlement is present in the repository, so Phase 12 does not invent a new monetisation entitlement. This conditional item is not required by the Phase 12 hard definition-of-done gates.
+The revised plan makes one monthly Pro/Premium Streak Freeze conditional on it being retained in monetisation. Phase 12 does not invent a new entitlement where none exists; this conditional item is not part of the hard Phase 12 definition-of-done gates.
 
 ## Privacy and presentation
 
-- The new `/api/gamification` surface is signed-in only and returns `private, no-store` responses.
-- There is no public XP/level endpoint in Phase 12.
-- The Activity page uses restrained presentation rather than noisy game-style effects.
-- No leaderboard, public rank, reward claim, referral, share card or anti-cheat system was introduced; those belong to Phase 13.
+- `/api/gamification` is signed-in only and returns `private, no-store` responses.
+- There is no public XP/level leaderboard endpoint in Phase 12.
+- Activity uses restrained presentation rather than noisy game effects.
+- No leaderboard, public rank, reward redemption, referral, share-card or Phase 13 anti-cheat system was introduced.
 
 ## Definition-of-done verification
 
-### 1. Replaying or retrying an API event cannot duplicate XP — PASS
+### 1. Replaying/retrying an API call cannot duplicate XP — PASS
 
 - deterministic event keys;
-- unique database boundary `UNIQUE(user_id,event_key)`;
+- `UNIQUE(user_id,event_key)` database boundary;
 - `INSERT OR IGNORE` reconciliation;
-- immutable XP ledger entries;
-- daily caps for repeatable session/Today events;
-- retakes excluded from repeat test XP.
+- immutable/append-only XP ledger;
+- period caps for repeatable reward families;
+- first-attempt-only test XP.
 
-### 2. XP never changes academic progress or readiness — PASS
+### 2. XP never changes progress/readiness fields — PASS
 
 - additive gamification schema only;
 - service has no academic mutation statements;
-- progress/readiness calculations remain in their existing academic services and tables.
+- progress/readiness calculations remain independent in their existing academic services/tables.
 
 ### 3. Streak calculation is deterministic and timezone-safe — PASS
 
-Regression coverage includes midnight boundaries, multiple timezones, DST, invalid-timezone fallback, duplicate date evidence, current-day grace and best/current run calculations.
+Regression coverage includes India midnight boundaries, DST behavior, invalid-timezone fallback, duplicate date evidence, current-day grace, actual Today completion dates, source timezone retention and immutable historical streak evidence.
 
-### 4. Achievement unlock logic is idempotent — PASS
+### 4. Achievement unlocks are idempotent — PASS
 
-- deterministic eligibility function;
+- deterministic eligibility;
 - `(user_id,achievement_key)` primary key;
 - `INSERT OR IGNORE` unlock writes;
-- repeated evaluation returns the same eligible achievement set without duplicate rows.
+- immutable unlock rows;
+- repeated reconciliation cannot duplicate an achievement.
 
 ## Regression coverage
 
-`tests/product-phase12-gamification.test.mjs` locks:
+`tests/product-phase12-gamification.test.mjs` and `tests/product-phase12-abuse-hardening.test.mjs` lock:
 
-- meaningful-session threshold;
-- fixed/bounded XP values;
-- daily repeatable-event caps;
-- deterministic replay event keys;
+- meaningful-session threshold and fixed/bounded XP;
+- daily session/Today caps and deterministic replay event keys;
+- Today streak evidence based on actual completion time, not scheduled/backdated dates;
+- reflection/resolved-doubt meaningful-session requirements and daily caps;
+- daily/weekly study-goal period caps;
+- Study Together dual-completion with two meaningful canonical sessions;
 - timezone midnight and DST behavior;
 - deterministic current/best streaks;
+- append-only streak evidence;
 - monotonic professional levels;
-- deterministic achievement eligibility;
-- XP/achievement D1 uniqueness and immutability contracts;
-- meaningful Today-item minimum-duration requirement;
-- first-test-attempt anti-farming rule;
-- Study Together dual-completion evidence;
+- deterministic/idempotent achievement eligibility;
+- XP/achievement D1 uniqueness and immutability;
+- first-test-attempt anti-farming behavior;
 - no writes from gamification into academic truth tables;
 - private API behavior;
 - migration/deployment `0022` wiring;
@@ -167,7 +166,7 @@ Regression coverage includes midnight boundaries, multiple timezones, DST, inval
 
 ## Repository and Cloudflare gates
 
-Validated on runtime SHA `fe64bc8176c11bf94fe2a20daee1e1a267bcdada`:
+Validated on runtime SHA `466ac4e2b9116d53330e1d778bd6e6fbd11d82e0`:
 
 - permanent Supabase retirement scan — PASS;
 - TypeScript typecheck — PASS;
@@ -180,25 +179,26 @@ Validated on runtime SHA `fe64bc8176c11bf94fe2a20daee1e1a267bcdada`:
 - generated Cloudflare SSR route smoke — PASS;
 - final Supabase retirement rescan — PASS.
 
-CI evidence: GitHub Actions run `34059944141` completed successfully.  
-Retirement closure evidence: run `34059944137` completed successfully.
+CI evidence: GitHub Actions run `34060582774` completed successfully.  
+Retirement closure evidence: run `34060582796` completed successfully.
 
 ## Production migration and deployment
 
-Deployment run `34059944102` completed successfully with rollback protection enabled.
+Deployment run `34060582805` completed successfully with rollback protection enabled.
 
-- Additive Product D1 migrations through `0022_product_phase12_gamification.sql` were applied remotely.
+- Additive Product D1 migrations through `0022_product_phase12_gamification.sql` were applied/reapplied remotely and verified idempotently.
 - `_ca_schema_migrations` contains version `0022` with description `product phase 12 idempotent xp fair streaks professional levels and achievements`.
 - Remote D1 verification successfully queried `xp_ledger`, `study_streak_days` and `user_achievements`.
-- Production table counts immediately after migration were valid at zero before user reconciliation populated them.
+- Phase 12 table counts were valid at zero before user reconciliation populated them; no gamification data was fabricated by migration.
+- Updated streak immutability triggers were installed by the idempotent `0022` migration.
 - Migration/post-deploy foreign-key and D1 verification passed.
 - ICAI Worker deployment — PASS.
 - Billing Worker deployment — PASS.
 - Existing web Worker secrets verification — PASS.
 - Web runtime deployment — PASS.
 - Post-deploy SSR/health/D1 verification — PASS; rollback was not required.
-- Deployment evidence artifact: `cloudflare-deployment-34059944102`.
-- Latest deployment evidence records the newly deployed web Worker version at 100% traffic.
+- Deployment evidence artifact: `cloudflare-deployment-34060582805`.
+- Deployment evidence records the latest web Worker version at 100% traffic.
 
 ## Phase boundary
 
