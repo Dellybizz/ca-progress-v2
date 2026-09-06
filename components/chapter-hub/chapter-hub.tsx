@@ -72,7 +72,7 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
 
     <div className="chapter-hub-grid chapter-hub-grid--primary">
       <Card className="chapter-hub-section chapter-hub-progress"><CardBody>
-        <SectionTitle icon="target" eyebrow="Progress" title="Chapter stages" action={<Link href={`/subjects/${academic.subjectSlug}/progress`} className="chapter-hub-text-link">Open tracker <Icon name="arrow" size={13}/></Link>}/>
+        <SectionTitle icon="target" eyebrow="Progress" title="Chapter stages" action={<Link href={`/subjects/${academic.subjectSlug}/progress?chapterId=${encodeURIComponent(academic.chapterId)}`} className="chapter-hub-text-link">Open tracker <Icon name="arrow" size={13}/></Link>}/>
         <div className="chapter-hub-stage-grid">{STAGES.map((stage) => {
           const completedAt = model.progress[stage.field];
           return <div key={stage.field} className={completedAt ? "is-complete" : ""}><span>{completedAt ? <Icon name="check" size={14}/> : stage.short}</span><strong>{stage.label}</strong><small>{dateLabel(completedAt)}</small></div>;
@@ -115,7 +115,7 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
     </div>
 
     <Card className="chapter-hub-section chapter-hub-official"><CardBody>
-      <SectionTitle icon="shield" eyebrow="Official ICAI resources" title="Verified material for this subject & attempt" action={<Link href={`/resources?subject=${encodeURIComponent(academic.subjectId)}`} className="chapter-hub-text-link">Browse all <Icon name="arrow" size={13}/></Link>}/>
+      <SectionTitle icon="shield" eyebrow="Official ICAI resources" title="Verified material for this subject & attempt" action={<Link href={`/resources?${chapterQuery}`} className="chapter-hub-text-link">Browse all <Icon name="arrow" size={13}/></Link>}/>
       <p className="chapter-hub-helper">Cards use CA Progress canonical resource IDs. The open route resolves the latest verified ICAI location, so an upstream URL move does not change this card identity.</p>
       {model.officialResources.length ? <div className="chapter-hub-official-grid">{model.officialResources.map((resource) => <Link key={resource.canonicalResourceId} href={`/resources/${encodeURIComponent(resource.canonicalResourceId)}/open`} data-canonical-resource-id={resource.canonicalResourceId}>
         <span className="chapter-hub-resource-icon"><Icon name="book" size={18}/></span><span><Badge>{resource.resourceType.replaceAll("_", " ")}</Badge><strong>{resource.title}</strong><small>{resource.sourceName} · verified {dateLabel(resource.lastVerifiedAt)}</small></span><Icon name="arrow" size={15}/>
