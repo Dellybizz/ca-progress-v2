@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Level = { name: string };
 type Reward = { id: string; competitionPeriod: string; rewardPeriod: string; rank: number; rewardTier: "premium" | "pro"; status: string; startsAt: string; endsAt: string };
@@ -93,20 +93,15 @@ async function shareInstagram(card: ShareCard) {
   await downloadCard(card);
 }
 
-export function Phase13Panel({ initial }: { initial: Phase13Model }) {
+export function Phase13Panel({ initial, initialReferralCode = "" }: { initial: Phase13Model; initialReferralCode?: string }) {
+  const safeInitialReferralCode = /^[A-Z0-9]{8,32}$/.test(initialReferralCode) ? initialReferralCode : "";
   const [model, setModel] = useState(initial);
   const [alias, setAlias] = useState(initial.leaderboard.publicAlias);
   const [category, setCategory] = useState("overall");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [referralInput, setReferralInput] = useState("");
+  const [referralInput, setReferralInput] = useState(initial.referral.inbound ? "" : safeInitialReferralCode);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (model.referral.inbound) return;
-    const referral = new URLSearchParams(window.location.search).get("ref")?.trim().toUpperCase() ?? "";
-    if (/^[A-Z0-9]{8,32}$/.test(referral)) setReferralInput(referral);
-  }, [model.referral.inbound]);
 
   async function post(body: Record<string, unknown>) {
     setBusy(true);
