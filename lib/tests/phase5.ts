@@ -36,7 +36,7 @@ type AttemptRow = {
   marks_scored: number;
   marks_total: number;
   percentage: number;
-  duration_minutes: number;
+  duration_minutes: number | null;
   completed_at: string;
   progress_event_id: string | null;
   created_at: string;
@@ -108,7 +108,7 @@ function stageField(stage: TestProgressStage): "test_1_at" | "test_2_at" {
 }
 
 async function applicableChapter(userId: string, chapterId: string, db: HotD1Database) {
-  const row = await db.prepare(`SELECT c.id,c.subject_id
+  const row = await db.prepare(`SELECT c.id,asm.subject_id
     FROM profiles p
     JOIN course_levels l ON l.code=p.ca_level
     JOIN chapters c ON c.id=?1
@@ -146,7 +146,7 @@ function looksUnique(error: unknown) {
 }
 
 async function getAttemptByIdempotency(userId: string, idempotencyKey: string, db: HotD1Database) {
-  return db.prepare(`SELECT a.id,a.subject_id,s.title AS subject_title,a.chapter_id,c.title AS chapter_title,c.number AS chapter_number,
+  return db.prepare(`SELECT a.id,a.subject_id,s.title AS subject_title,a.chapter_id,c.title AS chapter_title,c.chapter_number AS chapter_number,
       a.test_stage,a.attempt_number,a.marks_scored,a.marks_total,a.percentage,a.duration_minutes,a.completed_at,a.progress_event_id,a.created_at
     FROM test_attempts a JOIN chapters c ON c.id=a.chapter_id JOIN subjects s ON s.id=a.subject_id
     WHERE a.user_id=?1 AND a.idempotency_key=?2 LIMIT 1`).bind(userId, idempotencyKey).first<AttemptRow>();
@@ -191,7 +191,7 @@ function attemptsDto(rows: AttemptRow[], mistakes: MistakeRow[], attachments: At
       marksScored: Number(row.marks_scored),
       marksTotal: Number(row.marks_total),
       percentage: Number(row.percentage),
-      durationMinutes: Number(row.duration_minutes),
+      durationMinutes: row.duration_minutes === null ? null : Number(row.duration_minutes),
       completedAt: row.completed_at,
       improvementPoints: previous === undefined ? null : Math.round((Number(row.percentage) - previous) * 100) / 100,
       progressEventId: row.progress_event_id,
@@ -206,7 +206,7 @@ export async function getPhase5TestArchive(userId: string, chapterIds: string[],
   const ids = [...new Set(chapterIds.map((value) => value.trim()).filter(Boolean))].slice(0, 500);
   if (!ids.length) return { attempts: [], journal: [] };
   const placeholders = ids.map((_, index) => `?${index + 2}`).join(",");
-  const result = await db.prepare(`SELECT a.id,a.subject_id,s.title AS subject_title,a.chapter_id,c.title AS chapter_title,c.number AS chapter_number,
+  const result = await db.prepare(`SELECT a.id,a.subject_id,s.title AS subject_title,a.chapter_id,c.title AS chapter_title,c.chapter_number AS chapter_number,
       a.test_stage,a.attempt_number,a.marks_scored,a.marks_total,a.percentage,a.duration_minutes,a.completed_at,a.progress_event_id,a.created_at
     FROM test_attempts a JOIN chapters c ON c.id=a.chapter_id JOIN subjects s ON s.id=a.subject_id
     WHERE a.user_id=?1 AND a.chapter_id IN (${placeholders})
@@ -248,8 +248,9 @@ export async function createPhase5TestAttempt(
   const durationMinutes = parseDuration(input.durationMinutes);
   const completedAt = parseCompletedOn(input.completedOn);
   const idempotencyKey = cleanId(input.idempotencyKey, "retry key");
-  const mistakeCategories = parseMistakes(input.mistakeCategories);
   const mistakeNote = parseNote(input.mistakeNote);
+  const parsedMistakes = parseMistakes(input.mistakeCategories);
+  const mistakeCategories: TestMistakeCategory[] = mistakeNote && parsedMistakes.length === 0 ? ["other"] : parsedMistakes;
 
   const prior = await getAttemptByIdempotency(userId, idempotencyKey, db);
   if (prior) {

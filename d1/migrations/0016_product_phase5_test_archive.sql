@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS test_attempts (
   idempotency_key TEXT NOT NULL,
   progress_event_id TEXT REFERENCES progress_events(id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(id,user_id),
   UNIQUE(user_id,chapter_id,test_stage,attempt_number),
   UNIQUE(user_id,idempotency_key),
   CHECK(marks_scored <= marks_total)
@@ -29,14 +30,15 @@ CREATE INDEX IF NOT EXISTS idx_test_attempts_owner_subject_date
 
 CREATE TABLE IF NOT EXISTS test_attempt_mistakes (
   id TEXT PRIMARY KEY,
-  attempt_id TEXT NOT NULL REFERENCES test_attempts(id) ON DELETE CASCADE,
+  attempt_id TEXT NOT NULL,
   user_id TEXT NOT NULL REFERENCES app_users(user_id) ON DELETE CASCADE,
   category TEXT NOT NULL CHECK(category IN (
     'conceptual','calculation','forgot_provision_formula','presentation','time_management',
     'didnt_revise','silly_mistake','didnt_understand_question','other'
   )),
   note TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(attempt_id,user_id) REFERENCES test_attempts(id,user_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_test_mistakes_owner_category
@@ -46,14 +48,16 @@ CREATE INDEX IF NOT EXISTS idx_test_mistakes_attempt
 
 CREATE TABLE IF NOT EXISTS test_attempt_attachments (
   id TEXT PRIMARY KEY,
-  attempt_id TEXT NOT NULL REFERENCES test_attempts(id) ON DELETE CASCADE,
+  attempt_id TEXT NOT NULL,
   user_id TEXT NOT NULL REFERENCES app_users(user_id) ON DELETE CASCADE,
   attachment_kind TEXT NOT NULL CHECK(attachment_kind IN ('question_paper','my_answer_sheet','checked_paper','suggested_answer')),
   object_key TEXT NOT NULL UNIQUE,
   filename TEXT NOT NULL,
   mime_type TEXT NOT NULL,
   size_bytes INTEGER NOT NULL CHECK(size_bytes > 0),
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(id,user_id),
+  FOREIGN KEY(attempt_id,user_id) REFERENCES test_attempts(id,user_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_test_attachments_owner_attempt
@@ -62,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_test_attachments_owner_attempt
 CREATE TABLE IF NOT EXISTS test_attachment_upload_intents (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES app_users(user_id) ON DELETE CASCADE,
-  attempt_id TEXT NOT NULL REFERENCES test_attempts(id) ON DELETE CASCADE,
+  attempt_id TEXT NOT NULL,
   attachment_kind TEXT NOT NULL CHECK(attachment_kind IN ('question_paper','my_answer_sheet','checked_paper','suggested_answer')),
   object_key TEXT NOT NULL UNIQUE,
   filename TEXT NOT NULL,
@@ -72,7 +76,8 @@ CREATE TABLE IF NOT EXISTS test_attachment_upload_intents (
   attachment_id TEXT REFERENCES test_attempt_attachments(id) ON DELETE SET NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  completed_at TEXT
+  completed_at TEXT,
+  FOREIGN KEY(attempt_id,user_id) REFERENCES test_attempts(id,user_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_test_upload_intents_owner_status
@@ -80,6 +85,7 @@ CREATE INDEX IF NOT EXISTS idx_test_upload_intents_owner_status
 
 -- Preserve Phase 4 current milestone records as Attempt 1 history before Phase 5 takes over writes.
 -- Phase 4 did not store duration, so legacy duration remains NULL instead of being fabricated.
+-- Subject identity is resolved through the normalized chapter -> syllabus version -> subject relationship.
 INSERT OR IGNORE INTO test_attempts(
   id,user_id,subject_id,chapter_id,test_stage,attempt_number,marks_scored,marks_total,percentage,
   duration_minutes,completed_at,idempotency_key,progress_event_id,created_at
@@ -87,7 +93,7 @@ INSERT OR IGNORE INTO test_attempts(
 SELECT
   'phase4-' || r.id,
   r.user_id,
-  c.subject_id,
+  sv.subject_id,
   r.chapter_id,
   r.test_stage,
   1,
@@ -100,7 +106,8 @@ SELECT
   r.progress_event_id,
   r.created_at
 FROM test_stage_records r
-JOIN chapters c ON c.id=r.chapter_id;
+JOIN chapters c ON c.id=r.chapter_id
+JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id;
 
 -- Historical attempts are immutable. Retakes must append a new row.
 CREATE TRIGGER IF NOT EXISTS trg_phase5_test_attempt_no_update

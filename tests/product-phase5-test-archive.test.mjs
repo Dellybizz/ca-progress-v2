@@ -17,12 +17,16 @@ test("Product Phase 5 stores immutable numbered attempts instead of overwriting 
   assert.doesNotMatch(service, /UPDATE test_attempts/);
 });
 
-test("Product Phase 5 backfills Phase 4 milestone records as Attempt 1 without inventing missing duration", () => {
+test("Product Phase 5 backfills Phase 4 milestone records as Attempt 1 through canonical academic ownership without inventing duration", () => {
   const migration = read("d1/migrations/0016_product_phase5_test_archive.sql");
+  const service = read("lib/tests/phase5.ts");
   const ui = read("components/tests/test-archive-workspace.tsx");
   assert.match(migration, /FROM test_stage_records r/);
   assert.match(migration, /'phase4-' \|\| r\.id/);
-  assert.match(migration, /c\.subject_id/);
+  assert.match(migration, /JOIN syllabus_versions sv ON sv\.id=c\.syllabus_version_id/);
+  assert.match(migration, /sv\.subject_id/);
+  assert.match(service, /SELECT c\.id,asm\.subject_id/);
+  assert.match(service, /c\.chapter_number AS chapter_number/);
   assert.match(migration, /ROUND\(\(r\.marks_scored \* 100\.0\) \/ r\.marks_total, 2\)/);
   assert.match(migration, /Phase 4 did not store duration/);
   assert.match(migration, /\n  NULL,\n  r\.completed_at/);
@@ -63,13 +67,17 @@ test("Product Phase 5 save retries are idempotent and allocation retries do not 
   assert.match(ui, /no duplicate was created/);
 });
 
-test("Product Phase 5 private test files use direct signed R2 upload and owner-scoped D1 metadata", () => {
+test("Product Phase 5 ownership is enforced in D1 and at every private attachment boundary", () => {
+  const migration = read("d1/migrations/0016_product_phase5_test_archive.sql");
   const issue = read("app/api/tests/attachments/upload-url/route.ts");
   const complete = read("app/api/tests/attachments/upload-complete/route.ts");
   const access = read("app/api/tests/attachments/[id]/access/route.ts");
+  assert.match(migration, /UNIQUE\(id,user_id\)/);
+  assert.match(migration, /FOREIGN KEY\(attempt_id,user_id\) REFERENCES test_attempts\(id,user_id\)/);
   assert.match(issue, /getOwnedPhase5Attempt\(user\.id, attemptId\)/);
   assert.match(issue, /createR2PresignedUrl\(\{ key: objectKey, method: "PUT"/);
   assert.match(issue, /test-attempts\/\$\{user\.id\}\/\$\{attempt\.id\}/);
+  assert.match(complete, /intent\.user_id !== user\.id/);
   assert.match(complete, /bucket\.head\(intent\.object_key\)/);
   assert.match(complete, /test_attempt_attachments/);
   assert.match(access, /getOwnedPhase5Attachment\(user\.id, id\)/);
@@ -91,8 +99,10 @@ test("Product Phase 5 attachment completion is retry-safe and never exposes publ
 
 test("Product Phase 5 Mistake Journal stores the complete required category set and filters it", () => {
   const types = read("lib/tests/phase5-types.ts");
+  const service = read("lib/tests/phase5.ts");
   const ui = read("components/tests/test-archive-workspace.tsx");
   for (const category of ["conceptual", "calculation", "forgot_provision_formula", "presentation", "time_management", "didnt_revise", "silly_mistake", "didnt_understand_question", "other"]) assert.match(types, new RegExp(category));
+  assert.match(service, /mistakeNote && parsedMistakes\.length === 0 \? \["other"\]/);
   assert.match(ui, /Mistake Journal/);
   assert.match(ui, /journalSubject/);
   assert.match(ui, /journalChapter/);
