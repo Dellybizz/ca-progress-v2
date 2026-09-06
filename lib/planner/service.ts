@@ -8,7 +8,7 @@ import { getHotActivityRows, getHotPlannerRows } from "@/lib/data/d1/hot-screens
 import type { Database } from "@/lib/data/database.types";
 import type { StudySubjectOption } from "@/lib/study/types";
 import { getPhase8GoalSummaries, getPhase8NotificationCenter, getSelectedAttemptCountdown, getTaskPlanningExtensions } from "./phase8";
-import type { ActivityItem, ActivityPageModel, GoalsPageModel, PlannerGoal, PlannerPageModel, PlannerTask } from "./types";
+import type { ActivityItem, ActivityPageModel, GoalsPageModel, PlannerPageModel, PlannerTask } from "./types";
 
 export { getCalendarPageModel } from "./calendar";
 
