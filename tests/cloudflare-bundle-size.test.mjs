@@ -26,10 +26,16 @@ test("application source does not use Next OG image generation", () => {
 
 test("Cloudflare builds strip the unused Vercel OG runtime without creating rejected startup promises", () => {
   const pkg = JSON.parse(read("package.json"));
+  const wrangler = read("wrangler.jsonc");
+  const ensureBuild = read("scripts/ensure-opennext-build.mjs");
   const patch = read("scripts/patch-opennext-vercel-og.mjs");
   assert.match(pkg.scripts["cf:build"], /patch-opennext-vercel-og\.mjs/);
   assert.match(pkg.scripts["cf:deploy"], /npm run cf:build/);
-  assert.match(pkg.scripts["cf:check"], /npm run cf:build/);
+  assert.match(pkg.scripts["cf:check"], /cf:check:web/);
+  assert.doesNotMatch(pkg.scripts["cf:check"], /^npm run cf:build/);
+  assert.equal(pkg.scripts["cf:ensure-build"], "node scripts/ensure-opennext-build.mjs");
+  assert.match(wrangler, /"build"\s*:\s*\{\s*"command"\s*:\s*"npm run cf:ensure-build"\s*\}/);
+  assert.match(ensureBuild, /\["run", "cf:build"\]/);
   assert.ok(patch.includes("@vercel\\/og\\/index\\.edge\\.js"));
   assert.match(patch, /Refusing to strip @vercel\/og because application source uses OG image generation/);
   assert.match(patch, /Promise\.resolve\(Object\.freeze\(\{\}\)\)/);
