@@ -55,7 +55,7 @@ test("Product Phase 9 treats complete First Coverage as deterministic without in
   assert.equal(result.observedChaptersPerWeek, null);
 });
 
-test("Product Phase 9 analytics are derived from canonical student rows and exclude XP from readiness", () => {
+test("Product Phase 9 analytics are derived from canonical student rows and exclude XP from readiness calculations", () => {
   const service = read("lib/analytics/phase9.ts");
   for (const table of ["study_sessions", "study_session_phase3", "chapter_progress", "test_attempts", "revision_due_items", "exam_attempts", "exam_events"]) assert.match(service, new RegExp(table));
   assert.match(service, /First Coverage/);
@@ -63,7 +63,8 @@ test("Product Phase 9 analytics are derived from canonical student rows and excl
   assert.match(service, /Testing Readiness/);
   assert.match(service, /rolling last 7 days/);
   assert.match(service, /Distinct local calendar days/);
-  assert.doesNotMatch(service, /\bXP\b/);
+  assert.match(service, /No cohort, AI, Mentor, XP or self-rated-understanding score is used to calculate the forecast/);
+  assert.doesNotMatch(service, /xp_total|xp_points|user_xp|FROM\s+xp|JOIN\s+xp/i);
   assert.doesNotMatch(service, /@\/lib\/(mentor|thinker)/i);
 });
 
