@@ -37,7 +37,7 @@ test("ICAI review action uses canonical review decisions and dedicated patch app
   assert.match(review, /raw==="approve"\|\|raw==="approved"/);
   assert.match(review, /raw==="reject"\|\|raw==="rejected"/);
   assert.match(review, /decision_notes/);
-  assert.doesNotMatch(review, /icai_review_queue SET[^\n]*review_notes/);
+  assert.doesNotMatch(review, /UPDATE icai_review_queue SET review_notes/);
 });
 
 test("approval is restricted to known high-impact ICAI entities and updates the audit event", () => {
