@@ -3,9 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOperator } from "@/lib/authorization/server";
-import { createD1AdminClient } from "@/lib/data/d1/client";
 import { invalidateSharedPublicCache } from "@/lib/cache/public";
 import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
+import { decideIcaiReview, normalizeIcaiReviewDecision } from "@/lib/icai/review";
 
 function message(error: unknown) {
   return error instanceof Error ? error.message : "Unknown background job error.";
@@ -35,23 +35,21 @@ export async function decideIcaiReviewAction(formData: FormData) {
   try {
     const operator = await requireAdminOperator();
     const reviewId = String(formData.get("reviewId") ?? "");
-    const decision = String(formData.get("decision") ?? "");
-    if (!reviewId || !["approved", "rejected"].includes(decision)) throw new Error("Invalid review request.");
+    const decision = normalizeIcaiReviewDecision(formData.get("decision"));
+    if (!reviewId || !decision) throw new Error("Invalid review request.");
 
-    const admin = createD1AdminClient();
-    const { error } = await admin.rpc("icai_review_decide", {
-      p_review_id: reviewId,
-      p_decision: decision,
-      p_reviewer: operator.user.id,
-      p_notes: "",
+    const result = await decideIcaiReview({
+      reviewId,
+      decision,
+      reviewerUserId: operator.user.id,
+      notes: "",
     });
-    if (error) throw error;
     await invalidateSharedPublicCache(["icai"]);
 
     revalidatePath("/admin/icai-sync");
     revalidatePath("/updates");
     revalidatePath("/resources/icai");
-    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Review ${decision}. The audit trail has been updated.`)}`;
+    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Review ${result.status}. The approved patch and audit trail are now consistent.`)}`;
   } catch (error) {
     destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`;
   }

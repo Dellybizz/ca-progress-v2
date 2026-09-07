@@ -1,4 +1,4 @@
-import { runIcaiSyncEngine } from "./sync-engine";
+import { IcaiSyncAlreadyRunningError, runIcaiSyncEngine } from "./sync-engine";
 import type { D1Database } from "./d1-client";
 
 type Env = { DB?: D1Database };
@@ -23,7 +23,7 @@ const icaiSyncWorker = {
     const userAgent=request.headers.get("x-ca-progress-icai-user-agent")?.trim()||"CA Progress V2 Official ICAI Monitor/phase8";
     const enabled=request.headers.get("x-ca-progress-icai-enabled")!=="false";
     try{const summary=await runIcaiSyncEngine({db:env.DB,enabled,userAgent},{trigger,requestedBy});return json({ok:true,summary});}
-    catch(error){return json({ok:false,error:error instanceof Error?error.message:"ICAI synchronization failed."},500);}
+    catch(error){if(error instanceof IcaiSyncAlreadyRunningError)return json({ok:false,error:error.message},409);return json({ok:false,error:error instanceof Error?error.message:"ICAI synchronization failed."},500);}
   },
 };
 
