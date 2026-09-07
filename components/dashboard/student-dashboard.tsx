@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DashboardQuickActions, DashboardViewTracker } from "./dashboard-interactions";
+import { DashboardLeaderboard, DashboardQuickActions, DashboardViewTracker } from "./dashboard-interactions";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -178,7 +178,7 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
   );
 }
 
-function TodayOverview({ model }: { model: DashboardReadyModel }) {
+export function TodayOverview({ model }: { model: DashboardReadyModel }) {
   return (
     <Link href="/planner/today" className="dashboard-overview-card" aria-label="Open today plan">
       <header className="dashboard-overview-card__header">
@@ -197,7 +197,7 @@ function TodayOverview({ model }: { model: DashboardReadyModel }) {
   );
 }
 
-function StudyOverview({ model }: { model: DashboardReadyModel }) {
+export function StudyOverview({ model }: { model: DashboardReadyModel }) {
   return (
     <Link href="/study" className="dashboard-overview-card" aria-label="Open study mode">
       <header className="dashboard-overview-card__header">
@@ -216,7 +216,7 @@ function StudyOverview({ model }: { model: DashboardReadyModel }) {
   );
 }
 
-function ProgressOverview({ model }: { model: DashboardReadyModel }) {
+export function ProgressOverview({ model }: { model: DashboardReadyModel }) {
   return (
     <Link href="/progress" className="dashboard-overview-card dashboard-overview-card--progress" aria-label="Open progress tracker">
       <header className="dashboard-overview-card__header">
@@ -242,60 +242,59 @@ function ProgressOverview({ model }: { model: DashboardReadyModel }) {
 
 function ReadyDashboard({ model }: { model: DashboardReadyModel }) {
   const latestUpdate = model.icai.updates[0] ?? null;
+  const targetPercent = model.study.weeklyTargetMinutes > 0
+    ? Math.min(100, Math.round((model.study.studiedThisWeekMinutes / model.study.weeklyTargetMinutes) * 100))
+    : 0;
 
   return (
     <div className="student-dashboard student-dashboard--home">
       <DashboardViewTracker/>
-      <PageHeader
-        preview={false}
-        eyebrow="Dashboard"
-        title={`Welcome back, ${model.viewer.displayName}.`}
-        description={`${model.context.levelName} · ${model.context.groupLabel} · ${model.context.attemptLabel}`}
-      />
+      <PageHeader preview={false} eyebrow="Dashboard" title={`Welcome back, ${model.viewer.displayName}.`} description={`${model.context.levelName} · ${model.context.groupLabel} · ${model.context.attemptLabel}`}/>
 
-      <AttemptStrip model={model}/>
-
-      <section className="dashboard-overview-grid" aria-label="Study overview">
-        <TodayOverview model={model}/>
-        <StudyOverview model={model}/>
-        <ProgressOverview model={model}/>
-      </section>
-
-      <section className="dashboard-home-grid">
-        <Card className="dashboard-next-card">
-          <CardHeader title="Next up" action={<Link className="ui-text-link" href={model.recommendation.href}>Open <Icon name="arrow" size={13}/></Link>}/>
-          <CardBody>
-            <div className="dashboard-next-card__row">
-              <span className="dashboard-next-card__icon"><Icon name="target" size={18}/></span>
-              <div><strong>{model.recommendation.title}</strong><p>{model.recommendation.description}</p></div>
+      <div className="dashboard-command-layout">
+        <main className="dashboard-command-main">
+          <section className="dashboard-focus-card" aria-labelledby="dashboard-focus-title">
+            <div className="dashboard-focus-card__content">
+              <span className="dashboard-focus-card__eyebrow"><Icon name="sparkles" size={15}/> Today&apos;s focus</span>
+              <h2 id="dashboard-focus-title">{model.recommendation.title}</h2>
+              <p>{model.recommendation.description}</p>
+              <div className="dashboard-focus-card__actions">
+                <Link className="dashboard-focus-card__primary" href={model.recommendation.href}>Start studying <Icon name="arrow" size={14}/></Link>
+                <Link className="dashboard-focus-card__secondary" href="/planner/today">View today&apos;s plan</Link>
+              </div>
             </div>
-          </CardBody>
-        </Card>
+            <div className="dashboard-focus-card__illustration" aria-hidden="true"><Icon name="book" size={42}/><span><Icon name="timer" size={25}/></span></div>
+          </section>
 
-        <Card className="dashboard-actions-card">
-          <CardHeader title="Quick actions" action={<Link className="ui-text-link" href="/activity#leaderboard">Leaderboard <Icon name="arrow" size={13}/></Link>}/>
-          <CardBody><DashboardQuickActions actions={model.quickActions}/></CardBody>
-        </Card>
-      </section>
+          <section className="dashboard-metric-strip" aria-label="Study overview">
+            <Link href="/study" className="dashboard-metric-card"><span><Icon name="timer" size={18}/></span><div><small>Study time this week</small><strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><em>{targetPercent}% of weekly target</em></div></Link>
+            <Link href="/activity" className="dashboard-metric-card"><span><Icon name="sparkles" size={18}/></span><div><small>Study streak</small><strong>{model.study.streakDays} day{model.study.streakDays === 1 ? "" : "s"}</strong><em>{model.study.streakDays ? "Keep it going" : "Start today"}</em></div></Link>
+            <Link href="/progress" className="dashboard-metric-card"><span><Icon name="chart" size={18}/></span><div><small>Syllabus completed</small><strong>{model.progress.overallPercent}%</strong><em>{model.context.chapterCount} chapters tracked</em></div></Link>
+          </section>
 
-      <Card className="dashboard-icai-compact">
-        <CardHeader title="ICAI updates" action={<Link className="ui-text-link" href="/updates">View all <Icon name="arrow" size={13}/></Link>}/>
-        <CardBody>
-          {latestUpdate ? (
-            <article className="dashboard-latest-update">
-              <span className="dashboard-latest-update__icon"><Icon name="book" size={17}/></span>
-              <div><strong>{latestUpdate.title}</strong><p>{latestUpdate.summary || "Official update for your selected course and attempt."}</p></div>
-              <a href={latestUpdate.officialUrl} target="_blank" rel="noreferrer">ICAI <Icon name="arrow" size={12}/></a>
-            </article>
-          ) : (
-            <div className="dashboard-no-update">
-              <span><Icon name="check" size={16}/></span>
-              <div><strong>No new updates</strong><p>There are no current ICAI changes matching your selection.</p></div>
-              <small>{formatVerifiedAt(model.icai.verifiedAt)}</small>
-            </div>
-          )}
-        </CardBody>
-      </Card>
+          <Card className="dashboard-continue-card">
+            <CardHeader title="Continue where you left off" action={<Link className="ui-text-link" href={model.recommendation.href}>Open <Icon name="arrow" size={13}/></Link>}/>
+            <CardBody><div className="dashboard-next-card__row"><span className="dashboard-next-card__icon"><Icon name="target" size={18}/></span><div><small className="dashboard-next-card__eyebrow">Next up</small><strong>{model.recommendation.title}</strong><p>{model.recommendation.description}</p></div></div></CardBody>
+          </Card>
+
+          <Card className="dashboard-actions-card dashboard-actions-card--horizontal">
+            <CardHeader title="Quick actions"/>
+            <CardBody><DashboardQuickActions actions={model.quickActions}/></CardBody>
+          </Card>
+        </main>
+
+        <aside className="dashboard-command-rail" aria-label="Attempt and community overview">
+          <AttemptStrip model={model}/>
+          <Card className="dashboard-leaderboard-card">
+            <CardHeader title="Monthly leaderboard" action={<Link className="ui-text-link" href="/activity#leaderboard">Leaderboard <Icon name="arrow" size={13}/></Link>}/>
+            <CardBody><DashboardLeaderboard/></CardBody>
+          </Card>
+          <Card className="dashboard-icai-compact">
+            <CardHeader title="Latest ICAI update" action={<Link className="ui-text-link" href="/updates">View all <Icon name="arrow" size={13}/></Link>}/>
+            <CardBody>{latestUpdate ? <article className="dashboard-latest-update"><span className="dashboard-latest-update__icon"><Icon name="bell" size={17}/></span><div><strong>{latestUpdate.title}</strong><p>{latestUpdate.summary || "Official update for your selected course and attempt."}</p></div><a href={latestUpdate.officialUrl} target="_blank" rel="noreferrer" aria-label={`Open ${latestUpdate.title} on ICAI`}><Icon name="arrow" size={12}/></a></article> : <div className="dashboard-no-update"><span><Icon name="check" size={16}/></span><div><strong>No new updates</strong><p>There are no current ICAI changes matching your selection.</p></div></div>}</CardBody>
+          </Card>
+        </aside>
+      </div>
     </div>
   );
 }
