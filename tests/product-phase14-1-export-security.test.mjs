@@ -11,12 +11,15 @@ function fakeProgressDb(profileRows, progressRows) {
     prepare(sql) {
       return {
         bind(...values) {
+          const owner = values[0];
           return {
+            async first() {
+              if (/FROM profiles/.test(sql)) return profileRows.find((row) => row.user_id === owner) ?? null;
+              throw new Error(`Unexpected first() SQL: ${sql}`);
+            },
             async all() {
-              const owner = values[0];
-              if (/FROM profiles/.test(sql)) return { results: profileRows.filter((row) => row.user_id === owner) };
               if (/FROM chapter_progress/.test(sql)) return { results: progressRows.filter((row) => row.user_id === owner) };
-              throw new Error(`Unexpected SQL: ${sql}`);
+              throw new Error(`Unexpected all() SQL: ${sql}`);
             },
           };
         },
@@ -42,10 +45,10 @@ test("Phase 14.1 maps internal billing tiers to product plans without weakening 
 });
 
 test("Progress PDF is valid for an empty account", () => {
-  const pdf = buildProgressPdf({ profile: null, rows: [] });
+  const pdf = buildProgressPdf({ profile: { displayName: "Empty Student" }, rows: [] });
   assert.ok(pdf instanceof Uint8Array);
   assert.equal(new TextDecoder().decode(pdf.slice(0, 8)), "%PDF-1.4");
-  assert.match(new TextDecoder().decode(pdf), /No chapter progress has been recorded yet/);
+  assert.match(new TextDecoder().decode(pdf), /No saved chapter progress yet\./);
 });
 
 test("Progress PDF bytes are deterministic even when input rows arrive in a different order", () => {
