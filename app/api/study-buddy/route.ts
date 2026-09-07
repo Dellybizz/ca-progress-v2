@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { assertSameOriginMutation } from "@/lib/auth/csrf";
 import { optionalUser } from "@/lib/auth/server";
+import { getPlanFeatureAccessForUser } from "@/lib/billing/feature-access";
 import { StudyTogetherInviteError, assertStudyTogetherInviteAllowed } from "@/lib/study-buddy/invite-guard";
 import {
   StudyBuddyError,
@@ -21,6 +22,7 @@ import {
 
 export const dynamic = "force-dynamic";
 const privateHeaders = { "cache-control": "private, no-store" };
+const ADVANCED_ACTIONS = new Set(["sharing", "nudge", "createGoal", "contributeGoal", "startTogether", "joinTogether", "completeTogether"]);
 
 export async function GET() {
   const user = await optionalUser();
@@ -42,10 +44,15 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, error: "Sign in to use Study Buddy." }, { status: 401, headers: privateHeaders });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ ok: false, error: "Invalid Study Buddy request." }, { status: 400, headers: privateHeaders });
+  const action = typeof body.action === "string" ? body.action : "";
+  if (ADVANCED_ACTIONS.has(action)) {
+    const access = await getPlanFeatureAccessForUser(user.id, "expanded_study_buddy");
+    if (!access.allowed) return NextResponse.json({ ok: false, error: access.upgradeMessage, code: "PLAN_UPGRADE_REQUIRED" }, { status: 403, headers: privateHeaders });
+  }
 
   try {
     let result: unknown;
-    switch (body.action) {
+    switch (action) {
       case "request": result = await requestStudyBuddy(user.id, body.buddyUserId); break;
       case "respond": result = await respondStudyBuddy(user.id, body.buddyUserId, body.response); break;
       case "remove": result = await removeStudyBuddy(user.id, body.buddyUserId); break;
