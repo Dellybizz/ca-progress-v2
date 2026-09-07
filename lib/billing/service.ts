@@ -6,6 +6,7 @@ import { createD1AdminClient } from "@/lib/data/d1/client";
 import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
+import { hasSubscriptionAccess } from "./lifecycle.mjs";
 import { canUsePlanFeature, storageQuotaBytes, storageQuotaMegabytes, tierRank } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
@@ -16,7 +17,7 @@ export type PlanEntitlement = { plan_id: string; feature_key: string; enabled: b
 export type Entitlement = { planId: string; tier: PlanTier; planName: string; featureKey: string; allowed: boolean; limitValue: number | null; limitUnit: string; resetPeriod: string; upgradeMessage: string };
 export type BillingModel = { mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: SubscriptionRow | null; payments?: PaymentRow[]; events?: SubscriptionEventRow[]; plans?: SubscriptionPlan[] };
 
-type CurrentPlanRow = { plan_id: string; starts_at: string; ends_at: string | null };
+type CurrentPlanRow = { plan_id: string; status: string; starts_at: string; ends_at: string | null };
 type StorageRow = { size_bytes: number };
 type IdRow = { id: string };
 type ProfileLabelRow = { display_name: string | null };
@@ -59,16 +60,16 @@ async function currentPlanId(userId: string) {
   const client = db();
   const now = new Date();
   const [current, reward, plans] = await Promise.all([
-    client.from("user_subscriptions").select("plan_id,ends_at,starts_at").eq("user_id", userId).eq("status", "active").lte("starts_at", now.toISOString()).order("starts_at", { ascending: false }),
+    client.from("user_subscriptions").select("plan_id,status,ends_at,starts_at").eq("user_id", userId).lte("starts_at", now.toISOString()).order("starts_at", { ascending: false }),
     getEligibleLeaderboardRewardPlan(userId, now),
     listPlans(),
   ]);
   if (current.error) throw new Error(current.error.message);
-  const active = asRows<CurrentPlanRow>(current.data).find((item) => !item.ends_at || new Date(item.ends_at) > now);
-  const activeTier = plans.find((plan) => plan.id === active?.plan_id)?.tier_key ?? "free";
+  const subscription = asRows<CurrentPlanRow>(current.data).find((item) => hasSubscriptionAccess(item, now));
+  const activeTier = plans.find((plan) => plan.id === subscription?.plan_id)?.tier_key ?? "free";
   const rewardTier = plans.find((plan) => plan.id === reward?.planId)?.tier_key;
   if (reward && rewardTier && tierRank(rewardTier) > tierRank(activeTier)) return reward.planId;
-  if (active?.plan_id) return active.plan_id;
+  if (subscription?.plan_id) return subscription.plan_id;
   const free = plans.find((plan) => plan.tier_key === "free" && plan.billing_cycle === "free");
   return free?.id ?? null;
 }
@@ -179,6 +180,6 @@ export async function getBillingModel(): Promise<BillingModel> {
   const error = subscriptionsResult.error || paymentsResult.error || eventsResult.error; if (error) throw new Error(error.message);
   const subscriptions = asRows<SubscriptionRow>(subscriptionsResult.data);
   const now = new Date();
-  const currentSubscription = subscriptions.find((item) => item.plan_id === currentPlan.id && item.status === "active" && new Date(item.starts_at) <= now && (!item.ends_at || new Date(item.ends_at) > now)) ?? null;
+  const currentSubscription = subscriptions.find((item) => hasSubscriptionAccess(item, now)) ?? null;
   return { mode: "ready", currentPlan, currentSubscription, payments: asRows<PaymentRow>(paymentsResult.data), events: asRows<SubscriptionEventRow>(eventsResult.data), plans };
 }
