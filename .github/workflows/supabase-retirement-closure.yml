@@ -40,6 +40,8 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Focused ICAI Phase 4 verification
+        run: npm run test:icai:phase4
       - name: Retained D1 index validation
         run: npm run d1:hot-indexes:validate
       - name: Repository tests
