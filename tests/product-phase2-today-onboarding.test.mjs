@@ -89,7 +89,8 @@ test("Product Phase 2 first-week prompts are evidence-based, day-scoped and non-
   assert.match(experience, /first analytics check/);
   assert.match(experience, /Your First CA Progress Week/);
   assert.match(experience, /return null/);
-  assert.match(page, /model\.firstWeek \?/);
+  assert.match(page, /const firstWeek = enriched \? model\.firstWeek : null/);
+  assert.match(page, /\{firstWeek \?/);
   assert.doesNotMatch(page, /firstWeek[\s\S]{0,100}redirect\(/);
   assert.doesNotMatch(page, /aria-modal=.*firstWeek|firstWeek.*aria-modal/);
 });
