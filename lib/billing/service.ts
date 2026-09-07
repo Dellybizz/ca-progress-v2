@@ -6,6 +6,7 @@ import { createD1AdminClient } from "@/lib/data/d1/client";
 import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
+import { canUsePlanFeature, storageQuotaBytes, storageQuotaMegabytes, tierRank } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -64,8 +65,9 @@ async function currentPlanId(userId: string) {
   ]);
   if (current.error) throw new Error(current.error.message);
   const active = asRows<CurrentPlanRow>(current.data).find((item) => !item.ends_at || new Date(item.ends_at) > now);
-  const activeRank = plans.find((plan) => plan.id === active?.plan_id)?.rank ?? -1;
-  if (reward && reward.rank > activeRank) return reward.planId;
+  const activeTier = plans.find((plan) => plan.id === active?.plan_id)?.tier_key ?? "free";
+  const rewardTier = plans.find((plan) => plan.id === reward?.planId)?.tier_key;
+  if (reward && rewardTier && tierRank(rewardTier) > tierRank(activeTier)) return reward.planId;
   if (active?.plan_id) return active.plan_id;
   const free = plans.find((plan) => plan.tier_key === "free" && plan.billing_cycle === "free");
   return free?.id ?? null;
@@ -75,10 +77,9 @@ async function rewardEntitlementOverride(userId: string, featureKey: string, cur
   const reward = await getEligibleLeaderboardRewardPlan(userId);
   if (!reward) return current;
   const plans = await listPlans();
-  const currentRank = plans.find((plan) => plan.id === current?.planId)?.rank ?? -1;
-  if (current && currentRank >= reward.rank) return current;
+  const currentTier = plans.find((plan) => plan.id === current?.planId)?.tier_key ?? "free";
   const plan = plans.find((item) => item.id === reward.planId);
-  if (!plan) return current;
+  if (!plan || (current && tierRank(currentTier) >= tierRank(plan.tier_key))) return current;
   const result = await db().from("plan_entitlements").select("plan_id,feature_key,enabled,limit_value,limit_unit,reset_period,upgrade_message").eq("plan_id", reward.planId).eq("feature_key", featureKey).maybeSingle();
   if (result.error) throw new Error(result.error.message);
   const entitlement = asRow<PlanEntitlement>(result.data);
@@ -126,15 +127,25 @@ export async function getResourceStorageAccess(userId: string) {
   const result = await db().from("uploaded_resources").select("size_bytes").eq("owner_user_id", userId);
   if (result.error) throw new Error(result.error.message);
   const usedBytes = asRows<StorageRow>(result.data).reduce((sum, item) => sum + Number(item.size_bytes ?? 0), 0);
-  const limitBytes = entitlement.limitUnit === "megabytes" && entitlement.limitValue !== null ? Math.floor(entitlement.limitValue * 1024 * 1024) : null;
-  return { ...entitlement, usedBytes, limitBytes, remainingBytes: limitBytes === null ? null : Math.max(0, limitBytes - usedBytes) };
+  const allowed = Boolean(entitlement.planId) && canUsePlanFeature(entitlement.tier, "resources_storage");
+  const limitValue = storageQuotaMegabytes(entitlement.tier);
+  const limitBytes = storageQuotaBytes(entitlement.tier);
+  return {
+    ...entitlement,
+    allowed,
+    limitValue,
+    limitUnit: "megabytes",
+    usedBytes,
+    limitBytes,
+    remainingBytes: Math.max(0, limitBytes - usedBytes),
+  };
 }
 
 export async function createResourceMetadataWithinQuota(input: { userId: string; title: string; description: string | null; subjectId: string | null; chapterId: string | null; originalFilename: string; safeFilename: string; storagePath: string; mimeType: string; extension: string; sizeBytes: number; visibility: "private" | "shared" }) {
   const client = db();
   const access = await getResourceStorageAccess(input.userId);
   if (!access.allowed) throw new Error(access.upgradeMessage || "Resource storage is not available on this plan.");
-  if (access.limitBytes !== null && access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
+  if (access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
   const duplicateResult = await client.from("uploaded_resources").select("id").eq("storage_path", input.storagePath).maybeSingle();
   if (duplicateResult.error) throw new Error(duplicateResult.error.message);
   if (asRow<IdRow>(duplicateResult.data)) throw new Error("This resource upload has already been recorded.");
