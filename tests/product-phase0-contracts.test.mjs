@@ -74,14 +74,14 @@ test("autofetch contracts separate content identity from URL location", () => {
   assert.match(migration, /status='previous'/);
 });
 
-test("existing ICAI sync keeps last-known-good data and holds high-impact date changes for review", () => {
+test("existing ICAI sync keeps last-known-good data and holds high-impact or low-confidence changes for review", () => {
   const engine = read("workers/icai-sync/sync-engine.ts");
   const d1 = read("workers/icai-sync/d1-client.ts");
   assert.match(engine, /If-None-Match/);
   assert.match(engine, /If-Modified-Since/);
   assert.match(engine, /Parser returned zero academic items\. Last verified data was preserved for review\./);
   assert.match(d1, /risk:"high",decision:"pending_review",applied:false/);
-  assert.match(d1, /Canonical dates remain unchanged until review/);
+  assert.match(d1, /Canonical values remain unchanged until review/);
 });
 
 test("stable resource open endpoint prefers the verified direct document and never proxies it", () => {
