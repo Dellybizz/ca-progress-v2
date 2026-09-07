@@ -73,17 +73,20 @@ test("Progress PDF route derives ownership from session and returns private atta
   assert.doesNotMatch(route, /searchParams|request\.url|request\.json|userId/);
 });
 
-test("Phase 14.1 export implementation exposes no R2 internals and does not start later export routes", () => {
+test("export implementation exposes no R2 internals and does not start Phase 14.2B or 14.3", () => {
   const paths = [
     "lib/exports/policy.mjs",
     "lib/exports/progress-data.mjs",
     "lib/exports/progress-pdf.mjs",
+    "lib/exports/csv.mjs",
+    "lib/exports/study-data.mjs",
     "lib/exports/service.ts",
     "app/api/exports/progress/route.ts",
+    "app/api/exports/study/route.ts",
   ];
   const source = paths.map((path) => fs.readFileSync(path, "utf8")).join("\n");
   assert.doesNotMatch(source, /bucket_name|bucketName|object_key|objectKey|signed[_-]?url|presign|R2_BUCKET|\.r2\./i);
-  assert.equal(fs.existsSync("app/api/exports/study/route.ts"), false);
+  assert.equal(fs.existsSync("app/api/exports/study/route.ts"), true);
   assert.equal(fs.existsSync("app/api/exports/tests/route.ts"), false);
   assert.equal(fs.existsSync("app/api/exports/backup/route.ts"), false);
 });
