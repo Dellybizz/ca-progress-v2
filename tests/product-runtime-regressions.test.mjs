@@ -35,5 +35,8 @@ test("Activity filters invalid evidence timestamps and avoids parallel reconcili
   assert.match(service, /validInstant\(row\.completed_at\)/);
   assert.doesNotMatch(phase13, /getPhase13UserModel[\s\S]{0,100}reconcileGamification/);
   assert.doesNotMatch(page, /Promise\.all\(\[getGamificationSummary/);
-  assert.match(page, /getPhase13UserModel\(user\.id, now, gamification\)/);
+  assert.match(page, /Promise\.allSettled\(\[getActivityPageModel\(\), optionalUser\(\)\]\)/);
+  assert.match(page, /getPhase13UserModel\(user\.id, now, gamification \?\? undefined\)\.catch\(\(\) => null\)/);
+  assert.match(page, /XP summary is temporarily unavailable/);
+  assert.match(page, /Leaderboard and referrals are temporarily unavailable/);
 });
