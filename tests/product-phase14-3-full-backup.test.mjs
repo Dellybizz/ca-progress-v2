@@ -228,6 +228,8 @@ test("Settings enables Full Backup only through the Premium entitlement", () => 
   assert.match(settings, /Full Backup · Premium/);
 });
 
-test("Phase 14.3 does not introduce Phase 15 implementation files", () => {
-  assert.equal(fs.existsSync("docs/CA_PROGRESS_PRODUCT_PHASE15_STATUS.md"), false);
+test("Phase 14.3 closure record preserves its original Phase 15 boundary", () => {
+  const phase14Status = read("docs/CA_PROGRESS_PRODUCT_PHASE14_STATUS.md");
+  assert.match(phase14Status, /Phase 15 remains intentionally unstarted/);
+  assert.equal(fs.existsSync("docs/CA_PROGRESS_PRODUCT_PHASE16_STATUS.md"), false);
 });
