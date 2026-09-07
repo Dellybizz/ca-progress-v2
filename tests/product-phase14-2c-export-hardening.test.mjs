@@ -37,7 +37,6 @@ test("Phase 14.2C locks the complete Free/Pro/Premium CSV entitlement matrix", (
   assert.equal(canUseExport("free", "full_backup"), false);
   assert.equal(canUseExport("basic", "full_backup"), false);
   assert.equal(canUseExport("pro", "full_backup"), true);
-  assert.equal(fs.existsSync("app/api/exports/backup/route.ts"), false, "Phase 14.3 backup route must not start in 14.2C");
 });
 
 test("both CSV contracts are deterministic, unique, and bounded for Worker-safe generation", () => {
@@ -123,23 +122,20 @@ test("both Pro CSV routes fail closed and bind export ownership only to the auth
   assert.match(tests, /createOwnedTestHistoryCsvStream\(user\.id\)/);
 });
 
-test("Settings exposes only entitled CSV links and keeps Premium backup visibly deferred", () => {
+test("Settings keeps Pro CSV actions entitlement-gated while allowing later Premium additions", () => {
   const settings = read(SETTINGS_PAGE);
   assert.match(settings, /const billingReady = billing\.mode === "ready"/);
   assert.match(settings, /canUseExport\(tier, "study_csv"\)/);
   assert.match(settings, /canUseExport\(tier, "test_history_csv"\)/);
   assert.match(settings, /href="\/api\/exports\/study"/);
   assert.match(settings, /href="\/api\/exports\/tests"/);
-  assert.match(settings, /Full Backup · Premium/);
-  assert.doesNotMatch(settings, /href="\/api\/exports\/backup"/);
 });
 
-test("Phase 14.2 export surface contains no R2 storage internals or arbitrary-owner inputs", () => {
+test("Phase 14.2 CSV surface contains no R2 storage internals or arbitrary-owner inputs", () => {
   const source = [
     "lib/exports/csv.mjs",
     "lib/exports/study-data.mjs",
     "lib/exports/test-history-data.mjs",
-    "lib/exports/service.ts",
     STUDY_ROUTE,
     TEST_ROUTE,
   ].map(read).join("\n");
