@@ -78,7 +78,7 @@ jobs:
       # contains historical 0003-0011 schema changes. Fresh/local databases still
       # validate the complete ordered migration chain. Production therefore reapplies
       # only additive idempotent product and ICAI bootstrap migrations directly before Worker rollout.
-      - name: Apply additive Product and ICAI D1 migrations
+      - name: Apply additive Product D1 migrations
         shell: bash
         run: |
           set -euo pipefail
