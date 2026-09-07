@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
-import { FeatureLock } from "@/components/billing/feature-lock";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPhase9AnalyticsModel } from "@/lib/analytics/phase9";
-import { optionalUser } from "@/lib/auth/server";
-import { getEntitlementForUser } from "@/lib/billing/service";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Completion Forecast | CA Progress" };
@@ -23,12 +20,6 @@ function statusLabel(status: string) {
 }
 
 export default async function ForecastPage() {
-  const identity = await optionalUser();
-  if (identity) {
-    const access = await getEntitlementForUser(identity.id, "analytics.forecast");
-    if (!access.allowed) return <div className="phase9-page"><PageHeader preview={false} eyebrow="Forecast" title="Completion forecast is not included in your current plan." description="Your progress data remains intact and available in Analytics and Progress."/><FeatureLock planName={access.planName} title="Unlock completion forecasting" description={access.upgradeMessage || "Compare plans to enable pace and completion forecasting."}/></div>;
-  }
-
   const model = await getPhase9AnalyticsModel();
   if (model.mode === "guest") return <div className="phase9-page"><LoginRequired next="/analytics/forecast" title="Sign in to view your completion forecast"/></div>;
   if (model.mode === "setup") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Forecast" title="Complete your academic profile first." description="Forecasting requires your applicable syllabus and selected attempt."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
@@ -39,12 +30,12 @@ export default async function ForecastPage() {
       preview={false}
       eyebrow="Forecast"
       title="Evidence-gated baseline completion forecast"
-      description="A deterministic planning estimate from your own chapter-completion history and a verified exam date. It is not CA Thinker/Mentor intelligence and it is not an exam-result prediction."
+      description="This baseline forecast is part of Free: a deterministic planning estimate from your own chapter-completion history and a verified exam date. It is not CA Thinker/Mentor intelligence and it is not an exam-result prediction."
       actions={<div className="phase9-header-links"><Link href="/analytics">Analytics</Link><Link href="/planner/today">Today Plan</Link></div>}
     />
 
     <Card>
-      <CardHeader title={forecast.attemptLabel} description="Only a verified attempt date can anchor the baseline forecast." action={<Badge tone={forecast.eligible ? "brand" : "neutral"}>Baseline · not Mentor</Badge>}/>
+      <CardHeader title={forecast.attemptLabel} description="Only a verified attempt date can anchor the baseline forecast." action={<Badge tone={forecast.eligible ? "brand" : "neutral"}>Baseline · Free</Badge>}/>
       <CardBody>
         <div className="phase9-forecast-hero">
           <div><span>Status</span><strong>{statusLabel(forecast.status)}</strong><p>{forecast.boundary}</p></div>
@@ -69,7 +60,7 @@ export default async function ForecastPage() {
     </Card>
 
     <Card>
-      <CardHeader title="Why the forecast may be withheld" description="Phase 9 prefers no forecast over a confident-looking guess."/>
+      <CardHeader title="Why the forecast may be withheld" description="CA Progress prefers no forecast over a confident-looking guess."/>
       <CardBody>
         <ul>
           <li>The attempt must have a verified exam date; the selected attempt month alone is not enough.</li>
