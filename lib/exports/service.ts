@@ -4,6 +4,7 @@ import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { fetchOwnedProgressData } from "./progress-data.mjs";
 import { buildProgressPdf } from "./progress-pdf.mjs";
 import { generateOwnedStudyCsvChunks } from "./study-data.mjs";
+import { generateOwnedTestHistoryCsvChunks } from "./test-history-data.mjs";
 
 export async function getOwnedProgressExportData(userId: string, db: HotD1Database = getHotD1Database()) {
   return fetchOwnedProgressData(db, userId);
@@ -33,8 +34,7 @@ export async function createOwnedProgressPdf(userId: string, db: HotD1Database =
   });
 }
 
-export function createOwnedStudyCsvStream(userId: string, db: HotD1Database = getHotD1Database()) {
-  const iterator = generateOwnedStudyCsvChunks(db, userId);
+function createCsvStream(iterator: AsyncGenerator<string, void, unknown>) {
   const encoder = new TextEncoder();
 
   return new ReadableStream<Uint8Array>({
@@ -50,4 +50,12 @@ export function createOwnedStudyCsvStream(userId: string, db: HotD1Database = ge
       await iterator.return(undefined);
     },
   });
+}
+
+export function createOwnedStudyCsvStream(userId: string, db: HotD1Database = getHotD1Database()) {
+  return createCsvStream(generateOwnedStudyCsvChunks(db, userId));
+}
+
+export function createOwnedTestHistoryCsvStream(userId: string, db: HotD1Database = getHotD1Database()) {
+  return createCsvStream(generateOwnedTestHistoryCsvChunks(db, userId));
 }
