@@ -165,7 +165,7 @@ export function Phase13Panel({ initial, initialReferralCode = "" }: { initial: P
   }
 
   return <div style={panelStyle}>
-    <div style={boxStyle}>
+    <div id="leaderboard" style={boxStyle}>
       <div><strong>Monthly leaderboard · opt-in only</strong><p>Only your chosen public alias, rank, XP and professional level can appear. Study sessions, chapter details and account identifiers stay private.</p></div>
       <div style={rowStyle}>
         <input aria-label="Public leaderboard alias" value={alias} maxLength={40} onChange={(event) => setAlias(event.target.value)} placeholder="Public alias" style={{ minWidth: 220, padding: "8px 10px", borderRadius: 10, border: "1px solid var(--border, #d1d5db)" }}/>

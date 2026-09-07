@@ -37,7 +37,7 @@ function GuestDashboard() {
       />
 
       <section className="dashboard-overview-grid" aria-label="Study overview">
-        <Link href="/subjects" className="dashboard-overview-card" aria-label="Browse subjects">
+        <Link href="/syllabus" className="dashboard-overview-card" aria-label="Browse subjects">
           <header className="dashboard-overview-card__header">
             <span className="dashboard-overview-card__icon"><Icon name="book" size={17}/></span>
             <div><strong>Subjects</strong><small>Explore the syllabus</small></div>
@@ -97,7 +97,7 @@ function GuestDashboard() {
           <CardHeader title="Quick actions"/>
           <CardBody>
             <div className="dashboard-quick-actions">
-              <Link href="/subjects" className="dashboard-quick-action"><span><Icon name="book" size={16}/></span><strong>Browse Subjects</strong><small>Explore the syllabus</small></Link>
+              <Link href="/syllabus" className="dashboard-quick-action"><span><Icon name="book" size={16}/></span><strong>Browse Subjects</strong><small>Explore the syllabus</small></Link>
               <Link href="/updates" className="dashboard-quick-action"><span><Icon name="bell" size={16}/></span><strong>ICAI Updates</strong><small>View official updates</small></Link>
               <Link href="/login?next=%2Fdashboard" className="dashboard-quick-action"><span><Icon name="arrow" size={16}/></span><strong>Sign In</strong><small>Save your workspace</small></Link>
             </div>
@@ -273,7 +273,7 @@ function ReadyDashboard({ model }: { model: DashboardReadyModel }) {
         </Card>
 
         <Card className="dashboard-actions-card">
-          <CardHeader title="Quick actions"/>
+          <CardHeader title="Quick actions" action={<Link className="ui-text-link" href="/activity#leaderboard">Leaderboard <Icon name="arrow" size={13}/></Link>}/>
           <CardBody><DashboardQuickActions actions={model.quickActions}/></CardBody>
         </Card>
       </section>

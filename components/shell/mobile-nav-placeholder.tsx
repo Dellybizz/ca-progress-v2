@@ -60,7 +60,7 @@ const studentSections: MobileSection[] = [
     matches: ["/community", "/activity"],
     items: [
       { label: "Community", description: "Talk and learn with other students", href: "/community", icon: "community" },
-      { label: "Activity", description: "See recent community activity", href: "/activity", icon: "sparkles" },
+      { label: "Activity & Leaderboard", description: "See XP, achievements and rankings", href: "/activity", icon: "sparkles" },
     ],
   },
 ];

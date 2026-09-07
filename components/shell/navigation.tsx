@@ -24,7 +24,7 @@ export const studentNavigation: NavItem[] = [
   { label: "Forecast", href: "/analytics/forecast", icon: "chart" },
   { label: "Goals", href: "/goals", icon: "target" },
   { label: "Calendar", href: "/calendar", icon: "calendar" },
-  { label: "Activity", href: "/activity", icon: "sparkles" },
+  { label: "Activity & Leaderboard", href: "/activity", icon: "sparkles" },
   { label: "Syllabus", href: "/syllabus", icon: "book" },
   { label: "ICAI Updates", href: "/updates", icon: "bell" },
   { label: "Resources", href: "/resources", icon: "book" },
@@ -62,7 +62,7 @@ const studentGroups: StudentNavGroup[] = [
   { key: "community", label: "Community", icon: "community", items: [
     { label: "Community", href: "/community", icon: "community" },
     { label: "Study Buddy", href: "/study-buddy", icon: "community" },
-    { label: "Activity", href: "/activity", icon: "sparkles" },
+    { label: "Activity & Leaderboard", href: "/activity", icon: "sparkles" },
   ] },
   { key: "account", label: "Account", icon: "settings", items: [
     { label: "Pricing", href: "/pricing", icon: "sparkles" },
