@@ -67,7 +67,7 @@ test("Progress PDF safely escapes PDF control characters in user-facing text", (
     profile: { displayName: "A (B) \\ C", caLevel: "Final", groupChoice: null, attemptKey: null },
     rows: [],
   }));
-  assert.match(pdf, /A \\(B\\) \\\\ C/);
+  assert.ok(pdf.includes("A \\(B\\) \\\\ C"));
 });
 
 test("owned progress queries bind the authenticated owner to every private table read", async () => {
