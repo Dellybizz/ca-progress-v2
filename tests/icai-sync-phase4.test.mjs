@@ -34,7 +34,14 @@ function executableRedirectHandler(fetchImpl) {
   const start = engine.indexOf("async function fetchFollowingApprovedRedirects");
   const end = engine.indexOf("\n\nasync function fetchOfficialPage", start);
   assert.ok(start >= 0 && end > start, "redirect handler must remain discoverable for executable verification");
-  const source = engine.slice(start, end).replace("url:string,init:RequestInit", "url,init");
+  const source = engine.slice(start, end);
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.None,
+      target: ts.ScriptTarget.ES2022,
+    },
+    fileName: "redirect-handler.ts",
+  }).outputText;
   const isApprovedHttpIcaiUrl = (value) => {
     try {
       const url = new URL(value);
@@ -49,7 +56,7 @@ function executableRedirectHandler(fetchImpl) {
     "isApprovedHttpIcaiUrl",
     "MAX_REDIRECTS",
     "REDIRECT_STATUSES",
-    `return (${source});`,
+    `${compiled}\nreturn fetchFollowingApprovedRedirects;`,
   );
   return factory(fetchImpl, isApprovedHttpIcaiUrl, 5, new Set([301, 302, 303, 307, 308]));
 }
