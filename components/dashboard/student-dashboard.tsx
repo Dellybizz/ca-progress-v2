@@ -26,6 +26,17 @@ function formatMinutes(value: number) {
   return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
 }
 
+function dashboardDate(value: string) {
+  return new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date(value));
+}
+
+function dashboardGreeting(value: string) {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Asia/Kolkata" }).format(new Date(value)));
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 function GuestDashboard() {
   return (
     <div className="student-dashboard student-dashboard--home">
@@ -242,45 +253,38 @@ export function ProgressOverview({ model }: { model: DashboardReadyModel }) {
 
 function ReadyDashboard({ model }: { model: DashboardReadyModel }) {
   const latestUpdate = model.icai.updates[0] ?? null;
-  const targetPercent = model.study.weeklyTargetMinutes > 0
-    ? Math.min(100, Math.round((model.study.studiedThisWeekMinutes / model.study.weeklyTargetMinutes) * 100))
-    : 0;
+  const continueSubject = model.progress.subjects.find((subject) => subject.percent < 100) ?? model.progress.subjects[0] ?? null;
+  const intendedActions = model.quickActions.map((action) => action.key === "open_progress"
+    ? { ...action, label: "Record progress", description: "Update your syllabus" }
+    : action.key === "start_study"
+      ? { ...action, label: "Save test", description: "Record an attempt", href: "/tests" }
+      : action.key === "add_note"
+        ? { ...action, label: "New note", description: "Capture revision notes" }
+        : { ...action, label: "Add task", description: "Plan your study" });
 
   return (
     <div className="student-dashboard student-dashboard--home">
       <DashboardViewTracker/>
-      <PageHeader preview={false} eyebrow="Dashboard" title={`Welcome back, ${model.viewer.displayName}.`} description={`${model.context.levelName} · ${model.context.groupLabel} · ${model.context.attemptLabel}`}/>
+      <header className="dashboard-welcome" aria-label="Welcome back dashboard">
+        <div><time dateTime={model.generatedAt}>{dashboardDate(model.generatedAt)}</time><h1>{dashboardGreeting(model.generatedAt)}, {model.viewer.displayName}</h1><p>{model.context.levelName} · {model.context.groupLabel} · {model.context.attemptLabel}</p></div>
+      </header>
 
       <div className="dashboard-command-layout">
         <main className="dashboard-command-main">
           <section className="dashboard-focus-card" aria-labelledby="dashboard-focus-title">
-            <div className="dashboard-focus-card__content">
-              <span className="dashboard-focus-card__eyebrow"><Icon name="sparkles" size={15}/> Today&apos;s focus</span>
-              <h2 id="dashboard-focus-title">{model.recommendation.title}</h2>
-              <p>{model.recommendation.description}</p>
-              <div className="dashboard-focus-card__actions">
-                <Link className="dashboard-focus-card__primary" href={model.recommendation.href}>Start studying <Icon name="arrow" size={14}/></Link>
-                <Link className="dashboard-focus-card__secondary" href="/planner/today">View today&apos;s plan</Link>
-              </div>
-            </div>
-            <div className="dashboard-focus-card__illustration" aria-hidden="true"><Icon name="book" size={42}/><span><Icon name="timer" size={25}/></span></div>
+            <div className="dashboard-focus-card__content"><span className="dashboard-focus-card__eyebrow"><Icon name="target" size={15}/> Today&apos;s focus</span><h2 id="dashboard-focus-title">{model.recommendation.title}</h2><p>{model.today.estimatedMinutes ? `${formatMinutes(model.today.estimatedMinutes)} planned · ${model.today.tasks} task${model.today.tasks === 1 ? "" : "s"} remaining` : model.recommendation.description}</p><div className="dashboard-focus-card__actions"><Link className="dashboard-focus-card__primary" href="/study">Start studying <Icon name="arrow" size={14}/></Link><Link className="dashboard-focus-card__secondary" href="/planner/today">View today&apos;s plan</Link></div></div>
+            <div className="dashboard-focus-scene" aria-hidden="true"><span className="dashboard-focus-book dashboard-focus-book--top">CA Study</span><span className="dashboard-focus-book dashboard-focus-book--bottom"/><span className="dashboard-focus-cup">Small<br/>Steps</span></div>
           </section>
 
-          <section className="dashboard-metric-strip" aria-label="Study overview">
-            <Link href="/study" className="dashboard-metric-card"><span><Icon name="timer" size={18}/></span><div><small>Study time this week</small><strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><em>{targetPercent}% of weekly target</em></div></Link>
-            <Link href="/activity" className="dashboard-metric-card"><span><Icon name="sparkles" size={18}/></span><div><small>Study streak</small><strong>{model.study.streakDays} day{model.study.streakDays === 1 ? "" : "s"}</strong><em>{model.study.streakDays ? "Keep it going" : "Start today"}</em></div></Link>
-            <Link href="/progress" className="dashboard-metric-card"><span><Icon name="chart" size={18}/></span><div><small>Syllabus completed</small><strong>{model.progress.overallPercent}%</strong><em>{model.context.chapterCount} chapters tracked</em></div></Link>
+          <section className="dashboard-metric-strip dashboard-metric-strip--intended" aria-label="Study overview">
+            <Link href="/study" className="dashboard-metric-card"><span><Icon name="timer" size={21}/></span><div><strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><small>This week</small></div></Link>
+            <Link href="/activity" className="dashboard-metric-card"><span><Icon name="sparkles" size={21}/></span><div><strong>{model.study.streakDays} day{model.study.streakDays === 1 ? "" : "s"}</strong><small>streak</small></div></Link>
+            <Link href="/progress" className="dashboard-metric-card"><span><Icon name="book" size={21}/></span><div><strong>{model.progress.overallPercent}%</strong><small>Syllabus completed</small></div></Link>
           </section>
 
-          <Card className="dashboard-continue-card">
-            <CardHeader title="Continue where you left off" action={<Link className="ui-text-link" href={model.recommendation.href}>Open <Icon name="arrow" size={13}/></Link>}/>
-            <CardBody><div className="dashboard-next-card__row"><span className="dashboard-next-card__icon"><Icon name="target" size={18}/></span><div><small className="dashboard-next-card__eyebrow">Next up</small><strong>{model.recommendation.title}</strong><p>{model.recommendation.description}</p></div></div></CardBody>
-          </Card>
+          <Card className="dashboard-continue-card"><CardHeader title="Continue where you left off"/><CardBody>{continueSubject ? <div className="dashboard-continue-row" aria-label="Next up"><span><Icon name="notes" size={18}/></span><div><strong>{continueSubject.title}</strong><small>{continueSubject.groupName}</small></div><i><b style={{ width: `${continueSubject.percent}%` }}/></i><em>{continueSubject.percent}%</em><Link href={`/subjects/${continueSubject.slug}/progress`}>Continue</Link></div> : <div className="dashboard-panel-empty">Choose a subject to continue studying.</div>}</CardBody></Card>
 
-          <Card className="dashboard-actions-card dashboard-actions-card--horizontal">
-            <CardHeader title="Quick actions"/>
-            <CardBody><DashboardQuickActions actions={model.quickActions}/></CardBody>
-          </Card>
+          <Card className="dashboard-actions-card dashboard-actions-card--horizontal"><CardHeader title="Quick actions"/><CardBody><DashboardQuickActions actions={intendedActions}/></CardBody></Card>
         </main>
 
         <aside className="dashboard-command-rail" aria-label="Attempt and community overview">
