@@ -63,8 +63,10 @@ test("pricing and billing have dedicated mobile breakpoints and overflow-safe pa
   assert.match(css, /\.phase11-plan-grid\{grid-template-columns:1fr\}/);
 });
 
-test("server-side entitlement checks cover retained protected Phase 11 integrations while Today remains core", () => {
-  assert.match(read("app/(student)/analytics/forecast/page.tsx"), /analytics\.forecast/);
+test("server-side entitlement checks cover retained protected Phase 11 integrations while core planning and forecast remain Free", () => {
+  const forecast = read("app/(student)/analytics/forecast/page.tsx");
+  assert.match(forecast, /baseline forecast is part of Free/);
+  assert.doesNotMatch(forecast, /analytics\.forecast|getEntitlementForUser/);
   assert.match(read("app/api/community/channels/[channel]/messages/route.ts"), /community\.attachments/);
   assert.match(read("lib/billing/service.ts"), /resources\.storage/);
   assert.doesNotMatch(read("app/api/planner/today/route.ts"), /planner\.smart|getEntitlementForUser/);

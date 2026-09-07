@@ -75,7 +75,7 @@ test("Product Phase 9 uses verified attempt dates only and the forecast route ex
   assert.doesNotMatch(service, /attemptMonthAnchor|attempt_month/);
   assert.match(route, /No personalised completion date is shown yet/);
   assert.match(route, /selected attempt month alone is not enough/i);
-  assert.match(route, /Baseline · not Mentor/);
+  assert.match(route, /Baseline · Free/);
   assert.doesNotMatch(route, /getForecastPageModel/);
 });
 
