@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
+import { generateOwnedFullBackupTarChunks } from "./backup";
 import { fetchOwnedProgressData } from "./progress-data.mjs";
 import { buildProgressPdf } from "./progress-pdf.mjs";
 import { generateOwnedStudyCsvChunks } from "./study-data.mjs";
@@ -52,10 +53,30 @@ function createCsvStream(iterator: AsyncGenerator<string, void, unknown>) {
   });
 }
 
+function createBinaryStream(iterator: AsyncGenerator<Uint8Array, void, unknown>) {
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const item = await iterator.next();
+      if (item.done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(item.value);
+    },
+    async cancel() {
+      await iterator.return(undefined);
+    },
+  });
+}
+
 export function createOwnedStudyCsvStream(userId: string, db: HotD1Database = getHotD1Database()) {
   return createCsvStream(generateOwnedStudyCsvChunks(db, userId));
 }
 
 export function createOwnedTestHistoryCsvStream(userId: string, db: HotD1Database = getHotD1Database()) {
   return createCsvStream(generateOwnedTestHistoryCsvChunks(db, userId));
+}
+
+export function createOwnedFullBackupStream(userId: string, db: HotD1Database = getHotD1Database()) {
+  return createBinaryStream(generateOwnedFullBackupTarChunks(db, userId));
 }
