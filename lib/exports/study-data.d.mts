@@ -35,6 +35,7 @@ export type StudyExportDatabase = {
 };
 
 export const STUDY_EXPORT_BATCH_SIZE: number;
+export const STUDY_EXPORT_MAX_BATCH_SIZE: number;
 export const STUDY_CSV_COLUMNS: readonly (keyof StudyExportRow)[];
 export const OWNED_STUDY_FIRST_PAGE_SQL: string;
 export const OWNED_STUDY_NEXT_PAGE_SQL: string;
