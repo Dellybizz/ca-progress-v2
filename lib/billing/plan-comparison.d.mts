@@ -11,7 +11,7 @@ export type PlanComparisonRow = Readonly<{
   key: string;
   label: string;
   featureKey?: string;
-  kind?: "storage";
+  kind?: "storage" | "planned";
   detail: string;
 }>;
 
