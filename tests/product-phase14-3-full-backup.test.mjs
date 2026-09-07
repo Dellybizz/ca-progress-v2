@@ -143,7 +143,7 @@ test("full backup zero-row datasets are valid and oversized batches are clamped"
   const dataset = FULL_BACKUP_DATASETS[0];
   const empty = fakeDatasetDb([], dataset);
   const pages = [];
-  for await (const page of iterateOwnedBackupDatasetPages(empty, "owner-1")) pages.push(page);
+  for await (const page of iterateOwnedBackupDatasetPages(empty, "owner-1", dataset)) pages.push(page);
   assert.deepEqual(pages, [[]]);
 
   const one = fakeDatasetDb([{ __backup_rowid: 1, owner: "owner-1", user_id: "owner-1" }], dataset);
