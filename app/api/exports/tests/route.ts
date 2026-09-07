@@ -8,7 +8,9 @@ export const dynamic = "force-dynamic";
 const PRIVATE_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0",
   Pragma: "no-cache",
+  Vary: "Cookie",
   "X-Content-Type-Options": "nosniff",
+  "Cross-Origin-Resource-Policy": "same-origin",
 };
 
 export async function GET() {
@@ -21,8 +23,8 @@ export async function GET() {
   }
 
   const billing = await getBillingModel();
-  const tier = billing.currentPlan?.tier_key ?? "free";
-  if (!canUseExport(tier, "test_history_csv")) {
+  const tier = billing.mode === "ready" ? (billing.currentPlan?.tier_key ?? "free") : "free";
+  if (billing.mode !== "ready" || !canUseExport(tier, "test_history_csv")) {
     return Response.json({ error: "Test History CSV export requires Pro or Premium." }, {
       status: 403,
       headers: PRIVATE_HEADERS,
