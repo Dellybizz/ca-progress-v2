@@ -8,6 +8,7 @@ export const PLAN_POLICY: Readonly<Record<PlanTier, Readonly<{
   tier: PlanTier;
   productPlan: ProductPlanLabel;
   rank: number;
+  monthlyPriceInr: number;
   storageQuotaMegabytes: number;
   storageQuotaBytes: number;
 }>>>;
@@ -17,6 +18,7 @@ export function normalizePlanTier(value: unknown): PlanTier;
 export function productPlanLabel(value: unknown): ProductPlanLabel;
 export function tierRank(value: unknown): number;
 export function meetsMinimumTier(value: unknown, requiredTier: unknown): boolean;
+export function monthlyPriceInr(value: unknown): number;
 export function storageQuotaMegabytes(value: unknown): number;
 export function storageQuotaBytes(value: unknown): number;
 export function canUsePlanFeature(value: unknown, featureKey: string): boolean;
