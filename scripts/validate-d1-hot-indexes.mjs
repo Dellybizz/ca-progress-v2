@@ -8,6 +8,8 @@ const database = "ca-progress-v2-retirement-validation";
 const persistTo = mkdtempSync(join(tmpdir(), "ca-progress-d1-indexes-"));
 const configPath = join(process.cwd(), `.wrangler-d1-validation-${process.pid}.json`);
 const base = ["wrangler", "--config", configPath];
+const icaiBootstrapMigration = "d1/migrations/0024_icai_source_bootstrap.sql";
+const seededSourceIds = ["icai-final-course", "icai-foundation-course", "icai-intermediate-course"];
 
 function run(args) {
   return execFileSync(wrangler, [...base, ...args], {
@@ -62,6 +64,12 @@ try {
 
   run(["d1", "migrations", "apply", database, "--local", "--persist-to", persistTo]);
   run(["d1", "migrations", "apply", database, "--local", "--persist-to", persistTo]);
+
+  // Retained production D1 reapplies additive migrations directly. Reapply the ICAI
+  // bootstrap twice here to prove its upsert is safe outside Wrangler's journal too.
+  run(["d1", "execute", database, "--local", "--persist-to", persistTo, "--file", icaiBootstrapMigration]);
+  run(["d1", "execute", database, "--local", "--persist-to", persistTo, "--file", icaiBootstrapMigration]);
+
   const indexes = execute("SELECT name FROM sqlite_master WHERE type='index';").map((row) => row.name);
   for (const name of expectedIndexes) assert(indexes.includes(name), `Missing index ${name}`);
 
@@ -73,7 +81,28 @@ try {
   assert(execute("PRAGMA foreign_key_check;").length === 0, "D1 foreign-key check failed");
   const migrationRows = execute("SELECT name FROM d1_migrations WHERE name='0009_phase5_hot_query_indexes.sql';");
   assert(migrationRows.length === 1, "Hot-query migration was not recorded exactly once");
-  console.log("Retained D1 hot-query index validation PASS (idempotent apply, intended plans, foreign keys).");
+
+  const bootstrapJournalRows = execute("SELECT name FROM d1_migrations WHERE name='0024_icai_source_bootstrap.sql';");
+  assert(bootstrapJournalRows.length === 1, "ICAI source bootstrap Wrangler migration was not recorded exactly once");
+  const bootstrapSchemaRows = execute("SELECT version FROM _ca_schema_migrations WHERE version='0024';");
+  assert(bootstrapSchemaRows.length === 1, "ICAI source bootstrap migration was not recorded exactly once");
+
+  const seededSources = execute(`SELECT id,official_url,adapter_key,level_codes,is_active FROM icai_sources WHERE id IN (${seededSourceIds.map((id) => `'${id}'`).join(",")}) AND is_active=1 ORDER BY id;`);
+  assert(seededSources.length === 3, "ICAI source bootstrap did not retain exactly three seeded active sources");
+  const expectedSources = new Map([
+    ["icai-final-course", ["https://www.icai.org/category/final-course", "final"]],
+    ["icai-foundation-course", ["https://www.icai.org/category/foundation-course", "foundation"]],
+    ["icai-intermediate-course", ["https://www.icai.org/category/intermediate-course", "intermediate"]],
+  ]);
+  for (const source of seededSources) {
+    const expected = expectedSources.get(String(source.id));
+    assert(expected, `Unexpected seeded ICAI source ${source.id}`);
+    assert(source.official_url === expected[0], `Unexpected URL for ${source.id}`);
+    assert(source.adapter_key === "resource_hub", `Unexpected adapter for ${source.id}`);
+    assert(JSON.stringify(JSON.parse(String(source.level_codes))) === JSON.stringify([expected[1]]), `Unexpected level scope for ${source.id}`);
+  }
+
+  console.log("Retained D1 hot-query and ICAI source bootstrap validation PASS (idempotent apply, intended plans, foreign keys, three official seeded sources).");
 } finally {
   rmSync(persistTo, { recursive: true, force: true });
   rmSync(configPath, { force: true });
