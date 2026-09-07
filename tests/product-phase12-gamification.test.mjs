@@ -116,14 +116,19 @@ test("Product Phase 12 reconciliation reads canonical academic evidence but writ
 test("Product Phase 12 private API and Activity UI expose motivation metrics without redefining readiness", () => {
   const route = read("app/api/gamification/route.ts");
   const activity = read("app/(student)/activity/page.tsx");
+  const client = read("components/gamification/activity-gamification-client.tsx");
   assert.match(route, /optionalUser/);
   assert.match(route, /getGamificationSummary/);
   assert.match(route, /private, no-store/);
   assert.doesNotMatch(route, /export async function POST/);
-  assert.match(activity, /getGamificationSummary/);
+  assert.match(activity, /ActivityGamificationClient/);
   assert.match(activity, /never change syllabus progress, revision readiness or test readiness/);
-  assert.match(activity, /Professional level/);
-  assert.match(activity, /Achievements/);
+  assert.doesNotMatch(activity, /getGamificationSummary|getPhase13UserModel/);
+  assert.match(client, /\/api\/gamification/);
+  assert.match(client, /Professional level/);
+  assert.match(client, /Current streak/);
+  assert.match(client, /Achievements/);
+  assert.match(client, /Recent XP/);
 });
 
 test("Product Phase 12 deployment applies and verifies additive migration 0022", () => {
