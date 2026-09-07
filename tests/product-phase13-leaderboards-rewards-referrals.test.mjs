@@ -123,13 +123,19 @@ test("Product Phase 13 subscription rewards overlay existing plan definitions wi
 });
 
 test("Product Phase 13 ships an activation referral link and the explicit 100-hour share milestone", () => {
-  const component = read("components/gamification/phase13-panel.tsx");
+  const panel = read("components/gamification/phase13-panel.tsx");
+  const client = read("components/gamification/activity-gamification-client.tsx");
   const activity = read("app/(student)/activity/page.tsx");
-  assert.match(component, /\/activity\?ref=/);
-  assert.match(component, /Copy referral link/);
-  assert.match(component, /only prefills the code/);
-  assert.match(component, /Apply code/);
-  assert.match(activity, /meaningfulStudyMinutes >= 100 \* 60/);
-  assert.match(activity, /100h study milestone/);
-  assert.match(activity, /100\+ meaningful study hours/);
+  assert.match(panel, /\/activity\?ref=/);
+  assert.match(panel, /Copy referral link/);
+  assert.match(panel, /only prefills the code/);
+  assert.match(panel, /Apply code/);
+  assert.match(activity, /ActivityGamificationClient/);
+  assert.doesNotMatch(activity, /getPhase13UserModel/);
+  assert.match(client, /meaningfulMinutes >= 100 \* 60/);
+  assert.match(client, /100h study milestone/);
+  assert.match(client, /100\+ meaningful study hours/);
+  assert.match(client, /effectiveLevel/);
+  assert.match(client, /hundredHourShareCard/);
+  assert.match(client, /Phase13Panel/);
 });
