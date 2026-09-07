@@ -111,7 +111,7 @@ test("Product Phase 13 subscription rewards overlay existing plan definitions wi
   assert.match(service, /subscription_plans/);
   assert.match(service, /reward_tier/);
   assert.match(billing, /getEligibleLeaderboardRewardPlan/);
-  assert.match(billing, /reward\.rank > activeRank/);
+  assert.match(billing, /tierRank\(rewardTier\) > tierRank\(activeTier\)/);
   assert.match(eligibility, /anti_cheat_flags/);
   assert.match(eligibility, /status IN \('pending','upheld'\)/);
   assert.match(eligibility, /SET status='withheld'/);
