@@ -77,7 +77,11 @@ function fakeDatasetDb(sourceRows, dataset) {
                 .filter((row) => row.owner === values[0] && (cursor === null || row.__backup_rowid > cursor))
                 .sort((a, b) => a.__backup_rowid - b.__backup_rowid)
                 .slice(0, limit)
-                .map(({ owner: _owner, ...row }) => row);
+                .map((row) => {
+                  const copy = { ...row };
+                  delete copy.owner;
+                  return copy;
+                });
               return { results: rows };
             },
           };
@@ -143,10 +147,14 @@ test("full backup zero-row datasets are valid and oversized batches are clamped"
   assert.deepEqual(pages, [[]]);
 
   const one = fakeDatasetDb([{ __backup_rowid: 1, owner: "owner-1", user_id: "owner-1" }], dataset);
-  for await (const _page of iterateOwnedBackupDatasetPages(one, "owner-1", dataset, { batchSize: 50_000 })) {}
+  for await (const page of iterateOwnedBackupDatasetPages(one, "owner-1", dataset, { batchSize: 50_000 })) {
+    assert.ok(Array.isArray(page));
+  }
   assert.equal(one.binds[0].at(-1), 500);
   await assert.rejects(async () => {
-    for await (const _page of iterateOwnedBackupDatasetPages(empty, "", dataset)) {}
+    for await (const page of iterateOwnedBackupDatasetPages(empty, "", dataset)) {
+      assert.ok(Array.isArray(page));
+    }
   }, /Authenticated user id is required/);
 });
 
