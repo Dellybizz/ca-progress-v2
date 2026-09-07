@@ -193,7 +193,7 @@ test("backup implementation never serializes private storage locators or signed 
   assert.match(backup, /storage_locators_exported: false/);
   assert.match(backup, /signed_urls_exported: false/);
   assert.doesNotMatch(backup, /createR2PresignedUrl|signed\.url|R2_ACCESS_KEY|R2_SECRET|R2_S3_ENDPOINT/);
-  assert.match(backup, /getPrivateResourceObject/);
+  assert.match(backup, /getResourceR2Bucket/);
 });
 
 test("Premium backup route is private, fail-closed, and requester-owned only", () => {
