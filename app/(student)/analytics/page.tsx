@@ -8,6 +8,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPhase9AnalyticsModel } from "@/lib/analytics/phase9";
+import { optionalUser } from "@/lib/auth/server";
+import { getPlanFeatureAccessForUser } from "@/lib/billing/feature-access";
 import { getCurrentPhase8Snapshot } from "@/lib/planner/phase8";
 import { getProgressPageModel } from "@/lib/progress/service";
 import { getStudyPageModel } from "@/lib/study/service";
@@ -28,11 +30,13 @@ function studyTime(seconds: number) {
 }
 
 export default async function AnalyticsPage() {
-  const [model, study, planning, phase9] = await Promise.all([
+  const identity = await optionalUser();
+  const [model, study, planning, phase9, advancedAnalytics] = await Promise.all([
     getProgressPageModel(),
     getStudyPageModel(),
     getCurrentPhase8Snapshot(),
     getPhase9AnalyticsModel(),
+    identity ? getPlanFeatureAccessForUser(identity.id, "advanced_analytics") : Promise.resolve(null),
   ]);
 
   if (model.mode === "guest") return <div className="progress-page">
@@ -54,11 +58,14 @@ export default async function AnalyticsPage() {
       preview={false}
       eyebrow="Analytics"
       title="Actionable analytics from your recorded study data."
-      description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Phase 9 uses completed study sessions, chapter progress, revision records, append-only test attempts and verified attempt dates. No manually maintained totals are used. No manual studyHours array is maintained. It does not use XP as readiness or pretend sparse data is a forecast.`}
+      description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Core analytics remain available on Free. Pro adds the deeper weakness, revision, consistency and test-insight analysis. No manually maintained totals are used, and XP is never treated as readiness.`}
       actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link><Link href="/analytics/forecast">Forecast</Link></div>}
     />
 
-    {phase9.mode === "ready" ? <Phase9ActionableAnalytics model={phase9}/> : null}
+    {phase9.mode === "ready" ? advancedAnalytics?.allowed ? <Phase9ActionableAnalytics model={phase9}/> : <Card>
+      <CardHeader title="Advanced analytics · Pro" description="Weakness, revision, consistency and test-insight analysis is a Pro capability. Your core analytics and baseline forecast remain available below and in Forecast."/>
+      <CardBody><Link href="/pricing" className="ui-button ui-button--primary">Compare plans</Link></CardBody>
+    </Card> : null}
 
     {studyAnalytics ? <>
       <section className="phase6-metric-strip">
@@ -74,7 +81,7 @@ export default async function AnalyticsPage() {
     </> : null}
 
     {planning ? <Card>
-      <CardHeader title="Goal progress" description="These values use the same Phase 8 recorded-state goal calculation shown in Planner and Today." action={<Badge tone="brand">Recorded state</Badge>}/>
+      <CardHeader title="Goal progress" description="These values use the same recorded-state goal calculation shown in Planner and Today." action={<Badge tone="brand">Recorded state</Badge>}/>
       <CardBody>{planning.goals.length ? <div className="analytics-list">{planning.goals.map((goal) => <div key={goal.id}><span><strong>{goal.title}</strong><small>{goal.currentValue}/{goal.targetValue} {goal.targetUnit} · due {goal.dueDate}</small></span><b>{goal.progressPercent}%</b><Meter value={goal.progressPercent}/></div>)}</div> : <EmptyState compact icon="target" title="No goals yet" description="Add a measurable study, completion, revision or test goal to track it here and in Today."/>}</CardBody>
     </Card> : null}
 
