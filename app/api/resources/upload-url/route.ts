@@ -13,6 +13,8 @@ const MIME_BY_EXTENSION: Record<string, string[]> = {
   webp: ["image/webp"], doc: ["application/msword"], docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
 };
 
+type D1RunResult = { meta?: { changes?: number } };
+
 function error(message: string, status: number, code: string) {
   return NextResponse.json({ error: message, code }, { status, headers: { "Cache-Control": "private, no-store" } });
 }
@@ -41,10 +43,20 @@ async function createUploadIntent(request: Request) {
   catch { return error("Direct R2 upload is temporarily unavailable.", 503, "R2_SIGNING_NOT_CONFIGURED"); }
 
   const uploadId = crypto.randomUUID();
+  const issuedAt = new Date().toISOString();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
   try {
-    await getHotD1Database().prepare("INSERT INTO r2_upload_intents(id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)")
-      .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt).run();
+    const reservation = await getHotD1Database().prepare(`
+      INSERT INTO r2_upload_intents(id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at)
+      SELECT ?1,?2,?3,?4,?5,?6,?7,?8
+      WHERE (
+        COALESCE((SELECT SUM(size_bytes) FROM uploaded_resources WHERE owner_user_id=?2), 0)
+        + COALESCE((SELECT SUM(expected_size_bytes) FROM r2_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?9), 0)
+        + ?6
+      ) <= ?10
+    `)
+      .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt, issuedAt, access.limitBytes).run() as D1RunResult;
+    if (Number(reservation.meta?.changes ?? 0) !== 1) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
   } catch {
     return error("Upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");
   }
