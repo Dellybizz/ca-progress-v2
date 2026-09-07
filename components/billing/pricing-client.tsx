@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import type { BillingCycle, PlanEntitlement, SubscriptionPlan } from "@/lib/billing/service";
+import { PLAN_COMPARISON_COLUMNS, PLAN_COMPARISON_ROWS, planComparisonValue } from "@/lib/billing/plan-comparison.mjs";
+import { monthlyPriceInr, productPlanLabel, storageQuotaMegabytes } from "@/lib/billing/plan-policy.mjs";
 
 type CheckoutResult = {
   razorpay_order_id: string;
@@ -46,29 +48,29 @@ function loadCheckout() {
   });
 }
 
-function money(plan: SubscriptionPlan) {
-  if (plan.tier_key === "free") return "Free";
-  if (plan.price_subunits === null) return "Price pending";
+function canonicalPrice(plan: SubscriptionPlan, cycle: Exclude<BillingCycle, "free">) {
+  const monthly = monthlyPriceInr(plan.tier_key);
+  const rupees = cycle === "annual" ? monthly * 12 : monthly;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: plan.currency,
+    currency: "INR",
     maximumFractionDigits: 0,
-  }).format(plan.price_subunits / 100);
+  }).format(rupees);
 }
 
-function storageLabel(entitlements: PlanEntitlement[], planId: string) {
-  const rule = entitlements.find(
-    (item) => item.plan_id === planId && item.feature_key === "resources.storage",
-  );
-  if (!rule || rule.limit_value === null) {
-    return "Private resource storage allowance pending configuration";
-  }
-  return `${Number(rule.limit_value).toLocaleString("en-IN")} MB private resource storage`;
+function checkoutMatchesPolicy(plan: SubscriptionPlan, cycle: Exclude<BillingCycle, "free">) {
+  if (plan.tier_key === "free") return true;
+  const multiplier = cycle === "annual" ? 12 : 1;
+  return Boolean(plan.checkout_enabled) && plan.currency === "INR" && plan.price_subunits === monthlyPriceInr(plan.tier_key) * multiplier * 100;
+}
+
+function storageLabel(plan: SubscriptionPlan) {
+  const megabytes = storageQuotaMegabytes(plan.tier_key);
+  return megabytes >= 1024 ? `${Number((megabytes / 1024).toFixed(1))} GB private storage` : `${megabytes} MB private storage`;
 }
 
 export function PricingClient({
   plans,
-  entitlements,
   authenticated,
   currentPlanId,
 }: {
@@ -94,6 +96,7 @@ export function PricingClient({
       ].filter(Boolean) as SubscriptionPlan[],
     [plans, cycle],
   );
+  const currentTier = plans.find((plan) => plan.id === currentPlanId)?.tier_key ?? null;
 
   async function purchase(plan: SubscriptionPlan) {
     if (plan.tier_key === "free") {
@@ -104,10 +107,10 @@ export function PricingClient({
       router.push(`/login?next=${encodeURIComponent("/pricing")}`);
       return;
     }
-    if (!plan.checkout_enabled || plan.price_subunits === null) {
+    if (!checkoutMatchesPolicy(plan, cycle)) {
       setNotice({
         tone: "info",
-        text: `${plan.name} checkout is intentionally disabled until its server-side price and Razorpay staging credentials are configured.`,
+        text: `${productPlanLabel(plan.tier_key)} checkout is disabled until the billing row matches the canonical ₹${monthlyPriceInr(plan.tier_key)}/month Product Phase 15 price.`,
       });
       return;
     }
@@ -143,7 +146,7 @@ export function PricingClient({
         amount: order.amount,
         currency: order.currency,
         name: "CA Progress",
-        description: `${order.planName} · ${order.billingCycle}`,
+        description: `${productPlanLabel(plan.tier_key)} · ${order.billingCycle}`,
         order_id: order.orderId,
         retry: { enabled: true, max_count: 3 },
         theme: { color: "#4f46e5" },
@@ -170,11 +173,7 @@ export function PricingClient({
               reconciliation?: { status?: string };
             };
             setBusy(null);
-            if (!verifyResponse.ok) {
-              router.push("/billing?payment=pending");
-              return;
-            }
-            if (verified.providerStatus !== "captured") {
+            if (!verifyResponse.ok || verified.providerStatus !== "captured") {
               router.push("/billing?payment=pending");
               return;
             }
@@ -217,11 +216,11 @@ export function PricingClient({
         </div>
       ) : null}
 
-      <section className="phase11-plan-grid">
+      <section className="phase11-plan-grid" aria-label="CA Progress plans">
         {visible.map((plan) => {
-          const current = plan.id === currentPlanId;
-          const configured =
-            plan.tier_key === "free" || (plan.checkout_enabled && plan.price_subunits !== null);
+          const current = plan.tier_key === currentTier;
+          const configured = checkoutMatchesPolicy(plan, cycle);
+          const productLabel = productPlanLabel(plan.tier_key);
           return (
             <article
               key={plan.id}
@@ -229,8 +228,8 @@ export function PricingClient({
             >
               <div className="phase11-plan-top">
                 <div>
-                  <span className="phase11-tier">{plan.tier_key}</span>
-                  <h2>{plan.name}</h2>
+                  <span className="phase11-tier">{productLabel}</span>
+                  <h2>{productLabel}</h2>
                 </div>
                 {current ? (
                   <span className="phase11-current">
@@ -238,22 +237,20 @@ export function PricingClient({
                   </span>
                 ) : plan.tier_key === "pro" ? (
                   <span className="phase11-popular">
-                    <Icon name="sparkles" size={14} />Highest allowance
+                    <Icon name="sparkles" size={14} />Full access
                   </span>
                 ) : null}
               </div>
-              <p>{plan.tagline}</p>
+              <p>{plan.tier_key === "free" ? "A complete core study system with no payment required." : plan.tier_key === "basic" ? "Advanced planning, exports and collaboration for active students." : "The deepest insight, history and backup layer."}</p>
               <div className="phase11-price">
-                <strong>{money(plan)}</strong>
-                {plan.tier_key !== "free" && plan.price_subunits !== null ? (
-                  <span>/{cycle === "monthly" ? "month" : "year"}</span>
-                ) : null}
+                <strong>{canonicalPrice(plan, cycle)}</strong>
+                <span>/{cycle === "monthly" ? "month" : "year"}</span>
               </div>
               <ul>
-                <li><Icon name="check" size={16} />Full current V2 study toolkit</li>
-                <li><Icon name="check" size={16} />Smart Planner, forecast and Community</li>
-                <li><Icon name="check" size={16} />{storageLabel(entitlements, plan.id)}</li>
-                <li><Icon name="shield" size={16} />Server-enforced account entitlements</li>
+                <li><Icon name="check" size={16} />Core Today → Study → Progress loop</li>
+                <li><Icon name="check" size={16} />{storageLabel(plan)}</li>
+                <li><Icon name="check" size={16} />{plan.tier_key === "free" ? "Core Analytics, Buddy and gamification" : plan.tier_key === "basic" ? "Advanced planner, CSV exports and expanded Buddy" : "Premium insights, full history and full backup"}</li>
+                <li><Icon name="shield" size={16} />Server-enforced account access</li>
               </ul>
               <button
                 className={`ui-button ${plan.tier_key === "pro" ? "ui-button--primary" : "ui-button--secondary"}`}
@@ -267,12 +264,12 @@ export function PricingClient({
                     : plan.tier_key === "free"
                       ? "Continue free"
                       : configured
-                        ? `Choose ${plan.name}`
+                        ? `Choose ${productLabel}`
                         : "Checkout not configured"}
               </button>
               {!configured && plan.tier_key !== "free" ? (
                 <small className="phase11-config-note">
-                  No price is invented in V2. This plan becomes purchasable only after a server-side staging price and Razorpay credentials are configured.
+                  Checkout stays locked if the server billing row differs from the canonical Product Phase 15 price.
                 </small>
               ) : null}
             </article>
@@ -280,12 +277,46 @@ export function PricingClient({
         })}
       </section>
 
+      <section className="phase15-plan-comparison" aria-labelledby="phase15-plan-comparison-title">
+        <div className="phase11-security-note">
+          <Icon name="sparkles" />
+          <div>
+            <strong id="phase15-plan-comparison-title">Compare plans</strong>
+            <p>Free remains genuinely usable. Paid plans add capability without deleting existing data when you later downgrade.</p>
+          </div>
+        </div>
+        <div className="phase15-plan-comparison__scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Capability</th>
+                {PLAN_COMPARISON_COLUMNS.map((column) => (
+                  <th scope="col" key={column.tier}>
+                    {column.label}<br/><small>₹{column.monthlyPriceInr}/month{currentTier === column.tier ? " · Current" : ""}</small>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {PLAN_COMPARISON_ROWS.map((row) => (
+                <tr key={row.key}>
+                  <th scope="row">{row.label}<small>{row.detail}</small></th>
+                  {PLAN_COMPARISON_COLUMNS.map((column) => (
+                    <td key={column.tier}>{planComparisonValue(row, column.tier)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div className="phase11-security-note">
         <Icon name="shield" />
         <div>
-          <strong>Payment state is never trusted from the browser.</strong>
+          <strong>Payment and feature state are never trusted from the browser.</strong>
           <p>
-            The server creates the Razorpay amount from the selected plan row, verifies checkout signatures and Razorpay payment state, and independently reconciles signed webhooks.
+            The server resolves the authenticated account, applies subscription lifecycle rules, checks paid feature floors, and independently verifies Razorpay payment state before activating a plan.
           </p>
         </div>
       </div>
