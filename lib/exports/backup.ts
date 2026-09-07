@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getPrivateResourceObject } from "@/lib/resources/r2";
+import { getResourceR2Bucket } from "@/lib/resources/r2";
 import {
   FULL_BACKUP_DATASETS,
   FULL_BACKUP_EXCLUDED_OPERATIONAL_TABLES,
@@ -13,8 +13,6 @@ import { generateTarChunks, sanitizeTarPath, textTarEntry } from "./tar.mjs";
 type BackupDatabase = Parameters<typeof iterateOwnedBackupDatasetPages>[0];
 type BackupOptions = { generatedAt?: string; batchSize?: number };
 type InternalFileRow = Record<string, unknown> & { __backup_rowid?: number };
-
-const encoder = new TextEncoder();
 
 function cleanArchiveLeaf(value: unknown, fallback: string) {
   const clean = String(value ?? "")
@@ -64,6 +62,11 @@ function binaryTarEntry(path: string, object: { size: number; body: ReadableStre
   return { path: sanitizeTarPath(path), size: Number(object.size), body: object.body, mtime };
 }
 
+async function getPrivateBackupObject(locator: unknown) {
+  if (typeof locator !== "string" || !locator) return null;
+  return getResourceR2Bucket().get(locator);
+}
+
 async function* generateOwnedFullBackupEntries(db: BackupDatabase, userId: string, options: BackupOptions = {}) {
   if (typeof userId !== "string" || !userId.trim()) throw new Error("Authenticated user id is required for exports.");
   const generatedAt = options.generatedAt ?? new Date().toISOString();
@@ -99,7 +102,7 @@ async function* generateOwnedFullBackupEntries(db: BackupDatabase, userId: strin
     const id = cleanArchiveLeaf(row.id, "resource");
     const filename = cleanArchiveLeaf(row.safe_filename ?? row.original_filename, "file");
     const archivePath = sanitizeTarPath(`files/resources/${id}-${filename}`);
-    const object = typeof row.storage_path === "string" ? await getPrivateResourceObject(row.storage_path) : null;
+    const object = await getPrivateBackupObject(row.storage_path);
     const included = Boolean(object);
     yield jsonEntry(`data/uploaded-resources/${id}.json`, safeResourceMetadata(row, archivePath, included), mtime);
     if (!object) {
@@ -116,7 +119,7 @@ async function* generateOwnedFullBackupEntries(db: BackupDatabase, userId: strin
     const id = cleanArchiveLeaf(row.id, "attachment");
     const filename = cleanArchiveLeaf(row.filename, "file");
     const archivePath = sanitizeTarPath(`files/test-attachments/${id}-${filename}`);
-    const object = typeof row.object_key === "string" ? await getPrivateResourceObject(row.object_key) : null;
+    const object = await getPrivateBackupObject(row.object_key);
     const included = Boolean(object);
     yield jsonEntry(`data/test-attachments/${id}.json`, safeTestMetadata(row, archivePath, included), mtime);
     if (!object) {
@@ -151,8 +154,4 @@ export async function* generateOwnedFullBackupTarChunks(db: BackupDatabase, user
   const generatedAt = options.generatedAt ?? new Date().toISOString();
   const mtime = Math.floor(Date.parse(generatedAt) / 1000);
   yield* generateTarChunks(generateOwnedFullBackupEntries(db, userId, { ...options, generatedAt }), { mtime });
-}
-
-export function fullBackupContentLengthForText(text: string) {
-  return encoder.encode(text).length;
 }
