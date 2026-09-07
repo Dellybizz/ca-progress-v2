@@ -45,7 +45,9 @@ test("pricing remains configuration-safe and sends only the plan identifier", ()
   const pricing = read("components/billing/pricing-client.tsx");
   assert.match(pricing, /body: JSON\.stringify\(\{ planId: plan\.id \}\)/);
   assert.match(pricing, /Checkout not configured/);
-  assert.match(pricing, /allowance pending configuration/);
+  assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
+  assert.match(pricing, /checkoutMatchesPolicy\(plan, cycle\)/);
+  assert.match(pricing, /Checkout stays locked if the server billing row differs/);
   assert.match(pricing, /\/billing\?payment=success/);
   assert.match(pricing, /\/billing\?payment=pending/);
   assert.match(pricing, /\/billing\?payment=failed/);
