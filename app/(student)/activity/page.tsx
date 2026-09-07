@@ -52,7 +52,11 @@ async function ActivityContent({ initialReferralCode }: { initialReferralCode: s
     <LoginRequired next={nextPath} title="Sign in to view your private activity"/>
   </div>;
 
-  const [gamification, phase13] = await Promise.all([getGamificationSummary(user.id), getPhase13UserModel(user.id)]);
+  // Reconciliation writes an idempotent XP/streak ledger. Keep these reads
+  // sequential so one request never races two reconciliations for the same user.
+  const now = new Date();
+  const gamification = await getGamificationSummary(user.id, now);
+  const phase13 = await getPhase13UserModel(user.id, now, gamification);
   const effectiveLevel = phase13.effectiveLevel;
   const effectiveTotalXp = phase13.effectiveTotalXp;
   const hundredHourShareCard = gamification.streak.meaningfulStudyMinutes >= 100 * 60

@@ -53,7 +53,10 @@ export async function getPhase8TodayModel(): Promise<TodayPlanPageModel | TodayP
   const identity = await optionalUser();
   if (!identity) return base;
   const taskIds = base.items.filter((item) => item.sourceType === "task" && item.sourceId).map((item) => item.sourceId as string);
-  const extensions = await getTaskPlanningExtensions(identity.id, taskIds);
+  // Today must remain usable when an optional planning-extension lookup fails.
+  // Canonical Today items are already present in `base`; extensions only change
+  // fixed-versus-flexible presentation.
+  const extensions = await getTaskPlanningExtensions(identity.id, taskIds).catch(() => new Map());
   const items = base.items.map((item) => {
     if (item.sourceType !== "task" || !item.sourceId) return item;
     const extension = extensions.get(item.sourceId);

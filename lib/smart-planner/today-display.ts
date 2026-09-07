@@ -73,6 +73,7 @@ function fixedTimeFor(item: TodayPlanItem) {
 }
 
 function dateKeyInTimezone(timezone: string, at: Date) {
+  if (!Number.isFinite(at.getTime())) return "";
   try {
     const parts = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(at);
     const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
@@ -93,7 +94,7 @@ function minutesForDate(sessions: SessionEvidenceRow[], date: string, timezone: 
 }
 
 function recordedStreak(sessions: SessionEvidenceRow[], today: string, timezone: string) {
-  const dates = new Set(sessions.map((session) => dateKeyInTimezone(timezone, new Date(session.ended_at))));
+  const dates = new Set(sessions.map((session) => dateKeyInTimezone(timezone, new Date(session.ended_at))).filter(Boolean));
   let streak = 0;
   let cursor = today;
   while (dates.has(cursor)) {

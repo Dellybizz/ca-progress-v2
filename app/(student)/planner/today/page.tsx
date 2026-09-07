@@ -21,7 +21,11 @@ function formatPlanDate(value: string) {
 }
 
 export default async function TodayPlanPage() {
-  const [model, pendingReflection, planning] = await Promise.all([getPhase8TodayModel(), getPendingStudyReflectionPrompt(), getCurrentPhase8Snapshot()]);
+  const [model, pendingReflection, planning] = await Promise.all([
+    getPhase8TodayModel(),
+    getPendingStudyReflectionPrompt().catch(() => null),
+    getCurrentPhase8Snapshot().catch(() => null),
+  ]);
   if (model.mode === "guest") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Today" title="Today’s study plan" description="Sign in to build Today from your selected attempt and real study state."/><Card><CardBody><div className="phase6-empty"><Icon name="calendar"/><strong>Today is ready after sign-in</strong><p>The signed-in plan uses your selected attempt and recorded work. CA Progress does not invent historical performance for a new account.</p></div></CardBody></Card><LoginRequired next="/planner/today" title="Sign in to open Today"/></div>;
   if (model.mode === "setup") return <div className="phase9-page"><PageHeader preview={false} eyebrow="Today" title="Finish the quick setup first." description="Choose your CA level, group, attempt and current preparation state. Detailed progress can be added later."/><Link href="/onboarding?next=%2Fplanner%2Ftoday" className="ui-button ui-button--primary">Continue setup</Link></div>;
   if (!("evidenceMode" in model)) throw new Error("Today display model is incomplete.");

@@ -80,6 +80,10 @@ function localWeekStartKey(localDate: string) {
   return date.toISOString().slice(0, 10);
 }
 
+function validInstant(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
+}
+
 function selectWeeklyBounded<T>(rows: LocalDated<T>[], maxPerWeek: number) {
   const counts = new Map<string, number>();
   const selected: LocalDated<T>[] = [];
@@ -188,7 +192,7 @@ function candidatesFromSources(sources: Awaited<ReturnType<typeof loadCanonicalS
   const candidates: XpCandidate[] = [];
   const streakEvidence: StreakEvidence[] = [];
 
-  const sessionDays = sources.sessions.map((row) => ({ row, localDate: localDateKey(row.ended_at, row.timezone) }));
+  const sessionDays = sources.sessions.flatMap((row) => validInstant(row.ended_at) ? [{ row, localDate: localDateKey(row.ended_at, row.timezone) }] : []);
   const boundedSessions = selectDailyBounded(sessionDays, MAX_SESSION_XP_EVENTS_PER_LOCAL_DAY);
   const boundedSessionIds = new Set(boundedSessions.map((item) => item.row.id));
   for (const item of sessionDays) {
@@ -213,7 +217,7 @@ function candidatesFromSources(sources: Awaited<ReturnType<typeof loadCanonicalS
     });
   }
 
-  const todayDays = sources.today.map((row) => ({ row, localDate: localDateKey(row.completed_at, row.timezone) }));
+  const todayDays = sources.today.flatMap((row) => validInstant(row.completed_at) ? [{ row, localDate: localDateKey(row.completed_at, row.timezone) }] : []);
   const boundedToday = selectDailyBounded(todayDays, MAX_TODAY_XP_EVENTS_PER_LOCAL_DAY);
   const boundedTodayIds = new Set(boundedToday.map((item) => item.row.id));
   for (const item of todayDays) {
@@ -239,26 +243,26 @@ function candidatesFromSources(sources: Awaited<ReturnType<typeof loadCanonicalS
   }
 
   for (const row of sources.progress) {
-    if (row.completed_at) candidates.push({ eventKey: xpEventKey("chapter_completion", row.chapter_id), eventType: "chapter_completion", sourceType: "chapter_progress", sourceId: row.chapter_id, xp: xpForEvent("chapter_completion"), occurredAt: row.completed_at });
-    if (row.revision_1_at) candidates.push({ eventKey: xpEventKey("revision_1", row.chapter_id), eventType: "revision_1", sourceType: "chapter_progress", sourceId: row.chapter_id, xp: xpForEvent("revision_1"), occurredAt: row.revision_1_at });
-    if (row.revision_2_at) candidates.push({ eventKey: xpEventKey("revision_2", row.chapter_id), eventType: "revision_2", sourceType: "chapter_progress", sourceId: row.chapter_id, xp: xpForEvent("revision_2"), occurredAt: row.revision_2_at });
+    if (validInstant(row.completed_at)) candidates.push({ eventKey: xpEventKey("chapter_completion", row.chapter_id), eventType: "chapter_completion", sourceType: "chapter_progress", sourceId: row.chapter_id, xp: xpForEvent("chapter_completion"), occurredAt: row.completed_at });
+    if (validInstant(row.revision_1_at)) candidates.push({ eventKey: xpEventKey("revision_1", row.chapter_id), eventType: "revision_1", sourceType: "chapter_progress", sourceId: row.chapter_id, xp: xpForEvent("revision_1"), occurredAt: row.revision_1_at });
+    if (validInstant(row.revision_2_at)) candidates.push({ eventKey: xpEventKey("revision_2", row.chapter_id), eventType: "revision_2", sourceType: "chapter_progress", sourceId: row.chapter_id, xp: xpForEvent("revision_2"), occurredAt: row.revision_2_at });
   }
-  for (const row of sources.tests) candidates.push({ eventKey: xpEventKey("test", row.id), eventType: "test", sourceType: "test_attempt", sourceId: row.id, xp: xpForEvent("test"), occurredAt: row.completed_at, metadata: { chapterId: row.chapter_id, testStage: row.test_stage, attemptNumber: row.attempt_number } });
+  for (const row of sources.tests) if (validInstant(row.completed_at)) candidates.push({ eventKey: xpEventKey("test", row.id), eventType: "test", sourceType: "test_attempt", sourceId: row.id, xp: xpForEvent("test"), occurredAt: row.completed_at, metadata: { chapterId: row.chapter_id, testStage: row.test_stage, attemptNumber: row.attempt_number } });
 
-  const reflectionDays = sources.reflections.map((row) => ({ row, localDate: localDateKey(row.reflection_saved_at, row.timezone) }));
+  const reflectionDays = sources.reflections.flatMap((row) => validInstant(row.reflection_saved_at) ? [{ row, localDate: localDateKey(row.reflection_saved_at, row.timezone) }] : []);
   for (const item of selectDailyBounded(reflectionDays, MAX_REFLECTION_XP_EVENTS_PER_LOCAL_DAY)) {
     const row = item.row;
     candidates.push({ eventKey: xpEventKey("reflection", row.session_id), eventType: "reflection", sourceType: "study_session_reflection", sourceId: row.session_id, xp: xpForEvent("reflection"), occurredAt: row.reflection_saved_at, metadata: { localDate: item.localDate } });
   }
 
-  const doubtDays = sources.doubts.map((row) => ({ row, localDate: localDateKey(row.resolved_at, row.timezone) }));
+  const doubtDays = sources.doubts.flatMap((row) => validInstant(row.resolved_at) ? [{ row, localDate: localDateKey(row.resolved_at, row.timezone) }] : []);
   for (const item of selectDailyBounded(doubtDays, MAX_RESOLVED_DOUBT_XP_EVENTS_PER_LOCAL_DAY)) {
     const row = item.row;
     candidates.push({ eventKey: xpEventKey("resolved_doubt", row.id), eventType: "resolved_doubt", sourceType: "study_session_doubt", sourceId: row.id, xp: xpForEvent("resolved_doubt"), occurredAt: row.resolved_at, metadata: { localDate: item.localDate } });
   }
 
   const dailyGoalDays = sources.goals
-    .filter((row) => row.goal_kind === "daily_study")
+    .filter((row) => row.goal_kind === "daily_study" && validInstant(row.completed_at))
     .map((row) => ({ row, localDate: localDateKey(row.completed_at, sources.timezone) }));
   for (const item of selectDailyBounded(dailyGoalDays, MAX_DAILY_GOAL_XP_EVENTS_PER_LOCAL_DAY)) {
     const row = item.row;
@@ -266,14 +270,14 @@ function candidatesFromSources(sources: Awaited<ReturnType<typeof loadCanonicalS
   }
 
   const weeklyGoalDays = sources.goals
-    .filter((row) => row.goal_kind === "weekly_study")
+    .filter((row) => row.goal_kind === "weekly_study" && validInstant(row.completed_at))
     .map((row) => ({ row, localDate: localDateKey(row.completed_at, sources.timezone) }));
   for (const item of selectWeeklyBounded(weeklyGoalDays, MAX_WEEKLY_GOAL_XP_EVENTS_PER_LOCAL_WEEK)) {
     const row = item.row;
     candidates.push({ eventKey: xpEventKey("weekly_goal", row.id), eventType: "weekly_goal", sourceType: "planner_goal", sourceId: row.id, xp: xpForEvent("weekly_goal"), occurredAt: row.completed_at, metadata: { goalKind: row.goal_kind, localDate: item.localDate, weekStart: localWeekStartKey(item.localDate) } });
   }
 
-  for (const row of sources.together) candidates.push({
+  for (const row of sources.together.filter((item) => validInstant(item.completed_at))) candidates.push({
     eventKey: xpEventKey("study_together", row.id),
     eventType: "study_together",
     sourceType: "study_together_session",

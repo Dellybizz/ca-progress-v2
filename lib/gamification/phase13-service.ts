@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
-import { getGamificationSummary, reconcileGamification } from "./service";
+import { getGamificationSummary, reconcileGamification, type GamificationSummary } from "./service";
 import { levelForXp } from "./policy.mjs";
 import {
   IMPOSSIBLE_SESSION_SECONDS,
@@ -398,11 +398,10 @@ async function outgoingReferrals(userId: string) {
   };
 }
 
-export async function getPhase13UserModel(userId: string, now = new Date()) {
-  await reconcileGamification(userId, now);
+export async function getPhase13UserModel(userId: string, now = new Date(), existingSummary?: GamificationSummary) {
   await reconcileReferralActivation(userId);
   const [base, bonus, preference, referralCode, inbound, outgoing, coverage, week, rewards] = await Promise.all([
-    getGamificationSummary(userId, now),
+    existingSummary ?? getGamificationSummary(userId, now),
     db().prepare("SELECT COALESCE(SUM(xp_amount),0) AS value FROM gamification_bonus_ledger WHERE user_id=?1").bind(userId).first<{ value: number }>(),
     currentLeaderboardPreference(userId),
     ensureReferralCode(userId),
