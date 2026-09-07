@@ -9,6 +9,7 @@ const persistTo = mkdtempSync(join(tmpdir(), "ca-progress-d1-indexes-"));
 const configPath = join(process.cwd(), `.wrangler-d1-validation-${process.pid}.json`);
 const base = ["wrangler", "--config", configPath];
 const icaiBootstrapMigration = "d1/migrations/0024_icai_source_bootstrap.sql";
+const icaiReviewAuditMigration = "d1/migrations/0025_icai_review_audit.sql";
 const seededSourceIds = ["icai-final-course", "icai-foundation-course", "icai-intermediate-course"];
 
 function run(args) {
@@ -66,9 +67,11 @@ try {
   run(["d1", "migrations", "apply", database, "--local", "--persist-to", persistTo]);
 
   // Retained production D1 reapplies additive migrations directly. Reapply the ICAI
-  // bootstrap twice here to prove its upsert is safe outside Wrangler's journal too.
+  // bootstrap and review audit migrations twice to prove they are safe outside Wrangler's journal too.
   run(["d1", "execute", database, "--local", "--persist-to", persistTo, "--file", icaiBootstrapMigration]);
   run(["d1", "execute", database, "--local", "--persist-to", persistTo, "--file", icaiBootstrapMigration]);
+  run(["d1", "execute", database, "--local", "--persist-to", persistTo, "--file", icaiReviewAuditMigration]);
+  run(["d1", "execute", database, "--local", "--persist-to", persistTo, "--file", icaiReviewAuditMigration]);
 
   const indexes = execute("SELECT name FROM sqlite_master WHERE type='index';").map((row) => row.name);
   for (const name of expectedIndexes) assert(indexes.includes(name), `Missing index ${name}`);
@@ -87,6 +90,15 @@ try {
   const bootstrapSchemaRows = execute("SELECT version FROM _ca_schema_migrations WHERE version='0024';");
   assert(bootstrapSchemaRows.length === 1, "ICAI source bootstrap migration was not recorded exactly once");
 
+  const reviewJournalRows = execute("SELECT name FROM d1_migrations WHERE name='0025_icai_review_audit.sql';");
+  assert(reviewJournalRows.length === 1, "ICAI review audit Wrangler migration was not recorded exactly once");
+  const reviewSchemaRows = execute("SELECT version FROM _ca_schema_migrations WHERE version='0025';");
+  assert(reviewSchemaRows.length === 1, "ICAI review audit migration was not recorded exactly once");
+  const auditTables = execute("SELECT name FROM sqlite_master WHERE type='table' AND name='icai_review_decisions';");
+  assert(auditTables.length === 1, "ICAI review decision audit table is missing");
+  const auditTriggers = execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'icai_review_%';").map((row) => row.name);
+  for (const trigger of ["icai_review_queue_requires_audit","icai_review_queue_blocks_dismissal","icai_review_decisions_no_update","icai_review_decisions_no_delete"]) assert(auditTriggers.includes(trigger), `Missing ICAI review audit trigger ${trigger}`);
+
   const seededSources = execute(`SELECT id,official_url,adapter_key,level_codes,is_active FROM icai_sources WHERE id IN (${seededSourceIds.map((id) => `'${id}'`).join(",")}) AND is_active=1 ORDER BY id;`);
   assert(seededSources.length === 3, "ICAI source bootstrap did not retain exactly three seeded active sources");
   const expectedSources = new Map([
@@ -102,7 +114,7 @@ try {
     assert(JSON.stringify(JSON.parse(String(source.level_codes))) === JSON.stringify([expected[1]]), `Unexpected level scope for ${source.id}`);
   }
 
-  console.log("Retained D1 hot-query and ICAI source bootstrap validation PASS (idempotent apply, intended plans, foreign keys, three official seeded sources).");
+  console.log("Retained D1 hot-query and ICAI source/review validation PASS (idempotent apply, intended plans, foreign keys, official sources, audited review enforcement).");
 } finally {
   rmSync(persistTo, { recursive: true, force: true });
   rmSync(configPath, { force: true });
