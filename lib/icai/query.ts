@@ -3,7 +3,13 @@ import "server-only";
 import { createD1ServerClient } from "@/lib/data/d1/client";
 import { createD1AdminClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/data/database.types";
-import type { IcaiAdminDashboard, IcaiPublicCatalog, IcaiPublicFilters, IcaiResourceCard, IcaiResourceType } from "./types";
+import type {
+  IcaiAdminDashboard,
+  IcaiPublicCatalog,
+  IcaiPublicFilters,
+  IcaiResourceCard,
+  IcaiResourceType,
+} from "./types";
 import { getSharedPublicJson } from "@/lib/cache/public";
 
 type LevelRow = Database["public"]["Tables"]["course_levels"]["Row"];
@@ -11,8 +17,10 @@ type AttemptRow = Database["public"]["Tables"]["exam_attempts"]["Row"];
 type ResourceRow = Database["public"]["Tables"]["icai_resources"]["Row"];
 type SourceRow = Database["public"]["Tables"]["icai_sources"]["Row"];
 type SubjectRow = Database["public"]["Tables"]["subjects"]["Row"];
-type AttemptMapRow = Database["public"]["Tables"]["resource_attempt_map"]["Row"];
-type SubjectMapRow = Database["public"]["Tables"]["resource_subject_map"]["Row"];
+type AttemptMapRow =
+  Database["public"]["Tables"]["resource_attempt_map"]["Row"];
+type SubjectMapRow =
+  Database["public"]["Tables"]["resource_subject_map"]["Row"];
 type EventRow = Database["public"]["Tables"]["exam_events"]["Row"];
 type SyncRunRow = Database["public"]["Tables"]["icai_sync_runs"]["Row"];
 type ReviewRow = Database["public"]["Tables"]["icai_review_queue"]["Row"];
@@ -28,154 +36,263 @@ function dateSort(a: string | null, b: string | null) {
   return (b ?? "").localeCompare(a ?? "");
 }
 
-export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Promise<IcaiPublicCatalog> {
-  const key = ["catalog-v1", filters.level, filters.attempt, filters.subject, filters.type].map((value) => encodeURIComponent(value ?? "")).join(":");
+export async function getIcaiPublicCatalog(
+  filters: IcaiPublicFilters = {},
+): Promise<IcaiPublicCatalog> {
+  const key = [
+    "catalog-v1",
+    filters.level,
+    filters.attempt,
+    filters.subject,
+    filters.type,
+  ]
+    .map((value) => encodeURIComponent(value ?? ""))
+    .join(":");
   return getSharedPublicJson({
     namespace: "icai",
     key,
     ttlSeconds: 300,
     load: async () => {
       const client = await createD1ServerClient();
-  const [levelsResponse, attemptsResponse, resourcesResponse, sourcesResponse, subjectsResponse, attemptMapResponse, subjectMapResponse, eventsResponse] = await Promise.all([
-    client.from("course_levels").select("*").eq("is_active", true).order("sort_order"),
-    client.from("exam_attempts").select("*").eq("verification_status", "verified").order("attempt_key", { ascending: false }),
-    client.from("icai_resources").select("*").eq("verification_status", "verified").eq("status", "active").order("last_seen_at", { ascending: false }).limit(500),
-    client.from("icai_sources").select("*").eq("is_active", true),
-    client.from("subjects").select("*").eq("is_active", true).order("sort_order"),
-    client.from("resource_attempt_map").select("*"),
-    client.from("resource_subject_map").select("*"),
-    client.from("exam_events").select("*").eq("verification_status", "verified").order("event_date").limit(150),
-  ]);
+      const [
+        levelsResponse,
+        attemptsResponse,
+        resourcesResponse,
+        sourcesResponse,
+        subjectsResponse,
+        attemptMapResponse,
+        subjectMapResponse,
+        eventsResponse,
+      ] = await Promise.all([
+        client
+          .from("course_levels")
+          .select("*")
+          .eq("is_active", true)
+          .order("sort_order"),
+        client
+          .from("exam_attempts")
+          .select("*")
+          .eq("verification_status", "verified")
+          .order("attempt_key", { ascending: false }),
+        client
+          .from("icai_resources")
+          .select("*")
+          .eq("verification_status", "verified")
+          .eq("status", "active")
+          .order("last_seen_at", { ascending: false })
+          .limit(500),
+        client.from("icai_sources").select("*").eq("is_active", true),
+        client
+          .from("subjects")
+          .select("*")
+          .eq("is_active", true)
+          .order("sort_order"),
+        client.from("resource_attempt_map").select("*"),
+        client.from("resource_subject_map").select("*"),
+        client
+          .from("exam_events")
+          .select("*")
+          .eq("verification_status", "verified")
+          .order("event_date")
+          .limit(150),
+      ]);
 
-  const firstError = [
-    levelsResponse.error,
-    attemptsResponse.error,
-    resourcesResponse.error,
-    sourcesResponse.error,
-    subjectsResponse.error,
-    attemptMapResponse.error,
-    subjectMapResponse.error,
-    eventsResponse.error,
-  ].find(Boolean);
-  if (firstError) throw firstError;
+      const firstError = [
+        levelsResponse.error,
+        attemptsResponse.error,
+        resourcesResponse.error,
+        sourcesResponse.error,
+        subjectsResponse.error,
+        attemptMapResponse.error,
+        subjectMapResponse.error,
+        eventsResponse.error,
+      ].find(Boolean);
+      if (firstError) throw firstError;
 
-  const levels = (levelsResponse.data ?? []) as LevelRow[];
-  const attempts = (attemptsResponse.data ?? []) as AttemptRow[];
-  const resources = (resourcesResponse.data ?? []) as ResourceRow[];
-  const sources = (sourcesResponse.data ?? []) as SourceRow[];
-  const subjects = (subjectsResponse.data ?? []) as SubjectRow[];
-  const attemptMaps = (attemptMapResponse.data ?? []) as AttemptMapRow[];
-  const subjectMaps = (subjectMapResponse.data ?? []) as SubjectMapRow[];
-  const events = (eventsResponse.data ?? []) as EventRow[];
+      const levels = (levelsResponse.data ?? []) as LevelRow[];
+      const attempts = (attemptsResponse.data ?? []) as AttemptRow[];
+      const resources = (resourcesResponse.data ?? []) as ResourceRow[];
+      const sources = (sourcesResponse.data ?? []) as SourceRow[];
+      const subjects = (subjectsResponse.data ?? []) as SubjectRow[];
+      const attemptMaps = (attemptMapResponse.data ?? []) as AttemptMapRow[];
+      const subjectMaps = (subjectMapResponse.data ?? []) as SubjectMapRow[];
+      const events = (eventsResponse.data ?? []) as EventRow[];
 
-  const selected = {
-    level: cleanFilter(filters.level),
-    attempt: cleanFilter(filters.attempt),
-    subject: cleanFilter(filters.subject),
-    type: cleanFilter(filters.type),
-  };
-
-  const levelById = new Map(levels.map((row: LevelRow) => [row.id, row]));
-  const attemptById = new Map(attempts.map((row: AttemptRow) => [row.id, row]));
-  const sourceById = new Map(sources.map((row: SourceRow) => [row.id, row]));
-  const subjectById = new Map(subjects.map((row: SubjectRow) => [row.id, row]));
-
-  const attemptIdsByResource = new Map<string, string[]>();
-  for (const row of attemptMaps as AttemptMapRow[]) {
-    attemptIdsByResource.set(row.resource_id, [...(attemptIdsByResource.get(row.resource_id) ?? []), row.attempt_id]);
-  }
-  const subjectIdsByResource = new Map<string, string[]>();
-  for (const row of subjectMaps as SubjectMapRow[]) {
-    subjectIdsByResource.set(row.resource_id, [...(subjectIdsByResource.get(row.resource_id) ?? []), row.subject_id]);
-  }
-
-  const filtered = (resources as ResourceRow[]).filter((resource) => {
-    if (selected.type && resource.resource_type !== selected.type) return false;
-    const mappedAttemptIds = attemptIdsByResource.get(resource.id) ?? [];
-    const mappedSubjectIds = subjectIdsByResource.get(resource.id) ?? [];
-    if (selected.attempt && !mappedAttemptIds.some((id) => attemptById.get(id)?.attempt_key === selected.attempt)) return false;
-    if (selected.subject && !mappedSubjectIds.includes(selected.subject)) return false;
-    if (selected.level) {
-      const metadata = resource.metadata && typeof resource.metadata === "object" && !Array.isArray(resource.metadata)
-        ? resource.metadata as Record<string, unknown>
-        : {};
-      const levelsFromMetadata = Array.isArray(metadata.level_codes)
-        ? metadata.level_codes.filter((value): value is string => typeof value === "string")
-        : [];
-      const mappedLevel = mappedAttemptIds.some((id) => levelById.get(attemptById.get(id)?.level_id ?? "")?.code === selected.level)
-        || mappedSubjectIds.some((id) => levelById.get(subjectById.get(id)?.level_id ?? "")?.code === selected.level);
-      if (!levelsFromMetadata.includes(selected.level) && !mappedLevel) return false;
-    }
-    return true;
-  });
-
-  const cards: IcaiResourceCard[] = filtered.map((resource) => {
-    const source = sourceById.get(resource.source_id);
-    const mappedAttemptIds = attemptIdsByResource.get(resource.id) ?? [];
-    const mappedSubjectIds = subjectIdsByResource.get(resource.id) ?? [];
-    const metadata = resource.metadata && typeof resource.metadata === "object" && !Array.isArray(resource.metadata)
-      ? resource.metadata as Record<string, unknown>
-      : {};
-    const levelCodes = Array.isArray(metadata.level_codes)
-      ? metadata.level_codes.filter((value): value is string => typeof value === "string")
-      : [];
-    return {
-      id: resource.id,
-      type: resource.resource_type as IcaiResourceType,
-      title: resource.title,
-      summary: resource.summary,
-      officialUrl: resource.official_url,
-      sourceName: source?.name ?? "ICAI",
-      sourceUrl: source?.official_url ?? resource.official_url,
-      firstSeenAt: resource.first_seen_at,
-      lastVerifiedAt: resource.last_seen_at,
-      lastChangedAt: resource.last_changed_at,
-      publishedOn: resource.published_on,
-      status: resource.status,
-      levelCodes,
-      attemptKeys: mappedAttemptIds.map((id) => attemptById.get(id)?.attempt_key).filter((value): value is string => Boolean(value)),
-      subjects: mappedSubjectIds
-        .map((id) => subjectById.get(id))
-        .filter((value): value is SubjectRow => Boolean(value))
-        .map((row) => ({ id: row.id, title: row.title })),
-    };
-  });
-
-  const eventCards = (events as EventRow[])
-    .filter((event) => {
-      const attempt = attemptById.get(event.attempt_id);
-      const level = levelById.get(attempt?.level_id ?? "");
-      if (selected.level && level?.code !== selected.level) return false;
-      if (selected.attempt && attempt?.attempt_key !== selected.attempt) return false;
-      if (selected.subject && event.subject_id !== selected.subject) return false;
-      return true;
-    })
-    .map((event) => {
-      const attempt = attemptById.get(event.attempt_id);
-      const level = levelById.get(attempt?.level_id ?? "");
-      return {
-        id: event.id,
-        title: event.title,
-        eventType: event.event_type,
-        eventDate: event.event_date,
-        attemptKey: attempt?.attempt_key ?? "",
-        attemptLabel: attempt?.label ?? "",
-        levelCode: level?.code ?? "",
-        sourceUrl: event.source_url,
-        lastVerifiedAt: event.last_seen_at,
+      const selected = {
+        level: cleanFilter(filters.level),
+        attempt: cleanFilter(filters.attempt),
+        subject: cleanFilter(filters.subject),
+        type: cleanFilter(filters.type),
       };
-    });
 
-  const verifiedAt = [...cards.map((item) => item.lastVerifiedAt), ...eventCards.map((item) => item.lastVerifiedAt)].sort().at(-1) ?? null;
+      const levelById = new Map(levels.map((row: LevelRow) => [row.id, row]));
+      const attemptById = new Map(
+        attempts.map((row: AttemptRow) => [row.id, row]),
+      );
+      const sourceById = new Map(
+        sources.map((row: SourceRow) => [row.id, row]),
+      );
+      const subjectById = new Map(
+        subjects.map((row: SubjectRow) => [row.id, row]),
+      );
 
-  return {
-    resources: cards.sort((a, b) => dateSort(a.publishedOn ?? a.lastVerifiedAt, b.publishedOn ?? b.lastVerifiedAt)),
-    events: eventCards,
-    levels: levels.map((row: LevelRow) => ({ code: row.code, name: row.name })),
-    attempts: attempts.map((row: AttemptRow) => ({ id: row.id, key: row.attempt_key, label: row.label, levelCode: levelById.get(row.level_id)?.code ?? "" })),
-    subjects: subjects.map((row: SubjectRow) => ({ id: row.id, title: row.title, levelCode: levelById.get(row.level_id)?.code ?? "" })),
-    filters: selected,
-    verifiedAt,
+      const attemptIdsByResource = new Map<string, string[]>();
+      for (const row of attemptMaps as AttemptMapRow[]) {
+        attemptIdsByResource.set(row.resource_id, [
+          ...(attemptIdsByResource.get(row.resource_id) ?? []),
+          row.attempt_id,
+        ]);
+      }
+      const subjectIdsByResource = new Map<string, string[]>();
+      for (const row of subjectMaps as SubjectMapRow[]) {
+        subjectIdsByResource.set(row.resource_id, [
+          ...(subjectIdsByResource.get(row.resource_id) ?? []),
+          row.subject_id,
+        ]);
+      }
+
+      const filtered = (resources as ResourceRow[]).filter((resource) => {
+        if (selected.type && resource.resource_type !== selected.type)
+          return false;
+        const mappedAttemptIds = attemptIdsByResource.get(resource.id) ?? [];
+        const mappedSubjectIds = subjectIdsByResource.get(resource.id) ?? [];
+        if (
+          selected.attempt &&
+          !mappedAttemptIds.some(
+            (id) => attemptById.get(id)?.attempt_key === selected.attempt,
+          )
+        )
+          return false;
+        if (selected.subject && !mappedSubjectIds.includes(selected.subject))
+          return false;
+        if (selected.level) {
+          const metadata =
+            resource.metadata &&
+            typeof resource.metadata === "object" &&
+            !Array.isArray(resource.metadata)
+              ? (resource.metadata as Record<string, unknown>)
+              : {};
+          const levelsFromMetadata = Array.isArray(metadata.level_codes)
+            ? metadata.level_codes.filter(
+                (value): value is string => typeof value === "string",
+              )
+            : [];
+          const mappedLevel =
+            mappedAttemptIds.some(
+              (id) =>
+                levelById.get(attemptById.get(id)?.level_id ?? "")?.code ===
+                selected.level,
+            ) ||
+            mappedSubjectIds.some(
+              (id) =>
+                levelById.get(subjectById.get(id)?.level_id ?? "")?.code ===
+                selected.level,
+            );
+          if (!levelsFromMetadata.includes(selected.level) && !mappedLevel)
+            return false;
+        }
+        return true;
+      });
+
+      const cards: IcaiResourceCard[] = filtered.map((resource) => {
+        const source = sourceById.get(resource.source_id);
+        const mappedAttemptIds = attemptIdsByResource.get(resource.id) ?? [];
+        const mappedSubjectIds = subjectIdsByResource.get(resource.id) ?? [];
+        const metadata =
+          resource.metadata &&
+          typeof resource.metadata === "object" &&
+          !Array.isArray(resource.metadata)
+            ? (resource.metadata as Record<string, unknown>)
+            : {};
+        const levelCodes = Array.isArray(metadata.level_codes)
+          ? metadata.level_codes.filter(
+              (value): value is string => typeof value === "string",
+            )
+          : [];
+        return {
+          id: resource.id,
+          type: resource.resource_type as IcaiResourceType,
+          title: resource.title,
+          summary: resource.summary,
+          officialUrl: resource.official_url,
+          sourceName: source?.name ?? "ICAI",
+          sourceUrl: source?.official_url ?? resource.official_url,
+          firstSeenAt: resource.first_seen_at,
+          lastVerifiedAt: resource.last_seen_at,
+          lastChangedAt: resource.last_changed_at,
+          publishedOn: resource.published_on,
+          status: resource.status,
+          levelCodes,
+          attemptKeys: mappedAttemptIds
+            .map((id) => attemptById.get(id)?.attempt_key)
+            .filter((value): value is string => Boolean(value)),
+          subjects: mappedSubjectIds
+            .map((id) => subjectById.get(id))
+            .filter((value): value is SubjectRow => Boolean(value))
+            .map((row) => ({ id: row.id, title: row.title })),
+        };
+      });
+
+      const eventCards = (events as EventRow[])
+        .filter((event) => {
+          const attempt = attemptById.get(event.attempt_id);
+          const level = levelById.get(attempt?.level_id ?? "");
+          if (selected.level && level?.code !== selected.level) return false;
+          if (selected.attempt && attempt?.attempt_key !== selected.attempt)
+            return false;
+          if (selected.subject && event.subject_id !== selected.subject)
+            return false;
+          return true;
+        })
+        .map((event) => {
+          const attempt = attemptById.get(event.attempt_id);
+          const level = levelById.get(attempt?.level_id ?? "");
+          return {
+            id: event.id,
+            title: event.title,
+            eventType: event.event_type,
+            eventDate: event.event_date,
+            attemptKey: attempt?.attempt_key ?? "",
+            attemptLabel: attempt?.label ?? "",
+            levelCode: level?.code ?? "",
+            sourceUrl: event.source_url,
+            lastVerifiedAt: event.last_seen_at,
+          };
+        });
+
+      const verifiedAt =
+        [
+          ...cards.map((item) => item.lastVerifiedAt),
+          ...eventCards.map((item) => item.lastVerifiedAt),
+        ]
+          .sort()
+          .at(-1) ?? null;
+
+      return {
+        resources: cards.sort((a, b) =>
+          dateSort(
+            a.publishedOn ?? a.lastVerifiedAt,
+            b.publishedOn ?? b.lastVerifiedAt,
+          ),
+        ),
+        events: eventCards,
+        levels: levels.map((row: LevelRow) => ({
+          code: row.code,
+          name: row.name,
+        })),
+        attempts: attempts.map((row: AttemptRow) => ({
+          id: row.id,
+          key: row.attempt_key,
+          label: row.label,
+          levelCode: levelById.get(row.level_id)?.code ?? "",
+        })),
+        subjects: subjects.map((row: SubjectRow) => ({
+          id: row.id,
+          title: row.title,
+          levelCode: levelById.get(row.level_id)?.code ?? "",
+        })),
+        filters: selected,
+        verifiedAt,
       };
     },
   });
@@ -183,37 +300,125 @@ export async function getIcaiPublicCatalog(filters: IcaiPublicFilters = {}): Pro
 
 export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
   const client = createD1AdminClient();
-  const [runResponse, sourceResponse, reviewResponse, changeResponse] = await Promise.all([
-    client.from("icai_sync_runs").select("*").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+  const [
+    runResponse,
+    sourceResponse,
+    reviewResponse,
+    changeResponse,
+    jobResponse,
+  ] = await Promise.all([
+    client
+      .from("icai_sync_runs")
+      .select("*")
+      .order("started_at", { ascending: false })
+      .limit(12),
     client.from("icai_sources").select("*").order("id"),
-    client.from("icai_review_queue").select("*").eq("status", "pending").order("created_at").limit(100),
-    client.from("icai_change_events").select("*").order("detected_at", { ascending: false }).limit(100),
+    client
+      .from("icai_review_queue")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at")
+      .limit(100),
+    client
+      .from("icai_change_events")
+      .select("*")
+      .order("detected_at", { ascending: false })
+      .limit(100),
+    client
+      .from("background_jobs")
+      .select("*")
+      .eq("job_type", "icai-sync")
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
-  const firstError = [runResponse.error, sourceResponse.error, reviewResponse.error, changeResponse.error].find(Boolean);
+  const firstError = [
+    runResponse.error,
+    sourceResponse.error,
+    reviewResponse.error,
+    changeResponse.error,
+    jobResponse.error,
+  ].find(Boolean);
   if (firstError) throw firstError;
 
   const sources = (sourceResponse.data ?? []) as SourceRow[];
   const sourceById = new Map(sources.map((source) => [source.id, source]));
-  const run = runResponse.data as SyncRunRow | null;
+  const runs = (runResponse.data ?? []) as SyncRunRow[];
+  const run = runs[0] ?? null;
+  const snapshotResponse = run
+    ? await client
+        .from("icai_source_snapshots")
+        .select("*")
+        .eq("run_id", run.id)
+    : { data: [], error: null };
+  if (snapshotResponse.error) throw snapshotResponse.error;
+  const snapshots = (snapshotResponse.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const snapshotBySource = new Map(
+    snapshots.map((snapshot) => [String(snapshot.source_id), snapshot]),
+  );
+  const jobs = (jobResponse.data ?? []) as Array<Record<string, unknown>>;
+  const activeJob =
+    jobs.find((job) => job.status === "queued" || job.status === "running") ??
+    null;
+  const mapRun = (item: SyncRunRow) => ({
+    id: item.id,
+    status: item.status,
+    triggerType: item.trigger_type,
+    startedAt: item.started_at,
+    completedAt: item.completed_at,
+    sourceTotal: Number(item.source_total),
+    sourceProcessed: Number(item.source_processed),
+    sourceSucceeded: Number(item.source_succeeded),
+    sourceFailed: Number(item.source_failed),
+    newItems: Number(item.new_items),
+    changedItems: Number(item.changed_items),
+    unchangedItems: Number(item.unchanged_items),
+    removedItems: Number(item.removed_items),
+    pendingReviews: Number(item.pending_reviews),
+    errorSummary: item.error_summary,
+  });
 
   return {
-    latestRun: run ? {
-      id: run.id,
-      status: run.status,
-      triggerType: run.trigger_type,
-      startedAt: run.started_at,
-      completedAt: run.completed_at,
-      sourceTotal: run.source_total,
-      sourceSucceeded: run.source_succeeded,
-      sourceFailed: run.source_failed,
-      newItems: run.new_items,
-      changedItems: run.changed_items,
-      unchangedItems: run.unchanged_items,
-      removedItems: run.removed_items,
-      pendingReviews: run.pending_reviews,
-      errorSummary: run.error_summary,
-    } : null,
+    activeJob: activeJob
+      ? {
+          id: String(activeJob.id),
+          status: String(activeJob.status),
+          attempts: Number(activeJob.attempts),
+          maxAttempts: Number(activeJob.max_attempts),
+          createdAt: String(activeJob.created_at),
+          startedAt: activeJob.started_at ? String(activeJob.started_at) : null,
+          finishedAt: activeJob.finished_at
+            ? String(activeJob.finished_at)
+            : null,
+          lastError: activeJob.last_error ? String(activeJob.last_error) : null,
+        }
+      : null,
+    latestRun: run ? mapRun(run) : null,
+    recentRuns: runs.map(mapRun),
+    sourceResults: sources.map((source) => {
+      const snapshot = snapshotBySource.get(source.id);
+      const failedThisRun = Boolean(
+        run && source.last_error_at && source.last_error_at >= run.started_at,
+      );
+      return {
+        sourceId: source.id,
+        sourceName: source.name,
+        state: snapshot
+          ? ("fetched" as const)
+          : failedThisRun
+            ? ("failed" as const)
+            : run
+              ? ("pending" as const)
+              : ("not_run" as const),
+        httpStatus: snapshot ? Number(snapshot.http_status) : null,
+        parsedItemCount: snapshot ? Number(snapshot.parsed_item_count) : null,
+        changed: snapshot ? Boolean(snapshot.is_changed) : null,
+        fetchedAt: snapshot?.fetched_at ? String(snapshot.fetched_at) : null,
+        error: failedThisRun ? source.last_error : null,
+      };
+    }),
     sources: sources.map((source) => ({
       id: source.id,
       name: source.name,
@@ -243,14 +448,16 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
         createdAt: review.created_at,
       };
     }),
-    recentChanges: ((changeResponse.data ?? []) as ChangeRow[]).map((change) => ({
-      id: change.id,
-      entityType: change.entity_type,
-      entityId: change.entity_id,
-      changeType: change.change_type,
-      riskLevel: change.risk_level,
-      decisionStatus: change.decision_status,
-      detectedAt: change.detected_at,
-    })),
+    recentChanges: ((changeResponse.data ?? []) as ChangeRow[]).map(
+      (change) => ({
+        id: change.id,
+        entityType: change.entity_type,
+        entityId: change.entity_id,
+        changeType: change.change_type,
+        riskLevel: change.risk_level,
+        decisionStatus: change.decision_status,
+        detectedAt: change.detected_at,
+      }),
+    ),
   };
 }
