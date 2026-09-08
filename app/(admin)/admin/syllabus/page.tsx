@@ -3,11 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
+import { requireAdminPageCapability } from "@/lib/authorization/server";
 import { getAcademicVersionPreview } from "@/lib/academic/query";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSyllabusPreviewPage() {
+  await requireAdminPageCapability("academic.read");
   const versions = await getAcademicVersionPreview();
   return <div className="academic-page academic-admin-page">
     <section className="academic-hero"><div><Badge tone="warning">Read-only admin preview</Badge><h1>Syllabus structure</h1><p>Review normalized syllabus versions and source verification before syllabus editing is introduced in a later admin phase.</p></div><div className="academic-source-chip"><Icon name="shield" size={18}/><span><strong>No editing in Phase 3</strong><small>Academic writes remain migration/service-role only.</small></span></div></section>

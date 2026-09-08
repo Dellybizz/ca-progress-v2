@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireAdminOperator } from "@/lib/authorization/server";
+import { adminAuthorizationStatus, requireAdminCapability } from "@/lib/authorization/server";
 import { getBackgroundJobStatus, getOpenDeadLetters } from "@/lib/jobs/status";
 
 export const dynamic = "force-dynamic";
+const privateHeaders = { "Cache-Control": "private, no-store" };
 
 export async function GET() {
-  const operator = await requireAdminOperator();
-  if (!operator.allowed) return NextResponse.json({ error: "Access denied." }, { status: 403 });
+  try { await requireAdminCapability("jobs.read"); }
+  catch (error) {
+    const status = adminAuthorizationStatus(error) ?? 403;
+    return NextResponse.json({ error: status === 401 ? "Authentication required." : "Jobs access required." }, { status, headers: privateHeaders });
+  }
   const [jobs, deadLetters] = await Promise.all([getBackgroundJobStatus(), getOpenDeadLetters()]);
-  return NextResponse.json({ jobs, deadLetters }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ jobs, deadLetters }, { headers: privateHeaders });
 }

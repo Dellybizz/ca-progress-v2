@@ -1,11 +1,10 @@
-import { requireAdminOperator } from "@/lib/authorization/server";
+import { requireAdminPageCapability } from "@/lib/authorization/server";
 import { getBackgroundJobStatus, getOpenDeadLetters } from "@/lib/jobs/status";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminJobsPage() {
-  const operator = await requireAdminOperator();
-  if (!operator.allowed) return <main><h1>Access denied</h1></main>;
+  await requireAdminPageCapability("jobs.read");
   const [jobs, deadLetters] = await Promise.all([getBackgroundJobStatus(), getOpenDeadLetters()]);
   return <main style={{ padding: 24 }}>
     <h1>Background jobs</h1>
