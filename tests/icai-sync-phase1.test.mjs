@@ -16,16 +16,16 @@ test("ICAI sync run acquisition is atomic and records started_at", () => {
 
 test("ICAI source redirects are manually followed and every hop is revalidated", () => {
   const engine = read("workers/icai-sync/sync-engine.ts");
-  assert.match(engine, /redirect:"manual"/);
+  assert.match(engine, /redirect:\s*"manual"/);
   assert.match(engine, /MAX_REDIRECTS = 5/);
   assert.match(engine, /Rejected redirect outside approved ICAI hosts/);
-  assert.doesNotMatch(engine, /redirect:"follow"/);
+  assert.doesNotMatch(engine, /redirect:\s*"follow"/);
 });
 
 test("date-less attempt discoveries preserve an existing verified exam date", () => {
   const engine = read("workers/icai-sync/sync-engine.ts");
-  assert.match(engine, /parsedAttempt\.startDate\?\?existingAttempt\?\.start_date/);
-  assert.match(engine, /parsedAttempt\.endDate\?\?existingAttempt\?\.end_date/);
+  assert.match(engine, /parsedAttempt\.startDate\s*\?\?\s*existingAttempt\?\.start_date/);
+  assert.match(engine, /parsedAttempt\.endDate\s*\?\?\s*existingAttempt\?\.end_date/);
 });
 
 test("ICAI review action uses canonical review decisions and dedicated patch application", () => {
