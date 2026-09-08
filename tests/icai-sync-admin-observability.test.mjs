@@ -10,7 +10,7 @@ test("ICAI admin monitor reports queue, progress, source outcomes and history", 
   assert.match(monitor, /Sync in progress/);
   assert.match(monitor, /sourceProcessed/);
   assert.match(monitor, /sourceResults/);
-  assert.match(monitor, /Recent executions/);
+  assert.match(monitor, /Execution history/);
   assert.match(query, /background_jobs/);
   assert.match(query, /icai_source_snapshots/);
 });
@@ -21,8 +21,14 @@ test("manual ICAI sync refuses a duplicate queued or running operation", () => {
   assert.match(action, /already queued or running/);
 });
 
-test("active ICAI sync pages refresh without user polling", () => {
+test("active ICAI sync pages use lightweight adaptive polling instead of full-page polling", () => {
   const refresh = read("components/icai/sync-live-refresh.tsx");
-  assert.match(refresh, /setInterval\(\(\) => router\.refresh\(\), 3000\)/);
-  assert.match(refresh, /clearInterval/);
+  const route = read("app/api/admin/icai-sync/status/route.ts");
+  assert.match(refresh, /window\.setTimeout/);
+  assert.match(refresh, /5_000/);
+  assert.match(refresh, /15_000/);
+  assert.match(refresh, /visibilitychange/);
+  assert.match(refresh, /router\.refresh\(\)/);
+  assert.doesNotMatch(refresh, /setInterval/);
+  assert.match(route, /private, no-store/);
 });
