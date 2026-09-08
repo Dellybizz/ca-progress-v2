@@ -119,3 +119,27 @@ test("Phase 5 queue sync is bounded into sequential per-source continuation jobs
   assert.match(live, /icai_sync_source_states/);
   assert.match(live, /childJobs\.length === sourceTotal/);
 });
+
+test("ICAI bootstrap is bounded, incremental, non-destructive and stores direct student-facing evidence", () => {
+  const migration = read("d1/migrations/0029_icai_bootstrap_window.sql");
+  const policy = read("workers/icai-sync/bootstrap-policy.ts");
+  const resolver = read("workers/icai-sync/direct-resource-resolver.ts");
+  const engine = read("workers/icai-sync/sync-engine.ts");
+  const dataPage = read("components/icai/admin-sync-data.tsx");
+  const route = read("app/(admin)/admin/icai-sync/data/page.tsx");
+
+  assert.match(migration, /bootstrap_attempt_floor'.*2026-05/s);
+  assert.match(migration, /bootstrap_published_floor'.*2025-12-01/s);
+  assert.match(migration, /last_content_hash = NULL/);
+  assert.match(migration, /etag = NULL/);
+  assert.match(policy, /mode === "bootstrap" \? configuredPublishedFloor : incrementalFloor/);
+  assert.match(policy, /resourceType === "study_material"/);
+  assert.match(resolver, /\/\\\.pdf\$\/i/);
+  assert.match(resolver, /evidencePdfByLanding\.get\(event\.sourceUrl\)/);
+  assert.match(engine, /authoritative_listing:[\s\S]*windowed\.filteredCount === 0/);
+  assert.match(engine, /bootstrap_complete/);
+  assert.match(dataPage, /What will students see\?/);
+  assert.match(dataPage, /Open ICAI PDF/);
+  assert.match(dataPage, /Exam date shown to students/);
+  assert.match(route, /getIcaiPublicCatalog/);
+});
