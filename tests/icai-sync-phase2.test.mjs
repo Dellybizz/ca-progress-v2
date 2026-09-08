@@ -32,12 +32,15 @@ test("Phase 2 source bootstrap is idempotent without erasing sync health history
   assert.match(migration, /VALUES \('0024'/);
 });
 
-test("fresh D1 validation reapplies the source bootstrap and verifies all three seeded sources", () => {
+test("fresh D1 validation preserves the original three Phase 2 level sources inside the six-source Phase 1 registry", () => {
   const validator = read("scripts/validate-d1-hot-indexes.mjs");
   assert.match(validator, /0024_icai_source_bootstrap\.sql/);
   assert.match(validator, /seededSourceIds/);
-  assert.match(validator, /ICAI source bootstrap did not retain exactly three seeded active sources/);
-  assert.match(validator, /ICAI source bootstrap migration was not recorded exactly once/);
+  for (const id of ["icai-foundation-course", "icai-intermediate-course", "icai-final-course"]) {
+    assert.match(validator, new RegExp(id));
+  }
+  assert.match(validator, /ICAI Phase 1 bootstrap did not retain exactly six active current sources/);
+  assert.match(validator, /0024_icai_source_bootstrap\.sql.*Wrangler migration was not recorded exactly once/s);
 });
 
 test("retained Cloudflare D1 deployment applies and verifies ICAI source bootstrap before Worker rollout", () => {
@@ -46,10 +49,10 @@ test("retained Cloudflare D1 deployment applies and verifies ICAI source bootstr
   const migrationStep = workflow.indexOf("- name: Apply missing retained D1 migrations");
   const workerIndex = workflow.indexOf("- name: Deploy ICAI service");
   assert.match(migrator, /\["0024", "d1\/migrations\/0024_icai_source_bootstrap\.sql"\]/);
+  assert.match(migrator, /\["0030", "d1\/migrations\/0030_icai_phase1_current_sources\.sql"\]/);
   assert.match(migrator, /_ca_schema_migrations/);
   assert.ok(migrationStep >= 0, "retained D1 deployment must invoke the ledger-aware migrator");
-  assert.ok(workerIndex > migrationStep, "retained migrations, including 0024, must be verified before the ICAI Worker is deployed");
-  assert.match(workflow, /version BETWEEN '0012' AND '0028'/);
+  assert.ok(workerIndex > migrationStep, "retained migrations, including the current Phase 1 source registry, must be verified before the ICAI Worker is deployed");
   assert.match(workflow, /icai_active_seeded_sources/);
   assert.match(workflow, /icai-foundation-course/);
   assert.match(workflow, /icai-intermediate-course/);
