@@ -3,18 +3,44 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOperator } from "@/lib/authorization/server";
+import { createD1AdminClient } from "@/lib/data/d1/client";
 import { invalidateSharedPublicCache } from "@/lib/cache/public";
 import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
-import { decideIcaiReview, normalizeIcaiReviewDecision } from "@/lib/icai/review";
+import {
+  decideIcaiReview,
+  normalizeIcaiReviewDecision,
+} from "@/lib/icai/review";
 
 function message(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown background job error.";
+  return error instanceof Error
+    ? error.message
+    : "Unknown background job error.";
 }
 
 export async function runIcaiSyncAction() {
   let destination = "/admin/icai-sync";
   try {
     const operator = await requireAdminOperator();
+    const admin = createD1AdminClient();
+    const [activeRun, activeJob] = await Promise.all([
+      admin
+        .from("icai_sync_runs")
+        .select("id")
+        .eq("status", "running")
+        .limit(1)
+        .maybeSingle(),
+      admin
+        .from("background_jobs")
+        .select("id")
+        .eq("job_type", "icai-sync")
+        .in("status", ["queued", "running"])
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (activeRun.error) throw activeRun.error;
+    if (activeJob.error) throw activeJob.error;
+    if (activeRun.data || activeJob.data)
+      throw new Error("An ICAI synchronization is already queued or running.");
     const now = new Date().toISOString();
     const job = await enqueueBackgroundJob({
       type: "icai-sync",
