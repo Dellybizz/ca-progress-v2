@@ -22,6 +22,10 @@ const migrations = [
   ["0028", "d1/migrations/0028_icai_sync_continuation.sql"],
 ];
 
+if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
+  throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
+}
+
 function wrangler(args, { capture = false } = {}) {
   const result = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["wrangler", ...args], {
     encoding: "utf8",
