@@ -111,8 +111,7 @@ export function SyncLiveRefresh({
           signal: controller.signal,
         });
         const body = (await response.json()) as
-          | IcaiSyncLiveStatus
-          | { error?: string };
+          IcaiSyncLiveStatus | { error?: string };
         if (!response.ok) {
           throw new Error(
             "error" in body && body.error
@@ -170,8 +169,14 @@ export function SyncLiveRefresh({
       <section className="icai-section icai-runtime-panel" aria-live="polite">
         <div className="icai-section-heading">
           <div>
-            <span className="eyebrow">{active ? labels.live : "Run diagnostics"}</span>
-            <h2>{active ? "Connecting to the sync worker" : "Loading item results"}</h2>
+            <span className="eyebrow">
+              {active ? labels.live : "Run diagnostics"}
+            </span>
+            <h2>
+              {active
+                ? "Connecting to the sync worker"
+                : "Loading item results"}
+            </h2>
             <p className="icai-muted">
               Reading compact sync state without refreshing the full admin page.
             </p>
@@ -197,8 +202,18 @@ export function SyncLiveRefresh({
   const failedItems = status.itemResults.filter(
     (item) => item.status === "failed" || item.status === "timed_out",
   );
-  const retryableItems = status.itemResults.filter((item) => item.retryEligible);
-  const timedOutItems = retryableItems.filter((item) => item.status === "timed_out");
+  const retryableItems = status.itemResults.filter(
+    (item) => item.retryEligible,
+  );
+  const unchangedItems = status.itemResults.filter(
+    (item) => item.stage === "unchanged",
+  );
+  const deferredItems = status.itemResults.filter(
+    (item) => item.stage === "retry_deferred",
+  );
+  const timedOutItems = retryableItems.filter(
+    (item) => item.status === "timed_out",
+  );
   const currentSource = runtime?.currentSourceId
     ? status.sourceResults.find(
         (source) => source.sourceId === runtime.currentSourceId,
@@ -222,7 +237,9 @@ export function SyncLiveRefresh({
             <div>
               <span>Overall progress</span>
               <strong>
-                {run ? `${overallPercent}% · ${processed}/${total}` : "Waiting for run"}
+                {run
+                  ? `${overallPercent}% · ${processed}/${total}`
+                  : "Waiting for run"}
               </strong>
             </div>
             <div>
@@ -235,7 +252,9 @@ export function SyncLiveRefresh({
             </div>
             <div>
               <span>Next scheduled group</span>
-              <strong>{status.nextScheduledGroup?.label ?? "Not configured yet"}</strong>
+              <strong>
+                {status.nextScheduledGroup?.label ?? "Not configured yet"}
+              </strong>
             </div>
           </section>
 
@@ -247,7 +266,8 @@ export function SyncLiveRefresh({
                 <h2>
                   {status.job?.status === "queued"
                     ? "Waiting for a worker"
-                    : runtime?.currentSourceName ?? "Preparing official sources"}
+                    : (runtime?.currentSourceName ??
+                      "Preparing official sources")}
                 </h2>
                 <p>
                   {run
@@ -286,12 +306,15 @@ export function SyncLiveRefresh({
                 {stale ? "possibly stuck" : "live"}
               </Badge>
             </div>
-            <div className="icai-progress" aria-label="Current source stage progress">
+            <div
+              className="icai-progress"
+              aria-label="Current source stage progress"
+            >
               <i style={{ width: `${stagePercent}%` }} />
             </div>
             <p className="icai-muted">
-              Current-source workflow {stagePercent}% · overall {overallPercent}% (
-              {processed}/{total} sources)
+              Current-source workflow {stagePercent}% · overall {overallPercent}
+              % ({processed}/{total} sources)
             </p>
             {runtime?.currentItemUrl ? (
               <div className="icai-runtime-actions">
@@ -308,9 +331,9 @@ export function SyncLiveRefresh({
             ) : null}
             {stale ? (
               <div className="auth-status auth-status--danger" role="alert">
-                No heartbeat has been received for more than two minutes. Recovery
-                can safely close the stale run without changing previously verified
-                ICAI data.
+                No heartbeat has been received for more than two minutes.
+                Recovery can safely close the stale run without changing
+                previously verified ICAI data.
               </div>
             ) : null}
             {status.runId && runtime ? (
@@ -320,7 +343,9 @@ export function SyncLiveRefresh({
                   <input type="hidden" name="intent" value="skip_item" />
                   <button
                     className="ui-button"
-                    disabled={!runtime.currentItemUrl || runtime.skipItemRequested}
+                    disabled={
+                      !runtime.currentItemUrl || runtime.skipItemRequested
+                    }
                   >
                     {runtime.skipItemRequested
                       ? "Item skip requested"
@@ -350,7 +375,9 @@ export function SyncLiveRefresh({
                       !runtime.currentSourceId || runtime.skipSourceRequested
                     }
                   >
-                    {runtime.skipSourceRequested ? "Skip requested" : labels.skip}
+                    {runtime.skipSourceRequested
+                      ? "Skip requested"
+                      : labels.skip}
                   </button>
                 </form>
                 <form action={controlIcaiSyncAction}>
@@ -360,7 +387,9 @@ export function SyncLiveRefresh({
                     className="ui-button"
                     disabled={runtime.cancelRequested}
                   >
-                    {runtime.cancelRequested ? "Cancel requested" : labels.cancel}
+                    {runtime.cancelRequested
+                      ? "Cancel requested"
+                      : labels.cancel}
                   </button>
                 </form>
                 {stale ? (
@@ -378,15 +407,28 @@ export function SyncLiveRefresh({
             {runtime?.currentSourceId ? (
               <details className="icai-diagnostic-details">
                 <summary>Temporarily pause current source</summary>
-                <form action={manageIcaiItemAction} className="icai-runtime-actions">
+                <form
+                  action={manageIcaiItemAction}
+                  className="icai-runtime-actions"
+                >
                   <input type="hidden" name="action" value="pause_source" />
-                  <input type="hidden" name="runId" value={status.runId ?? ""} />
+                  <input
+                    type="hidden"
+                    name="runId"
+                    value={status.runId ?? ""}
+                  />
                   <input
                     type="hidden"
                     name="sourceId"
                     value={runtime.currentSourceId}
                   />
-                  <input type="number" name="hours" min="1" max="168" defaultValue="24" />
+                  <input
+                    type="number"
+                    name="hours"
+                    min="1"
+                    max="168"
+                    defaultValue="24"
+                  />
                   <input
                     name="reason"
                     maxLength={500}
@@ -409,15 +451,20 @@ export function SyncLiveRefresh({
           </div>
           <div>
             <span>Sources</span>
-            <strong>{run.processed}/{run.total}</strong>
+            <strong>
+              {run.processed}/{run.total}
+            </strong>
           </div>
           <div>
             <span>Item failures</span>
             <strong>{failedItems.length}</strong>
           </div>
           <div>
-            <span>Retry eligible</span>
-            <strong>{retryableItems.length}</strong>
+            <span>Incremental savings</span>
+            <strong>
+              {unchangedItems.length} unchanged · {deferredItems.length}{" "}
+              deferred
+            </strong>
           </div>
         </section>
       ) : null}
@@ -477,12 +524,14 @@ export function SyncLiveRefresh({
               <span className="eyebrow">Per-item isolation</span>
               <h2>Files and links</h2>
               <p className="icai-muted">
-                Every discovered academic item receives a terminal result. One failed
-                item cannot stop safe items from the same source.
+                Every discovered academic item receives a terminal result. One
+                failed item cannot stop safe items from the same source.
               </p>
             </div>
             <Badge tone={failedItems.length ? "warning" : "success"}>
-              {failedItems.length ? `${failedItems.length} problem items` : "all terminal"}
+              {failedItems.length
+                ? `${failedItems.length} problem items`
+                : "all terminal"}
             </Badge>
           </div>
 
@@ -499,7 +548,9 @@ export function SyncLiveRefresh({
                 <form action={retryIcaiItemsAction}>
                   <input type="hidden" name="runId" value={status.runId} />
                   <input type="hidden" name="mode" value="timed_out" />
-                  <button className="ui-button">Retry timed-out items only</button>
+                  <button className="ui-button">
+                    Retry timed-out items only
+                  </button>
                 </form>
               ) : null}
             </div>
@@ -541,7 +592,11 @@ export function SyncLiveRefresh({
                     <CopyUrlButton url={item.itemUrl} />
                     {!status.active && status.runId && item.retryEligible ? (
                       <form action={retryIcaiItemsAction}>
-                        <input type="hidden" name="runId" value={status.runId} />
+                        <input
+                          type="hidden"
+                          name="runId"
+                          value={status.runId}
+                        />
                         <input type="hidden" name="mode" value="item" />
                         <input type="hidden" name="itemId" value={item.id} />
                         <button className="ui-button ui-button--sm">
@@ -555,45 +610,122 @@ export function SyncLiveRefresh({
                 <details className="icai-diagnostic-details">
                   <summary>Item controls & technical details</summary>
                   <p className="icai-muted">
-                    HTTP {item.httpStatus ?? "—"} · {item.bytesFetched} bytes · retry {item.retryEligible ? "eligible" : "not eligible"}
+                    HTTP {item.httpStatus ?? "—"} · {item.bytesFetched} bytes ·
+                    retry {item.retryEligible ? "eligible" : "not eligible"}
                   </p>
-                  {item.failureMessage ? <pre>{item.failureMessage}</pre> : null}
+                  {item.failureMessage ? (
+                    <pre>{item.failureMessage}</pre>
+                  ) : null}
 
-                  <form action={manageIcaiItemAction} className="icai-runtime-actions">
+                  <form
+                    action={manageIcaiItemAction}
+                    className="icai-runtime-actions"
+                  >
                     <input type="hidden" name="action" value="note" />
-                    <input type="hidden" name="runId" value={status.runId ?? ""} />
+                    <input
+                      type="hidden"
+                      name="runId"
+                      value={status.runId ?? ""}
+                    />
                     <input type="hidden" name="itemId" value={item.id} />
-                    <input type="hidden" name="sourceId" value={item.sourceId} />
+                    <input
+                      type="hidden"
+                      name="sourceId"
+                      value={item.sourceId}
+                    />
                     <input
                       name="reason"
                       maxLength={2000}
                       placeholder="Administrative note"
                       required
                     />
-                    <button className="ui-button ui-button--sm">Save note</button>
+                    <button className="ui-button ui-button--sm">
+                      Save note
+                    </button>
                   </form>
 
-                  <form action={manageIcaiItemAction} className="icai-runtime-actions">
+                  <form
+                    action={manageIcaiItemAction}
+                    className="icai-runtime-actions"
+                  >
                     <input type="hidden" name="action" value="exclude_temp" />
-                    <input type="hidden" name="runId" value={status.runId ?? ""} />
+                    <input
+                      type="hidden"
+                      name="runId"
+                      value={status.runId ?? ""}
+                    />
                     <input type="hidden" name="itemId" value={item.id} />
-                    <input type="hidden" name="sourceId" value={item.sourceId} />
-                    <input type="number" name="hours" min="1" max="168" defaultValue="24" />
-                    <input name="reason" maxLength={2000} placeholder="Temporary exclusion reason" required />
-                    <input name="confirmation" placeholder="Type IGNORE" required />
-                    <button className="ui-button ui-button--sm">Ignore temporarily</button>
+                    <input
+                      type="hidden"
+                      name="sourceId"
+                      value={item.sourceId}
+                    />
+                    <input
+                      type="number"
+                      name="hours"
+                      min="1"
+                      max="168"
+                      defaultValue="24"
+                    />
+                    <input
+                      name="reason"
+                      maxLength={2000}
+                      placeholder="Temporary exclusion reason"
+                      required
+                    />
+                    <input
+                      name="confirmation"
+                      placeholder="Type IGNORE"
+                      required
+                    />
+                    <button className="ui-button ui-button--sm">
+                      Ignore temporarily
+                    </button>
                   </form>
 
-                  <form action={manageIcaiItemAction} className="icai-runtime-actions">
-                    <input type="hidden" name="action" value="exclude_permanent" />
-                    <input type="hidden" name="runId" value={status.runId ?? ""} />
+                  <form
+                    action={manageIcaiItemAction}
+                    className="icai-runtime-actions"
+                  >
+                    <input
+                      type="hidden"
+                      name="action"
+                      value="exclude_permanent"
+                    />
+                    <input
+                      type="hidden"
+                      name="runId"
+                      value={status.runId ?? ""}
+                    />
                     <input type="hidden" name="itemId" value={item.id} />
-                    <input type="hidden" name="sourceId" value={item.sourceId} />
-                    <input name="reason" maxLength={2000} placeholder="Permanent exclusion reason" required />
-                    <input name="confirmation" placeholder="Type IGNORE" required />
-                    <input name="permanentConfirmation" placeholder="Type PERMANENT" required />
-                    <input name="ownerConfirmation" placeholder="High-impact only: type OWNER" />
-                    <button className="ui-button ui-button--sm">Permanent exclusion</button>
+                    <input
+                      type="hidden"
+                      name="sourceId"
+                      value={item.sourceId}
+                    />
+                    <input
+                      name="reason"
+                      maxLength={2000}
+                      placeholder="Permanent exclusion reason"
+                      required
+                    />
+                    <input
+                      name="confirmation"
+                      placeholder="Type IGNORE"
+                      required
+                    />
+                    <input
+                      name="permanentConfirmation"
+                      placeholder="Type PERMANENT"
+                      required
+                    />
+                    <input
+                      name="ownerConfirmation"
+                      placeholder="High-impact only: type OWNER"
+                    />
+                    <button className="ui-button ui-button--sm">
+                      Permanent exclusion
+                    </button>
                   </form>
                 </details>
               </article>

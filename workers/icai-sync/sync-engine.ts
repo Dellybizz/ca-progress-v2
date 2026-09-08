@@ -205,12 +205,15 @@ async function fetchOfficialPage(
       if (!force && source.etag) headers.set("If-None-Match", source.etag);
       if (!force && source.lastModified)
         headers.set("If-Modified-Since", source.lastModified);
-      const response = await fetchFollowingApprovedRedirects(source.officialUrl, {
-        method: "GET",
-        headers,
-        cache: "no-store",
-        signal: controller.signal,
-      });
+      const response = await fetchFollowingApprovedRedirects(
+        source.officialUrl,
+        {
+          method: "GET",
+          headers,
+          cache: "no-store",
+          signal: controller.signal,
+        },
+      );
       if (response.status === 304)
         return { response, html: "", bytes: 0, notModified: true };
       if (response.status === 429 || response.status >= 500) {
@@ -433,6 +436,29 @@ async function processSource(
   const parsedItemCount =
     parsed.resources.length + parsed.attempts.length + parsed.events.length;
   const allowEmpty = source.adapterConfig.allow_empty === true;
+  if (
+    parsedItemCount === 0 &&
+    isolated.unchangedCount + isolated.deferredCount > 0 &&
+    isolated.failedCount === 0 &&
+    isolated.skippedCount === 0
+  ) {
+    await stage("writing");
+    const { error } = await client.rpc("icai_sync_record_unchanged", {
+      p_run_id: runId,
+      p_source_id: source.id,
+      p_snapshot: {
+        ...snapshotBase,
+        canonical_hash: source.lastContentHash ?? `incremental:${source.id}`,
+        metadata: {
+          ...snapshotBase.metadata,
+          item_unchanged_count: isolated.unchangedCount,
+          item_deferred_count: isolated.deferredCount,
+        },
+      } as Json,
+    });
+    if (error) throw error;
+    return;
+  }
   if (parsedItemCount === 0 && !allowEmpty)
     throw new Error(
       isolated.failures.length
@@ -463,7 +489,11 @@ async function processSource(
   await stage("comparing");
   const canonicalHash = await sha256Hex(stableJson(parsed));
   const authoritativeListing =
-    source.authoritativeListing && !incomplete && !targetedRetry;
+    source.authoritativeListing &&
+    !incomplete &&
+    isolated.unchangedCount === 0 &&
+    isolated.deferredCount === 0 &&
+    !targetedRetry;
   const snapshot = {
     ...snapshotBase,
     canonical_hash: canonicalHash,
@@ -474,6 +504,8 @@ async function processSource(
       item_success_count: isolated.successfulCount,
       item_failed_count: isolated.failedCount,
       item_skipped_count: isolated.skippedCount,
+      item_unchanged_count: isolated.unchangedCount,
+      item_deferred_count: isolated.deferredCount,
     },
   };
 
@@ -497,8 +529,7 @@ async function processSource(
   const attemptRowsByIdentity = new Map<string, AttemptRow>();
   for (const attempt of attempts) {
     const levelCode = levelById.get(attempt.level_id)?.code as
-      | IcaiLevelCode
-      | undefined;
+      IcaiLevelCode | undefined;
     if (levelCode) {
       const identity = `${levelCode}:${attempt.attempt_key}`;
       attemptIdsByIdentity.set(identity, attempt.id);
@@ -562,7 +593,9 @@ async function processSource(
         )
         .run();
       isolated.failedCount += 1;
-      isolated.failures.push(`${resource.officialUrl}: ${asErrorMessage(error)}`);
+      isolated.failures.push(
+        `${resource.officialUrl}: ${asErrorMessage(error)}`,
+      );
     }
   }
 
@@ -595,8 +628,13 @@ async function processSource(
     });
   }
 
-  const unsafeAfterPayload = isolated.failedCount > 0 || isolated.skippedCount > 0;
-  if (!resourcePayloads.length && !attemptPayloads.length && !eventPayloads.length) {
+  const unsafeAfterPayload =
+    isolated.failedCount > 0 || isolated.skippedCount > 0;
+  if (
+    !resourcePayloads.length &&
+    !attemptPayloads.length &&
+    !eventPayloads.length
+  ) {
     throw new Error(
       `No safe payload remained after per-item validation. Last verified data was preserved. ${isolated.failures[0] ?? ""}`.trim(),
     );
@@ -608,7 +646,11 @@ async function processSource(
     metadata: {
       ...snapshot.metadata,
       authoritative_listing:
-        source.authoritativeListing && !unsafeAfterPayload && !targetedRetry,
+        source.authoritativeListing &&
+        !unsafeAfterPayload &&
+        isolated.unchangedCount === 0 &&
+        isolated.deferredCount === 0 &&
+        !targetedRetry,
     },
   };
   const { error } = await client.rpc("icai_sync_apply_source_batch", {
