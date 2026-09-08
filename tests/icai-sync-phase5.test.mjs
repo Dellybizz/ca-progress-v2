@@ -58,7 +58,8 @@ test("Phase 5 remains attached to the real cron, queue and private ICAI service 
   assert.match(wrangler, /"30 0,2,4,6,8,10,12,14,16,18 \* \* \*"/);
   assert.match(wrangler, /"0 \* \* \* \*"/);
   assert.match(wrangler, /"binding": "ICAI_SYNC_SERVICE"/);
-  assert.match(worker, /scheduledJob\(controller\)/);
+  assert.match(worker, /scheduled\(controller: ScheduledController, env: WorkerEnv, ctx: WorkerContext\)/);
+  assert.match(worker, /dispatchScheduledIcai\(controller, env\)/);
   assert.match(worker, /selectIcaiScheduledDispatch/);
   assert.match(worker, /type: "icai-sync"/);
   assert.match(sync, /ICAI_SYNC_SERVICE/);
