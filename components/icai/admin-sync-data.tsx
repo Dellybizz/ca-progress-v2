@@ -1,0 +1,236 @@
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Icon } from "@/components/ui/icon";
+import type { IcaiAdminDashboard, IcaiPublicCatalog } from "@/lib/icai/types";
+import { decideIcaiReviewAction } from "@/app/(admin)/admin/icai-sync/actions";
+
+function time(value: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Kolkata",
+  }).format(date);
+}
+
+function text(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function isPdf(url: string | null) {
+  if (!url) return false;
+  try { return /\.pdf$/i.test(new URL(url).pathname); } catch { return false; }
+}
+
+function reviewPreview(
+  review: IcaiAdminDashboard["reviews"][number],
+  catalog: IcaiPublicCatalog,
+) {
+  const patch = review.proposedPatch;
+  const resource = catalog.resources.find((item) => item.id === review.entityId);
+  const patchUrl = text(patch.source_url);
+
+  if (review.entityType === "exam_event") {
+    const date = text(patch.event_date);
+    return {
+      label: "Exam date shown to students",
+      title: text(patch.title) ?? review.title.replace(/^Exam event review:\s*/i, ""),
+      detail: date ? time(date) : "Date change detected",
+      url: patchUrl ?? review.sourceUrl,
+      urlLabel: "Open official exam notification",
+    };
+  }
+
+  if (review.entityType === "exam_attempt") {
+    const start = text(patch.start_date);
+    const end = text(patch.end_date);
+    const range = start && end && start !== end ? `${time(start)} – ${time(end)}` : time(start ?? end);
+    return {
+      label: "Countdown / attempt date shown to students",
+      title: text(patch.label) ?? review.title.replace(/^Exam attempt review:\s*/i, ""),
+      detail: range,
+      url: patchUrl ?? review.sourceUrl,
+      urlLabel: "Open official exam notification",
+    };
+  }
+
+  return {
+    label: "Resource shown to students",
+    title: resource?.title ?? review.title.replace(/^ICAI resource removal:\s*/i, ""),
+    detail: resource ? resource.type.replaceAll("_", " ") : "ICAI resource",
+    url: resource?.officialUrl ?? patchUrl ?? review.sourceUrl,
+    urlLabel: isPdf(resource?.officialUrl ?? patchUrl ?? review.sourceUrl) ? "Open ICAI PDF" : "Open official ICAI evidence",
+  };
+}
+
+export function IcaiAdminSyncData({
+  dashboard,
+  catalog,
+  notice,
+  error,
+}: {
+  dashboard: IcaiAdminDashboard;
+  catalog: IcaiPublicCatalog;
+  notice?: string | null;
+  error?: string | null;
+}) {
+  const directPdfs = catalog.resources.filter((item) => isPdf(item.officialUrl)).length;
+
+  return (
+    <div className="icai-page icai-admin-page">
+      <section className="icai-hero">
+        <div>
+          <Badge tone="warning">Admin · ICAI Data</Badge>
+          <h1>Synced data & review</h1>
+          <p>Read the ICAI data in the same terms students will see: chapter PDFs, exam dates and official notifications. Technical sync controls stay on the Sync page.</p>
+          <div className="icai-source-flags">
+            <Link className="ui-button ui-button--secondary ui-button--sm" href="/admin/icai-sync">1. Sync & progress</Link>
+            <Badge tone="info">2. Synced data & review</Badge>
+          </div>
+        </div>
+      </section>
+
+      {notice ? <div className="auth-status auth-status--success" role="status">{notice}</div> : null}
+      {error ? <div className="auth-status auth-status--danger" role="alert">{error}</div> : null}
+
+      <section className="icai-admin-summary">
+        <div><span>Synced resources</span><strong>{catalog.resources.length}</strong></div>
+        <div><span>Direct PDFs</span><strong>{directPdfs}</strong></div>
+        <div><span>Exam dates</span><strong>{catalog.events.length}</strong></div>
+        <div><span>Needs review</span><strong>{dashboard.reviews.length}</strong></div>
+      </section>
+
+      <section className="icai-section">
+        <div className="icai-section-heading">
+          <div>
+            <span className="eyebrow">Approval queue</span>
+            <h2>What will students see?</h2>
+            <p className="icai-muted">Review the proposed student-facing value and its official ICAI evidence. Approve only when those two agree.</p>
+          </div>
+          <Badge tone={dashboard.reviews.length ? "warning" : "success"}>{dashboard.reviews.length} pending</Badge>
+        </div>
+
+        {dashboard.reviews.length ? (
+          <div className="icai-review-list">
+            {dashboard.reviews.map((review) => {
+              const preview = reviewPreview(review, catalog);
+              return (
+                <article key={review.id}>
+                  <div>
+                    <Badge tone="warning">{Math.round(review.confidence * 100)}% confidence</Badge>
+                    <span className="eyebrow">{preview.label}</span>
+                    <h3>{preview.title}</h3>
+                    <p><strong>{preview.detail}</strong></p>
+                    <p>{review.reason}</p>
+                    <small>{review.sourceName} · detected {time(review.createdAt)}</small>
+                    {preview.url ? (
+                      <a href={preview.url} target="_blank" rel="noreferrer">
+                        {preview.urlLabel} <Icon name="arrow" size={14} />
+                      </a>
+                    ) : null}
+                  </div>
+                  <div className="icai-review-actions">
+                    <form action={decideIcaiReviewAction}>
+                      <input type="hidden" name="reviewId" value={review.id} />
+                      <input type="hidden" name="decision" value="approve" />
+                      <button className="ui-button ui-button--primary ui-button--sm" type="submit">Approve</button>
+                    </form>
+                    <form action={decideIcaiReviewAction}>
+                      <input type="hidden" name="reviewId" value={review.id} />
+                      <input type="hidden" name="decision" value="reject" />
+                      <button className="ui-button ui-button--secondary ui-button--sm" type="submit">Reject</button>
+                    </form>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState compact icon="check" title="Nothing needs approval" description="Verified synced data is already available below." />
+        )}
+      </section>
+
+      <section className="icai-section">
+        <div className="icai-section-heading">
+          <div>
+            <span className="eyebrow">Student-facing exam information</span>
+            <h2>Exam dates</h2>
+          </div>
+        </div>
+        {catalog.events.length ? (
+          <div className="icai-result-list">
+            {catalog.events.map((event) => (
+              <article key={event.id}>
+                <span>
+                  <span>
+                    <strong>{event.title}</strong>
+                    <small>{event.levelCode} · {event.attemptLabel || event.attemptKey}</small>
+                  </span>
+                </span>
+                <span>
+                  <strong>{time(event.eventDate)}</strong>
+                  <a href={event.sourceUrl} target="_blank" rel="noreferrer">Official notification <Icon name="arrow" size={14} /></a>
+                </span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState compact icon="clock" title="No verified exam dates yet" description="Exam dates appear here after ICAI sync verifies them." />
+        )}
+      </section>
+
+      <section className="icai-section">
+        <div className="icai-section-heading">
+          <div>
+            <span className="eyebrow">Student-facing resources</span>
+            <h2>Synced ICAI resources</h2>
+            <p className="icai-muted">Study Material entries should open the ICAI chapter PDF directly, not an ICAI page containing another list of links.</p>
+          </div>
+        </div>
+        {catalog.resources.length ? (
+          <div className="icai-result-list">
+            {catalog.resources.map((resource) => (
+              <article key={resource.id}>
+                <span>
+                  <span>
+                    <strong>{resource.title}</strong>
+                    <small>{resource.type.replaceAll("_", " ")}{resource.subjects.length ? ` · ${resource.subjects.map((subject) => subject.title).join(", ")}` : ""}</small>
+                  </span>
+                </span>
+                <span>
+                  <Badge tone={isPdf(resource.officialUrl) ? "success" : "neutral"}>{isPdf(resource.officialUrl) ? "direct PDF" : "official link"}</Badge>
+                  <a href={resource.officialUrl} target="_blank" rel="noreferrer">{isPdf(resource.officialUrl) ? "Open PDF" : "Open"} <Icon name="arrow" size={14} /></a>
+                </span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <EmptyState compact icon="shield" title="No synced resources yet" description="Run the bootstrap sync first." />
+        )}
+      </section>
+
+      <section className="icai-section">
+        <div className="icai-section-heading"><div><span className="eyebrow">Source health</span><h2>Official ICAI sources</h2></div></div>
+        <div className="icai-source-table">
+          {dashboard.sources.map((source) => (
+            <article key={source.id} className={source.failures ? "has-error" : ""}>
+              <div>
+                <span className="icai-source-health"><i />{source.name}</span>
+                <a href={source.officialUrl} target="_blank" rel="noreferrer">Discovery source</a>
+              </div>
+              <dl>
+                <div><dt>Last success</dt><dd>{time(source.lastSuccessAt)}</dd></div>
+                <div><dt>Failures</dt><dd>{source.failures}</dd></div>
+              </dl>
+              {source.lastError ? <p>{source.lastError}</p> : null}
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
