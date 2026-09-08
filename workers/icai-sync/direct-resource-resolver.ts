@@ -1,5 +1,6 @@
 import { parseOfficialSource } from "../../lib/icai/adapters";
-import { isApprovedIcaiUrl } from "../../lib/icai/html";
+import { detectAttemptKeys } from "../../lib/icai/classify";
+import { cleanText, isApprovedIcaiUrl } from "../../lib/icai/html";
 import type {
   IcaiLevelCode,
   IcaiResourceType,
@@ -9,6 +10,7 @@ import type {
 } from "../../lib/icai/types";
 
 type SubjectLookup = { id: string; title: string; levelCode: IcaiLevelCode };
+type ParsedLanding = { html: string; resources: ParsedIcaiResource[] };
 
 const MAX_CHILD_PAGES = 80;
 const MAX_STUDY_DEPTH = 3;
@@ -40,15 +42,39 @@ function validAttemptKey(value: string) {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
 
+function compactUrlAttemptKey(url: string) {
+  const match = /(?:^|[-_/])(jan(?:uary)?|may|sep(?:tember)?|nov(?:ember)?)[-_]?(20\d{2})(?:$|[-_/])/i.exec(url);
+  if (!match) return null;
+  const month = match[1].toLowerCase();
+  const monthNumber = month.startsWith("jan") ? "01" : month === "may" ? "05" : month.startsWith("sep") ? "09" : "11";
+  return `${match[2]}-${monthNumber}`;
+}
+
 function nestedPageIsInBootstrapWindow(resource: ParsedIcaiResource, source: IcaiSourceConfig) {
   const attemptFloor = configString(source, "bootstrap_attempt_floor", "2026-05");
   const publishedFloor = configString(source, "bootstrap_published_floor", "2025-12-01");
   const attemptKeys = resource.attemptKeys.filter(validAttemptKey);
+  const urlAttempt = compactUrlAttemptKey(resource.officialUrl);
+  if (urlAttempt && urlAttempt < attemptFloor) return false;
   if (attemptKeys.length && !attemptKeys.some((key) => key >= attemptFloor)) return false;
   if (resource.publishedOn && resource.publishedOn < publishedFloor && !attemptKeys.some((key) => key >= attemptFloor)) {
     return false;
   }
   return true;
+}
+
+function applicabilityPageIsInBootstrapWindow(html: string, source: IcaiSourceConfig) {
+  const attemptFloor = configString(source, "bootstrap_attempt_floor", "2026-05");
+  const text = cleanText(html);
+  const applicability = [...text.matchAll(/Applicable\s+for\s+(.{1,180}?)(?:Exams?|Examinations?)(?:\s+Onwards)?/gi)];
+  if (!applicability.length) return true;
+
+  const keys = applicability.flatMap((match) => detectAttemptKeys(match[0]));
+  // Some ICAI selectors contain several applicability branches. The selector is
+  // traversable if at least one branch is in scope; each destination page is
+  // checked again before any PDF is accepted, so an old May-2025/Jan-2026
+  // terminal page cannot leak chapter PDFs into the current bootstrap.
+  return keys.length === 0 || keys.some((key) => key >= attemptFloor);
 }
 
 function isTraversableIcaiPage(url: string) {
@@ -147,8 +173,8 @@ export async function resolveDirectStudyMaterialPdfs(
   let droppedLandingPages = 0;
   let childPages = 0;
 
-  const parseLanding = async (resource: ParsedIcaiResource) => {
-    if (visited.has(resource.officialUrl)) return [] as ParsedIcaiResource[];
+  const parseLanding = async (resource: ParsedIcaiResource): Promise<ParsedLanding | null> => {
+    if (visited.has(resource.officialUrl)) return null;
     if (childPages >= MAX_CHILD_PAGES) {
       throw new Error(`Direct-PDF resolver exceeded ${MAX_CHILD_PAGES} ICAI landing pages.`);
     }
@@ -156,9 +182,10 @@ export async function resolveDirectStudyMaterialPdfs(
     childPages += 1;
     const html = await fetchApprovedHtml(resource.officialUrl, userAgent, source.timeoutMs);
     const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
-    return parseOfficialSource(html, childSource, subjects).resources.map((child) =>
+    const parsed = parseOfficialSource(html, childSource, subjects).resources.map((child) =>
       mergeContext(resource, child),
     );
+    return { html, resources: parsed };
   };
 
   const resolveStudyMaterial = async (
@@ -167,10 +194,13 @@ export async function resolveDirectStudyMaterialPdfs(
   ): Promise<ParsedIcaiResource[]> => {
     if (isDirectPdf(resource.officialUrl)) return [resource];
     if (depth > MAX_STUDY_DEPTH || !isTraversableIcaiPage(resource.officialUrl)) return [];
+    if (!nestedPageIsInBootstrapWindow(resource, source)) return [];
 
-    const children = await parseLanding(resource);
-    const direct = children.filter((child) => isDirectPdf(child.officialUrl));
-    const nested = children.filter((child) =>
+    const landing = await parseLanding(resource);
+    if (!landing || !applicabilityPageIsInBootstrapWindow(landing.html, source)) return [];
+
+    const direct = landing.resources.filter((child) => isDirectPdf(child.officialUrl));
+    const nested = landing.resources.filter((child) =>
       !isDirectPdf(child.officialUrl) &&
       isTraversableIcaiPage(child.officialUrl) &&
       nestedPageIsInBootstrapWindow(child, source),
@@ -205,8 +235,8 @@ export async function resolveDirectStudyMaterialPdfs(
       continue;
     }
 
-    const children = await parseLanding(resource);
-    const pdfs = children.filter((child) => isDirectPdf(child.officialUrl));
+    const landing = await parseLanding(resource);
+    const pdfs = landing?.resources.filter((child) => isDirectPdf(child.officialUrl)) ?? [];
     if (pdfs.length) {
       resources.push(...pdfs);
       resolvedLandingPages += 1;
