@@ -28,6 +28,8 @@ Phase 5 closes the lightweight distributed-sync implementation with a bounded pr
 - Typecheck: passed locally.
 - Lint: passed locally.
 - Next.js production build: passed locally.
-- Authoritative CI and deployed Cloudflare proof: pending on the Phase 5 commit.
+- V2 CI run `34241871496`: passed on implementation SHA `57b31ff2efaf6d942ba52d4db7041fa9beab060e`.
+- Supabase Retirement Permanent Closure run `34241871433`: passed on the same implementation SHA.
+- Deployed Cloudflare live proof: runs when this cumulative branch is promoted through the existing deployment workflow; no production deployment or `main` merge was performed here.
 
-Phase 5 must not be marked operationally complete until the authoritative workflows and deployed live proof pass on the same final SHA.
+The Phase 5 implementation and authoritative repository gates are complete. Production rollout remains a separate promotion action because the deployment workflow intentionally targets `phase-12-operations-admin-platform`.

@@ -99,5 +99,7 @@ test("Phase 5 is a permanent focused gate in CI, retirement closure and deployme
   const status = read("docs/ICAI_SYNC_PHASE5_STATUS.md");
   assert.match(status, /bounded to one source/);
   assert.match(status, /469\/469 passed/);
-  assert.match(status, /pending on the Phase 5 commit/);
+  assert.match(status, /34241871496/);
+  assert.match(status, /34241871433/);
+  assert.match(status, /implementation and authoritative repository gates are complete/);
 });
