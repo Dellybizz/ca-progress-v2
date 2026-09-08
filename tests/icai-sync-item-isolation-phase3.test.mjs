@@ -70,13 +70,13 @@ test("Phase 3 exposes cooperative item controls and safe exclusion rules", () =>
   const panel = read("components/icai/sync-live-refresh.tsx");
   assert.match(runtime, /SyncItemSkippedError/);
   assert.match(runtime, /SyncRemainingItemsSkippedError/);
-  assert.match(actions, /skip_item/);
-  assert.match(actions, /skip_remaining/);
-  assert.match(actions, /exclude_temp/);
-  assert.match(actions, /exclude_permanent/);
+  assert.match(actions, /skip-item/);
+  assert.match(actions, /skip-remaining/);
+  assert.match(actions, /exclude-temp/);
+  assert.match(actions, /exclude-permanent/);
   assert.match(actions, /PERMANENT/);
   assert.match(actions, /parent_owner/);
-  assert.match(actions, /pause_source/);
+  assert.match(actions, /pause-source/);
   assert.match(panel, /Retry failed items only/);
   assert.match(panel, /Retry timed-out items only/);
   assert.match(panel, /Copy URL/);
