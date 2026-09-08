@@ -137,6 +137,17 @@ export type IcaiPublicCatalog = {
 };
 
 export type IcaiAdminDashboard = {
+  runtime: {
+    runId: string;
+    stage: string;
+    currentSourceId: string | null;
+    currentItemUrl: string | null;
+    stageStartedAt: string;
+    heartbeatAt: string;
+    cancelRequested: boolean;
+    skipSourceRequested: boolean;
+    stale: boolean;
+  } | null;
   activeJob: {
     id: string;
     status: string;
