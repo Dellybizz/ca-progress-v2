@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   controlIcaiSyncAction,
   manageIcaiItemAction,
+  recoverIcaiStartupJobAction,
   retryIcaiItemsAction,
 } from "@/app/(admin)/admin/icai-sync/actions";
 import {
@@ -224,7 +225,8 @@ export function SyncLiveRefresh({
     <div className="icai-live-monitor" aria-live="polite">
       {status.scheduleError ? (
         <div className="auth-status auth-status--danger" role="alert">
-          Distributed scheduler status is unavailable: {status.scheduleError}
+          <strong>Distributed scheduler setup is incomplete.</strong>{" "}
+          Apply D1 migration 0028 before starting another sync. Existing verified ICAI data is unchanged.
         </div>
       ) : null}
       {status.active ? (
@@ -334,6 +336,17 @@ export function SyncLiveRefresh({
                 No heartbeat has been received for more than two minutes.
                 Recovery can safely close the stale run without changing
                 previously verified ICAI data.
+              </div>
+            ) : null}
+            {!run && status.job?.stale ? (
+              <div className="auth-status auth-status--danger" role="alert">
+                The worker did not create a sync run within two minutes. This startup job is stalled and can be closed safely.
+                <form action={recoverIcaiStartupJobAction}>
+                  <input type="hidden" name="jobId" value={status.job.id} />
+                  <button className="ui-button ui-button--sm" type="submit">
+                    Recover stalled startup
+                  </button>
+                </form>
               </div>
             ) : null}
             {status.runId && runtime ? (

@@ -61,3 +61,19 @@ test("Phase 6 exposes incremental savings and deploys its migration before Worke
       workflow.indexOf("Deploy ICAI service"),
   );
 });
+
+test("Phase 6 recovers orphaned startup jobs and accepts verified unchanged items", () => {
+  const actions = read("app/(admin)/admin/icai-sync/actions.ts");
+  const monitor = read("components/icai/sync-live-refresh.tsx");
+  const status = read("lib/icai/status-query.ts");
+  const verifier = read("scripts/verify-icai-phase5-live.mjs");
+  const deployment = read(".github/workflows/deploy-staging.yml");
+
+  assert.match(actions, /recoverIcaiStartupJobAction/);
+  assert.match(actions, /recover_stale_job/);
+  assert.match(monitor, /Recover stalled startup/);
+  assert.match(status, /isJobStale/);
+  assert.match(verifier, /row\.stage !== "unchanged"/);
+  assert.match(deployment, /ICAI scheduler migration 0028 was not recorded/);
+  assert.match(deployment, /ICAI incremental migration 0029 was not recorded/);
+});
