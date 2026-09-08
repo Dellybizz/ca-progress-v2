@@ -10,5 +10,6 @@
     "database_name": "ca-progress-v2-phase4-shadow",
     "database_id": "6f002cbe-fe40-4d1b-9cf4-df6faaf52350"
   }],
+  "limits": { "cpu_ms": 300000 },
   "observability": { "enabled": true }
 }
