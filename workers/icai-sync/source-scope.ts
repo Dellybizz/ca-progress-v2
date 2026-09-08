@@ -1,4 +1,4 @@
-import type { D1Database, D1Result, D1Statement } from "./d1-client";
+import type { D1Database, D1Statement } from "./d1-client";
 import { recordIcaiSourceScheduleResult } from "../../lib/icai/scheduler";
 
 const ACTIVE_SOURCE_QUERY =
