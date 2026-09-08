@@ -41,6 +41,16 @@ test("Phase 1 Study Material traversal ends at direct ICAI PDFs and is bounded",
   assert.match(resolver, /Study Material list\/subject page is never student-facing/);
 });
 
+test("Phase 1 keeps direct selector PDFs only when their nearest ICAI applicability branch is current", () => {
+  const resolver = read("workers/icai-sync/direct-resource-resolver.ts");
+
+  assert.match(resolver, /ANCHOR_CONTEXT_BYTES = 1_500/);
+  assert.match(resolver, /anchorApplicabilityIsInBootstrapWindow/);
+  assert.match(resolver, /canonicalOfficialUrl\(href, baseUrl\)/);
+  assert.match(resolver, /const nearest = phrases\.at\(-1\)/);
+  assert.match(resolver, /anchorApplicabilityIsInBootstrapWindow\(landing\.html, resource\.officialUrl, child\.officialUrl, source\)/);
+});
+
 test("Phase 1 prevents cross-course attempt pollution from shared exam notices", () => {
   const policy = read("workers/icai-sync/bootstrap-policy.ts");
 
