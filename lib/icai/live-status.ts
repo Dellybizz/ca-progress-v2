@@ -89,6 +89,7 @@ export type IcaiSyncLiveStatus = {
     adminNote: string | null;
   }>;
   latestFailure: string | null;
+  scheduleError: string | null;
   nextScheduledGroup: {
     id: string;
     label: string;

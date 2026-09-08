@@ -11,6 +11,7 @@ import {
   loadRetrySelection,
   previousSourceItemCount,
   processIsolatedSourceItems,
+  resolveSuccessfulRetryItems,
   sourceIsPaused,
   type RetrySelection,
 } from "./item-isolation";
@@ -364,6 +365,7 @@ async function processSource(
   subjects: SubjectRow[],
   attempts: AttemptRow[],
   allowedItemUrls: Set<string> | null,
+  retryOriginRunId: string | null,
 ) {
   const targetedRetry = Boolean(allowedItemUrls);
   const deadline = Date.now() + 2 * 60_000;
@@ -621,6 +623,14 @@ async function processSource(
 
   if (targetedRetry) {
     await restoreTargetedRetrySourceState(runtime, source);
+    if (retryOriginRunId) {
+      await resolveSuccessfulRetryItems(
+        runtime.db,
+        retryOriginRunId,
+        runId,
+        source.id,
+      );
+    }
   }
   if (unsafeAfterPayload) {
     await markSourcePartial(
@@ -750,6 +760,7 @@ export async function runIcaiSyncEngine(
           (subjectResponse.data ?? []) as SubjectRow[],
           (attemptResponse.data ?? []) as AttemptRow[],
           retrySelection?.urlsBySource.get(source.id) ?? null,
+          retrySelection?.originRunId ?? null,
         );
       } catch (error) {
         if (error instanceof SyncCancelledError) throw error;

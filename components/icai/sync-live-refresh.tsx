@@ -207,6 +207,11 @@ export function SyncLiveRefresh({
 
   return (
     <div className="icai-live-monitor" aria-live="polite">
+      {status.scheduleError ? (
+        <div className="auth-status auth-status--danger" role="alert">
+          Distributed scheduler status is unavailable: {status.scheduleError}
+        </div>
+      ) : null}
       {status.active ? (
         <>
           <section className="icai-admin-summary">

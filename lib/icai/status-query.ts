@@ -108,6 +108,7 @@ export async function getIcaiSyncLiveStatus(
       itemResults: [],
       latestFailure: asString(job?.last_error),
       nextScheduledGroup: null,
+      scheduleError: null,
     };
   }
 
@@ -286,5 +287,6 @@ export async function getIcaiSyncLiveStatus(
       asString(job?.last_error) ??
       asString(sourceFailure?.last_error),
     nextScheduledGroup: null,
+    scheduleError: null,
   };
 }

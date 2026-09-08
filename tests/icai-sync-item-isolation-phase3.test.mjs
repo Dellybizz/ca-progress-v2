@@ -35,6 +35,9 @@ test("Phase 3 isolates academic links and continues after terminal item failures
   assert.match(isolation, /extractAcademicItemCandidates/);
   assert.match(isolation, /for \(const candidate of candidates\)/);
   assert.match(isolation, /ITEM_TIMEOUT_MS = 30_000/);
+  assert.match(isolation, /MAX_ITEM_HTML_BYTES = 512_000/);
+  assert.match(isolation, /redirect: "manual"/);
+  assert.match(isolation, /httpStatus: fetched\.httpStatus/);
   assert.match(isolation, /status: timedOut \? "timed_out" : "failed"/);
   assert.match(isolation, /retryEligible: true/);
   assert.match(isolation, /payloads\.push\(parsed\)/);
@@ -59,6 +62,8 @@ test("Phase 3 retries only failed or timed-out URLs rather than successful items
   assert.match(isolation, /loadRetrySelection/);
   assert.match(isolation, /retry_eligible=1/);
   assert.match(isolation, /status='timed_out'/);
+  assert.match(isolation, /resolveSuccessfulRetryItems/);
+  assert.match(isolation, /SET retry_eligible=0/);
   assert.match(engine, /retrySelection\?\.urlsBySource\.get\(source\.id\)/);
   assert.match(engine, /force: targetedRetry/);
   assert.match(jobs, /retryItemId/);
@@ -70,13 +75,13 @@ test("Phase 3 exposes cooperative item controls and safe exclusion rules", () =>
   const panel = read("components/icai/sync-live-refresh.tsx");
   assert.match(runtime, /SyncItemSkippedError/);
   assert.match(runtime, /SyncRemainingItemsSkippedError/);
-  assert.match(actions, /skip-item/);
-  assert.match(actions, /skip-remaining/);
-  assert.match(actions, /exclude-temp/);
-  assert.match(actions, /exclude-permanent/);
+  assert.match(actions, /skip_item/);
+  assert.match(actions, /skip_remaining/);
+  assert.match(actions, /exclude_temp/);
+  assert.match(actions, /exclude_permanent/);
   assert.match(actions, /PERMANENT/);
   assert.match(actions, /parent_owner/);
-  assert.match(actions, /pause-source/);
+  assert.match(actions, /pause_source/);
   assert.match(panel, /Retry failed items only/);
   assert.match(panel, /Retry timed-out items only/);
   assert.match(panel, /Copy URL/);

@@ -27,13 +27,23 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [status, schedule] = await Promise.all([
+    const [status, scheduleResult] = await Promise.all([
       getIcaiSyncLiveStatus(requestedRunId),
-      getIcaiScheduleOverview(getD1RuntimeDatabase()).catch(() => null),
+      getIcaiScheduleOverview(getD1RuntimeDatabase())
+        .then((value) => ({ value, error: null }))
+        .catch((error: unknown) => ({
+          value: null,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Unable to read the distributed schedule.",
+        })),
     ]);
+    const schedule = scheduleResult.value;
     const next = schedule?.nextScheduledGroup;
     return json({
       ...status,
+      scheduleError: scheduleResult.error,
       nextScheduledGroup: next
         ? { id: next.key, label: next.label, dueAt: next.scheduledFor }
         : null,

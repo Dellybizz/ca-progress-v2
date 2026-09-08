@@ -110,8 +110,8 @@ export function IcaiAdminSyncMonitor({
           <strong>{active ? "5s → 15s adaptive" : "stopped"}</strong>
         </div>
         <div>
-          <span>Current scheduler</span>
-          <strong>Daily schedule</strong>
+          <span>Distributed scheduler</span>
+          <strong>Every 2 hours · IST windows</strong>
         </div>
       </section>
 
