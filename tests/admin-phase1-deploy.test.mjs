@@ -4,17 +4,23 @@ import { readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
+function read(path) {
+  return readFileSync(new URL(path, import.meta.url), "utf8");
+}
+
 function readJsonc(path) {
-  const raw = readFileSync(new URL(path, import.meta.url), "utf8");
+  const raw = read(path);
   return JSON.parse(raw.replace(/^\s*\/\/.*$/gm, ""));
 }
 
 test("Phase 1 web deployment applies the immutable admin audit migration before Worker rollout", () => {
+  const migrator = read("../scripts/apply-retained-d1-migrations.mjs");
   const migration = packageJson.scripts?.["cf:migrate:admin-phase1"] ?? "";
   const deployWeb = packageJson.scripts?.["cf:deploy:web"] ?? "";
-  assert.match(migration, /0027_admin_phase1_security\.sql/);
-  assert.match(migration, /wrangler d1 execute ca-progress-v2-phase4-shadow --remote/);
-  assert.ok(deployWeb.startsWith("npm run cf:migrate:admin-phase1 && "), "web deployment must migrate D1 before publishing the Worker");
+  assert.match(migrator, /\["0027", "d1\/migrations\/0027_admin_phase1_security\.sql"\]/);
+  assert.match(migrator, /_ca_schema_migrations/);
+  assert.match(migration, /cf:migrate:retained/);
+  assert.ok(deployWeb.startsWith("npm run cf:migrate:retained && "), "web deployment must verify/apply retained D1 migrations before publishing the Worker");
 });
 
 test("heavy private ICAI sync has the paid-Worker CPU budget required by the live queue proof", () => {
