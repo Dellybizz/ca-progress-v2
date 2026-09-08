@@ -40,6 +40,18 @@ test("Phase 5 live verifier pushes through Cloudflare Queues and proves official
   assert.match(live, /background_jobs/);
   assert.match(live, /icai_sync_runs/);
   assert.match(live, /icai_source_snapshots/);
+  assert.match(live, /sourceIds: \[selectedSource\.id\]/);
+  assert.match(live, /phase8\.1-item-isolation/);
+  assert.match(live, /icai_sync_items/);
+  assert.match(live, /http_status/);
+  assert.match(live, /duration_ms/);
+  assert.match(live, /bytes_fetched/);
+  assert.match(live, /parsed_count/);
+  assert.match(live, /enabled_windows/);
+  assert.match(live, /active_runs/);
+  assert.match(live, /active_jobs/);
+  assert.match(live, /sync-replay\.json/);
+  assert.match(live, /review-replay\.json/);
   assert.match(live, /source_succeeded/);
   assert.match(live, /icai_review_decisions/);
   assert.match(live, /canonical_before/);
@@ -48,6 +60,7 @@ test("Phase 5 live verifier pushes through Cloudflare Queues and proves official
   assert.match(live, /\/updates\?phase5=/);
   assert.match(live, /\/resources\/icai\?phase5=/);
   assert.match(live, /PRAGMA foreign_key_check/);
+  assert.match(live, /source_total\) !== 1/);
 });
 
 test("Phase 5 remains attached to the real cron, queue and private ICAI service architecture", () => {
@@ -83,4 +96,8 @@ test("Phase 5 is a permanent focused gate in CI, retirement closure and deployme
   assert.match(deployment, /verify-icai-phase5-live\.mjs/);
   assert.match(deployment, /rollback --name ca-progress-v2-icai-sync/);
   assert.match(deployment, /rollback --name ca-progress-v2/);
+  const status = read("docs/ICAI_SYNC_PHASE5_STATUS.md");
+  assert.match(status, /bounded to one source/);
+  assert.match(status, /469\/469 passed/);
+  assert.match(status, /pending on the Phase 5 commit/);
 });

@@ -16,6 +16,7 @@ const runAttempt = process.env.GITHUB_RUN_ATTEMPT || "1";
 const correlationId = `${sha.slice(0, 12)}-${runId}-${runAttempt}`.replace(/[^A-Za-z0-9._-]/g, "-");
 const queueName = "ca-progress-v2-phase3-background";
 const databaseName = "ca-progress-v2-phase4-shadow";
+const parserVersion = "phase8.1-item-isolation";
 const evidenceDir = "deployment-evidence";
 mkdirSync(evidenceDir, { recursive: true });
 
@@ -83,30 +84,62 @@ if (!queue?.queue_id) throw new Error(`Cloudflare Queue ${queueName} was not fou
 writeFileSync(`${evidenceDir}/icai-phase5-queue.json`, JSON.stringify({ queue_id: queue.queue_id, queue_name: queue.queue_name }, null, 2));
 
 const startedAt = new Date(Date.now() - 5_000).toISOString();
+const sourceRows = d1(`SELECT s.id,s.name,COALESCE(ss.priority,100) AS priority
+  FROM icai_sources s
+  LEFT JOIN icai_source_schedule ss ON ss.source_id=s.id
+  WHERE s.is_active=1
+    AND NOT EXISTS (
+      SELECT 1 FROM icai_source_controls c
+      WHERE c.source_id=s.id AND c.paused_until>CURRENT_TIMESTAMP
+    )
+  ORDER BY COALESCE(ss.priority,100),s.id LIMIT 1;`);
+const selectedSource = sourceRows[0];
+if (!selectedSource?.id) throw new Error("Phase 5 could not select one active ICAI source for the bounded live proof.");
+writeFileSync(`${evidenceDir}/icai-phase5-selected-source.json`, JSON.stringify(selectedSource, null, 2));
 const syncKey = `icai-phase5-sync:${correlationId}`;
 const reviewKey = `icai-phase5-review:${correlationId}`;
-await publish(queue.queue_id, {
+const syncJob = {
   id: `phase5-sync-${correlationId}`,
   type: "icai-sync",
   idempotencyKey: syncKey,
-  payload: { trigger: "manual", requestedBy: null, phase5Correlation: correlationId, gitSha: sha },
+  payload: {
+    trigger: "manual",
+    requestedBy: null,
+    sourceIds: [selectedSource.id],
+    syncGroup: "phase5-live-proof",
+    scheduleWindow: "deployment",
+    phase5Correlation: correlationId,
+    gitSha: sha,
+  },
   createdBy: null,
-}, "icai-phase5-sync-push.json");
-await publish(queue.queue_id, {
+};
+const reviewJob = {
   id: `phase5-review-${correlationId}`,
   type: "icai-phase5-review-probe",
   idempotencyKey: reviewKey,
   payload: { correlationId, gitSha: sha },
   createdBy: null,
-}, "icai-phase5-review-push.json");
+};
+await publish(queue.queue_id, syncJob, "icai-phase5-sync-push.json");
+await publish(queue.queue_id, reviewJob, "icai-phase5-review-push.json");
 
 await waitForJobs([reviewKey, syncKey]);
 
-const realRuns = d1(`SELECT id,status,trigger_type,parser_version,started_at,completed_at,source_total,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary FROM icai_sync_runs WHERE trigger_type='manual' AND parser_version='phase8.1' AND started_at >= ${sqlText(startedAt)} ORDER BY started_at DESC LIMIT 1;`);
+// Replay both queue messages with the same idempotency keys. The consumer must
+// acknowledge them without creating or executing duplicate durable jobs.
+await publish(queue.queue_id, syncJob, "icai-phase5-sync-replay.json");
+await publish(queue.queue_id, reviewJob, "icai-phase5-review-replay.json");
+await waitForJobs([reviewKey, syncKey]);
+
+const realRuns = d1(`SELECT id,status,trigger_type,parser_version,started_at,completed_at,source_total,source_processed,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary,details FROM icai_sync_runs WHERE trigger_type='manual' AND parser_version=${sqlText(parserVersion)} AND started_at >= ${sqlText(startedAt)} ORDER BY started_at DESC LIMIT 1;`);
 const realRun = realRuns[0];
 if (!realRun) throw new Error("Phase 5 could not find the queue-triggered ICAI sync run in D1.");
-if (!["success", "partial"].includes(realRun.status) || Number(realRun.source_succeeded) < 1) {
+if (!["success", "partial"].includes(realRun.status) || Number(realRun.source_succeeded) < 1 || Number(realRun.source_total) !== 1 || Number(realRun.source_processed) !== 1) {
   throw new Error(`Phase 5 real ICAI sync did not verify an official source: status=${realRun.status}, succeeded=${realRun.source_succeeded}, failed=${realRun.source_failed}.`);
+}
+const runDetails = JSON.parse(realRun.details || "{}");
+if (!Array.isArray(runDetails.source_ids) || runDetails.source_ids.length !== 1 || runDetails.source_ids[0] !== selectedSource.id) {
+  throw new Error("Phase 5 bounded live proof did not remain scoped to the selected source.");
 }
 writeFileSync(`${evidenceDir}/icai-phase5-real-run.json`, JSON.stringify(realRun, null, 2));
 
@@ -118,6 +151,29 @@ if (snapshots.some((row) => !/^https?:\/\/([a-z0-9-]+\.)*icai\.org(?:\/|$)/i.tes
   throw new Error("Phase 5 snapshot evidence includes a non-ICAI source URL.");
 }
 writeFileSync(`${evidenceDir}/icai-phase5-source-snapshots.json`, JSON.stringify(snapshots, null, 2));
+
+const itemRows = d1(`SELECT id,source_id,item_url,status,stage,attempts,http_status,duration_ms,bytes_fetched,parsed_count,failure_category,failure_message,skip_reason,retry_eligible FROM icai_sync_items WHERE run_id=${sqlText(realRun.id)} ORDER BY source_id,item_url;`);
+if (!itemRows.length) throw new Error("Phase 5 real sync produced no per-item execution evidence.");
+if (itemRows.some((row) => !["succeeded","failed","timed_out","skipped"].includes(row.status))) {
+  throw new Error("Phase 5 found a non-terminal item after the sync run completed.");
+}
+const successfulItems = itemRows.filter((row) => row.status === "succeeded");
+if (!successfulItems.length) throw new Error("Phase 5 real sync produced no successfully parsed item.");
+if (successfulItems.some((row) => Number(row.http_status) < 200 || Number(row.http_status) >= 400 || row.duration_ms === null || Number(row.bytes_fetched) < 0 || Number(row.parsed_count) < 1)) {
+  throw new Error("Phase 5 item diagnostics are incomplete or inconsistent.");
+}
+writeFileSync(`${evidenceDir}/icai-phase5-item-results.json`, JSON.stringify(itemRows, null, 2));
+
+const schedulerRows = d1(`SELECT
+  (SELECT COUNT(*) FROM icai_sync_schedule_windows WHERE enabled=1) AS enabled_windows,
+  (SELECT COUNT(*) FROM icai_source_schedule WHERE enabled=1) AS enabled_sources,
+  (SELECT COUNT(*) FROM icai_sync_runs WHERE status IN ('queued','running')) AS active_runs,
+  (SELECT COUNT(*) FROM background_jobs WHERE status IN ('queued','running') AND job_type='icai-sync') AS active_jobs;`);
+const scheduler = schedulerRows[0];
+if (!scheduler || Number(scheduler.enabled_windows) !== 10 || Number(scheduler.enabled_sources) < 1 || Number(scheduler.active_runs) !== 0 || Number(scheduler.active_jobs) !== 0) {
+  throw new Error(`Phase 5 scheduler did not return to a healthy idle state: ${JSON.stringify(scheduler ?? {})}`);
+}
+writeFileSync(`${evidenceDir}/icai-phase5-scheduler-health.json`, JSON.stringify(scheduler, null, 2));
 
 const approveReviewId = `__phase5__approve_review_${correlationId}`;
 const rejectReviewId = `__phase5__reject_review_${correlationId}`;
@@ -169,6 +225,10 @@ writeFileSync(`${evidenceDir}/icai-phase5-summary.json`, JSON.stringify({
   realSyncStatus: realRun.status,
   sourceSucceeded: Number(realRun.source_succeeded),
   sourceFailed: Number(realRun.source_failed),
+  selectedSourceId: selectedSource.id,
+  terminalItems: itemRows.length,
+  successfulItems: successfulItems.length,
+  scheduler: "healthy_idle",
   reviewApproval: "approved_and_applied",
   reviewRejection: "rejected_without_mutation",
   frontend: "verified",
