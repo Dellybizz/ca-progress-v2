@@ -13,14 +13,15 @@ function readJsonc(path) {
   return JSON.parse(raw.replace(/^\s*\/\/.*$/gm, ""));
 }
 
-test("Phase 1 web deployment applies the immutable admin audit migration before Worker rollout", () => {
+test("Phase 1 web deployment uses the retained ledger and includes immutable admin audit migration 0027", () => {
   const migrator = read("../scripts/apply-retained-d1-migrations.mjs");
   const migration = packageJson.scripts?.["cf:migrate:admin-phase1"] ?? "";
   const deployWeb = packageJson.scripts?.["cf:deploy:web"] ?? "";
   assert.match(migrator, /\["0027", "d1\/migrations\/0027_admin_phase1_security\.sql"\]/);
   assert.match(migrator, /_ca_schema_migrations/);
-  assert.match(migration, /cf:migrate:retained/);
+  assert.equal(migration, "npm run cf:migrate:retained");
   assert.ok(deployWeb.startsWith("npm run cf:migrate:retained && "), "web deployment must verify/apply retained D1 migrations before publishing the Worker");
+  assert.doesNotMatch(deployWeb, /cf:migrate:admin-phase1/, "web deployment must not chain through the obsolete single-migration publish gate");
 });
 
 test("heavy private ICAI sync has the paid-Worker CPU budget required by the live queue proof", () => {
