@@ -12,6 +12,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
+    environment: v2-staging
     timeout-minutes: 10
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
