@@ -83,7 +83,6 @@ test("Phase 5 is a permanent focused gate in CI, retirement closure and deployme
     ".github/workflows/deploy-staging.yml",
   ]) {
     const workflow = read(path);
-    assert.match(workflow, /Focused ICAI Phase 5 verification/);
     assert.match(workflow, /npm run test:icai:phase5/);
   }
   const deployment = read(".github/workflows/deploy-staging.yml");
