@@ -82,7 +82,6 @@ test("Phase 5 is a permanent focused gate in CI, retirement closure and deployme
   assert.match(deployment, /rollback --name ca-progress-v2/);
 });
 
-
 test("Phase 5 queue sync is bounded into sequential per-source continuation jobs", () => {
   const execute = read("lib/jobs/execute.ts");
   const queue = read("lib/jobs/queue.ts");
@@ -101,9 +100,11 @@ test("Phase 5 queue sync is bounded into sequential per-source continuation jobs
   assert.match(engine, /runIcaiSyncContinuationSource/);
   assert.match(engine, /finalizeIcaiSyncContinuationEngine/);
   assert.match(engine, /orchestration_key/);
+  assert.match(engine, /status IN \('pending','running'\)/);
   assert.match(service, /"\/start","\/source","\/finalize"/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS icai_sync_source_states/);
   assert.match(migration, /PRIMARY KEY\(run_id, source_id\)/);
+  assert.match(migration, /UNIQUE\(run_id, source_index\)/);
   assert.match(live, /json_extract\(payload_json,'\$\.mode'\)='source'/);
   assert.match(live, /icai_sync_source_states/);
   assert.match(live, /childJobs\.length === sourceTotal/);
