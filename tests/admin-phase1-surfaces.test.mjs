@@ -51,7 +51,8 @@ test("Phase 1 audit workspace reads only the immutable unified ledger", () => {
   assert.match(page, /Rows cannot be updated or deleted/);
   assert.match(service, /FROM admin_audit_events/);
   assert.match(service, /ORDER BY created_at DESC,id DESC LIMIT/);
-  assert.doesNotMatch(page, /delete|edit audit/i);
+  assert.doesNotMatch(page, /<button[^>]*>\s*(Delete|Edit)\s*<\/button>/i);
+  assert.doesNotMatch(page, /deleteAdminAudit|updateAdminAudit|editAdminAudit/i);
 });
 
 test("Phase 1 owner workspaces are discoverable in admin navigation", () => {
