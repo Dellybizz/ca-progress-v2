@@ -1,0 +1,64 @@
+name: Patch ICAI continuation migration ordering
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/patch-icai-continuation-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: phase-12-operations-admin-platform
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Apply migration-ordering fix and regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          workflow = Path('.github/workflows/deploy-staging.yml')
+          text = workflow.read_text()
+          anchor = '          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --file=d1/migrations/0026_icai_sync_recovery.sql\n'
+          addition = anchor + '          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --file=d1/migrations/0028_icai_sync_continuation.sql\n'
+          if 'd1/migrations/0028_icai_sync_continuation.sql' not in text:
+              if anchor not in text:
+                  raise SystemExit('Could not locate ICAI recovery migration anchor')
+              text = text.replace(anchor, addition, 1)
+          text = text.replace("'0024','0025') ORDER BY version", "'0024','0025','0026','0028') ORDER BY version", 1)
+          marker = 'SELECT COUNT(*) AS icai_review_decisions FROM icai_review_decisions; PRAGMA foreign_key_check;'
+          replacement = 'SELECT COUNT(*) AS icai_review_decisions FROM icai_review_decisions; SELECT COUNT(*) AS icai_sync_source_states FROM icai_sync_source_states; PRAGMA foreign_key_check;'
+          if marker in text and 'AS icai_sync_source_states FROM icai_sync_source_states' not in text:
+              text = text.replace(marker, replacement, 1)
+          workflow.write_text(text)
+
+          package_path = Path('package.json')
+          package = json.loads(package_path.read_text())
+          scripts = package['scripts']
+          scripts['cf:migrate:icai-continuation'] = 'wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --file=d1/migrations/0028_icai_sync_continuation.sql'
+          scripts['cf:deploy:icai'] = 'npm run cf:migrate:icai-continuation && wrangler deploy -c workers/icai-sync/wrangler.jsonc'
+          package_path.write_text(json.dumps(package, indent=2) + '\n')
+
+          test_path = Path('tests/icai-sync-phase5.test.mjs')
+          test_text = test_path.read_text()
+          block = '''\n\ntest("ICAI continuation schema is applied before the private Worker rollout", () => {\n  const deployment = read(".github/workflows/deploy-staging.yml");\n  const packageJson = JSON.parse(read("package.json"));\n  const migration = deployment.indexOf("--file=d1/migrations/0028_icai_sync_continuation.sql");\n  const privateWorker = deployment.indexOf("- name: Deploy ICAI service");\n  const liveProof = deployment.indexOf("- name: ICAI Phase 5 live pipeline proof");\n  assert.ok(migration >= 0, "Deployment does not apply ICAI continuation migration 0028.");\n  assert.ok(privateWorker > migration, "ICAI private Worker is deployed before continuation migration 0028.");\n  assert.ok(liveProof > privateWorker, "Live proof must run after the private ICAI Worker rollout.");\n  assert.match(deployment, /icai_sync_source_states/);\n  assert.match(packageJson.scripts["cf:migrate:icai-continuation"], /0028_icai_sync_continuation\\.sql/);\n  assert.match(packageJson.scripts["cf:deploy:icai"], /cf:migrate:icai-continuation/);\n});\n'''
+          if 'ICAI continuation schema is applied before the private Worker rollout' not in test_text:
+              test_path.write_text(test_text.rstrip() + block)
+          PY
+          rm .github/workflows/patch-icai-continuation-migration.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/deploy-staging.yml package.json tests/icai-sync-phase5.test.mjs .github/workflows/patch-icai-continuation-migration.yml
+          git commit -m "fix(icai): apply continuation schema before worker rollout"
+          git push origin HEAD:phase-12-operations-admin-platform
