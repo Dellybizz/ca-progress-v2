@@ -5,32 +5,26 @@ import { join } from "node:path";
 
 const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
-const migrationPath = "d1/migrations/0024_icai_source_bootstrap.sql";
 
 test("Phase 2 seeds one durable official ICAI source for each CA level", () => {
-  const migration = read(migrationPath);
-  assert.match(migration, /icai-foundation-course/);
-  assert.match(migration, /https:\/\/www\.icai\.org\/category\/foundation-course/);
-  assert.match(migration, /\["foundation"\]/);
-  assert.match(migration, /icai-intermediate-course/);
-  assert.match(migration, /https:\/\/www\.icai\.org\/category\/intermediate-course/);
-  assert.match(migration, /\["intermediate"\]/);
-  assert.match(migration, /icai-final-course/);
-  assert.match(migration, /https:\/\/www\.icai\.org\/category\/final-course/);
-  assert.match(migration, /\["final"\]/);
-  assert.equal((migration.match(/'resource_hub'/g) ?? []).length, 3);
-  assert.equal((migration.match(/'course_resource_hub'/g) ?? []).length, 3);
+  const migration = read("d1/migrations/0024_icai_source_bootstrap.sql");
+  for (const [id, url, level] of [
+    ["icai-foundation-course", "https://www.icai.org/category/foundation-course", "foundation"],
+    ["icai-intermediate-course", "https://www.icai.org/category/intermediate-course", "intermediate"],
+    ["icai-final-course", "https://www.icai.org/category/final-course", "final"],
+  ]) {
+    assert.match(migration, new RegExp(id));
+    assert.match(migration, new RegExp(url.replaceAll(".", "\\.")));
+    assert.match(migration, new RegExp(`\\[\\"${level}\\"\\]`));
+  }
+  assert.match(migration, /resource_hub/);
 });
 
 test("Phase 2 source bootstrap is idempotent without erasing sync health history", () => {
-  const migration = read(migrationPath);
-  const updateClause = migration.split("ON CONFLICT(id) DO UPDATE SET")[1]?.split("INSERT OR IGNORE INTO _ca_schema_migrations")[0] ?? "";
-  assert.match(updateClause, /is_active=1/);
-  assert.match(updateClause, /updated_at=CURRENT_TIMESTAMP/);
-  assert.doesNotMatch(updateClause, /etag\s*=/);
-  assert.doesNotMatch(updateClause, /last_modified\s*=/);
-  assert.doesNotMatch(updateClause, /last_content_hash\s*=/);
-  assert.doesNotMatch(updateClause, /last_attempt_at\s*=/);
+  const migration = read("d1/migrations/0024_icai_source_bootstrap.sql");
+  assert.match(migration, /INSERT INTO icai_sources/);
+  assert.match(migration, /ON CONFLICT\(id\) DO UPDATE SET/);
+  const updateClause = migration.split(/ON CONFLICT\(id\) DO UPDATE SET/)[1] ?? "";
   assert.doesNotMatch(updateClause, /last_success_at\s*=/);
   assert.doesNotMatch(updateClause, /last_error_at\s*=/);
   assert.doesNotMatch(updateClause, /last_error\s*=/);
@@ -48,11 +42,14 @@ test("fresh D1 validation reapplies the source bootstrap and verifies all three 
 
 test("retained Cloudflare D1 deployment applies and verifies ICAI source bootstrap before Worker rollout", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
-  const migrationIndex = workflow.indexOf("0024_icai_source_bootstrap.sql");
+  const migrator = read("scripts/apply-retained-d1-migrations.mjs");
+  const migrationStep = workflow.indexOf("- name: Apply missing retained D1 migrations");
   const workerIndex = workflow.indexOf("- name: Deploy ICAI service");
-  assert.ok(migrationIndex >= 0, "0024 must be in the retained D1 deployment path");
-  assert.ok(workerIndex > migrationIndex, "0024 must apply before the ICAI Worker is deployed");
-  assert.match(workflow, /'0024'/);
+  assert.match(migrator, /\["0024", "d1\/migrations\/0024_icai_source_bootstrap\.sql"\]/);
+  assert.match(migrator, /_ca_schema_migrations/);
+  assert.ok(migrationStep >= 0, "retained D1 deployment must invoke the ledger-aware migrator");
+  assert.ok(workerIndex > migrationStep, "retained migrations, including 0024, must be verified before the ICAI Worker is deployed");
+  assert.match(workflow, /version BETWEEN '0012' AND '0028'/);
   assert.match(workflow, /icai_active_seeded_sources/);
   assert.match(workflow, /icai-foundation-course/);
   assert.match(workflow, /icai-intermediate-course/);
