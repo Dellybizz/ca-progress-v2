@@ -56,6 +56,91 @@ export async function runIcaiSyncAction() {
   redirect(destination);
 }
 
+export async function controlIcaiSyncAction(formData: FormData) {
+  let destination = "/admin/icai-sync";
+  try {
+    const operator = await requireAdminOperator();
+    const runId = String(formData.get("runId") ?? "");
+    const intent = String(formData.get("intent") ?? "");
+    if (!runId || !["cancel", "skip", "recover"].includes(intent))
+      throw new Error("Invalid synchronization control request.");
+
+    const admin = createD1AdminClient();
+    const current = await admin
+      .from("icai_sync_runtime")
+      .select("*")
+      .eq("run_id", runId)
+      .maybeSingle();
+    if (current.error) throw current.error;
+    if (!current.data)
+      throw new Error("The active sync runtime was not found.");
+
+    if (intent === "recover") {
+      const heartbeat = new Date(current.data.heartbeat_at).getTime();
+      if (Date.now() - heartbeat < 2 * 60_000)
+        throw new Error(
+          "This run still has a recent heartbeat and is not stale.",
+        );
+      const now = new Date().toISOString();
+      const runUpdate = await admin
+        .from("icai_sync_runs")
+        .update({
+          status: "failed",
+          completed_at: now,
+          error_summary:
+            "Run recovered by an administrator after its heartbeat stopped.",
+        })
+        .eq("id", runId);
+      if (runUpdate.error) throw runUpdate.error;
+      const jobUpdate = await admin
+        .from("background_jobs")
+        .update({
+          status: "failed",
+          finished_at: now,
+          last_error: "Recovered after the ICAI sync heartbeat stopped.",
+          updated_at: now,
+        })
+        .eq("job_type", "icai-sync")
+        .in("status", ["queued", "running"]);
+      if (jobUpdate.error) throw jobUpdate.error;
+      const runtimeUpdate = await admin
+        .from("icai_sync_runtime")
+        .update({
+          stage: "failed",
+          control_requested_by: operator.user.id,
+          control_reason: "stale_recovery",
+          updated_at: now,
+        })
+        .eq("run_id", runId);
+      if (runtimeUpdate.error) throw runtimeUpdate.error;
+      destination = "/admin/icai-sync?notice=Stale%20run%20recovered.";
+    } else {
+      const update = await admin
+        .from("icai_sync_runtime")
+        .update({
+          ...(intent === "cancel"
+            ? { cancel_requested: true }
+            : { skip_source_requested: true }),
+          control_requested_by: operator.user.id,
+          control_reason:
+            intent === "cancel" ? "admin_cancel" : "admin_skip_source",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("run_id", runId);
+      if (update.error) throw update.error;
+      destination = `/admin/icai-sync?notice=${encodeURIComponent(
+        intent === "cancel"
+          ? "Cancellation requested. The worker will stop at its next checkpoint."
+          : "Skip requested. The worker will preserve existing data and continue with the next source.",
+      )}`;
+    }
+    revalidatePath("/admin/icai-sync");
+  } catch (error) {
+    destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`;
+  }
+  redirect(destination);
+}
+
 export async function decideIcaiReviewAction(formData: FormData) {
   let destination = "/admin/icai-sync";
   try {
