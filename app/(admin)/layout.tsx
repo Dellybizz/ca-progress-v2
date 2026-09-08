@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AppShell } from "@/components/layout/app-shell";
+import { AppShell } from "@/components/shell/app-shell";
 import { requireAdminAreaPageAccess } from "@/lib/authorization/server";
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
