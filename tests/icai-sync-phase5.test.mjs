@@ -134,10 +134,11 @@ test("ICAI bootstrap is bounded, incremental, non-destructive and stores direct 
   assert.match(migration, /etag = NULL/);
   assert.match(policy, /mode === "bootstrap" \? configuredPublishedFloor : incrementalFloor/);
   assert.match(policy, /resourceType === "study_material"/);
+  assert.match(policy, /bootstrap_complete: true/);
   assert.match(resolver, /\/\\\.pdf\$\/i/);
   assert.match(resolver, /evidencePdfByLanding\.get\(event\.sourceUrl\)/);
   assert.match(engine, /authoritative_listing:[\s\S]*windowed\.filteredCount === 0/);
-  assert.match(engine, /bootstrap_complete/);
+  assert.match(engine, /completedAdapterConfig\(source, completedAt\)/);
   assert.match(dataPage, /What will students see\?/);
   assert.match(dataPage, /Open ICAI PDF/);
   assert.match(dataPage, /Exam date shown to students/);
