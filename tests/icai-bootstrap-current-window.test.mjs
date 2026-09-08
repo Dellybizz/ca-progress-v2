@@ -29,8 +29,14 @@ test("Phase 1 Study Material traversal ends at direct ICAI PDFs and is bounded",
   assert.match(resolver, /const visited = new Set<string>\(\)/);
   assert.match(resolver, /parsed\.pathname\.includes\("\/post\/"\)/);
   assert.match(resolver, /nestedPageIsInBootstrapWindow/);
+  assert.match(resolver, /applicabilityPageIsInBootstrapWindow/);
+  assert.match(resolver, /Applicable\\s\+for/);
+  assert.match(resolver, /detectAttemptKeys\(match\[0\]\)/);
+  assert.match(resolver, /compactUrlAttemptKey/);
+  assert.match(resolver, /urlAttempt < attemptFloor/);
   assert.match(resolver, /attemptFloor.*2026-05/);
   assert.match(resolver, /isDirectPdf\(resource\.officialUrl\)/);
+  assert.match(resolver, /!applicabilityPageIsInBootstrapWindow\(landing\.html, source\)/);
   assert.match(resolver, /droppedLandingPages \+= 1/);
   assert.match(resolver, /Study Material list\/subject page is never student-facing/);
 });
