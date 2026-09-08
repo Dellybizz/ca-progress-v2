@@ -6,7 +6,7 @@ import { CommunityChannelCoordinator } from "./community-coordinator";
 export { CommunityChannelCoordinator };
 
 type ServiceBinding = { fetch(request: Request): Promise<Response> };
-type QueueBinding = { send(body: BackgroundJob): Promise<void> };
+type QueueBinding = { send(body: BackgroundJob, options?: { delaySeconds?: number }): Promise<void> };
 type D1Statement = { bind(...values: unknown[]): D1Statement; first<T = Record<string, unknown>>(): Promise<T | null>; all<T = Record<string, unknown>>(): Promise<{ results?: T[] }>; run<T = Record<string, unknown>>(): Promise<{ success?: boolean; results?: T[] }> };
 type D1Database = { prepare(query: string): D1Statement };
 type WorkerEnv = { ICAI_SYNC_SERVICE?: ServiceBinding; BACKGROUND_JOBS?: QueueBinding; DB?: D1Database; ICAI_SYNC_ENABLED?: string; ICAI_SYNC_USER_AGENT?: string };
@@ -17,6 +17,105 @@ type QueueBatch<T> = { messages: QueueMessage<T>[] };
 type JobType = "icai-sync" | "icai-phase5-review-probe" | "notification-fanout" | "analytics-aggregate" | "attachment-process" | "cleanup" | "ai-plan-generation";
 type BackgroundJob = { id: string; type: JobType; idempotencyKey: string; payload: Record<string, unknown>; createdBy?: string | null };
 type LegacyIcaiJob = { type: "icai-sync"; idempotencyKey: string; scheduledTime: number };
+
+const ICAI_SERVICE_TIMEOUT_MS = 20_000;
+
+type IcaiServicePayload = {
+  ok?: boolean;
+  result?: {
+    runId?: string;
+    sourceIds?: string[];
+    status?: string;
+    requestIntervalSeconds?: number;
+  };
+  summary?: unknown;
+  error?: string;
+};
+
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs / 1000} seconds.`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+async function callIcaiService(env: WorkerEnv, path: "/start" | "/source" | "/finalize", body: Record<string, unknown>) {
+  if (!env.ICAI_SYNC_SERVICE) throw new Error("ICAI sync service binding is unavailable.");
+  const response = await withTimeout(env.ICAI_SYNC_SERVICE.fetch(new Request(`https://icai-sync.internal${path}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-ca-progress-internal": "ca-progress-v2-web",
+      "x-ca-progress-icai-user-agent": env.ICAI_SYNC_USER_AGENT || "CA Progress V2 Official ICAI Monitor/phase8",
+      "x-ca-progress-icai-enabled": String(env.ICAI_SYNC_ENABLED !== "false"),
+    },
+    body: JSON.stringify(body),
+  })), ICAI_SERVICE_TIMEOUT_MS, `ICAI service ${path}`);
+  const text = await response.text();
+  let payload: IcaiServicePayload = {};
+  if (text) {
+    try { payload = JSON.parse(text) as IcaiServicePayload; }
+    catch { throw new Error(`ICAI service ${path} returned malformed JSON (${response.status}).`); }
+  }
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `ICAI service ${path} failed (${response.status}).`);
+  return payload;
+}
+
+async function executeIcaiQueueJob(job: BackgroundJob, env: WorkerEnv) {
+  if (!env.BACKGROUND_JOBS) throw new Error("Background Queue binding is unavailable for ICAI continuation.");
+  const mode = job.payload.mode;
+  if (mode === "source") {
+    const runId = typeof job.payload.runId === "string" ? job.payload.runId : null;
+    const sourceIds = Array.isArray(job.payload.sourceIds)
+      ? job.payload.sourceIds.filter((value): value is string => typeof value === "string")
+      : [];
+    const sourceIndex = Number(job.payload.sourceIndex);
+    if (!runId || !Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sourceIds.length) {
+      throw new Error("Invalid ICAI source continuation payload.");
+    }
+    const sourceId = sourceIds[sourceIndex];
+    const payload = await callIcaiService(env, "/source", { runId, sourceId });
+    const result = payload.result;
+    if (!result) throw new Error("ICAI service returned no source result.");
+    if (result.status === "cancelled") return;
+    const nextIndex = sourceIndex + 1;
+    if (nextIndex < sourceIds.length) {
+      const nextSourceId = sourceIds[nextIndex];
+      await env.BACKGROUND_JOBS.send({
+        id: crypto.randomUUID(),
+        type: "icai-sync",
+        idempotencyKey: `icai-sync-source:${runId}:${nextIndex}:${nextSourceId}`,
+        payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex: nextIndex },
+        createdBy: job.createdBy ?? null,
+      }, { delaySeconds: Math.max(0, Math.min(900, Number(result.requestIntervalSeconds ?? 0))) });
+      return;
+    }
+    await callIcaiService(env, "/finalize", { runId });
+    return;
+  }
+
+  const trigger = job.payload.trigger === "manual" ? "manual" : job.payload.trigger === "test" ? "test" : "cron";
+  const requestedBy = typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null;
+  const payload = await callIcaiService(env, "/start", { trigger, requestedBy, orchestrationKey: job.idempotencyKey });
+  const runId = payload.result?.runId;
+  const sourceIds = payload.result?.sourceIds?.filter((value): value is string => typeof value === "string") ?? [];
+  const firstSourceId = sourceIds[0];
+  if (!runId || !firstSourceId) throw new Error("ICAI continuation returned no active sources.");
+  await env.BACKGROUND_JOBS.send({
+    id: crypto.randomUUID(),
+    type: "icai-sync",
+    idempotencyKey: `icai-sync-source:${runId}:0:${firstSourceId}`,
+    payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex: 0 },
+    createdBy: job.createdBy ?? null,
+  });
+}
 
 function scheduledJob(controller: ScheduledController): BackgroundJob {
   const scheduledTime = controller.scheduledTime;
@@ -55,12 +154,16 @@ async function runQueuedJob(message: QueueMessage<unknown>, env: WorkerEnv) {
   }
   await env.DB.prepare("UPDATE background_jobs SET status='running',attempts=attempts+1,started_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE idempotency_key=?1").bind(job.idempotencyKey).run();
   try {
-    const response = await openNextWorker.fetch(new Request("https://internal.ca-progress/api/internal/background-jobs", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-ca-progress-internal": "ca-progress-v2-background-job" },
-      body: JSON.stringify(job),
-    }), env as unknown as Record<string, unknown>, { waitUntil() {} } as WorkerContext);
-    if (!response.ok) throw new Error((await response.text()).slice(0, 1000));
+    if (job.type === "icai-sync") {
+      await executeIcaiQueueJob(job, env);
+    } else {
+      const response = await openNextWorker.fetch(new Request("https://internal.ca-progress/api/internal/background-jobs", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-ca-progress-internal": "ca-progress-v2-background-job" },
+        body: JSON.stringify(job),
+      }), env as unknown as Record<string, unknown>, { waitUntil() {} } as WorkerContext);
+      if (!response.ok) throw new Error((await response.text()).slice(0, 1000));
+    }
     await env.DB.prepare("UPDATE background_jobs SET status='succeeded',finished_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE idempotency_key=?1").bind(job.idempotencyKey).run();
     message.ack();
   } catch (error) {

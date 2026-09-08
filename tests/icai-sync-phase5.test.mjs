@@ -64,6 +64,16 @@ test("Phase 5 remains attached to the real cron, queue and private ICAI service 
   assert.match(sync, /request\("\/run",\{trigger,requestedBy\}\)/);
 });
 
+test("ICAI queue continuations bypass the heavyweight OpenNext request executor", () => {
+  const worker = read("custom-worker.ts");
+  assert.match(worker, /if \(job\.type === "icai-sync"\) \{\s*await executeIcaiQueueJob\(job, env\)/);
+  assert.match(worker, /callIcaiService\(env, "\/start"/);
+  assert.match(worker, /callIcaiService\(env, "\/source"/);
+  assert.match(worker, /callIcaiService\(env, "\/finalize"/);
+  assert.match(worker, /ICAI_SERVICE_TIMEOUT_MS = 20_000/);
+  assert.match(worker, /status='dead_letter'/);
+});
+
 test("Phase 5 is a permanent focused gate in CI, retirement closure and deployment", () => {
   const packageJson = JSON.parse(read("package.json"));
   assert.match(packageJson.scripts["test:icai:phase5"], /icai-sync-phase5\.test\.mjs/);
