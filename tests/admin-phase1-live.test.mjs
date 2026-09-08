@@ -33,6 +33,9 @@ test("Phase 1 live admin verifier proves negative permissions and Parent Owner s
   assert.match(live, /streamed Next redirect/);
   assert.match(live, /forbiddenMarkers/);
   assert.match(live, /protected content leaked during redirect/);
+  assert.match(live, /guestAdmin, "\/dashboard"/);
+  assert.match(live, /Operational monitoring and owner controls\./);
+  assert.match(live, /Admin actions · 24h/);
   assert.match(live, /settle_rewards/);
   assert.match(live, /expectedStatus/);
   assert.match(live, /Parent Owner authority required/);
