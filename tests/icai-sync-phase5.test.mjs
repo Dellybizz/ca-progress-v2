@@ -60,7 +60,8 @@ test("Phase 5 remains attached to the real cron, queue and private ICAI service 
   assert.match(worker, /scheduledJob\(controller\)/);
   assert.match(worker, /type: "icai-sync"/);
   assert.match(sync, /ICAI_SYNC_SERVICE/);
-  assert.match(sync, /https:\/\/icai-sync\.internal\/run/);
+  assert.match(sync, /https:\/\/icai-sync\.internal\$\{path\}/);
+  assert.match(sync, /request\("\/run",\{trigger,requestedBy\}\)/);
 });
 
 test("Phase 5 is a permanent focused gate in CI, retirement closure and deployment", () => {
