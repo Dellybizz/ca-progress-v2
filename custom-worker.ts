@@ -79,7 +79,8 @@ async function runQueuedJob(message: QueueMessage<unknown>, env: WorkerEnv) {
 }
 
 const RATE_WINDOW_MS = 60_000;
-const RATE_LIMIT = 120;
+const READ_API_RATE_LIMIT = 300;
+const WRITE_API_RATE_LIMIT = 60;
 const rateBuckets = new Map<string, { startedAt: number; count: number }>();
 
 function errorFingerprint(error: unknown) {
@@ -98,16 +99,16 @@ function rateLimitKey(request: Request) {
   return request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 }
 
-function checkRateLimit(key: string) {
+function checkRateLimit(key: string, limit: number) {
   const now = Date.now();
   const current = rateBuckets.get(key);
   if (!current || now - current.startedAt >= RATE_WINDOW_MS) {
     rateBuckets.set(key, { startedAt: now, count: 1 });
     if (rateBuckets.size > 10_000) rateBuckets.delete(rateBuckets.keys().next().value!);
-    return { allowed: true, remaining: RATE_LIMIT - 1 };
+    return { allowed: true, remaining: limit - 1 };
   }
   current.count += 1;
-  return { allowed: current.count <= RATE_LIMIT, remaining: Math.max(0, RATE_LIMIT - current.count) };
+  return { allowed: current.count <= limit, remaining: Math.max(0, limit - current.count) };
 }
 
 async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContext) {
@@ -117,11 +118,16 @@ async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContex
   if (pathname === "/api/internal/background-jobs") {
     return new Response("Not found", { status: 404, headers: { "cache-control": "no-store", "x-request-id": id } });
   }
-  const rate = checkRateLimit(rateLimitKey(request));
-  if (!rate.allowed && pathname !== "/api/health") {
+  const isApi = pathname.startsWith("/api/");
+  const isRead = request.method === "GET" || request.method === "HEAD";
+  const limit = isRead ? READ_API_RATE_LIMIT : WRITE_API_RATE_LIMIT;
+  const rate = isApi && pathname !== "/api/health"
+    ? checkRateLimit(`${rateLimitKey(request)}:${isRead ? "read" : "write"}`, limit)
+    : { allowed: true, remaining: limit };
+  if (!rate.allowed) {
     return new Response(JSON.stringify({ error: "Too many requests. Please retry shortly.", requestId: id }), {
       status: 429,
-      headers: { "content-type": "application/json", "cache-control": "no-store", "retry-after": "60", "x-request-id": id, "x-ratelimit-limit": String(RATE_LIMIT), "x-ratelimit-remaining": "0" },
+      headers: { "content-type": "application/json", "cache-control": "no-store", "retry-after": "60", "x-request-id": id, "x-ratelimit-limit": String(limit), "x-ratelimit-remaining": "0" },
     });
   }
   const forwarded = new Request(request, { headers: new Headers(request.headers) });
@@ -130,8 +136,10 @@ async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContex
     const response = await openNextWorker.fetch(forwarded, env, ctx);
     const headers = new Headers(response.headers);
     headers.set("x-request-id", id);
-    headers.set("x-ratelimit-limit", String(RATE_LIMIT));
-    headers.set("x-ratelimit-remaining", String(rate.remaining));
+    if (isApi) {
+      headers.set("x-ratelimit-limit", String(limit));
+      headers.set("x-ratelimit-remaining", String(rate.remaining));
+    }
     headers.set("server-timing", `worker;dur=${Math.round((performance.now() - startedAt) * 100) / 100}`);
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   } catch (error) {
