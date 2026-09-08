@@ -226,6 +226,7 @@ export type IcaiAdminDashboard = {
     confidence: number;
     sourceName: string;
     sourceUrl: string;
+    proposedPatch: Record<string, unknown>;
     createdAt: string;
   }[];
   recentChanges: {
