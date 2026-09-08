@@ -1,0 +1,63 @@
+name: Patch Phase 1 Live Streamed Redirect
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/patch-phase1-live-streamed-redirect.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Patch live verifier
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/verify-admin-phase1-live.mjs')
+          text = path.read_text()
+          old = '''function assertRedirect(response, expectedFragment, label) {
+            const location = response.headers.get("location") || "";
+            assert([301, 302, 303, 307, 308].includes(response.status), `${label}: expected redirect, got ${response.status}.`);
+            assert(location.includes(expectedFragment), `${label}: expected redirect containing ${expectedFragment}, got ${location}.`);
+          }'''
+          new = '''async function assertRedirect(response, expectedFragment, label, forbiddenMarkers = []) {
+            const location = response.headers.get("location") || "";
+            if ([301, 302, 303, 307, 308].includes(response.status)) {
+              assert(location.includes(expectedFragment), `${label}: expected redirect containing ${expectedFragment}, got ${location}.`);
+              return;
+            }
+            const text = await response.text();
+            const decoded = htmlDecode(text).replaceAll("\\u0026", "&").replaceAll("\\u003d", "=");
+            const streamedRedirect = response.status === 200 && (
+              /NEXT_REDIRECT/i.test(decoded) ||
+              /__next-page-redirect/i.test(decoded) ||
+              /http-equiv=["']?refresh/i.test(decoded) ||
+              /redirect;(?:replace|push)/i.test(decoded)
+            );
+            assert(streamedRedirect, `${label}: expected HTTP or streamed Next redirect, got ${response.status}; body=${decoded.slice(0, 1200)}`);
+            assert(decoded.includes(expectedFragment), `${label}: streamed redirect did not target ${expectedFragment}; body=${decoded.slice(0, 1200)}`);
+            for (const marker of forbiddenMarkers) {
+              assert(!decoded.includes(marker), `${label}: protected content leaked during redirect (${marker}).`);
+            }
+          }'''
+          if old not in text:
+              raise SystemExit('assertRedirect source block not found')
+          text = text.replace(old, new)
+          text = text.replace('assertRedirect(guestAdmin, "/login", "guest admin denial");', 'await assertRedirect(guestAdmin, "/login", "guest admin denial", ["Command Center", "Owner Command Center"]);')
+          text = text.replace('assertRedirect(studentAdmin, "/dashboard", "student admin denial");', 'await assertRedirect(studentAdmin, "/dashboard", "student admin denial", ["Command Center", "Owner Command Center"]);')
+          text = text.replace('assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction");', 'await assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction", ["Command Center", "Owner Command Center"]);')
+          path.write_text(text)
+          PY
+          rm .github/workflows/patch-phase1-live-streamed-redirect.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/verify-admin-phase1-live.mjs .github/workflows/patch-phase1-live-streamed-redirect.yml
+          git commit -m "test(admin): support streamed redirect denial proof"
+          git push origin HEAD:phase-12-operations-admin-platform
