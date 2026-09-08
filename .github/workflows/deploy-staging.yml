@@ -39,6 +39,7 @@ jobs:
       RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
       RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
       SMOKE_AUTH_COOKIE: ${{ secrets.SMOKE_AUTH_COOKIE }}
+      ADMIN_PHASE1_AUTH_COOKIE: ${{ secrets.ADMIN_PHASE1_AUTH_COOKIE }}
       NEXT_PUBLIC_APP_ENV: production
       NEXT_PUBLIC_APP_NAME: CA Progress
       NEXT_PUBLIC_APP_VERSION: cloudflare-retired
@@ -173,6 +174,9 @@ jobs:
 
       - name: Deploy web runtime
         run: npm run cf:deploy:web
+
+      - name: Verify authenticated ICAI admin page
+        run: node scripts/verify-icai-admin-live.mjs
 
       - name: ICAI Phase 5 live pipeline proof
         shell: bash

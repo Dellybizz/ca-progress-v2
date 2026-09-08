@@ -14,6 +14,16 @@ test("ICAI queue execution has enough CPU budget on both caller and private serv
   assert.equal(icai.workers_dev, false, "ICAI service must remain private");
 });
 
+test("background jobs are isolated from concurrent D1 writes inside queue batches", () => {
+  const web = jsonc("wrangler.jsonc");
+  const worker = read("custom-worker.ts");
+  const consumer = web.queues?.consumers?.find((item) => item.queue === "ca-progress-v2-phase3-background");
+  assert.equal(consumer?.max_batch_size, 1);
+  assert.equal(consumer?.max_concurrency, 1);
+  assert.match(worker, /for \(const message of batch\.messages\) await runQueuedJob\(message, env\)/);
+  assert.doesNotMatch(worker, /Promise\.all\(batch\.messages\.map/);
+});
+
 test("live ICAI proof waits beyond the configured 5-minute CPU ceiling without masking dead letters", () => {
   const proof = read("scripts/verify-icai-phase5-live.mjs");
   assert.match(proof, /const JOB_POLL_INTERVAL_MS = 5_000/);

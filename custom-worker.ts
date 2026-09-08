@@ -268,7 +268,10 @@ const worker = {
     ctx.waitUntil(Promise.all(jobs.map((job) => env.BACKGROUND_JOBS!.send(job))).then(() => undefined));
   },
   async queue(batch: QueueBatch<unknown>, env: WorkerEnv) {
-    await Promise.all(batch.messages.map((message) => runQueuedJob(message, env)));
+    // D1 serializes writes. Running a delivered batch concurrently allowed one
+    // message to mark itself running while a sibling failed before persistence,
+    // causing Cloudflare to retry the entire batch and orphan the first job.
+    for (const message of batch.messages) await runQueuedJob(message, env);
   },
 };
 
