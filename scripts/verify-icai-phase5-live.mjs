@@ -17,6 +17,8 @@ const correlationId = `${sha.slice(0, 12)}-${runId}-${runAttempt}`.replace(/[^A-
 const queueName = "ca-progress-v2-phase3-background";
 const databaseName = "ca-progress-v2-phase4-shadow";
 const evidenceDir = "deployment-evidence";
+const JOB_POLL_INTERVAL_MS = 5_000;
+const JOB_POLL_ATTEMPTS = 90;
 mkdirSync(evidenceDir, { recursive: true });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -57,15 +59,15 @@ async function publish(queueId, job, filename) {
 }
 
 async function waitForJobs(keys) {
-  for (let attempt = 0; attempt < 36; attempt += 1) {
+  for (let attempt = 0; attempt < JOB_POLL_ATTEMPTS; attempt += 1) {
     const rows = d1(`SELECT idempotency_key,status,attempts,last_error,started_at,finished_at FROM background_jobs WHERE idempotency_key IN (${keys.map(sqlText).join(",")}) ORDER BY idempotency_key;`);
     writeFileSync(`${evidenceDir}/icai-phase5-background-jobs.json`, JSON.stringify(rows, null, 2));
     const terminalFailure = rows.find((row) => row.status === "dead_letter");
     if (terminalFailure) throw new Error(`Phase 5 queue job dead-lettered: ${terminalFailure.idempotency_key}: ${terminalFailure.last_error ?? "unknown error"}`);
     if (rows.length === keys.length && rows.every((row) => row.status === "succeeded")) return rows;
-    await sleep(5_000);
+    await sleep(JOB_POLL_INTERVAL_MS);
   }
-  throw new Error("Phase 5 queue jobs did not both reach succeeded state.");
+  throw new Error(`Phase 5 queue jobs did not both reach succeeded state within ${(JOB_POLL_ATTEMPTS * JOB_POLL_INTERVAL_MS) / 1000} seconds.`);
 }
 
 const internalAttempt = await fetch(`${baseUrl}/api/internal/background-jobs`, {
