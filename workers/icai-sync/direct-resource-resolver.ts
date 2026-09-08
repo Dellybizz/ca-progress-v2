@@ -10,7 +10,8 @@ import type {
 
 type SubjectLookup = { id: string; title: string; levelCode: IcaiLevelCode };
 
-const MAX_CHILD_PAGES = 50;
+const MAX_CHILD_PAGES = 80;
+const MAX_STUDY_DEPTH = 3;
 const MAX_CHILD_BYTES = 2_500_000;
 const MAX_REDIRECTS = 5;
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
@@ -28,6 +29,35 @@ function isDirectPdf(url: string) {
 function shouldResolve(resource: ParsedIcaiResource) {
   return !isDirectPdf(resource.officialUrl) &&
     (resource.resourceType === "study_material" || EVIDENCE_TYPES.has(resource.resourceType));
+}
+
+function configString(source: IcaiSourceConfig, key: string, fallback: string) {
+  const value = source.adapterConfig[key];
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function validAttemptKey(value: string) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+}
+
+function nestedPageIsInBootstrapWindow(resource: ParsedIcaiResource, source: IcaiSourceConfig) {
+  const attemptFloor = configString(source, "bootstrap_attempt_floor", "2026-05");
+  const publishedFloor = configString(source, "bootstrap_published_floor", "2025-12-01");
+  const attemptKeys = resource.attemptKeys.filter(validAttemptKey);
+  if (attemptKeys.length && !attemptKeys.some((key) => key >= attemptFloor)) return false;
+  if (resource.publishedOn && resource.publishedOn < publishedFloor && !attemptKeys.some((key) => key >= attemptFloor)) {
+    return false;
+  }
+  return true;
+}
+
+function isTraversableIcaiPage(url: string) {
+  try {
+    const parsed = new URL(url);
+    return isApprovedIcaiUrl(url) && parsed.pathname.includes("/post/");
+  } catch {
+    return false;
+  }
 }
 
 async function fetchApprovedHtml(url: string, userAgent: string, timeoutMs: number) {
@@ -112,39 +142,79 @@ export async function resolveDirectStudyMaterialPdfs(
 
   const resources: ParsedIcaiResource[] = [];
   const evidencePdfByLanding = new Map<string, string>();
+  const visited = new Set<string>();
   let resolvedLandingPages = 0;
   let droppedLandingPages = 0;
   let childPages = 0;
+
+  const parseLanding = async (resource: ParsedIcaiResource) => {
+    if (visited.has(resource.officialUrl)) return [] as ParsedIcaiResource[];
+    if (childPages >= MAX_CHILD_PAGES) {
+      throw new Error(`Direct-PDF resolver exceeded ${MAX_CHILD_PAGES} ICAI landing pages.`);
+    }
+    visited.add(resource.officialUrl);
+    childPages += 1;
+    const html = await fetchApprovedHtml(resource.officialUrl, userAgent, source.timeoutMs);
+    const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
+    return parseOfficialSource(html, childSource, subjects).resources.map((child) =>
+      mergeContext(resource, child),
+    );
+  };
+
+  const resolveStudyMaterial = async (
+    resource: ParsedIcaiResource,
+    depth: number,
+  ): Promise<ParsedIcaiResource[]> => {
+    if (isDirectPdf(resource.officialUrl)) return [resource];
+    if (depth > MAX_STUDY_DEPTH || !isTraversableIcaiPage(resource.officialUrl)) return [];
+
+    const children = await parseLanding(resource);
+    const direct = children.filter((child) => isDirectPdf(child.officialUrl));
+    const nested = children.filter((child) =>
+      !isDirectPdf(child.officialUrl) &&
+      isTraversableIcaiPage(child.officialUrl) &&
+      nestedPageIsInBootstrapWindow(child, source),
+    );
+
+    const resolved = [...direct];
+    if (depth < MAX_STUDY_DEPTH) {
+      for (const child of nested) {
+        resolved.push(...await resolveStudyMaterial(child, depth + 1));
+      }
+    }
+    if (resolved.length) resolvedLandingPages += 1;
+    return resolved;
+  };
 
   for (const resource of payload.resources) {
     if (!shouldResolve(resource)) {
       resources.push(resource);
       continue;
     }
-    if (childPages >= MAX_CHILD_PAGES) {
-      throw new Error(`Direct-PDF resolver exceeded ${MAX_CHILD_PAGES} ICAI landing pages.`);
+
+    if (resource.resourceType === "study_material") {
+      const pdfs = await resolveStudyMaterial(resource, 0);
+      if (pdfs.length) {
+        resources.push(...pdfs);
+      } else {
+        // A Study Material list/subject page is never student-facing. If ICAI's
+        // bounded current hierarchy does not end in a PDF, preserve existing D1
+        // data and surface the source failure rather than publishing a landing page.
+        droppedLandingPages += 1;
+      }
+      continue;
     }
-    childPages += 1;
 
-    const html = await fetchApprovedHtml(resource.officialUrl, userAgent, source.timeoutMs);
-    const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
-    const parsedChild = parseOfficialSource(html, childSource, subjects);
-    const pdfs = parsedChild.resources
-      .filter((child) => isDirectPdf(child.officialUrl))
-      .map((child) => mergeContext(resource, child));
-
+    const children = await parseLanding(resource);
+    const pdfs = children.filter((child) => isDirectPdf(child.officialUrl));
     if (pdfs.length) {
       resources.push(...pdfs);
       resolvedLandingPages += 1;
       const evidence = bestEvidencePdf(resource, pdfs);
       if (evidence) evidencePdfByLanding.set(resource.officialUrl, evidence);
-    } else if (resource.resourceType === "study_material") {
-      // Student-facing Study Material must open the ICAI chapter PDF itself.
-      // A landing page with another list of chapter links is intentionally not stored.
-      droppedLandingPages += 1;
     } else {
-      // Some ICAI notices are HTML-only. Preserve the official notification page
-      // when no attached PDF exists rather than losing the evidence entirely.
+      // Some official notices are HTML-only. Keep the notification page when no
+      // attached ICAI PDF exists so an administrator can still verify the evidence.
       resources.push(resource);
     }
   }
