@@ -1,7 +1,7 @@
 import "server-only";
 
-import { getD1RuntimeDatabase, type D1DatabaseLike } from "@/lib/data/d1/client";
-import { isApprovedIcaiUrl } from "@/lib/icai/html";
+import { getD1RuntimeDatabase, type D1DatabaseLike } from "./d1-runtime";
+import { isApprovedIcaiUrl } from "./html";
 
 export type IcaiReviewDecision = "approve" | "reject";
 type D1StatementLike = ReturnType<D1DatabaseLike["prepare"]>;
@@ -117,7 +117,6 @@ async function attemptPlan(db:D1DatabaseLike,review:ReviewRow,change:ChangeEvent
   if(!current)throw new Error("Reviewed exam attempt no longer exists.");
   assertCurrentMatchesOld(current,change,ATTEMPT_PATCH_KEYS);
   assertPatchMatchesNew(patch,change,ATTEMPT_PATCH_KEYS);
-
   const startDate=own(patch,"start_date")?dateValue(patch.start_date,"Exam start date"):dateValue(current.start_date,"Exam start date");
   const endDate=own(patch,"end_date")?dateValue(patch.end_date,"Exam end date"):dateValue(current.end_date,"Exam end date");
   if(startDate&&endDate&&endDate<startDate)throw new Error("Exam end date cannot be before the start date.");

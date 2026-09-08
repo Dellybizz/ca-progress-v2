@@ -1,7 +1,7 @@
 import "server-only";
 
-import { getD1RuntimeDatabase, type D1DatabaseLike } from "@/lib/data/d1/client";
-import { decideIcaiReview } from "@/lib/icai/review";
+import { getD1RuntimeDatabase, type D1DatabaseLike } from "./d1-runtime";
+import { decideIcaiReview } from "./review";
 
 export const ICAI_PHASE5_PROBE_PREFIX = "__phase5__";
 
@@ -67,14 +67,14 @@ export async function runIcaiPhase5ReviewProbe(input: { correlationId: string })
 
   const approveStatus = await reviewStatus(db, approveReviewId);
   if (approveStatus?.status === "pending") {
-    await decideIcaiReview({ reviewId: approveReviewId, decision: "approve", reviewerUserId, notes: `Phase 5 live approval ${correlationId}` });
+    await decideIcaiReview({ reviewId: approveReviewId, decision: "approve", reviewerUserId, notes: `Phase 5 live approval ${correlationId}`, db });
   } else if (approveStatus?.status !== "approved") {
     throw new Error(`Phase 5 approval review is unexpectedly ${approveStatus?.status ?? "missing"}.`);
   }
 
   const rejectStatus = await reviewStatus(db, rejectReviewId);
   if (rejectStatus?.status === "pending") {
-    await decideIcaiReview({ reviewId: rejectReviewId, decision: "reject", reviewerUserId, notes: `Phase 5 live rejection ${correlationId}` });
+    await decideIcaiReview({ reviewId: rejectReviewId, decision: "reject", reviewerUserId, notes: `Phase 5 live rejection ${correlationId}`, db });
   } else if (rejectStatus?.status !== "rejected") {
     throw new Error(`Phase 5 rejection review is unexpectedly ${rejectStatus?.status ?? "missing"}.`);
   }
