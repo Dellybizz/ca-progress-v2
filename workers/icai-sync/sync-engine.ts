@@ -16,6 +16,8 @@ import {
   SyncCancelledError,
   SyncSourceSkippedError,
 } from "./runtime-control";
+import { applyIcaiWindowPolicy, completedAdapterConfig } from "./bootstrap-policy";
+import { resolveDirectStudyMaterialPdfs } from "./direct-resource-resolver";
 
 const PARSER_VERSION = "phase8.1";
 const MAX_HTML_BYTES = 2_500_000;
@@ -334,17 +336,48 @@ async function processSource(
       : [];
   });
   await stage("parsing");
-  const parsed = parseOfficialSource(fetched.html, source, subjectLookups);
-  const parsedItemCount =
-    parsed.resources.length + parsed.attempts.length + parsed.events.length;
+  const discovered = parseOfficialSource(fetched.html, source, subjectLookups);
+  const discoveredItemCount =
+    discovered.resources.length + discovered.attempts.length + discovered.events.length;
   const allowEmpty = source.adapterConfig.allow_empty === true;
-  if (parsedItemCount === 0 && !allowEmpty)
+  if (discoveredItemCount === 0 && !allowEmpty)
     throw new Error(
       "Parser returned zero academic items. Last verified data was preserved for review.",
     );
+
+  const direct = await resolveDirectStudyMaterialPdfs(
+    discovered,
+    source,
+    subjectLookups,
+    runtime.userAgent,
+  );
+  const windowed = applyIcaiWindowPolicy(direct.payload, source);
+  const parsed = windowed.payload;
+  const parsedItemCount =
+    parsed.resources.length + parsed.attempts.length + parsed.events.length;
+
   await stage("comparing");
   const canonicalHash = await sha256Hex(stableJson(parsed));
-  const snapshot = { ...snapshotBase, canonical_hash: canonicalHash };
+  const snapshot = {
+    ...snapshotBase,
+    canonical_hash: canonicalHash,
+    metadata: {
+      ...snapshotBase.metadata,
+      // A bounded window is intentionally not a complete historical listing.
+      // Never convert filtered history into destructive removal reviews.
+      authoritative_listing:
+        source.authoritativeListing &&
+        windowed.filteredCount === 0 &&
+        direct.droppedLandingPages === 0,
+      window_mode: windowed.mode,
+      bootstrap_attempt_floor: windowed.attemptFloor,
+      published_floor: windowed.publishedFloor,
+      filtered_item_count: windowed.filteredCount,
+      resolved_study_material_pages: direct.resolvedLandingPages,
+      dropped_study_material_pages: direct.droppedLandingPages,
+      parsed_item_count_after_window: parsedItemCount,
+    },
+  };
   if (source.lastContentHash && source.lastContentHash === canonicalHash) {
     await stage("writing");
     const { error } = await client.rpc("icai_sync_record_unchanged", {
@@ -444,6 +477,14 @@ async function processSource(
     p_events: eventPayloads as Json,
   });
   if (error) throw error;
+
+  if (windowed.mode === "bootstrap") {
+    const completedAt = new Date().toISOString();
+    await runtime.db
+      .prepare("UPDATE icai_sources SET adapter_config=?1,updated_at=?2 WHERE id=?3")
+      .bind(JSON.stringify(completedAdapterConfig(source, completedAt)), completedAt, source.id)
+      .run();
+  }
 }
 
 async function acquireRun(

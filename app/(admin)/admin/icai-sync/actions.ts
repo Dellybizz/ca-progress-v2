@@ -89,7 +89,7 @@ export async function controlIcaiSyncAction(formData: FormData) {
 }
 
 export async function decideIcaiReviewAction(formData: FormData) {
-  let destination = "/admin/icai-sync";
+  let destination = "/admin/icai-sync/data";
   try {
     const operator = await requireAdminCapability("icai.review");
     const reviewId = String(formData.get("reviewId") ?? "");
@@ -98,8 +98,8 @@ export async function decideIcaiReviewAction(formData: FormData) {
     const result = await decideIcaiReview({ reviewId, decision, reviewerUserId: operator.user.id, notes: "" });
     await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.review", action: `icai.review.${decision}`, targetType: "icai_review", targetId: reviewId, reason: "ICAI high-impact review decision", newValue: { status: result.status }, traceId: traceId(), reversible: false });
     await invalidateSharedPublicCache(["icai"]);
-    revalidatePath("/admin/icai-sync"); revalidatePath("/updates"); revalidatePath("/resources/icai");
-    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Review ${result.status}. The approved patch and audit trail are now consistent.`)}`;
-  } catch (error) { destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`; }
+    revalidatePath("/admin/icai-sync"); revalidatePath("/admin/icai-sync/data"); revalidatePath("/updates"); revalidatePath("/resources/icai");
+    destination = `/admin/icai-sync/data?notice=${encodeURIComponent(`Review ${result.status}. Student-facing data and audit history are now consistent.`)}`;
+  } catch (error) { destination = `/admin/icai-sync/data?error=${encodeURIComponent(message(error))}`; }
   redirect(destination);
 }

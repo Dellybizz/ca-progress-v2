@@ -464,6 +464,15 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
     })),
     reviews: ((reviewResponse.data ?? []) as ReviewRow[]).map((review) => {
       const source = sourceById.get(review.source_id);
+      const rawPatch = review.proposed_patch;
+      const proposedPatch =
+        rawPatch && typeof rawPatch === "object" && !Array.isArray(rawPatch)
+          ? (rawPatch as Record<string, unknown>)
+          : {};
+      const proposedSourceUrl =
+        typeof proposedPatch.source_url === "string"
+          ? proposedPatch.source_url
+          : null;
       return {
         id: review.id,
         title: review.title,
@@ -472,7 +481,8 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
         entityId: review.entity_id,
         confidence: review.confidence,
         sourceName: source?.name ?? review.source_id,
-        sourceUrl: source?.official_url ?? "",
+        sourceUrl: proposedSourceUrl ?? source?.official_url ?? "",
+        proposedPatch,
         createdAt: review.created_at,
       };
     }),
