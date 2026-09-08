@@ -6,13 +6,14 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("ICAI live status endpoint is authenticated and never shared-cacheable", () => {
+test("ICAI live status endpoint is capability-authenticated and never shared-cacheable", () => {
   const route = read("app/api/admin/icai-sync/status/route.ts");
-  assert.match(route, /getAdminOperator/);
-  assert.match(route, /operator\.allowed/);
+  assert.match(route, /requireAdminCapability\("icai\.read"\)/);
+  assert.match(route, /adminAuthorizationStatus/);
   assert.match(route, /private, no-store/);
   assert.match(route, /getIcaiSyncLiveStatus/);
   assert.match(route, /searchParams\.get\("runId"\)/);
+  assert.doesNotMatch(route, /getAdminOperator|operator\.allowed/);
 });
 
 test("ICAI status query is compact and excludes heavy dashboard review history", () => {
