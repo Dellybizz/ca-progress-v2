@@ -3,6 +3,7 @@ import "server-only";
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { getResourceR2Bucket } from "@/lib/resources/r2";
 import { runIcaiSync } from "@/lib/icai/sync";
+import { runIcaiPhase5ReviewProbe } from "@/lib/icai/phase5";
 import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
 import type { BackgroundJob } from "./queue";
 
@@ -16,6 +17,8 @@ export async function executeBackgroundJob(job: BackgroundJob) {
         trigger: job.payload.trigger === "manual" ? "manual" : "cron",
         requestedBy: typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null,
       });
+    case "icai-phase5-review-probe":
+      return runIcaiPhase5ReviewProbe({ correlationId: String(job.payload.correlationId ?? "") });
     case "analytics-aggregate": {
       const date = typeof job.payload.date === "string" ? job.payload.date : new Date().toISOString().slice(0, 10);
       const rows = await db().prepare("SELECT event_type, COUNT(*) AS event_count FROM dashboard_events WHERE occurred_at >= ?1 AND occurred_at < ?2 GROUP BY event_type")

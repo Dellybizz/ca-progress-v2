@@ -14,7 +14,7 @@ type WorkerContext = { waitUntil(promise: Promise<unknown>): void };
 type ScheduledController = { scheduledTime: number; cron: string };
 type QueueMessage<T> = { id: string; attempts: number; body: T; ack(): void; retry(): void };
 type QueueBatch<T> = { messages: QueueMessage<T>[] };
-type JobType = "icai-sync" | "notification-fanout" | "analytics-aggregate" | "attachment-process" | "cleanup" | "ai-plan-generation";
+type JobType = "icai-sync" | "icai-phase5-review-probe" | "notification-fanout" | "analytics-aggregate" | "attachment-process" | "cleanup" | "ai-plan-generation";
 type BackgroundJob = { id: string; type: JobType; idempotencyKey: string; payload: Record<string, unknown>; createdBy?: string | null };
 type LegacyIcaiJob = { type: "icai-sync"; idempotencyKey: string; scheduledTime: number };
 
@@ -31,7 +31,7 @@ function scheduledJob(controller: ScheduledController): BackgroundJob {
 function normalizeJob(value: unknown): BackgroundJob | null {
   if (!value || typeof value !== "object") return null;
   const input = value as Partial<BackgroundJob> & Partial<LegacyIcaiJob>;
-  if (input.type !== "icai-sync" && input.type !== "notification-fanout" && input.type !== "analytics-aggregate" && input.type !== "attachment-process" && input.type !== "cleanup" && input.type !== "ai-plan-generation") return null;
+  if (input.type !== "icai-sync" && input.type !== "icai-phase5-review-probe" && input.type !== "notification-fanout" && input.type !== "analytics-aggregate" && input.type !== "attachment-process" && input.type !== "cleanup" && input.type !== "ai-plan-generation") return null;
   if (typeof input.idempotencyKey !== "string" || !input.idempotencyKey) return null;
   return {
     id: typeof input.id === "string" ? input.id : crypto.randomUUID(),
@@ -41,7 +41,6 @@ function normalizeJob(value: unknown): BackgroundJob | null {
     createdBy: typeof input.createdBy === "string" ? input.createdBy : null,
   };
 }
-
 
 async function runQueuedJob(message: QueueMessage<unknown>, env: WorkerEnv) {
   if (!env.DB) throw new Error("DB binding is required for queue idempotency.");
@@ -114,8 +113,12 @@ function checkRateLimit(key: string) {
 async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContext) {
   const id = requestId(request);
   const startedAt = performance.now();
+  const pathname = new URL(request.url).pathname;
+  if (pathname === "/api/internal/background-jobs") {
+    return new Response("Not found", { status: 404, headers: { "cache-control": "no-store", "x-request-id": id } });
+  }
   const rate = checkRateLimit(rateLimitKey(request));
-  if (!rate.allowed && new URL(request.url).pathname !== "/api/health") {
+  if (!rate.allowed && pathname !== "/api/health") {
     return new Response(JSON.stringify({ error: "Too many requests. Please retry shortly.", requestId: id }), {
       status: 429,
       headers: { "content-type": "application/json", "cache-control": "no-store", "retry-after": "60", "x-request-id": id, "x-ratelimit-limit": String(RATE_LIMIT), "x-ratelimit-remaining": "0" },
@@ -133,7 +136,7 @@ async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContex
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   } catch (error) {
     const fingerprint = errorFingerprint(error);
-    console.error(JSON.stringify({ event: "worker.request_error", requestId: id, fingerprint, path: new URL(request.url).pathname }));
+    console.error(JSON.stringify({ event: "worker.request_error", requestId: id, fingerprint, path: pathname }));
     return new Response(JSON.stringify({ error: "The service encountered a temporary error.", requestId: id }), {
       status: 500,
       headers: { "content-type": "application/json", "cache-control": "no-store", "x-request-id": id, "x-error-fingerprint": fingerprint },

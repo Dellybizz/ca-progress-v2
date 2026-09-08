@@ -4,6 +4,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export type BackgroundJobType =
   | "icai-sync"
+  | "icai-phase5-review-probe"
   | "notification-fanout"
   | "analytics-aggregate"
   | "attachment-process"

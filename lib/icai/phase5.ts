@@ -4,7 +4,6 @@ import { getD1RuntimeDatabase, type D1DatabaseLike } from "@/lib/data/d1/client"
 import { decideIcaiReview } from "@/lib/icai/review";
 
 export const ICAI_PHASE5_PROBE_PREFIX = "__phase5__";
-const PHASE5_REVIEWER_ID = "__phase5_verifier__";
 
 function cleanCorrelation(value: unknown) {
   const cleaned = String(value ?? "").trim().replace(/[^A-Za-z0-9._-]/g, "-").slice(0, 80);
@@ -24,6 +23,7 @@ async function reviewStatus(db: D1DatabaseLike, id: string) {
 
 export async function runIcaiPhase5ReviewProbe(input: { correlationId: string }) {
   const correlationId = cleanCorrelation(input.correlationId);
+  const reviewerUserId = `${ICAI_PHASE5_PROBE_PREFIX}verifier_${correlationId}`;
   const db = getD1RuntimeDatabase();
   const source = await db.prepare("SELECT id,official_url FROM icai_sources WHERE is_active=1 ORDER BY id LIMIT 1")
     .first<{ id: string; official_url: string }>();
@@ -46,14 +46,14 @@ export async function runIcaiPhase5ReviewProbe(input: { correlationId: string })
 
   await db.batch([
     db.prepare("INSERT OR IGNORE INTO app_users(user_id,auth_provider,provider_subject,account_state,created_at,updated_at) VALUES(?1,'phase5-verifier',?2,'active',?3,?3)")
-      .bind(PHASE5_REVIEWER_ID, correlationId, now),
+      .bind(reviewerUserId, correlationId, now),
     db.prepare("INSERT OR IGNORE INTO icai_sync_runs(id,trigger_type,requested_by,parser_version,status,started_at,completed_at,source_total,source_processed,source_succeeded,details) VALUES(?1,'test',NULL,'phase5-live-probe','success',?2,?2,1,1,1,?3)")
       .bind(runId, now, metadata),
     db.prepare("INSERT OR IGNORE INTO icai_source_snapshots(id,run_id,source_id,fetched_at,http_status,canonical_hash,is_changed,parser_version,parsed_item_count,metadata) VALUES(?1,?2,?3,?4,200,?5,1,'phase5-live-probe',2,?6)")
       .bind(snapshotId, runId, source.id, now, "5".repeat(64), metadata),
-    db.prepare("INSERT OR IGNORE INTO icai_resources(id,source_id,source_snapshot_id,resource_type,title,summary,official_url,source_url,published_on,status,verification_status,parser_version,content_hash,first_seen_at,last_seen_at,last_changed_at,metadata,created_at,updated_at) VALUES(?1,?2,?3,'announcement',?4,'Isolated deployment verification fixture.',?5,?5,NULL,'active','verified','phase5-live-probe',?6,?7,?7,?7,?8,?7,?7)")
+    db.prepare("INSERT OR IGNORE INTO icai_resources(id,source_id,source_snapshot_id,resource_type,title,summary,official_url,source_url,published_on,status,verification_status,parser_version,content_hash,first_seen_at,last_seen_at,last_changed_at,metadata,created_at,updated_at) VALUES(?1,?2,?3,'announcement',?4,'Isolated deployment verification fixture.',?5,?5,NULL,'active','phase5_probe','phase5-live-probe',?6,?7,?7,?7,?8,?7,?7)")
       .bind(approveResourceId, source.id, snapshotId, `Phase 5 approval probe ${correlationId}`, source.official_url, "a".repeat(64), now, metadata),
-    db.prepare("INSERT OR IGNORE INTO icai_resources(id,source_id,source_snapshot_id,resource_type,title,summary,official_url,source_url,published_on,status,verification_status,parser_version,content_hash,first_seen_at,last_seen_at,last_changed_at,metadata,created_at,updated_at) VALUES(?1,?2,?3,'announcement',?4,'Isolated deployment verification fixture.',?5,?5,NULL,'active','verified','phase5-live-probe',?6,?7,?7,?7,?8,?7,?7)")
+    db.prepare("INSERT OR IGNORE INTO icai_resources(id,source_id,source_snapshot_id,resource_type,title,summary,official_url,source_url,published_on,status,verification_status,parser_version,content_hash,first_seen_at,last_seen_at,last_changed_at,metadata,created_at,updated_at) VALUES(?1,?2,?3,'announcement',?4,'Isolated deployment verification fixture.',?5,?5,NULL,'active','phase5_probe','phase5-live-probe',?6,?7,?7,?7,?8,?7,?7)")
       .bind(rejectResourceId, source.id, snapshotId, `Phase 5 rejection probe ${correlationId}`, source.official_url, "b".repeat(64), now, metadata),
     db.prepare("INSERT OR IGNORE INTO icai_change_events(id,run_id,source_id,entity_type,entity_id,change_type,field_name,old_value,new_value,risk_level,decision_status,detected_at) VALUES(?1,?2,?3,'resource',?4,'removed','status',?5,?6,'high','pending_review',?7)")
       .bind(approveChangeId, runId, source.id, approveResourceId, oldValue, newValue, now),
@@ -67,14 +67,14 @@ export async function runIcaiPhase5ReviewProbe(input: { correlationId: string })
 
   const approveStatus = await reviewStatus(db, approveReviewId);
   if (approveStatus?.status === "pending") {
-    await decideIcaiReview({ id: approveReviewId, decision: "approve", reviewerUserId: PHASE5_REVIEWER_ID, notes: `Phase 5 live approval ${correlationId}` });
+    await decideIcaiReview({ id: approveReviewId, decision: "approve", reviewerUserId, notes: `Phase 5 live approval ${correlationId}` });
   } else if (approveStatus?.status !== "approved") {
     throw new Error(`Phase 5 approval review is unexpectedly ${approveStatus?.status ?? "missing"}.`);
   }
 
   const rejectStatus = await reviewStatus(db, rejectReviewId);
   if (rejectStatus?.status === "pending") {
-    await decideIcaiReview({ id: rejectReviewId, decision: "reject", reviewerUserId: PHASE5_REVIEWER_ID, notes: `Phase 5 live rejection ${correlationId}` });
+    await decideIcaiReview({ id: rejectReviewId, decision: "reject", reviewerUserId, notes: `Phase 5 live rejection ${correlationId}` });
   } else if (rejectStatus?.status !== "rejected") {
     throw new Error(`Phase 5 rejection review is unexpectedly ${rejectStatus?.status ?? "missing"}.`);
   }
@@ -92,6 +92,6 @@ export async function runIcaiPhase5ReviewProbe(input: { correlationId: string })
     throw new Error("Phase 5 review probe did not produce the required canonical and audit outcomes.");
   }
 
-  await db.prepare("DELETE FROM app_users WHERE user_id=?1 AND auth_provider='phase5-verifier'").bind(PHASE5_REVIEWER_ID).run();
+  await db.prepare("DELETE FROM app_users WHERE user_id=?1 AND auth_provider='phase5-verifier'").bind(reviewerUserId).run();
   return { correlationId, runId, approveReviewId, rejectReviewId, ...evidence };
 }
