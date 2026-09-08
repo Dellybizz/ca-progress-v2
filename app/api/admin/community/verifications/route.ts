@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { adminTraceId, recordAdminAuditEvent } from "@/lib/admin/audit";
-import { adminAuthorizationStatus, requireAdminCapability } from "@/lib/authorization/server";
+import { adminAuthorizationStatus, requireAdminCapability, type AdminActor } from "@/lib/authorization/server";
 import { getCommunityVerificationAdminModel, manageCommunityVerification } from "@/lib/community/phase7";
 
 export const dynamic = "force-dynamic";
 const privateHeaders = { "Cache-Control": "private, no-store" };
 
-async function verificationActor() {
+type VerificationAuth = { actor: AdminActor | null; error: NextResponse | null };
+async function verificationActor(): Promise<VerificationAuth> {
   try { return { actor: await requireAdminCapability("community.verification.manage"), error: null }; }
   catch (error) {
     const status = adminAuthorizationStatus(error) ?? 403;
@@ -29,7 +30,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const auth = await verificationActor();
-  if (auth.error || !auth.actor) return auth.error;
+  if (auth.error) return auth.error;
+  if (!auth.actor) return NextResponse.json({ error: "Admin authorization could not be resolved." }, { status: 500, headers: privateHeaders });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || (body.action !== "grant" && body.action !== "revoke")) return NextResponse.json({ error: "Verification action must be grant or revoke." }, { status: 400, headers: privateHeaders });
   try {

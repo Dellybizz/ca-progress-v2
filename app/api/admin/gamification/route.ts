@@ -16,6 +16,10 @@ async function authorized(capability: AdminCapability): Promise<{ actor: AdminAc
   }
 }
 
+function missingActor() {
+  return NextResponse.json({ ok: false, error: "Admin authorization could not be resolved." }, { status: 500, headers: privateHeaders });
+}
+
 export async function GET(request: Request) {
   const auth = await authorized("gamification.read");
   if (auth.error) return auth.error;
@@ -35,7 +39,8 @@ export async function POST(request: Request) {
   try {
     if (body.action === "scan_user") {
       const auth = await authorized("gamification.review");
-      if (auth.error || !auth.actor) return auth.error;
+      if (auth.error) return auth.error;
+      if (!auth.actor) return missingActor();
       const userId = typeof body.userId === "string" ? body.userId.trim() : "";
       if (!idPattern.test(userId)) return NextResponse.json({ ok: false, error: "User ID is invalid." }, { status: 400, headers: privateHeaders });
       const scan = await scanAntiCheatForUser(userId);
@@ -44,7 +49,8 @@ export async function POST(request: Request) {
     }
     if (body.action === "review_flag") {
       const auth = await authorized("gamification.review");
-      if (auth.error || !auth.actor) return auth.error;
+      if (auth.error) return auth.error;
+      if (!auth.actor) return missingActor();
       const flagId = typeof body.flagId === "string" ? body.flagId.trim() : "";
       const decision = body.decision === "clear" || body.decision === "uphold" ? body.decision : null;
       if (!idPattern.test(flagId) || !decision) return NextResponse.json({ ok: false, error: "Review request is invalid." }, { status: 400, headers: privateHeaders });
@@ -54,7 +60,8 @@ export async function POST(request: Request) {
     }
     if (body.action === "settle_rewards") {
       const auth = await authorized("rewards.settle");
-      if (auth.error || !auth.actor) return auth.error;
+      if (auth.error) return auth.error;
+      if (!auth.actor) return missingActor();
       const competitionPeriod = typeof body.competitionPeriod === "string" ? body.competitionPeriod.trim() : "";
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(competitionPeriod)) return NextResponse.json({ ok: false, error: "Competition period must be YYYY-MM." }, { status: 400, headers: privateHeaders });
       const settlement = await settleMonthlyRewards(competitionPeriod, auth.actor.user.id);
