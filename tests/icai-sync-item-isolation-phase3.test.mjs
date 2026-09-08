@@ -48,7 +48,7 @@ test("Phase 3 isolates academic links and continues after terminal item failures
 test("Phase 3 prevents parser/item failure from becoming authoritative removal", () => {
   const engine = read("workers/icai-sync/sync-engine.ts");
   assert.match(engine, /processIsolatedSourceItems/);
-  assert.match(engine, /source\.authoritativeListing && !unsafeAfterPayload && !targetedRetry/);
+  assert.match(engine, /source\.authoritativeListing[\s\S]*!unsafeAfterPayload[\s\S]*!targetedRetry/);
   assert.match(engine, /Last-known-good source validators were preserved/);
   assert.match(engine, /Suspicious parser item-count drop/);
   assert.match(engine, /restoreTargetedRetrySourceState/);

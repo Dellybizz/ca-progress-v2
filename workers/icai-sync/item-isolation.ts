@@ -1,8 +1,6 @@
 import { parseOfficialSource } from "../../lib/icai/adapters";
-import {
-  extractOfficialLinks,
-  isApprovedIcaiUrl,
-} from "../../lib/icai/html";
+import { sha256Hex } from "../../lib/icai/hash";
+import { extractOfficialLinks, isApprovedIcaiUrl } from "../../lib/icai/html";
 import type {
   IcaiSourceConfig,
   ParsedExamAttempt,
@@ -22,11 +20,18 @@ const ITEM_TIMEOUT_MS = 30_000;
 const MAX_ITEM_HTML_BYTES = 512_000;
 const MAX_ITEM_REDIRECTS = 5;
 const ITEM_REDIRECTS = new Set([301, 302, 303, 307, 308]);
-const GENERIC_NAV = /^(home|about|contact|students?|members?|login|search|read more|click here|view all|next|previous|committees?|departments?)$/i;
-const ACADEMIC_SIGNAL = /\b(exam|examination|rtp|revision test|mtp|mock test|model test|study material|statutory|amendment|question paper|suggested answer|date sheet|schedule|announcement|notification|corrigendum|addendum)\b/i;
-const RESOURCE_HUB_SIGNAL = /\b(paper\s*[-:]?\s*\d+|section\s+[a-z]|foundation course|intermediate course|final course|model test papers?)\b/i;
+const GENERIC_NAV =
+  /^(home|about|contact|students?|members?|login|search|read more|click here|view all|next|previous|committees?|departments?)$/i;
+const ACADEMIC_SIGNAL =
+  /\b(exam|examination|rtp|revision test|mtp|mock test|model test|study material|statutory|amendment|question paper|suggested answer|date sheet|schedule|announcement|notification|corrigendum|addendum)\b/i;
+const RESOURCE_HUB_SIGNAL =
+  /\b(paper\s*[-:]?\s*\d+|section\s+[a-z]|foundation course|intermediate course|final course|model test papers?)\b/i;
 
-type SubjectLookup = { id: string; title: string; levelCode: "foundation" | "intermediate" | "final" };
+type SubjectLookup = {
+  id: string;
+  title: string;
+  levelCode: "foundation" | "intermediate" | "final";
+};
 type Candidate = { title: string; url: string };
 type RetryMode = "failed" | "timed_out" | "item";
 
@@ -40,6 +45,18 @@ type FetchedItem = {
   html: string | null;
   httpStatus: number;
   bytesFetched: number;
+  notModified: boolean;
+  etag: string | null;
+  lastModified: string | null;
+  contentHash: string | null;
+};
+
+type ItemState = {
+  etag: string | null;
+  last_modified: string | null;
+  content_hash: string | null;
+  consecutive_failures: number;
+  next_retry_at: string | null;
 };
 
 export type RetrySelection = {
@@ -54,6 +71,8 @@ export type IsolatedItemResult = {
   successfulCount: number;
   failedCount: number;
   skippedCount: number;
+  unchangedCount: number;
+  deferredCount: number;
   failures: string[];
 };
 
@@ -103,10 +122,17 @@ function isAcademicCandidate(link: Candidate, source: IcaiSourceConfig) {
       (parsed.pathname.includes("/post/") && RESOURCE_HUB_SIGNAL.test(title))
     );
   }
-  return parsed.pathname.includes("/post/") || isDocument || ACADEMIC_SIGNAL.test(title);
+  return (
+    parsed.pathname.includes("/post/") ||
+    isDocument ||
+    ACADEMIC_SIGNAL.test(title)
+  );
 }
 
-export function extractAcademicItemCandidates(html: string, source: IcaiSourceConfig) {
+export function extractAcademicItemCandidates(
+  html: string,
+  source: IcaiSourceConfig,
+) {
   return extractOfficialLinks(html, source.officialUrl).filter((link) =>
     isAcademicCandidate(link, source),
   );
@@ -132,11 +158,14 @@ function singleLinkHtml(candidate: Candidate) {
 }
 
 function parsedCount(parsed: ParsedSourcePayload) {
-  return parsed.resources.length + parsed.attempts.length + parsed.events.length;
+  return (
+    parsed.resources.length + parsed.attempts.length + parsed.events.length
+  );
 }
 
 function itemType(parsed: ParsedSourcePayload) {
-  if (parsed.resources[0]?.resourceType) return parsed.resources[0].resourceType;
+  if (parsed.resources[0]?.resourceType)
+    return parsed.resources[0].resourceType;
   if (parsed.events.length) return "exam_event";
   if (parsed.attempts.length) return "exam_attempt";
   return "academic_link";
@@ -173,7 +202,11 @@ async function readBoundedHtml(response: Response) {
   return { html: new TextDecoder().decode(merged), bytes };
 }
 
-async function fetchItem(candidate: Candidate): Promise<FetchedItem> {
+async function fetchItem(
+  candidate: Candidate,
+  state: ItemState | null,
+  force: boolean,
+): Promise<FetchedItem> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ITEM_TIMEOUT_MS);
   let current = candidate.url;
@@ -181,15 +214,20 @@ async function fetchItem(candidate: Candidate): Promise<FetchedItem> {
     for (let hop = 0; hop <= MAX_ITEM_REDIRECTS; hop += 1) {
       if (!isApprovedHttpIcaiUrl(current))
         throw new Error("Rejected item redirect outside approved ICAI hosts.");
+      const headers: Record<string, string> = {
+        Accept:
+          "text/html,application/xhtml+xml,application/pdf,application/octet-stream",
+        Range: `bytes=0-${MAX_ITEM_HTML_BYTES - 1}`,
+      };
+      if (!force && state?.etag) headers["If-None-Match"] = state.etag;
+      if (!force && state?.last_modified)
+        headers["If-Modified-Since"] = state.last_modified;
       const response = await fetch(current, {
         method: "GET",
         redirect: "manual",
         cache: "no-store",
         signal: controller.signal,
-        headers: {
-          Accept: "text/html,application/xhtml+xml,application/pdf,application/octet-stream",
-          Range: `bytes=0-${MAX_ITEM_HTML_BYTES - 1}`,
-        },
+        headers,
       });
       if (ITEM_REDIRECTS.has(response.status)) {
         if (hop === MAX_ITEM_REDIRECTS)
@@ -199,6 +237,22 @@ async function fetchItem(candidate: Candidate): Promise<FetchedItem> {
         await response.body?.cancel();
         current = new URL(location, current).toString();
         continue;
+      }
+      if (response.status === 304) {
+        await response.body?.cancel();
+        return {
+          finalUrl: current,
+          html: null,
+          httpStatus: 304,
+          bytesFetched: 0,
+          notModified: true,
+          etag: response.headers.get("etag") ?? state?.etag ?? null,
+          lastModified:
+            response.headers.get("last-modified") ??
+            state?.last_modified ??
+            null,
+          contentHash: state?.content_hash ?? null,
+        };
       }
       if (!response.ok) {
         await response.body?.cancel();
@@ -215,6 +269,10 @@ async function fetchItem(candidate: Candidate): Promise<FetchedItem> {
           html: body.html,
           httpStatus: response.status,
           bytesFetched: body.bytes,
+          notModified: false,
+          etag: response.headers.get("etag"),
+          lastModified: response.headers.get("last-modified"),
+          contentHash: await sha256Hex(body.html),
         };
       }
       await response.body?.cancel();
@@ -223,6 +281,10 @@ async function fetchItem(candidate: Candidate): Promise<FetchedItem> {
         html: null,
         httpStatus: response.status,
         bytesFetched: 0,
+        notModified: false,
+        etag: response.headers.get("etag"),
+        lastModified: response.headers.get("last-modified"),
+        contentHash: null,
       };
     }
     throw new Error("ICAI item redirect handling failed.");
@@ -232,6 +294,69 @@ async function fetchItem(candidate: Candidate): Promise<FetchedItem> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function loadItemState(
+  db: D1Database,
+  sourceId: string,
+  itemUrl: string,
+) {
+  return db
+    .prepare(
+      `SELECT etag,last_modified,content_hash,consecutive_failures,next_retry_at
+    FROM icai_sync_item_state WHERE source_id=?1 AND item_url=?2`,
+    )
+    .bind(sourceId, itemUrl)
+    .first<ItemState>();
+}
+
+async function saveItemSuccess(
+  db: D1Database,
+  sourceId: string,
+  itemUrl: string,
+  fetched: FetchedItem,
+) {
+  await db
+    .prepare(
+      `INSERT INTO icai_sync_item_state(source_id,item_url,etag,last_modified,content_hash,last_http_status,last_bytes_fetched,last_checked_at,last_success_at,consecutive_failures,next_retry_at,last_error,parser_version,updated_at)
+    VALUES(?1,?2,?3,?4,?5,?6,?7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0,NULL,NULL,'phase8.1-item-isolation',CURRENT_TIMESTAMP)
+    ON CONFLICT(source_id,item_url) DO UPDATE SET etag=COALESCE(excluded.etag,etag),last_modified=COALESCE(excluded.last_modified,last_modified),content_hash=COALESCE(excluded.content_hash,content_hash),last_http_status=excluded.last_http_status,last_bytes_fetched=excluded.last_bytes_fetched,last_checked_at=CURRENT_TIMESTAMP,last_success_at=CURRENT_TIMESTAMP,consecutive_failures=0,next_retry_at=NULL,last_error=NULL,parser_version=excluded.parser_version,updated_at=CURRENT_TIMESTAMP`,
+    )
+    .bind(
+      sourceId,
+      itemUrl,
+      fetched.etag,
+      fetched.lastModified,
+      fetched.contentHash,
+      fetched.httpStatus,
+      fetched.bytesFetched,
+    )
+    .run();
+}
+
+async function saveItemFailure(
+  db: D1Database,
+  sourceId: string,
+  itemUrl: string,
+  state: ItemState | null,
+  message: string,
+) {
+  const failures = Math.min(20, Number(state?.consecutive_failures ?? 0) + 1);
+  const retryHours = Math.min(24, 2 ** failures);
+  await db
+    .prepare(
+      `INSERT INTO icai_sync_item_state(source_id,item_url,consecutive_failures,next_retry_at,last_error,parser_version,updated_at)
+    VALUES(?1,?2,?3,datetime('now',?4),?5,'phase8.1-item-isolation',CURRENT_TIMESTAMP)
+    ON CONFLICT(source_id,item_url) DO UPDATE SET last_checked_at=CURRENT_TIMESTAMP,consecutive_failures=excluded.consecutive_failures,next_retry_at=excluded.next_retry_at,last_error=excluded.last_error,parser_version=excluded.parser_version,updated_at=CURRENT_TIMESTAMP`,
+    )
+    .bind(
+      sourceId,
+      itemUrl,
+      failures,
+      `+${retryHours} hours`,
+      message.slice(0, 2000),
+    )
+    .run();
 }
 
 async function beginExecution(
@@ -254,7 +379,14 @@ async function beginExecution(
         skip_reason=NULL,retry_eligible=0,updated_at=excluded.updated_at
       RETURNING id,started_at`,
     )
-    .bind(id, runId, sourceId, candidate.url, candidate.title.slice(0, 500), now)
+    .bind(
+      id,
+      runId,
+      sourceId,
+      candidate.url,
+      candidate.title.slice(0, 500),
+      now,
+    )
     .first<{ id: string; started_at: string }>();
   if (!row) throw new Error("Could not create ICAI item execution record.");
   return { id: row.id, startedAt: row.started_at };
@@ -326,7 +458,12 @@ async function activeExclusion(
        LIMIT 1`,
     )
     .bind(sourceId, itemUrl, runId)
-    .first<{ id: string; scope: string; reason: string; expires_at: string | null }>();
+    .first<{
+      id: string;
+      scope: string;
+      reason: string;
+      expires_at: string | null;
+    }>();
 }
 
 function mergePayloads(payloads: ParsedSourcePayload[]): ParsedSourcePayload {
@@ -364,7 +501,8 @@ function failureCategory(error: unknown) {
   if (error instanceof ItemTimeoutError) return "timeout";
   if (error instanceof ItemHttpError) return "http";
   if (error instanceof SyncItemSkippedError) return "admin_skip";
-  if (error instanceof SyncRemainingItemsSkippedError) return "admin_skip_remaining";
+  if (error instanceof SyncRemainingItemsSkippedError)
+    return "admin_skip_remaining";
   if (error instanceof TypeError) return "parser_validation";
   return "parser";
 }
@@ -391,6 +529,8 @@ export async function processIsolatedSourceItems(
   let skippedCount = 0;
   let successfulCount = 0;
   let terminalCount = 0;
+  let unchangedCount = 0;
+  let deferredCount = 0;
   let skipRemaining = false;
   const seen = new Set<string>();
 
@@ -409,7 +549,12 @@ export async function processIsolatedSourceItems(
       continue;
     }
 
-    const exclusion = await activeExclusion(db, runId, source.id, candidate.url);
+    const exclusion = await activeExclusion(
+      db,
+      runId,
+      source.id,
+      candidate.url,
+    );
     if (exclusion) {
       await finishExecution(db, execution, {
         status: "skipped",
@@ -422,12 +567,52 @@ export async function processIsolatedSourceItems(
       continue;
     }
 
+    const state = await loadItemState(db, source.id, candidate.url);
+    if (
+      !allowedItemUrls &&
+      state?.next_retry_at &&
+      new Date(state.next_retry_at).getTime() > Date.now()
+    ) {
+      await finishExecution(db, execution, {
+        status: "skipped",
+        stage: "retry_deferred",
+        skipReason: `Automatic retry deferred until ${state.next_retry_at}.`,
+        retryEligible: true,
+      });
+      deferredCount += 1;
+      terminalCount += 1;
+      continue;
+    }
+
     try {
       await setStage(db, runId, "parsing", source.id, candidate.url);
       await checkpoint(db, runId, "item");
       const itemStartedAt = Date.now();
-      const fetched = await fetchItem(candidate);
+      const fetched = await fetchItem(
+        candidate,
+        state,
+        Boolean(allowedItemUrls),
+      );
       await setStage(db, runId, "parsing", source.id, fetched.finalUrl);
+      if (
+        fetched.notModified ||
+        (!allowedItemUrls &&
+          fetched.contentHash &&
+          fetched.contentHash === state?.content_hash)
+      ) {
+        await saveItemSuccess(db, source.id, candidate.url, fetched);
+        await finishExecution(db, execution, {
+          status: "succeeded",
+          stage: "unchanged",
+          httpStatus: fetched.httpStatus,
+          bytesFetched: fetched.bytesFetched,
+          retryEligible: false,
+        });
+        unchangedCount += 1;
+        successfulCount += 1;
+        terminalCount += 1;
+        continue;
+      }
       const input = fetched.html ?? singleLinkHtml(candidate);
       const parsed = parseOfficialSource(
         input,
@@ -438,6 +623,7 @@ export async function processIsolatedSourceItems(
         throw new ItemTimeoutError();
       const count = parsedCount(parsed);
       if (count === 0) {
+        await saveItemSuccess(db, source.id, candidate.url, fetched);
         await finishExecution(db, execution, {
           status: "skipped",
           stage: "not_academic",
@@ -449,6 +635,7 @@ export async function processIsolatedSourceItems(
         continue;
       }
       payloads.push(parsed);
+      await saveItemSuccess(db, source.id, candidate.url, fetched);
       await finishExecution(db, execution, {
         status: "succeeded",
         stage: "parsed",
@@ -463,7 +650,10 @@ export async function processIsolatedSourceItems(
     } catch (error) {
       const category = failureCategory(error);
       if (error instanceof SyncRemainingItemsSkippedError) skipRemaining = true;
-      if (error instanceof SyncItemSkippedError || error instanceof SyncRemainingItemsSkippedError) {
+      if (
+        error instanceof SyncItemSkippedError ||
+        error instanceof SyncRemainingItemsSkippedError
+      ) {
         await finishExecution(db, execution, {
           status: "skipped",
           stage: "skipped",
@@ -475,13 +665,13 @@ export async function processIsolatedSourceItems(
       } else {
         const timedOut = error instanceof ItemTimeoutError;
         const message = errorMessage(error);
+        await saveItemFailure(db, source.id, candidate.url, state, message);
         await finishExecution(db, execution, {
           status: timedOut ? "timed_out" : "failed",
           stage: timedOut ? "timed_out" : "failed",
           failureCategory: category,
           failureMessage: message,
-          httpStatus:
-            error instanceof ItemHttpError ? error.httpStatus : null,
+          httpStatus: error instanceof ItemHttpError ? error.httpStatus : null,
           retryEligible: true,
         });
         failures.push(`${candidate.url}: ${message}`);
@@ -498,7 +688,8 @@ export async function processIsolatedSourceItems(
         title: "Retry target",
         url: missingUrl,
       });
-      const message = "Retry target is no longer present on the official source page.";
+      const message =
+        "Retry target is no longer present on the official source page.";
       await finishExecution(db, execution, {
         status: "failed",
         stage: "missing",
@@ -518,6 +709,8 @@ export async function processIsolatedSourceItems(
     successfulCount,
     failedCount,
     skippedCount,
+    unchangedCount,
+    deferredCount,
     failures,
   };
 }
@@ -533,7 +726,8 @@ export async function loadRetrySelection(
   if (mode === "timed_out") clauses.push("status='timed_out'");
   else clauses.push("status IN ('failed','timed_out','skipped')");
   if (mode === "item") {
-    if (!itemId) throw new Error("A specific ICAI item is required for item retry.");
+    if (!itemId)
+      throw new Error("A specific ICAI item is required for item retry.");
     values.push(itemId);
     clauses.push(`id=?${values.length}`);
   }
@@ -549,7 +743,8 @@ export async function loadRetrySelection(
     urls.add(row.item_url);
     urlsBySource.set(row.source_id, urls);
   }
-  if (!urlsBySource.size) throw new Error("No retry-eligible ICAI items matched this request.");
+  if (!urlsBySource.size)
+    throw new Error("No retry-eligible ICAI items matched this request.");
   return { originRunId, mode, urlsBySource };
 }
 
@@ -583,7 +778,10 @@ export async function sourceIsPaused(db: D1Database, sourceId: string) {
   return Boolean(row);
 }
 
-export async function previousSourceItemCount(db: D1Database, sourceId: string) {
+export async function previousSourceItemCount(
+  db: D1Database,
+  sourceId: string,
+) {
   const row = await db
     .prepare(
       "SELECT parsed_item_count FROM icai_source_snapshots WHERE source_id=?1 ORDER BY fetched_at DESC LIMIT 1",

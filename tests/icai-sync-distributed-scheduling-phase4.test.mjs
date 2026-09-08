@@ -207,7 +207,7 @@ test("Phase 4 runtime wiring scopes source execution and exposes operator schedu
   assert.match(route, /getIcaiScheduleOverview/);
   assert.match(route, /dueAt: next\.scheduledFor/);
   assert.match(route, /scheduleError: scheduleResult\.error/);
-  assert.match(read("components/icai/sync-live-refresh.tsx"), /Distributed scheduler status is unavailable/);
+  assert.match(read("components/icai/sync-live-refresh.tsx"), /Distributed scheduler setup is incomplete/);
   assert.match(read("components/icai/admin-sync-monitor.tsx"), /Every 2 hours · IST windows/);
 
   for (const mode of ["due", "source", "group", "failed", "high-impact", "all"]) {

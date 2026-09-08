@@ -44,6 +44,8 @@ jobs:
         run: npm run test:icai:phase4
       - name: Focused ICAI Phase 5 verification
         run: npm run test:icai:phase5
+      - name: Focused ICAI Phase 6 verification
+        run: npm run test:icai:phase6
       - name: Retained D1 index validation
         run: npm run d1:hot-indexes:validate
       - name: Repository tests

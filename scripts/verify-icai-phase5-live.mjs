@@ -158,8 +158,8 @@ if (itemRows.some((row) => !["succeeded","failed","timed_out","skipped"].include
   throw new Error("Phase 5 found a non-terminal item after the sync run completed.");
 }
 const successfulItems = itemRows.filter((row) => row.status === "succeeded");
-if (!successfulItems.length) throw new Error("Phase 5 real sync produced no successfully parsed item.");
-if (successfulItems.some((row) => Number(row.http_status) < 200 || Number(row.http_status) >= 400 || row.duration_ms === null || Number(row.bytes_fetched) < 0 || Number(row.parsed_count) < 1)) {
+if (!successfulItems.length) throw new Error("Phase 5 real sync produced no successful item evidence.");
+if (successfulItems.some((row) => Number(row.http_status) < 200 || Number(row.http_status) >= 400 || row.duration_ms === null || Number(row.bytes_fetched) < 0 || (row.stage !== "unchanged" && Number(row.parsed_count) < 1))) {
   throw new Error("Phase 5 item diagnostics are incomplete or inconsistent.");
 }
 writeFileSync(`${evidenceDir}/icai-phase5-item-results.json`, JSON.stringify(itemRows, null, 2));

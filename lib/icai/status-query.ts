@@ -42,6 +42,10 @@ function isStale(value: unknown) {
   return Number.isFinite(timestamp) && Date.now() - timestamp > 2 * 60_000;
 }
 
+function isJobStale(job: Record<string, unknown>) {
+  return isStale(job.started_at ?? job.created_at);
+}
+
 function itemState(value: unknown): IcaiSyncLiveItemState {
   const state = String(value ?? "pending");
   return [
@@ -100,6 +104,7 @@ export async function getIcaiSyncLiveStatus(
             createdAt: String(job.created_at),
             startedAt: asString(job.started_at),
             lastError: asString(job.last_error),
+            stale: isJobStale(job),
           }
         : null,
       run: null,
@@ -247,6 +252,7 @@ export async function getIcaiSyncLiveStatus(
           createdAt: String(job.created_at),
           startedAt: asString(job.started_at),
           lastError: asString(job.last_error),
+          stale: isJobStale(job),
         }
       : null,
     run: {
