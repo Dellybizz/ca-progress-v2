@@ -12,6 +12,7 @@ Phase 5 closes the lightweight distributed-sync implementation with a bounded pr
 - Identical sync and review messages are replayed with the same idempotency keys; D1 must retain exactly one durable job for each key.
 - The existing audited approve/reject proof, official-source snapshots, student frontend visibility and foreign-key checks remain mandatory.
 - Deployment evidence is written as separate JSON artifacts for source selection, queue pushes/replays, run details, item results, scheduler health, review outcomes and the final summary.
+- Worker deployment retries recognized transient Cloudflare control-plane failures up to four times with bounded backoff; non-transient build, configuration and authentication errors fail immediately.
 
 ## Safety boundaries
 

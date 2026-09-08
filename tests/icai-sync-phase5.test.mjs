@@ -96,6 +96,12 @@ test("Phase 5 is a permanent focused gate in CI, retirement closure and deployme
   assert.match(deployment, /verify-icai-phase5-live\.mjs/);
   assert.match(deployment, /rollback --name ca-progress-v2-icai-sync/);
   assert.match(deployment, /rollback --name ca-progress-v2/);
+  const retry = read("scripts/retry-transient-cloudflare-command.mjs");
+  assert.match(retry, /maxAttempts = 4/);
+  assert.match(retry, /service unavailable/);
+  assert.match(retry, /received a malformed response from the api/);
+  assert.match(retry, /if \(!retryable \|\| attempt === maxAttempts\)/);
+  assert.match(deployment, /retry-transient-cloudflare-command\.mjs -- npm run cf:deploy:web/);
   const status = read("docs/ICAI_SYNC_PHASE5_STATUS.md");
   assert.match(status, /bounded to one source/);
   assert.match(status, /469\/469 passed/);
