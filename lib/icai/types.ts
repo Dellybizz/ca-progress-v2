@@ -137,6 +137,16 @@ export type IcaiPublicCatalog = {
 };
 
 export type IcaiAdminDashboard = {
+  activeJob: {
+    id: string;
+    status: string;
+    attempts: number;
+    maxAttempts: number;
+    createdAt: string;
+    startedAt: string | null;
+    finishedAt: string | null;
+    lastError: string | null;
+  } | null;
   latestRun: {
     id: string;
     status: string;
@@ -144,6 +154,7 @@ export type IcaiAdminDashboard = {
     startedAt: string;
     completedAt: string | null;
     sourceTotal: number;
+    sourceProcessed: number;
     sourceSucceeded: number;
     sourceFailed: number;
     newItems: number;
@@ -153,6 +164,33 @@ export type IcaiAdminDashboard = {
     pendingReviews: number;
     errorSummary: string | null;
   } | null;
+  recentRuns: {
+    id: string;
+    status: string;
+    triggerType: string;
+    startedAt: string;
+    completedAt: string | null;
+    sourceTotal: number;
+    sourceProcessed: number;
+    sourceSucceeded: number;
+    sourceFailed: number;
+    newItems: number;
+    changedItems: number;
+    unchangedItems: number;
+    removedItems: number;
+    pendingReviews: number;
+    errorSummary: string | null;
+  }[];
+  sourceResults: {
+    sourceId: string;
+    sourceName: string;
+    state: "fetched" | "failed" | "pending" | "not_run";
+    httpStatus: number | null;
+    parsedItemCount: number | null;
+    changed: boolean | null;
+    fetchedAt: string | null;
+    error: string | null;
+  }[];
   sources: {
     id: string;
     name: string;
