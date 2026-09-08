@@ -26,4 +26,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Read-only proof of the production ledger and FK state.
           npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --command "SELECT version,description FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0028' ORDER BY version; SELECT name FROM sqlite_master WHERE type='table' AND name IN ('test_stage_records','icai_sync_source_states') ORDER BY name; PRAGMA foreign_key_list(test_stage_records); PRAGMA foreign_key_check;"
