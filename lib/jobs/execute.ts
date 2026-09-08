@@ -12,11 +12,21 @@ function json(value: unknown) { return JSON.stringify(value ?? {}); }
 
 export async function executeBackgroundJob(job: BackgroundJob) {
   switch (job.type) {
-    case "icai-sync":
+    case "icai-sync": {
+      const retryMode =
+        job.payload.retryMode === "failed" ||
+        job.payload.retryMode === "timed_out" ||
+        job.payload.retryMode === "item"
+          ? job.payload.retryMode
+          : null;
       return runIcaiSync({
         trigger: job.payload.trigger === "manual" ? "manual" : "cron",
         requestedBy: typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null,
+        retryRunId: typeof job.payload.retryRunId === "string" ? job.payload.retryRunId : null,
+        retryMode,
+        retryItemId: typeof job.payload.retryItemId === "string" ? job.payload.retryItemId : null,
       });
+    }
     case "icai-phase5-review-probe":
       return runIcaiPhase5ReviewProbe({ correlationId: String(job.payload.correlationId ?? "") });
     case "analytics-aggregate": {
