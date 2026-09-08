@@ -67,14 +67,14 @@ export async function runIcaiPhase5ReviewProbe(input: { correlationId: string })
 
   const approveStatus = await reviewStatus(db, approveReviewId);
   if (approveStatus?.status === "pending") {
-    await decideIcaiReview({ id: approveReviewId, decision: "approve", reviewerUserId, notes: `Phase 5 live approval ${correlationId}` });
+    await decideIcaiReview({ reviewId: approveReviewId, decision: "approve", reviewerUserId, notes: `Phase 5 live approval ${correlationId}` });
   } else if (approveStatus?.status !== "approved") {
     throw new Error(`Phase 5 approval review is unexpectedly ${approveStatus?.status ?? "missing"}.`);
   }
 
   const rejectStatus = await reviewStatus(db, rejectReviewId);
   if (rejectStatus?.status === "pending") {
-    await decideIcaiReview({ id: rejectReviewId, decision: "reject", reviewerUserId, notes: `Phase 5 live rejection ${correlationId}` });
+    await decideIcaiReview({ reviewId: rejectReviewId, decision: "reject", reviewerUserId, notes: `Phase 5 live rejection ${correlationId}` });
   } else if (rejectStatus?.status !== "rejected") {
     throw new Error(`Phase 5 rejection review is unexpectedly ${rejectStatus?.status ?? "missing"}.`);
   }
