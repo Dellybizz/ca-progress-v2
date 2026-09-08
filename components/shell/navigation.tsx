@@ -72,9 +72,13 @@ const studentGroups: StudentNavGroup[] = [
 ];
 
 export const adminNavigation: NavItem[] = [
-  { label: "Admin overview", href: "/admin", icon: "shield", exact: true },
+  { label: "Command Center", href: "/admin", icon: "shield", exact: true },
+  { label: "Users", href: "/admin/users", icon: "community" },
+  { label: "Staff & roles", href: "/admin/staff", icon: "shield" },
+  { label: "Audit log", href: "/admin/audit", icon: "notes" },
   { label: "Syllabus preview", href: "/admin/syllabus", icon: "book" },
   { label: "ICAI Sync", href: "/admin/icai-sync", icon: "bell" },
+  { label: "Jobs", href: "/admin/jobs", icon: "timer" },
   { label: "Resource moderation", href: "/admin/resources/moderation", icon: "notes" },
   { label: "Community moderation", href: "/admin/community/moderation", icon: "community" },
 ];
