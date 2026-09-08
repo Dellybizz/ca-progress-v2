@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { controlIcaiSyncAction } from "@/app/(admin)/admin/icai-sync/actions";
+import {
+  controlIcaiSyncAction,
+  manageIcaiItemAction,
+  retryIcaiItemsAction,
+} from "@/app/(admin)/admin/icai-sync/actions";
 import {
   ICAI_STAGE_PROGRESS,
   type IcaiSyncLiveStatus,
@@ -20,11 +24,41 @@ function elapsed(value: string | null | undefined, now: string | undefined) {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-function tone(status: string): "success" | "warning" | "danger" | "info" | "neutral" {
-  if (["success", "completed", "fetched"].includes(status)) return "success";
+function durationMs(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "—";
+  if (value < 1_000) return `${Math.round(value)}ms`;
+  const seconds = Math.round(value / 1_000);
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function tone(
+  status: string,
+): "success" | "warning" | "danger" | "info" | "neutral" {
+  if (["success", "completed", "fetched", "succeeded"].includes(status))
+    return "success";
   if (["failed", "dead_letter"].includes(status)) return "danger";
+  if (["timed_out", "partial", "skipped"].includes(status)) return "warning";
   if (["running", "queued", "pending"].includes(status)) return "info";
-  return status === "partial" ? "warning" : "neutral";
+  return "neutral";
+}
+
+function CopyUrlButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="ui-button ui-button--sm"
+      onClick={() => {
+        void navigator.clipboard.writeText(url).then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1_500);
+        });
+      }}
+    >
+      {copied ? "Copied" : "Copy URL"}
+    </button>
+  );
 }
 
 export function SyncLiveRefresh({
@@ -47,7 +81,7 @@ export function SyncLiveRefresh({
   const refreshed = useRef(false);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active && !runId) return;
     let disposed = false;
     let timer: number | null = null;
     let controller: AbortController | null = null;
@@ -76,9 +110,15 @@ export function SyncLiveRefresh({
           credentials: "same-origin",
           signal: controller.signal,
         });
-        const body = (await response.json()) as IcaiSyncLiveStatus | { error?: string };
+        const body = (await response.json()) as
+          | IcaiSyncLiveStatus
+          | { error?: string };
         if (!response.ok) {
-          throw new Error("error" in body && body.error ? body.error : "Status request failed.");
+          throw new Error(
+            "error" in body && body.error
+              ? body.error
+              : "Status request failed.",
+          );
         }
         const next = body as IcaiSyncLiveStatus;
         if (disposed) return;
@@ -86,7 +126,7 @@ export function SyncLiveRefresh({
         setPollError(null);
         if (!next.active) {
           clearTimer();
-          if (!refreshed.current) {
+          if (active && !refreshed.current) {
             refreshed.current = true;
             router.refresh();
           }
@@ -95,8 +135,12 @@ export function SyncLiveRefresh({
         schedule(poll);
       } catch (error) {
         if (disposed || controller?.signal.aborted) return;
-        setPollError(error instanceof Error ? error.message : "Live status is temporarily unavailable.");
-        schedule(poll);
+        setPollError(
+          error instanceof Error
+            ? error.message
+            : "Live status is temporarily unavailable.",
+        );
+        if (active) schedule(poll);
       }
     };
 
@@ -119,20 +163,22 @@ export function SyncLiveRefresh({
     };
   }, [active, runId, router]);
 
-  if (!active) return null;
+  if (!active && !runId) return null;
 
   if (!status) {
     return (
       <section className="icai-section icai-runtime-panel" aria-live="polite">
         <div className="icai-section-heading">
           <div>
-            <span className="eyebrow">{labels.live}</span>
-            <h2>Connecting to the sync worker</h2>
+            <span className="eyebrow">{active ? labels.live : "Run diagnostics"}</span>
+            <h2>{active ? "Connecting to the sync worker" : "Loading item results"}</h2>
             <p className="icai-muted">
-              Loading compact live status without refreshing the full admin page.
+              Reading compact sync state without refreshing the full admin page.
             </p>
           </div>
-          <Badge tone={pollError ? "warning" : "info"}>{pollError ? "retrying" : "live"}</Badge>
+          <Badge tone={pollError ? "warning" : "info"}>
+            {pollError ? "retrying" : active ? "live" : "loading"}
+          </Badge>
         </div>
         {pollError ? <p className="icai-inline-error">{pollError}</p> : null}
       </section>
@@ -143,140 +189,413 @@ export function SyncLiveRefresh({
   const runtime = status.runtime;
   const processed = run?.processed ?? 0;
   const total = run?.total ?? 0;
-  const overallPercent = total ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+  const overallPercent = total
+    ? Math.min(100, Math.round((processed / total) * 100))
+    : 0;
   const stagePercent = runtime ? (ICAI_STAGE_PROGRESS[runtime.stage] ?? 0) : 0;
   const stale = Boolean(runtime?.stale);
+  const failedItems = status.itemResults.filter(
+    (item) => item.status === "failed" || item.status === "timed_out",
+  );
+  const retryableItems = status.itemResults.filter((item) => item.retryEligible);
+  const timedOutItems = retryableItems.filter((item) => item.status === "timed_out");
+  const currentSource = runtime?.currentSourceId
+    ? status.sourceResults.find(
+        (source) => source.sourceId === runtime.currentSourceId,
+      )
+    : null;
 
   return (
     <div className="icai-live-monitor" aria-live="polite">
-      <section className="icai-admin-summary">
-        <div>
-          <span>Live state</span>
-          <strong>{status.job?.status ?? run?.status ?? "starting"}</strong>
-        </div>
-        <div>
-          <span>Overall progress</span>
-          <strong>{run ? `${overallPercent}% · ${processed}/${total}` : "Waiting for run"}</strong>
-        </div>
-        <div>
-          <span>Heartbeat</span>
-          <strong>{runtime ? `${elapsed(runtime.heartbeatAt, status.observedAt)} ago` : "Waiting"}</strong>
-        </div>
-        <div>
-          <span>Next scheduled group</span>
-          <strong>{status.nextScheduledGroup?.label ?? "Not configured yet"}</strong>
-        </div>
-      </section>
+      {status.active ? (
+        <>
+          <section className="icai-admin-summary">
+            <div>
+              <span>Live state</span>
+              <strong>{status.job?.status ?? run?.status ?? "starting"}</strong>
+            </div>
+            <div>
+              <span>Overall progress</span>
+              <strong>
+                {run ? `${overallPercent}% · ${processed}/${total}` : "Waiting for run"}
+              </strong>
+            </div>
+            <div>
+              <span>Heartbeat</span>
+              <strong>
+                {runtime
+                  ? `${elapsed(runtime.heartbeatAt, status.observedAt)} ago`
+                  : "Waiting"}
+              </strong>
+            </div>
+            <div>
+              <span>Next scheduled group</span>
+              <strong>{status.nextScheduledGroup?.label ?? "Not configured yet"}</strong>
+            </div>
+          </section>
 
-      <section className="icai-active-run">
-        <div>
-          <span className="icai-live-dot" />
-          <span>
-            <small>Active run</small>
-            <h2>
-              {status.job?.status === "queued"
-                ? "Waiting for a worker"
-                : runtime?.currentSourceName ?? "Preparing official sources"}
-            </h2>
-            <p>
-              {run
-                ? `Run ${status.runId?.slice(0, 8)} · ${run.triggerType} · running ${elapsed(run.startedAt, status.observedAt)}`
-                : status.job
-                  ? `Job ${status.job.id.slice(0, 8)} · attempt ${status.job.attempts}/${status.job.maxAttempts}`
-                  : "Worker startup in progress"}
-            </p>
-          </span>
-          <Badge tone={tone(status.job?.status ?? run?.status ?? "queued")}>
-            {status.job?.status ?? run?.status ?? "queued"}
-          </Badge>
-        </div>
-        <div className="icai-progress" aria-label="Overall source progress">
-          <i style={{ width: `${overallPercent}%` }} />
-        </div>
-      </section>
+          <section className="icai-active-run">
+            <div>
+              <span className="icai-live-dot" />
+              <span>
+                <small>Active run</small>
+                <h2>
+                  {status.job?.status === "queued"
+                    ? "Waiting for a worker"
+                    : runtime?.currentSourceName ?? "Preparing official sources"}
+                </h2>
+                <p>
+                  {run
+                    ? `Run ${status.runId?.slice(0, 8)} · ${run.triggerType} · running ${elapsed(run.startedAt, status.observedAt)}`
+                    : status.job
+                      ? `Job ${status.job.id.slice(0, 8)} · attempt ${status.job.attempts}/${status.job.maxAttempts}`
+                      : "Worker startup in progress"}
+                </p>
+              </span>
+              <Badge tone={tone(status.job?.status ?? run?.status ?? "queued")}>
+                {status.job?.status ?? run?.status ?? "queued"}
+              </Badge>
+            </div>
+            <div className="icai-progress" aria-label="Overall source progress">
+              <i style={{ width: `${overallPercent}%` }} />
+            </div>
+          </section>
 
-      <section className="icai-section icai-runtime-panel">
-        <div className="icai-section-heading">
-          <div>
-            <span className="eyebrow">{labels.live}</span>
-            <h2>{runtime ? runtime.stage.replaceAll("_", " ") : "Worker startup"}</h2>
+          <section className="icai-section icai-runtime-panel">
+            <div className="icai-section-heading">
+              <div>
+                <span className="eyebrow">{labels.live}</span>
+                <h2>
+                  {runtime
+                    ? runtime.stage.replaceAll("_", " ")
+                    : "Worker startup"}
+                </h2>
+                <p className="icai-muted">
+                  {runtime?.currentSourceName ?? "Preparing sources"}
+                  {runtime
+                    ? ` · stage ${elapsed(runtime.stageStartedAt, status.observedAt)} · heartbeat ${elapsed(runtime.heartbeatAt, status.observedAt)} ago`
+                    : ""}
+                </p>
+              </div>
+              <Badge tone={stale ? "danger" : "info"}>
+                {stale ? "possibly stuck" : "live"}
+              </Badge>
+            </div>
+            <div className="icai-progress" aria-label="Current source stage progress">
+              <i style={{ width: `${stagePercent}%` }} />
+            </div>
             <p className="icai-muted">
-              {runtime?.currentSourceName ?? "Preparing sources"}
-              {runtime ? ` · stage ${elapsed(runtime.stageStartedAt, status.observedAt)} · heartbeat ${elapsed(runtime.heartbeatAt, status.observedAt)} ago` : ""}
+              Current-source workflow {stagePercent}% · overall {overallPercent}% (
+              {processed}/{total} sources)
             </p>
-          </div>
-          <Badge tone={stale ? "danger" : "info"}>{stale ? "possibly stuck" : "live"}</Badge>
-        </div>
-        <div className="icai-progress" aria-label="Current source stage progress">
-          <i style={{ width: `${stagePercent}%` }} />
-        </div>
-        <p className="icai-muted">
-          Current-source workflow {stagePercent}% · overall {overallPercent}% ({processed}/{total} sources)
-        </p>
-        {runtime?.currentItemUrl ? (
-          <a href={runtime.currentItemUrl} target="_blank" rel="noreferrer">
-            {runtime.currentItemUrl}
-          </a>
-        ) : null}
-        {stale ? (
-          <div className="auth-status auth-status--danger" role="alert">
-            No heartbeat has been received for more than two minutes. Recovery can safely close the stale run without changing previously verified ICAI data.
-          </div>
-        ) : null}
-        {status.runId && runtime ? (
-          <div className="icai-runtime-actions">
-            <form action={controlIcaiSyncAction}>
-              <input type="hidden" name="runId" value={status.runId} />
-              <input type="hidden" name="intent" value="skip" />
-              <button className="ui-button" disabled={!runtime.currentSourceId || runtime.skipSourceRequested}>
-                {runtime.skipSourceRequested ? "Skip requested" : labels.skip}
-              </button>
-            </form>
-            <form action={controlIcaiSyncAction}>
-              <input type="hidden" name="runId" value={status.runId} />
-              <input type="hidden" name="intent" value="cancel" />
-              <button className="ui-button" disabled={runtime.cancelRequested}>
-                {runtime.cancelRequested ? "Cancel requested" : labels.cancel}
-              </button>
-            </form>
-            {stale ? (
-              <form action={controlIcaiSyncAction}>
-                <input type="hidden" name="runId" value={status.runId} />
-                <input type="hidden" name="intent" value="recover" />
-                <button className="ui-button ui-button--primary">{labels.recover}</button>
-              </form>
+            {runtime?.currentItemUrl ? (
+              <div className="icai-runtime-actions">
+                <a
+                  className="ui-button ui-button--sm"
+                  href={runtime.currentItemUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open current item
+                </a>
+                <CopyUrlButton url={runtime.currentItemUrl} />
+              </div>
             ) : null}
-          </div>
-        ) : null}
-      </section>
+            {stale ? (
+              <div className="auth-status auth-status--danger" role="alert">
+                No heartbeat has been received for more than two minutes. Recovery
+                can safely close the stale run without changing previously verified
+                ICAI data.
+              </div>
+            ) : null}
+            {status.runId && runtime ? (
+              <div className="icai-runtime-actions">
+                <form action={controlIcaiSyncAction}>
+                  <input type="hidden" name="runId" value={status.runId} />
+                  <input type="hidden" name="intent" value="skip_item" />
+                  <button
+                    className="ui-button"
+                    disabled={!runtime.currentItemUrl || runtime.skipItemRequested}
+                  >
+                    {runtime.skipItemRequested
+                      ? "Item skip requested"
+                      : "Skip current item"}
+                  </button>
+                </form>
+                <form action={controlIcaiSyncAction}>
+                  <input type="hidden" name="runId" value={status.runId} />
+                  <input type="hidden" name="intent" value="skip_remaining" />
+                  <button
+                    className="ui-button"
+                    disabled={
+                      !runtime.currentItemUrl || runtime.skipRemainingRequested
+                    }
+                  >
+                    {runtime.skipRemainingRequested
+                      ? "Skip remaining requested"
+                      : "Skip remaining files"}
+                  </button>
+                </form>
+                <form action={controlIcaiSyncAction}>
+                  <input type="hidden" name="runId" value={status.runId} />
+                  <input type="hidden" name="intent" value="skip" />
+                  <button
+                    className="ui-button"
+                    disabled={
+                      !runtime.currentSourceId || runtime.skipSourceRequested
+                    }
+                  >
+                    {runtime.skipSourceRequested ? "Skip requested" : labels.skip}
+                  </button>
+                </form>
+                <form action={controlIcaiSyncAction}>
+                  <input type="hidden" name="runId" value={status.runId} />
+                  <input type="hidden" name="intent" value="cancel" />
+                  <button
+                    className="ui-button"
+                    disabled={runtime.cancelRequested}
+                  >
+                    {runtime.cancelRequested ? "Cancel requested" : labels.cancel}
+                  </button>
+                </form>
+                {stale ? (
+                  <form action={controlIcaiSyncAction}>
+                    <input type="hidden" name="runId" value={status.runId} />
+                    <input type="hidden" name="intent" value="recover" />
+                    <button className="ui-button ui-button--primary">
+                      {labels.recover}
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            ) : null}
 
-      <section className="icai-section">
-        <div className="icai-section-heading">
+            {runtime?.currentSourceId ? (
+              <details className="icai-diagnostic-details">
+                <summary>Temporarily pause current source</summary>
+                <form action={manageIcaiItemAction} className="icai-runtime-actions">
+                  <input type="hidden" name="action" value="pause_source" />
+                  <input type="hidden" name="runId" value={status.runId ?? ""} />
+                  <input
+                    type="hidden"
+                    name="sourceId"
+                    value={runtime.currentSourceId}
+                  />
+                  <input type="number" name="hours" min="1" max="168" defaultValue="24" />
+                  <input
+                    name="reason"
+                    maxLength={500}
+                    placeholder="Reason for temporary pause"
+                    required
+                  />
+                  <button className="ui-button" type="submit">
+                    Pause source
+                  </button>
+                </form>
+              </details>
+            ) : null}
+          </section>
+        </>
+      ) : run ? (
+        <section className="icai-admin-summary">
           <div>
-            <span className="eyebrow">Source-by-source status</span>
-            <h2>Current fetch results</h2>
+            <span>Run status</span>
+            <strong>{run.status}</strong>
           </div>
-          <Badge tone="neutral">{status.sourceResults.length} sources</Badge>
-        </div>
-        <div className="icai-result-list">
-          {status.sourceResults.map((result) => (
-            <article key={result.sourceId}>
-              <span>
-                <i className={`is-${result.state}`} />
+          <div>
+            <span>Sources</span>
+            <strong>{run.processed}/{run.total}</strong>
+          </div>
+          <div>
+            <span>Item failures</span>
+            <strong>{failedItems.length}</strong>
+          </div>
+          <div>
+            <span>Retry eligible</span>
+            <strong>{retryableItems.length}</strong>
+          </div>
+        </section>
+      ) : null}
+
+      {status.sourceResults.length ? (
+        <section className="icai-section">
+          <div className="icai-section-heading">
+            <div>
+              <span className="eyebrow">Source-by-source status</span>
+              <h2>Current fetch results</h2>
+            </div>
+            <Badge tone="neutral">{status.sourceResults.length} sources</Badge>
+          </div>
+          <div className="icai-result-list">
+            {status.sourceResults.map((result) => (
+              <article key={result.sourceId}>
                 <span>
-                  <strong>{result.sourceName}</strong>
-                  <small>{result.error ?? (result.fetchedAt ? `Fetched ${elapsed(result.fetchedAt, status.observedAt)} ago` : "Awaiting result")}</small>
+                  <i className={`is-${result.state}`} />
+                  <span>
+                    <strong>{result.sourceName}</strong>
+                    <small>
+                      {result.error ??
+                        (result.fetchedAt
+                          ? `Fetched ${elapsed(result.fetchedAt, status.observedAt)} ago`
+                          : "Awaiting result")}
+                    </small>
+                  </span>
                 </span>
-              </span>
-              <span>
-                <Badge tone={tone(result.state)}>{result.state.replaceAll("_", " ")}</Badge>
-                <small>{result.httpStatus ? `HTTP ${result.httpStatus}` : "No response yet"}</small>
-                <small>{result.parsedItemCount === null ? "—" : `${result.parsedItemCount} items`}</small>
-              </span>
-            </article>
-          ))}
-        </div>
-      </section>
+                <span>
+                  <Badge tone={tone(result.state)}>
+                    {result.state.replaceAll("_", " ")}
+                  </Badge>
+                  <small>
+                    {result.httpStatus
+                      ? `HTTP ${result.httpStatus}`
+                      : "No response yet"}
+                  </small>
+                  <small>
+                    {result.parsedItemCount === null
+                      ? "—"
+                      : `${result.parsedItemCount} items`}
+                  </small>
+                  <a href={result.officialUrl} target="_blank" rel="noreferrer">
+                    Official source
+                  </a>
+                </span>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {status.itemResults.length ? (
+        <section className="icai-section">
+          <div className="icai-section-heading">
+            <div>
+              <span className="eyebrow">Per-item isolation</span>
+              <h2>Files and links</h2>
+              <p className="icai-muted">
+                Every discovered academic item receives a terminal result. One failed
+                item cannot stop safe items from the same source.
+              </p>
+            </div>
+            <Badge tone={failedItems.length ? "warning" : "success"}>
+              {failedItems.length ? `${failedItems.length} problem items` : "all terminal"}
+            </Badge>
+          </div>
+
+          {!status.active && status.runId && retryableItems.length ? (
+            <div className="icai-runtime-actions">
+              <form action={retryIcaiItemsAction}>
+                <input type="hidden" name="runId" value={status.runId} />
+                <input type="hidden" name="mode" value="failed" />
+                <button className="ui-button ui-button--primary">
+                  Retry failed items only
+                </button>
+              </form>
+              {timedOutItems.length ? (
+                <form action={retryIcaiItemsAction}>
+                  <input type="hidden" name="runId" value={status.runId} />
+                  <input type="hidden" name="mode" value="timed_out" />
+                  <button className="ui-button">Retry timed-out items only</button>
+                </form>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="icai-result-list">
+            {status.itemResults.map((item) => (
+              <article key={item.id}>
+                <span>
+                  <i className={`is-${item.status}`} />
+                  <span>
+                    <strong>{item.itemTitle ?? item.itemType}</strong>
+                    <small>{item.sourceName}</small>
+                    <a href={item.itemUrl} target="_blank" rel="noreferrer">
+                      {item.itemUrl}
+                    </a>
+                    {item.failureMessage || item.skipReason ? (
+                      <small className="icai-inline-error">
+                        {item.failureMessage ?? item.skipReason}
+                      </small>
+                    ) : null}
+                    {item.adminNote ? (
+                      <small>Admin note: {item.adminNote}</small>
+                    ) : null}
+                  </span>
+                </span>
+                <span>
+                  <Badge tone={tone(item.status)}>
+                    {item.status.replaceAll("_", " ")}
+                  </Badge>
+                  <small>Stage: {item.stage.replaceAll("_", " ")}</small>
+                  <small>Attempt {item.attempts}</small>
+                  <small>{durationMs(item.durationMs)}</small>
+                  <small>{item.parsedCount} parsed</small>
+                  {item.failureCategory ? (
+                    <small>Category: {item.failureCategory}</small>
+                  ) : null}
+                  <div className="icai-runtime-actions">
+                    <CopyUrlButton url={item.itemUrl} />
+                    {!status.active && status.runId && item.retryEligible ? (
+                      <form action={retryIcaiItemsAction}>
+                        <input type="hidden" name="runId" value={status.runId} />
+                        <input type="hidden" name="mode" value="item" />
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <button className="ui-button ui-button--sm">
+                          Retry item
+                        </button>
+                      </form>
+                    ) : null}
+                  </div>
+                </span>
+
+                <details className="icai-diagnostic-details">
+                  <summary>Item controls & technical details</summary>
+                  <p className="icai-muted">
+                    HTTP {item.httpStatus ?? "—"} · {item.bytesFetched} bytes · retry {item.retryEligible ? "eligible" : "not eligible"}
+                  </p>
+                  {item.failureMessage ? <pre>{item.failureMessage}</pre> : null}
+
+                  <form action={manageIcaiItemAction} className="icai-runtime-actions">
+                    <input type="hidden" name="action" value="note" />
+                    <input type="hidden" name="runId" value={status.runId ?? ""} />
+                    <input type="hidden" name="itemId" value={item.id} />
+                    <input type="hidden" name="sourceId" value={item.sourceId} />
+                    <input
+                      name="reason"
+                      maxLength={2000}
+                      placeholder="Administrative note"
+                      required
+                    />
+                    <button className="ui-button ui-button--sm">Save note</button>
+                  </form>
+
+                  <form action={manageIcaiItemAction} className="icai-runtime-actions">
+                    <input type="hidden" name="action" value="exclude_temp" />
+                    <input type="hidden" name="runId" value={status.runId ?? ""} />
+                    <input type="hidden" name="itemId" value={item.id} />
+                    <input type="hidden" name="sourceId" value={item.sourceId} />
+                    <input type="number" name="hours" min="1" max="168" defaultValue="24" />
+                    <input name="reason" maxLength={2000} placeholder="Temporary exclusion reason" required />
+                    <input name="confirmation" placeholder="Type IGNORE" required />
+                    <button className="ui-button ui-button--sm">Ignore temporarily</button>
+                  </form>
+
+                  <form action={manageIcaiItemAction} className="icai-runtime-actions">
+                    <input type="hidden" name="action" value="exclude_permanent" />
+                    <input type="hidden" name="runId" value={status.runId ?? ""} />
+                    <input type="hidden" name="itemId" value={item.id} />
+                    <input type="hidden" name="sourceId" value={item.sourceId} />
+                    <input name="reason" maxLength={2000} placeholder="Permanent exclusion reason" required />
+                    <input name="confirmation" placeholder="Type IGNORE" required />
+                    <input name="permanentConfirmation" placeholder="Type PERMANENT" required />
+                    <input name="ownerConfirmation" placeholder="High-impact only: type OWNER" />
+                    <button className="ui-button ui-button--sm">Permanent exclusion</button>
+                  </form>
+                </details>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {status.latestFailure || pollError ? (
         <section className="icai-section">
@@ -289,6 +608,10 @@ export function SyncLiveRefresh({
             <Badge tone="danger">attention</Badge>
           </div>
         </section>
+      ) : null}
+
+      {!status.active && currentSource ? (
+        <p className="icai-muted">Last source: {currentSource.sourceName}</p>
       ) : null}
     </div>
   );
