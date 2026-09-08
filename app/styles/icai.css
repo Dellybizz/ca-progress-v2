@@ -390,6 +390,23 @@
   background: var(--color-info);
   transition: width 0.3s ease;
 }
+
+.icai-runtime-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.icai-runtime-panel > a {
+  color: var(--color-primary, #4f46e5);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.icai-runtime-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
 .icai-inline-error {
   padding: var(--space-3);
   border-radius: var(--radius-sm);

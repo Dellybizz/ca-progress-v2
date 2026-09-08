@@ -5,6 +5,7 @@ import { SyncLiveRefresh } from "./sync-live-refresh";
 import type { AppRole } from "@/lib/authorization/roles";
 import type { IcaiAdminDashboard } from "@/lib/icai/types";
 import {
+  controlIcaiSyncAction,
   decideIcaiReviewAction,
   runIcaiSyncAction,
 } from "@/app/(admin)/admin/icai-sync/actions";
@@ -59,6 +60,26 @@ export function IcaiAdminSyncMonitor({
   const percent = total
     ? Math.min(100, Math.round((processed / total) * 100))
     : 0;
+  const runtime = dashboard.runtime;
+  const stageProgress: Record<string, number> = {
+    acquiring_lock: 2,
+    selecting_sources: 5,
+    fetching: 15,
+    validating: 30,
+    parsing: 50,
+    comparing: 70,
+    writing: 90,
+    finalizing: 98,
+    completed: 100,
+    partial: 100,
+    failed: 100,
+    cancelled: 100,
+  };
+  const stagePercent = runtime ? (stageProgress[runtime.stage] ?? 0) : 0;
+  const stale = Boolean(active && runtime?.stale);
+  const currentSource = dashboard.sources.find(
+    (source) => source.id === runtime?.currentSourceId,
+  );
   return (
     <div className="icai-page icai-admin-page">
       <SyncLiveRefresh active={active} />
@@ -140,6 +161,78 @@ export function IcaiAdminSyncMonitor({
           {dashboard.activeJob.lastError ? (
             <p className="icai-inline-error">{dashboard.activeJob.lastError}</p>
           ) : null}
+        </section>
+      ) : null}
+
+      {active && run && runtime ? (
+        <section className="icai-section icai-runtime-panel">
+          <div className="icai-section-heading">
+            <div>
+              <span className="eyebrow">Live worker state</span>
+              <h2>{runtime.stage.replaceAll("_", " ")}</h2>
+              <p className="icai-muted">
+                {currentSource?.name ?? "Preparing sources"} · stage running for{" "}
+                {duration(runtime.stageStartedAt, null)} · heartbeat{" "}
+                {duration(runtime.heartbeatAt, null)} ago
+              </p>
+            </div>
+            <Badge tone={stale ? "danger" : "info"}>
+              {stale ? "stalled" : "live"}
+            </Badge>
+          </div>
+          <div
+            className="icai-progress"
+            aria-label="Current source stage progress"
+          >
+            <i style={{ width: `${stagePercent}%` }} />
+          </div>
+          <p className="icai-muted">
+            Current source stage {stagePercent}% · overall run {percent}% (
+            {processed}/{total} sources)
+          </p>
+          {runtime.currentItemUrl ? (
+            <a href={runtime.currentItemUrl} target="_blank" rel="noreferrer">
+              {runtime.currentItemUrl}
+            </a>
+          ) : null}
+          {stale ? (
+            <div className="auth-status auth-status--danger" role="alert">
+              No heartbeat has been received for more than two minutes. The run
+              can be safely recovered; previously verified data is unchanged.
+            </div>
+          ) : null}
+          <div className="icai-runtime-actions">
+            <form action={controlIcaiSyncAction}>
+              <input type="hidden" name="runId" value={run.id} />
+              <input type="hidden" name="intent" value="skip" />
+              <button
+                className="ui-button"
+                disabled={
+                  !runtime.currentSourceId || runtime.skipSourceRequested
+                }
+              >
+                {runtime.skipSourceRequested
+                  ? "Skip requested"
+                  : "Skip current source"}
+              </button>
+            </form>
+            <form action={controlIcaiSyncAction}>
+              <input type="hidden" name="runId" value={run.id} />
+              <input type="hidden" name="intent" value="cancel" />
+              <button className="ui-button" disabled={runtime.cancelRequested}>
+                {runtime.cancelRequested ? "Cancel requested" : "Cancel run"}
+              </button>
+            </form>
+            {stale ? (
+              <form action={controlIcaiSyncAction}>
+                <input type="hidden" name="runId" value={run.id} />
+                <input type="hidden" name="intent" value="recover" />
+                <button className="ui-button ui-button--primary">
+                  Recover stalled run
+                </button>
+              </form>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
