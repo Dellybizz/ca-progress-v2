@@ -57,6 +57,8 @@ jobs:
         run: npm run lint
       - name: Focused ICAI Phase 4 verification
         run: npm run test:icai:phase4
+      - name: Focused ICAI Phase 5 verification
+        run: npm run test:icai:phase5
       - name: Validate retained D1 hot-query indexes
         run: npm run d1:hot-indexes:validate
       - name: Repository tests
@@ -170,6 +172,18 @@ jobs:
 
       - name: Deploy web runtime
         run: npm run cf:deploy:web
+
+      - name: ICAI Phase 5 live pipeline proof
+        shell: bash
+        run: |
+          set +e
+          node scripts/verify-icai-phase5-live.mjs
+          result=$?
+          if [ "$result" -ne 0 ]; then
+            npx wrangler rollback --name ca-progress-v2-icai-sync --message "Automated rollback after failed ICAI Phase 5 live proof" || true
+            npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after failed ICAI Phase 5 live proof" || true
+            exit "$result"
+          fi
 
       - name: Verify deployment and rollback web runtime on failure
         shell: bash
