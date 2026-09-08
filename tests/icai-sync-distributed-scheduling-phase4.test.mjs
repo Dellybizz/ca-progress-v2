@@ -21,8 +21,8 @@ async function loadScheduler() {
   }).outputText;
   const file = join(dir, "scheduler.mjs");
   writeFileSync(file, output);
-  const module = await import(`${pathToFileURL(file).href}?v=${Date.now()}`);
-  return { module, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  const scheduler = await import(`${pathToFileURL(file).href}?v=${Date.now()}`);
+  return { scheduler, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 }
 
 function d1(db) {
@@ -98,11 +98,11 @@ function schedulerDb() {
 }
 
 test("Phase 4 scheduler dispatches only due work, caps windows, defers overlap, and keeps failures due", async () => {
-  const { module, cleanup } = await loadScheduler();
+  const { scheduler, cleanup } = await loadScheduler();
   const db = schedulerDb();
   const cloudDb = d1(db);
   try {
-    const foundationWindow = await module.selectIcaiScheduledDispatch(
+    const foundationWindow = await scheduler.selectIcaiScheduledDispatch(
       cloudDb,
       "2030-01-01T02:30:00.000Z",
     );
@@ -113,7 +113,7 @@ test("Phase 4 scheduler dispatches only due work, caps windows, defers overlap, 
     assert.equal(foundationWindow.sourceIds.includes("intermediate"), false, "an unrelated not-selected group must not be fetched");
 
     const beforeSuccess = db.prepare("SELECT next_due_at FROM icai_source_schedule WHERE source_id='foundation'").get().next_due_at;
-    await module.recordIcaiSourceScheduleResult(cloudDb, "foundation", {
+    await scheduler.recordIcaiSourceScheduleResult(cloudDb, "foundation", {
       success: true,
       completedAt: "2030-01-01T02:31:00.000Z",
       durationMs: 1250,
@@ -128,7 +128,7 @@ test("Phase 4 scheduler dispatches only due work, caps windows, defers overlap, 
     assert.equal(success.last_item_count, 12);
 
     const beforeFailure = db.prepare("SELECT next_due_at FROM icai_source_schedule WHERE source_id='exam-dates'").get().next_due_at;
-    await module.recordIcaiSourceScheduleResult(cloudDb, "exam-dates", {
+    await scheduler.recordIcaiSourceScheduleResult(cloudDb, "exam-dates", {
       success: false,
       completedAt: "2030-01-01T02:32:00.000Z",
       durationMs: 900,
@@ -137,7 +137,7 @@ test("Phase 4 scheduler dispatches only due work, caps windows, defers overlap, 
     assert.equal(afterFailure, beforeFailure, "failed sources must remain due instead of being pushed into the future");
 
     db.prepare("INSERT INTO icai_sync_runs(id,status) VALUES('active-run','running')").run();
-    const deferred = await module.selectIcaiScheduledDispatch(
+    const deferred = await scheduler.selectIcaiScheduledDispatch(
       cloudDb,
       "2030-01-01T04:30:00.000Z",
     );
@@ -151,13 +151,13 @@ test("Phase 4 scheduler dispatches only due work, caps windows, defers overlap, 
 });
 
 test("Phase 4 retry and manual selectors isolate only requested work", async () => {
-  const { module, cleanup } = await loadScheduler();
+  const { scheduler, cleanup } = await loadScheduler();
   const db = schedulerDb();
   const cloudDb = d1(db);
   try {
     db.prepare(`INSERT INTO icai_sync_items(id,run_id,source_id,status,retry_eligible,completed_at)
       VALUES('failed-item','origin-run','intermediate','failed',1,'2030-01-01T11:00:00.000Z')`).run();
-    const retryWindow = await module.selectIcaiScheduledDispatch(
+    const retryWindow = await scheduler.selectIcaiScheduledDispatch(
       cloudDb,
       "2030-01-01T12:30:00.000Z",
     );
@@ -167,14 +167,14 @@ test("Phase 4 retry and manual selectors isolate only requested work", async () 
     assert.equal(retryWindow.retryRunId, "origin-run");
     assert.equal(retryWindow.retryMode, "failed");
 
-    const group = await module.selectIcaiManualDispatch(cloudDb, {
+    const group = await scheduler.selectIcaiManualDispatch(cloudDb, {
       mode: "group",
       value: "foundation",
       now: "2030-01-01T00:00:00.000Z",
     });
     assert.deepEqual(group.sourceIds, ["foundation"]);
 
-    const source = await module.selectIcaiManualDispatch(cloudDb, {
+    const source = await scheduler.selectIcaiManualDispatch(cloudDb, {
       mode: "source",
       value: "intermediate",
       now: "2030-01-01T00:00:00.000Z",
