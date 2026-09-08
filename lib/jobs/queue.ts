@@ -19,7 +19,7 @@ export type BackgroundJob = {
   createdBy?: string | null;
 };
 
-type QueueProducer = { send(body: BackgroundJob): Promise<void> };
+type QueueProducer = { send(body: BackgroundJob, options?: { delaySeconds?: number }): Promise<void> };
 
 function producer(): QueueProducer | null {
   try {
@@ -36,6 +36,7 @@ export async function enqueueBackgroundJob(input: {
   idempotencyKey: string;
   payload?: Record<string, unknown>;
   createdBy?: string | null;
+  delaySeconds?: number;
 }) {
   const job: BackgroundJob = {
     id: crypto.randomUUID(),
@@ -46,7 +47,8 @@ export async function enqueueBackgroundJob(input: {
   };
   const queue = producer();
   if (!queue) throw new Error("Background job queue is unavailable.");
-  await queue.send(job);
+  const delaySeconds = input.delaySeconds == null ? undefined : Math.max(0, Math.min(86_400, Math.trunc(input.delaySeconds)));
+  await queue.send(job, delaySeconds == null ? undefined : { delaySeconds });
   return job;
 }
 

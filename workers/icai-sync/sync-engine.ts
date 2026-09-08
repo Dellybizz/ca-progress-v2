@@ -475,6 +475,223 @@ async function acquireRun(
   return row.id;
 }
 
+
+export type IcaiSyncContinuationStart = {
+  runId: string;
+  sourceIds: string[];
+};
+
+export type IcaiSyncContinuationSourceResult = {
+  runId: string;
+  sourceId: string;
+  status: "succeeded" | "failed" | "skipped" | "cancelled";
+  requestIntervalSeconds: number;
+  alreadyComplete: boolean;
+};
+
+function parseDetails(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    } catch { return {}; }
+  }
+  return {};
+}
+
+async function ensureContinuationSourceStates(runtime: IcaiSyncRuntime, runId: string, sourceIds: string[]) {
+  if (!sourceIds.length) return;
+  await runtime.db.batch(sourceIds.map((sourceId, sourceIndex) =>
+    runtime.db.prepare("INSERT OR IGNORE INTO icai_sync_source_states(run_id,source_id,source_index,status,attempts,updated_at) VALUES(?1,?2,?3,'pending',0,CURRENT_TIMESTAMP)")
+      .bind(runId, sourceId, sourceIndex)
+  ));
+}
+
+async function continuationSources(client: AdminClient) {
+  const response = await client.from("icai_sources").select("*").eq("is_active", true).order("id");
+  if (response.error) throw response.error;
+  const sources = ((response.data ?? []) as SourceRow[]).map(sourceDto);
+  if (!sources.length) throw new Error("No active ICAI sources are configured.");
+  return sources;
+}
+
+export async function startIcaiSyncContinuationEngine(
+  runtime: IcaiSyncRuntime,
+  { trigger, requestedBy = null, orchestrationKey }: {
+    trigger: "cron" | "manual" | "test";
+    requestedBy?: string | null;
+    orchestrationKey: string;
+  },
+): Promise<IcaiSyncContinuationStart> {
+  if (!runtime.enabled) throw new Error("ICAI synchronization is disabled for this environment.");
+  await recoverStaleRuns(runtime.db);
+  const client = adminClient(runtime);
+  const sources = await continuationSources(client);
+  const sourceIds = sources.map((source) => source.id);
+
+  const active = await runtime.db.prepare("SELECT id,details FROM icai_sync_runs WHERE status IN ('queued','running') ORDER BY started_at DESC LIMIT 1")
+    .first<{ id: string; details: unknown }>();
+  if (active) {
+    const details = parseDetails(active.details);
+    if (details.orchestration_key === orchestrationKey) {
+      const storedSourceIds = stringArray(details.source_ids);
+      const effectiveSourceIds = storedSourceIds.length ? storedSourceIds : sourceIds;
+      await ensureContinuationSourceStates(runtime, active.id, effectiveSourceIds);
+      return { runId: active.id, sourceIds: effectiveSourceIds };
+    }
+    throw new IcaiSyncAlreadyRunningError();
+  }
+
+  const runId = crypto.randomUUID();
+  const startedAt = new Date().toISOString();
+  const details = JSON.stringify({
+    engine: "phase8",
+    execution: "queue_continuation",
+    persistence: "cloudflare-d1",
+    orchestration_key: orchestrationKey,
+    source_ids: sourceIds,
+  });
+  const inserted = await runtime.db.prepare("INSERT INTO icai_sync_runs(id,trigger_type,requested_by,parser_version,status,started_at,source_total,details) SELECT ?1,?2,?3,?4,'running',?5,?6,?7 WHERE NOT EXISTS (SELECT 1 FROM icai_sync_runs WHERE status IN ('queued','running')) RETURNING id")
+    .bind(runId, trigger, requestedBy, PARSER_VERSION, startedAt, sourceIds.length, details)
+    .first<{ id: string }>();
+  if (!inserted) {
+    const retryActive = await runtime.db.prepare("SELECT id,details FROM icai_sync_runs WHERE status IN ('queued','running') ORDER BY started_at DESC LIMIT 1")
+      .first<{ id: string; details: unknown }>();
+    const retryDetails = parseDetails(retryActive?.details);
+    if (retryActive && retryDetails.orchestration_key === orchestrationKey) {
+      const storedSourceIds = stringArray(retryDetails.source_ids);
+      const effectiveSourceIds = storedSourceIds.length ? storedSourceIds : sourceIds;
+      await ensureContinuationSourceStates(runtime, retryActive.id, effectiveSourceIds);
+      return { runId: retryActive.id, sourceIds: effectiveSourceIds };
+    }
+    throw new IcaiSyncAlreadyRunningError();
+  }
+  await ensureContinuationSourceStates(runtime, runId, sourceIds);
+  await initializeRuntime(runtime.db, runId);
+  return { runId, sourceIds };
+}
+
+export async function runIcaiSyncContinuationSource(
+  runtime: IcaiSyncRuntime,
+  { runId, sourceId }: { runId: string; sourceId: string },
+): Promise<IcaiSyncContinuationSourceResult> {
+  if (!runtime.enabled) throw new Error("ICAI synchronization is disabled for this environment.");
+  const client = adminClient(runtime);
+  const [sourceResponse, levelResponse, subjectResponse, attemptResponse] = await Promise.all([
+    client.from("icai_sources").select("*").eq("id", sourceId).eq("is_active", true).single(),
+    client.from("course_levels").select("*").eq("is_active", true),
+    client.from("subjects").select("*").eq("is_active", true),
+    client.from("exam_attempts").select("*").eq("verification_status", "verified"),
+  ]);
+  const firstError = [sourceResponse.error, levelResponse.error, subjectResponse.error, attemptResponse.error].find(Boolean);
+  if (firstError) throw firstError;
+  if (!sourceResponse.data) throw new Error(`ICAI source ${sourceId} is not active or does not exist.`);
+  const source = sourceDto(sourceResponse.data as SourceRow);
+  const state = await runtime.db.prepare("SELECT status FROM icai_sync_source_states WHERE run_id=?1 AND source_id=?2 LIMIT 1")
+    .bind(runId, sourceId).first<{ status: string }>();
+  if (!state) throw new Error(`ICAI continuation source state is missing for ${sourceId}.`);
+  if (["succeeded", "failed", "skipped", "cancelled"].includes(state.status)) {
+    return {
+      runId,
+      sourceId,
+      status: state.status as IcaiSyncContinuationSourceResult["status"],
+      requestIntervalSeconds: source.requestIntervalSeconds,
+      alreadyComplete: true,
+    };
+  }
+  const run = await runtime.db.prepare("SELECT status FROM icai_sync_runs WHERE id=?1 LIMIT 1").bind(runId).first<{ status: string }>();
+  if (!run) throw new Error(`ICAI sync run ${runId} does not exist.`);
+  if (run.status === "cancelled") {
+    await runtime.db.prepare("UPDATE icai_sync_source_states SET status='cancelled',finished_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2").bind(runId, sourceId).run();
+    return { runId, sourceId, status: "cancelled", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
+  }
+  if (run.status !== "running") throw new Error(`ICAI sync run ${runId} is not running (status=${run.status}).`);
+  await runtime.db.prepare("UPDATE icai_sync_source_states SET status='running',attempts=attempts+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2")
+    .bind(runId, sourceId).run();
+  try {
+    await processSource(
+      client,
+      runtime,
+      runId,
+      source,
+      (levelResponse.data ?? []) as LevelRow[],
+      (subjectResponse.data ?? []) as SubjectRow[],
+      (attemptResponse.data ?? []) as AttemptRow[],
+    );
+    await runtime.db.prepare("UPDATE icai_sync_source_states SET status='succeeded',finished_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2")
+      .bind(runId, sourceId).run();
+    return { runId, sourceId, status: "succeeded", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
+  } catch (error) {
+    if (error instanceof SyncCancelledError) {
+      const message = asErrorMessage(error).slice(0, 2000);
+      await runtime.db.batch([
+        runtime.db.prepare("UPDATE icai_sync_runs SET status='cancelled',completed_at=CURRENT_TIMESTAMP,error_summary=?1 WHERE id=?2").bind(message, runId),
+        runtime.db.prepare("UPDATE icai_sync_source_states SET status='cancelled',finished_at=CURRENT_TIMESTAMP,last_error=?1,updated_at=CURRENT_TIMESTAMP WHERE run_id=?2 AND source_id=?3").bind(message, runId, sourceId),
+      ]);
+      await setStage(runtime.db, runId, "cancelled");
+      return { runId, sourceId, status: "cancelled", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
+    }
+    const skipped = error instanceof SyncSourceSkippedError;
+    const message = skipped
+      ? "Skipped by an administrator. Last verified data was preserved."
+      : asErrorMessage(error);
+    const { error: failureError } = await client.rpc("icai_sync_mark_source_failure", {
+      p_run_id: runId,
+      p_source_id: source.id,
+      p_error: message,
+    });
+    if (failureError) throw failureError;
+    await runtime.db.prepare("UPDATE icai_sync_source_states SET status=?1,finished_at=CURRENT_TIMESTAMP,last_error=?2,updated_at=CURRENT_TIMESTAMP WHERE run_id=?3 AND source_id=?4")
+      .bind(skipped ? "skipped" : "failed", message.slice(0, 2000), runId, sourceId).run();
+    return { runId, sourceId, status: skipped ? "skipped" : "failed", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
+  }
+}
+
+function summaryFromRun(runId: string, result: RunRow, status: IcaiSyncSummary["status"]): IcaiSyncSummary {
+  return {
+    runId,
+    status,
+    sourceTotal: Number(result.source_total),
+    sourceSucceeded: Number(result.source_succeeded),
+    sourceFailed: Number(result.source_failed),
+    newItems: Number(result.new_items),
+    changedItems: Number(result.changed_items),
+    unchangedItems: Number(result.unchanged_items),
+    removedItems: Number(result.removed_items),
+    pendingReviews: Number(result.pending_reviews),
+  };
+}
+
+export async function finalizeIcaiSyncContinuationEngine(
+  runtime: IcaiSyncRuntime,
+  { runId }: { runId: string },
+): Promise<IcaiSyncSummary> {
+  const client = adminClient(runtime);
+  const incomplete = await runtime.db.prepare("SELECT COUNT(*) AS count FROM icai_sync_source_states WHERE run_id=?1 AND status IN ('pending','running')")
+    .bind(runId).first<{ count: number }>();
+  if (Number(incomplete?.count ?? 0) > 0) throw new Error("ICAI continuation cannot finalize while source work is still pending.");
+  const { data: finalRun, error: finalReadError } = await client.from("icai_sync_runs").select("*").eq("id", runId).single();
+  if (finalReadError || !finalRun) throw finalReadError ?? new Error("Could not finalize ICAI sync run.");
+  const row = finalRun as unknown as RunRow & { status?: string };
+  if (row.status === "success" || row.status === "partial" || row.status === "failed") {
+    return summaryFromRun(runId, row, row.status);
+  }
+  if (row.status === "cancelled") throw new SyncCancelledError();
+  await setStage(runtime.db, runId, "finalizing");
+  await checkpoint(runtime.db, runId);
+  const status: IcaiSyncSummary["status"] = row.source_failed === 0
+    ? "success"
+    : row.source_succeeded > 0
+      ? "partial"
+      : "failed";
+  const { error: finishError } = await client.from("icai_sync_runs")
+    .update({ status, completed_at: new Date().toISOString() }).eq("id", runId);
+  if (finishError) throw finishError;
+  await setStage(runtime.db, runId, status === "success" ? "completed" : status);
+  return summaryFromRun(runId, row, status);
+}
+
 export async function runIcaiSyncEngine(
   runtime: IcaiSyncRuntime,
   {

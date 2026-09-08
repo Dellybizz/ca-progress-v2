@@ -70,6 +70,29 @@ async function waitForJobs(keys) {
   throw new Error(`Phase 5 queue jobs did not both reach succeeded state within ${(JOB_POLL_ATTEMPTS * JOB_POLL_INTERVAL_MS) / 1000} seconds.`);
 }
 
+async function waitForIcaiContinuation(startedAt) {
+  for (let attempt = 0; attempt < JOB_POLL_ATTEMPTS; attempt += 1) {
+    const realRuns = d1(`SELECT id,status,trigger_type,parser_version,started_at,completed_at,source_total,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary FROM icai_sync_runs WHERE trigger_type='manual' AND parser_version='phase8.1' AND started_at >= ${sqlText(startedAt)} ORDER BY started_at DESC LIMIT 1;`);
+    const realRun = realRuns[0];
+    if (realRun) {
+      const childJobs = d1(`SELECT idempotency_key,status,attempts,last_error,payload_json,started_at,finished_at FROM background_jobs WHERE job_type='icai-sync' AND json_extract(payload_json,'$.mode')='source' AND json_extract(payload_json,'$.runId')=${sqlText(realRun.id)} ORDER BY idempotency_key;`);
+      writeFileSync(`${evidenceDir}/icai-phase5-source-jobs.json`, JSON.stringify(childJobs, null, 2));
+      const deadLetter = childJobs.find((row) => row.status === "dead_letter");
+      if (deadLetter) throw new Error(`Phase 5 ICAI source continuation dead-lettered: ${deadLetter.idempotency_key}: ${deadLetter.last_error ?? "unknown error"}`);
+      if (["failed", "cancelled"].includes(realRun.status)) throw new Error(`Phase 5 real ICAI continuation ended ${realRun.status}: ${realRun.error_summary ?? "unknown error"}`);
+      const sourceTotal = Number(realRun.source_total);
+      if (["success", "partial"].includes(realRun.status) && childJobs.length === sourceTotal && childJobs.every((row) => row.status === "succeeded")) {
+        const sourceStates = d1(`SELECT source_id,source_index,status,attempts,last_error,started_at,finished_at FROM icai_sync_source_states WHERE run_id=${sqlText(realRun.id)} ORDER BY source_index;`);
+        writeFileSync(`${evidenceDir}/icai-phase5-source-states.json`, JSON.stringify(sourceStates, null, 2));
+        if (sourceStates.length !== sourceTotal || sourceStates.some((row) => !["succeeded", "failed", "skipped"].includes(row.status))) throw new Error("Phase 5 continuation source states are incomplete.");
+        return { realRun, childJobs, sourceStates };
+      }
+    }
+    await sleep(JOB_POLL_INTERVAL_MS);
+  }
+  throw new Error(`Phase 5 ICAI continuation did not reach a verified terminal state within ${(JOB_POLL_ATTEMPTS * JOB_POLL_INTERVAL_MS) / 1000} seconds.`);
+}
+
 const internalAttempt = await fetch(`${baseUrl}/api/internal/background-jobs`, {
   method: "POST",
   headers: { "content-type": "application/json", "x-ca-progress-internal": "ca-progress-v2-background-job" },
@@ -103,13 +126,11 @@ await publish(queue.queue_id, {
 }, "icai-phase5-review-push.json");
 
 await waitForJobs([reviewKey, syncKey]);
-
-const realRuns = d1(`SELECT id,status,trigger_type,parser_version,started_at,completed_at,source_total,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary FROM icai_sync_runs WHERE trigger_type='manual' AND parser_version='phase8.1' AND started_at >= ${sqlText(startedAt)} ORDER BY started_at DESC LIMIT 1;`);
-const realRun = realRuns[0];
-if (!realRun) throw new Error("Phase 5 could not find the queue-triggered ICAI sync run in D1.");
-if (!["success", "partial"].includes(realRun.status) || Number(realRun.source_succeeded) < 1) {
+const { realRun, childJobs } = await waitForIcaiContinuation(startedAt);
+if (Number(realRun.source_succeeded) < 1) {
   throw new Error(`Phase 5 real ICAI sync did not verify an official source: status=${realRun.status}, succeeded=${realRun.source_succeeded}, failed=${realRun.source_failed}.`);
 }
+if (childJobs.length !== Number(realRun.source_total)) throw new Error("Phase 5 did not persist exactly one bounded source job per configured source.");
 writeFileSync(`${evidenceDir}/icai-phase5-real-run.json`, JSON.stringify(realRun, null, 2));
 
 const snapshots = d1(`SELECT ss.id,ss.source_id,ss.fetched_at,ss.http_status,ss.canonical_hash,ss.parsed_item_count,s.official_url FROM icai_source_snapshots ss JOIN icai_sources s ON s.id=ss.source_id WHERE ss.run_id=${sqlText(realRun.id)} ORDER BY ss.source_id;`);

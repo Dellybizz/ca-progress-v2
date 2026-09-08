@@ -81,3 +81,30 @@ test("Phase 5 is a permanent focused gate in CI, retirement closure and deployme
   assert.match(deployment, /rollback --name ca-progress-v2-icai-sync/);
   assert.match(deployment, /rollback --name ca-progress-v2/);
 });
+
+
+test("Phase 5 queue sync is bounded into sequential per-source continuation jobs", () => {
+  const execute = read("lib/jobs/execute.ts");
+  const queue = read("lib/jobs/queue.ts");
+  const engine = read("workers/icai-sync/sync-engine.ts");
+  const service = read("workers/icai-sync/index.ts");
+  const migration = read("d1/migrations/0028_icai_sync_continuation.sql");
+  const live = read("scripts/verify-icai-phase5-live.mjs");
+  assert.match(execute, /mode === "source"/);
+  assert.match(execute, /startIcaiSyncContinuation/);
+  assert.match(execute, /runIcaiSyncSource/);
+  assert.match(execute, /finalizeIcaiSyncContinuation/);
+  assert.match(execute, /icai-sync-source:\$\{started\.runId\}:0:/);
+  assert.match(execute, /delaySeconds: result\.requestIntervalSeconds/);
+  assert.match(queue, /delaySeconds\?: number/);
+  assert.match(engine, /startIcaiSyncContinuationEngine/);
+  assert.match(engine, /runIcaiSyncContinuationSource/);
+  assert.match(engine, /finalizeIcaiSyncContinuationEngine/);
+  assert.match(engine, /orchestration_key/);
+  assert.match(service, /"\/start","\/source","\/finalize"/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS icai_sync_source_states/);
+  assert.match(migration, /PRIMARY KEY\(run_id, source_id\)/);
+  assert.match(live, /json_extract\(payload_json,'\$\.mode'\)='source'/);
+  assert.match(live, /icai_sync_source_states/);
+  assert.match(live, /childJobs\.length === sourceTotal/);
+});

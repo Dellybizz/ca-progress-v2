@@ -2,21 +2,54 @@ import "server-only";
 
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { getResourceR2Bucket } from "@/lib/resources/r2";
-import { runIcaiSync } from "@/lib/icai/sync";
+import { finalizeIcaiSyncContinuation, runIcaiSyncSource, startIcaiSyncContinuation } from "@/lib/icai/sync";
 import { runIcaiPhase5ReviewProbe } from "@/lib/icai/phase5";
 import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
-import type { BackgroundJob } from "./queue";
+import { enqueueBackgroundJob, type BackgroundJob } from "./queue";
 
 function db(): HotD1Database { return getHotD1Database(); }
 function json(value: unknown) { return JSON.stringify(value ?? {}); }
 
 export async function executeBackgroundJob(job: BackgroundJob) {
   switch (job.type) {
-    case "icai-sync":
-      return runIcaiSync({
-        trigger: job.payload.trigger === "manual" ? "manual" : "cron",
-        requestedBy: typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null,
+    case "icai-sync": {
+      const mode = job.payload.mode;
+      if (mode === "source") {
+        const runId = typeof job.payload.runId === "string" ? job.payload.runId : null;
+        const sourceIds = Array.isArray(job.payload.sourceIds) ? job.payload.sourceIds.filter((value): value is string => typeof value === "string") : [];
+        const sourceIndex = Number(job.payload.sourceIndex);
+        if (!runId || !Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sourceIds.length) throw new Error("Invalid ICAI source continuation payload.");
+        const sourceId = sourceIds[sourceIndex];
+        const result = await runIcaiSyncSource({ runId, sourceId });
+        if (result.status === "cancelled") return result;
+        const nextIndex = sourceIndex + 1;
+        if (nextIndex < sourceIds.length) {
+          const nextSourceId = sourceIds[nextIndex];
+          await enqueueBackgroundJob({
+            type: "icai-sync",
+            idempotencyKey: `icai-sync-source:${runId}:${nextIndex}:${nextSourceId}`,
+            payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex: nextIndex },
+            createdBy: job.createdBy ?? null,
+            delaySeconds: result.requestIntervalSeconds,
+          });
+          return { ...result, nextSourceId };
+        }
+        const summary = await finalizeIcaiSyncContinuation({ runId });
+        return { ...result, summary };
+      }
+      const trigger = job.payload.trigger === "manual" ? "manual" : job.payload.trigger === "test" ? "test" : "cron";
+      const requestedBy = typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null;
+      const started = await startIcaiSyncContinuation({ trigger, requestedBy, orchestrationKey: job.idempotencyKey });
+      const firstSourceId = started.sourceIds[0];
+      if (!firstSourceId) throw new Error("ICAI continuation returned no active sources.");
+      await enqueueBackgroundJob({
+        type: "icai-sync",
+        idempotencyKey: `icai-sync-source:${started.runId}:0:${firstSourceId}`,
+        payload: { ...job.payload, mode: "source", runId: started.runId, sourceIds: started.sourceIds, sourceIndex: 0 },
+        createdBy: job.createdBy ?? null,
       });
+      return started;
+    }
     case "icai-phase5-review-probe":
       return runIcaiPhase5ReviewProbe({ correlationId: String(job.payload.correlationId ?? "") });
     case "analytics-aggregate": {
