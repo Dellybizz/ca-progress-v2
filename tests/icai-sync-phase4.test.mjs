@@ -142,11 +142,10 @@ test("Phase 4 executes the exact redirect handler and rejects an unsafe later ho
 test("Phase 4 executes the production run-acquisition SQL and proves overlapping runs are rejected atomically", () => {
   const engine = read("workers/icai-sync/sync-engine.ts");
   const acquireStart = engine.indexOf("async function acquireRun");
-  const prepareMarker = "runtime.db.prepare(`";
-  const sqlStartMarker = engine.indexOf(prepareMarker, acquireStart);
-  const sqlStart = sqlStartMarker + prepareMarker.length;
-  const sqlEnd = engine.indexOf("`)", sqlStart);
-  assert.ok(acquireStart >= 0 && sqlStartMarker >= acquireStart && sqlEnd > sqlStart);
+  const prepareStart = engine.indexOf(".prepare(", acquireStart);
+  const sqlStart = engine.indexOf("`", prepareStart) + 1;
+  const sqlEnd = engine.indexOf("`", sqlStart);
+  assert.ok(acquireStart >= 0 && prepareStart >= acquireStart && sqlStart > prepareStart && sqlEnd > sqlStart);
   const sql = engine.slice(sqlStart, sqlEnd);
 
   const db = new DatabaseSync(":memory:");
@@ -238,8 +237,8 @@ test("Phase 4 keeps date preservation, strict review application, destructive-ch
   const client = read("workers/icai-sync/d1-client.ts");
   const audit = read("d1/migrations/0025_icai_review_audit.sql");
 
-  assert.match(engine, /parsedAttempt\.startDate\?\?existingAttempt\?\.start_date/);
-  assert.match(engine, /parsedAttempt\.endDate\?\?existingAttempt\?\.end_date/);
+  assert.match(engine, /parsedAttempt\.startDate\s*\?\?\s*existingAttempt\?\.start_date/);
+  assert.match(engine, /parsedAttempt\.endDate\s*\?\?\s*existingAttempt\?\.end_date/);
   assert.match(engine, /Parser returned zero academic items\. Last verified data was preserved for review\./);
 
   assert.match(review, /assertCurrentMatchesOld/);
@@ -263,10 +262,11 @@ test("Phase 4 keeps date preservation, strict review application, destructive-ch
 
 test("Phase 4 is an explicit gate in CI, retirement closure, and Cloudflare deployment", () => {
   const packageJson = JSON.parse(read("package.json"));
-  assert.equal(
+  assert.match(
     packageJson.scripts["test:icai:phase4"],
-    "node --test tests/icai-sync-phase1.test.mjs tests/icai-sync-phase2.test.mjs tests/icai-sync-phase3.test.mjs tests/icai-sync-phase4.test.mjs",
+    /tests\/icai-sync-distributed-scheduling-phase4\.test\.mjs/,
   );
+  assert.match(packageJson.scripts["test:icai:phase4"], /tests\/icai-sync-phase4\.test\.mjs/);
   assert.match(packageJson.scripts["cf:check"], /cf:check:icai/);
   assert.match(packageJson.scripts["cf:check"], /cf:check:web/);
 

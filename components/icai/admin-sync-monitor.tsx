@@ -35,7 +35,8 @@ function duration(start: string, end: string | null) {
 function tone(
   status: string,
 ): "success" | "warning" | "danger" | "info" | "neutral" {
-  if (["success", "completed", "succeeded", "fetched"].includes(status)) return "success";
+  if (["success", "completed", "succeeded", "fetched"].includes(status))
+    return "success";
   if (["failed", "dead_letter"].includes(status)) return "danger";
   if (["running", "queued", "pending"].includes(status)) return "info";
   return status === "partial" ? "warning" : "neutral";
@@ -109,14 +110,14 @@ export function IcaiAdminSyncMonitor({
           <strong>{active ? "5s → 15s adaptive" : "stopped"}</strong>
         </div>
         <div>
-          <span>Current scheduler</span>
-          <strong>Daily schedule</strong>
+          <span>Distributed scheduler</span>
+          <strong>Every 2 hours · IST windows</strong>
         </div>
       </section>
 
       <SyncLiveRefresh
         active={active}
-        runId={run?.status === "running" && !dashboard.activeJob ? run.id : null}
+        runId={run?.id ?? null}
         labels={liveLabels}
       />
 

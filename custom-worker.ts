@@ -2,6 +2,7 @@
 // @ts-expect-error The generated worker does not exist before the Cloudflare build step.
 import openNextWorker from "./.open-next/worker.js";
 import { CommunityChannelCoordinator } from "./community-coordinator";
+import { markIcaiScheduleDispatched, selectIcaiScheduledDispatch } from "./lib/icai/scheduler";
 
 export { CommunityChannelCoordinator };
 
@@ -18,16 +19,6 @@ type JobType = "icai-sync" | "icai-phase5-review-probe" | "notification-fanout" 
 type BackgroundJob = { id: string; type: JobType; idempotencyKey: string; payload: Record<string, unknown>; createdBy?: string | null };
 type LegacyIcaiJob = { type: "icai-sync"; idempotencyKey: string; scheduledTime: number };
 
-function scheduledJob(controller: ScheduledController): BackgroundJob {
-  const scheduledTime = controller.scheduledTime;
-  return {
-    id: crypto.randomUUID(),
-    type: "icai-sync",
-    idempotencyKey: `icai-sync:${new Date(scheduledTime).toISOString()}`,
-    payload: { trigger: "cron", requestedBy: null, scheduledTime },
-  };
-}
-
 function normalizeJob(value: unknown): BackgroundJob | null {
   if (!value || typeof value !== "object") return null;
   const input = value as Partial<BackgroundJob> & Partial<LegacyIcaiJob>;
@@ -40,6 +31,40 @@ function normalizeJob(value: unknown): BackgroundJob | null {
     payload: input.payload && typeof input.payload === "object" ? input.payload as Record<string, unknown> : { scheduledTime: (input as LegacyIcaiJob).scheduledTime },
     createdBy: typeof input.createdBy === "string" ? input.createdBy : null,
   };
+}
+
+async function dispatchScheduledIcai(controller: ScheduledController, env: WorkerEnv) {
+  if (!env.DB) throw new Error("DB binding is required for ICAI scheduled selection.");
+  if (!env.BACKGROUND_JOBS) throw new Error("BACKGROUND_JOBS queue binding is required in the production runtime.");
+  const dispatch = await selectIcaiScheduledDispatch(env.DB, controller.scheduledTime);
+  console.info(JSON.stringify({
+    event: "icai.schedule_window",
+    scheduledTime: new Date(controller.scheduledTime).toISOString(),
+    window: dispatch.window?.key ?? null,
+    status: dispatch.status,
+    sourceCount: dispatch.sourceIds.length,
+    reason: dispatch.reason,
+  }));
+  if (dispatch.status !== "dispatch") return;
+  const scheduledIso = new Date(controller.scheduledTime).toISOString();
+  const job: BackgroundJob = {
+    id: crypto.randomUUID(),
+    type: "icai-sync",
+    idempotencyKey: `icai-sync:schedule:${dispatch.window.key}:${scheduledIso}`.slice(0, 180),
+    payload: {
+      trigger: "cron",
+      requestedBy: null,
+      scheduledTime: controller.scheduledTime,
+      sourceIds: dispatch.sourceIds,
+      syncGroup: dispatch.window.key,
+      scheduleWindow: dispatch.window.key,
+      retryRunId: dispatch.retryRunId,
+      retryMode: dispatch.retryMode,
+    },
+    createdBy: null,
+  };
+  await env.BACKGROUND_JOBS.send(job);
+  await markIcaiScheduleDispatched(env.DB, dispatch.sourceIds, controller.scheduledTime);
 }
 
 async function runQueuedJob(message: QueueMessage<unknown>, env: WorkerEnv) {
@@ -156,13 +181,15 @@ const worker = {
   fetch(request: Request, env: WorkerEnv, ctx: WorkerContext) { return handleRequest(request, env, ctx); },
   scheduled(controller: ScheduledController, env: WorkerEnv, ctx: WorkerContext) {
     if (!env.BACKGROUND_JOBS) throw new Error("BACKGROUND_JOBS queue binding is required in the production runtime.");
-    const jobs: BackgroundJob[] = controller.cron === "0 * * * *"
-      ? [
-          { id: crypto.randomUUID(), type: "analytics-aggregate", idempotencyKey: `analytics-aggregate:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { date: new Date(controller.scheduledTime).toISOString().slice(0, 10) } },
-          { id: crypto.randomUUID(), type: "cleanup", idempotencyKey: `cleanup:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { retentionDays: 30 } },
-        ]
-      : [scheduledJob(controller)];
-    ctx.waitUntil(Promise.all(jobs.map((job) => env.BACKGROUND_JOBS!.send(job))).then(() => undefined));
+    if (controller.cron === "0 * * * *") {
+      const jobs: BackgroundJob[] = [
+        { id: crypto.randomUUID(), type: "analytics-aggregate", idempotencyKey: `analytics-aggregate:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { date: new Date(controller.scheduledTime).toISOString().slice(0, 10) } },
+        { id: crypto.randomUUID(), type: "cleanup", idempotencyKey: `cleanup:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { retentionDays: 30 } },
+      ];
+      ctx.waitUntil(Promise.all(jobs.map((job) => env.BACKGROUND_JOBS!.send(job))).then(() => undefined));
+      return;
+    }
+    ctx.waitUntil(dispatchScheduledIcai(controller, env));
   },
   async queue(batch: QueueBatch<unknown>, env: WorkerEnv) {
     await Promise.all(batch.messages.map((message) => runQueuedJob(message, env)));

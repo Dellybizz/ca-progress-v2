@@ -9,14 +9,32 @@ import type { BackgroundJob } from "./queue";
 
 function db(): HotD1Database { return getHotD1Database(); }
 function json(value: unknown) { return JSON.stringify(value ?? {}); }
+function sourceIds(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  const ids = value.filter((item): item is string => typeof item === "string" && item.length > 0 && item.length <= 200);
+  return [...new Set(ids)].slice(0, 20);
+}
 
 export async function executeBackgroundJob(job: BackgroundJob) {
   switch (job.type) {
-    case "icai-sync":
+    case "icai-sync": {
+      const retryMode =
+        job.payload.retryMode === "failed" ||
+        job.payload.retryMode === "timed_out" ||
+        job.payload.retryMode === "item"
+          ? job.payload.retryMode
+          : null;
       return runIcaiSync({
         trigger: job.payload.trigger === "manual" ? "manual" : "cron",
         requestedBy: typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null,
+        retryRunId: typeof job.payload.retryRunId === "string" ? job.payload.retryRunId : null,
+        retryMode,
+        retryItemId: typeof job.payload.retryItemId === "string" ? job.payload.retryItemId : null,
+        sourceIds: sourceIds(job.payload.sourceIds),
+        syncGroup: typeof job.payload.syncGroup === "string" ? job.payload.syncGroup.slice(0, 80) : null,
+        scheduleWindow: typeof job.payload.scheduleWindow === "string" ? job.payload.scheduleWindow.slice(0, 80) : null,
       });
+    }
     case "icai-phase5-review-probe":
       return runIcaiPhase5ReviewProbe({ correlationId: String(job.payload.correlationId ?? "") });
     case "analytics-aggregate": {

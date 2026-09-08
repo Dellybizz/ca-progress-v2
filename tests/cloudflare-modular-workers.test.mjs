@@ -9,7 +9,8 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 test("heavy ICAI background processing lives outside the Next OpenNext Worker", () => {
   const proxy = read("lib/icai/sync.ts");
   const engine = read("workers/icai-sync/sync-engine.ts");
-  assert.match(engine, /parseOfficialSource/);
+  const isolation = read("workers/icai-sync/item-isolation.ts");
+  assert.match(isolation, /parseOfficialSource/);
   assert.match(engine, /icai_sync_apply_source_batch/);
   assert.match(proxy, /ICAI_SYNC_SERVICE/);
   assert.doesNotMatch(proxy, /parseOfficialSource|retryDelay|MAX_HTML_BYTES|icai_sync_apply_source_batch/);
