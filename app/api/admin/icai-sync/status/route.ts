@@ -1,4 +1,6 @@
 import { getAdminOperator } from "@/lib/authorization/server";
+import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
+import { getIcaiScheduleOverview } from "@/lib/icai/scheduler";
 import { getIcaiSyncLiveStatus } from "@/lib/icai/status-query";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +27,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    const status = await getIcaiSyncLiveStatus(requestedRunId);
-    return json(status);
+    const [status, schedule] = await Promise.all([
+      getIcaiSyncLiveStatus(requestedRunId),
+      getIcaiScheduleOverview(getD1RuntimeDatabase()).catch(() => null),
+    ]);
+    const next = schedule?.nextScheduledGroup;
+    return json({
+      ...status,
+      nextScheduledGroup: next
+        ? { id: next.key, label: next.label, dueAt: next.scheduledFor }
+        : null,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to read ICAI sync status.";
