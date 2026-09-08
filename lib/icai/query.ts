@@ -352,6 +352,15 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
         .eq("run_id", run.id)
     : { data: [], error: null };
   if (snapshotResponse.error) throw snapshotResponse.error;
+  const runtimeResponse = run
+    ? await client
+        .from("icai_sync_runtime")
+        .select("*")
+        .eq("run_id", run.id)
+        .maybeSingle()
+    : { data: null, error: null };
+  if (runtimeResponse.error) throw runtimeResponse.error;
+  const runtime = runtimeResponse.data as Record<string, unknown> | null;
   const snapshots = (snapshotResponse.data ?? []) as Array<
     Record<string, unknown>
   >;
@@ -381,6 +390,25 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
   });
 
   return {
+    runtime: runtime
+      ? {
+          runId: String(runtime.run_id),
+          stage: String(runtime.stage),
+          currentSourceId: runtime.current_source_id
+            ? String(runtime.current_source_id)
+            : null,
+          currentItemUrl: runtime.current_item_url
+            ? String(runtime.current_item_url)
+            : null,
+          stageStartedAt: String(runtime.stage_started_at),
+          heartbeatAt: String(runtime.heartbeat_at),
+          cancelRequested: Boolean(runtime.cancel_requested),
+          skipSourceRequested: Boolean(runtime.skip_source_requested),
+          stale:
+            Date.now() - new Date(String(runtime.heartbeat_at)).getTime() >
+            2 * 60_000,
+        }
+      : null,
     activeJob: activeJob
       ? {
           id: String(activeJob.id),
