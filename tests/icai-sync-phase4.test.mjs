@@ -262,10 +262,11 @@ test("Phase 4 keeps date preservation, strict review application, destructive-ch
 
 test("Phase 4 is an explicit gate in CI, retirement closure, and Cloudflare deployment", () => {
   const packageJson = JSON.parse(read("package.json"));
-  assert.equal(
+  assert.match(
     packageJson.scripts["test:icai:phase4"],
-    "node --test tests/icai-sync-phase1.test.mjs tests/icai-sync-phase2.test.mjs tests/icai-sync-phase3.test.mjs tests/icai-sync-phase4.test.mjs",
+    /tests\/icai-sync-distributed-scheduling-phase4\.test\.mjs/,
   );
+  assert.match(packageJson.scripts["test:icai:phase4"], /tests\/icai-sync-phase4\.test\.mjs/);
   assert.match(packageJson.scripts["cf:check"], /cf:check:icai/);
   assert.match(packageJson.scripts["cf:check"], /cf:check:web/);
 
