@@ -1,0 +1,29 @@
+name: Diagnose retained D1 migration replay
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/diagnose-retained-d1-migrations.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Inspect retained D1 migration state
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --command "SELECT version,description FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0028' ORDER BY version; SELECT name FROM sqlite_master WHERE type='table' AND name IN ('test_stage_records','icai_sync_source_states') ORDER BY name; PRAGMA foreign_key_list(test_stage_records); PRAGMA foreign_key_check;"
