@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { hasAdminCapability } from "../lib/authorization/capabilities.mjs";
 
 const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -36,10 +37,15 @@ test("Product Phase 13 anti-cheat is reviewable and never performs destructive a
   const migration = read("d1/migrations/0023_product_phase13_leaderboards_rewards_referrals.sql");
   assert.match(service, /status IN \('pending','upheld'\)/);
   assert.match(service, /reviewAntiCheatFlag/);
-  assert.match(admin, /getServerAppRole/);
-  assert.match(admin, /isPrivilegedRole/);
+  assert.match(admin, /authorized\("gamification\.review"\)/);
+  assert.match(admin, /requireAdminCapability/);
+  assert.match(admin, /recordAdminAuditEvent/);
+  assert.equal(hasAdminCapability("moderator", "gamification.review"), true);
+  assert.equal(hasAdminCapability("admin", "gamification.review"), true);
+  assert.equal(hasAdminCapability("student", "gamification.review"), false);
   assert.match(admin, /decision === "clear" \|\| body\.decision === "uphold"/);
   assert.match(migration, /status TEXT NOT NULL DEFAULT 'pending' CHECK\(status IN \('pending','cleared','upheld'\)\)/);
+  assert.doesNotMatch(admin, /getServerAppRole|isPrivilegedRole/);
   assert.doesNotMatch(service, /DELETE\s+FROM\s+(app_users|profiles|chapter_progress|progress_events|study_sessions|test_attempts)/i);
   assert.doesNotMatch(service, /UPDATE\s+(app_users|profiles|chapter_progress|study_sessions|test_attempts)/i);
   assert.doesNotMatch(admin, /delete|suspend|disable_account/i);
@@ -75,12 +81,16 @@ test("Product Phase 13 referral bonus cannot mutate Phase 12 immutable XP constr
   assert.doesNotMatch(phase13, /DROP TABLE\s+xp_ledger/i);
 });
 
-test("Product Phase 13 reward settlement is admin-only, post-period, rank-limited and idempotent", () => {
+test("Product Phase 13 reward settlement is owner-only, post-period, rank-limited and idempotent", () => {
   const service = read("lib/gamification/phase13-service.ts");
   const admin = read("app/api/admin/gamification/route.ts");
   const migration = read("d1/migrations/0023_product_phase13_leaderboards_rewards_referrals.sql");
-  assert.match(admin, /isPrivilegedRole/);
+  assert.match(admin, /authorized\("rewards\.settle"\)/);
   assert.match(admin, /settle_rewards/);
+  assert.equal(hasAdminCapability("moderator", "rewards.settle"), false);
+  assert.equal(hasAdminCapability("admin", "rewards.settle"), false);
+  assert.equal(hasAdminCapability("owner", "rewards.settle"), true);
+  assert.equal(hasAdminCapability("parent_owner", "rewards.settle"), true);
   assert.match(service, /rewards can only be settled after the competition period closes/i);
   assert.match(service, /ranked\.slice\(0, 3\)/);
   assert.match(migration, /UNIQUE\(competition_period,user_id\)/);
