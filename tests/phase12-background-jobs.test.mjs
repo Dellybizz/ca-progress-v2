@@ -35,8 +35,12 @@ test("uploads enqueue attachment processing after durable metadata commit", () =
   assert.match(upload, /processing: "queued"/);
 });
 
-test("admin job visibility is available privately", () => {
-  assert.match(read("app/api/admin/jobs/route.ts"), /requireAdminOperator/);
-  assert.match(read("app/api/admin/jobs/route.ts"), /getOpenDeadLetters/);
+test("admin job visibility is capability-protected and private", () => {
+  const route = read("app/api/admin/jobs/route.ts");
+  assert.match(route, /requireAdminCapability\("jobs\.read"\)/);
+  assert.match(route, /adminAuthorizationStatus/);
+  assert.match(route, /private, no-store/);
+  assert.match(route, /getOpenDeadLetters/);
+  assert.doesNotMatch(route, /requireAdminOperator/);
   assert.match(read("app/(admin)/admin/jobs/page.tsx"), /Open dead letters/);
 });
