@@ -1,5 +1,10 @@
 import { IcaiSyncAlreadyRunningError, runIcaiSyncEngine } from "./sync-engine";
 import type { D1Database } from "./d1-client";
+import {
+  annotateIcaiScheduledRun,
+  recordIcaiScheduledSourceOutcomes,
+  scopeIcaiSourceDatabase,
+} from "./source-scope";
 
 type Env = { DB?: D1Database };
 type SyncRequest = {
@@ -52,19 +57,21 @@ const icaiSyncWorker = {
     const userAgent=request.headers.get("x-ca-progress-icai-user-agent")?.trim()||"CA Progress V2 Official ICAI Monitor/phase8";
     const enabled=request.headers.get("x-ca-progress-icai-enabled")!=="false";
     try{
+      const runtimeDb=scopeIcaiSourceDatabase(env.DB,sourceIds);
       const summary=await runIcaiSyncEngine(
-        {db:env.DB,enabled,userAgent},
+        {db:runtimeDb,enabled,userAgent},
         {
           trigger,
           requestedBy,
           retryRunId,
           retryMode:retryMode==="failed"||retryMode==="timed_out"||retryMode==="item"?retryMode:null,
           retryItemId,
-          sourceIds,
-          syncGroup,
-          scheduleWindow,
         },
       );
+      if(sourceIds?.length){
+        await annotateIcaiScheduledRun(env.DB,summary.runId,{sourceIds,syncGroup,scheduleWindow});
+        await recordIcaiScheduledSourceOutcomes(env.DB,summary.runId,sourceIds);
+      }
       return json({ok:true,summary});
     }
     catch(error){if(error instanceof IcaiSyncAlreadyRunningError)return json({ok:false,error:error.message},409);return json({ok:false,error:error instanceof Error?error.message:"ICAI synchronization failed."},500);}
