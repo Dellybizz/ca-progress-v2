@@ -43,7 +43,8 @@ test("Phase 1 live admin verifier proves audit immutability, rollback and cleanu
   assert.match(live, /DELETE FROM sessions/);
   assert.match(live, /DELETE FROM app_users/);
   assert.match(live, /synthetic users and sessions cleaned up/);
-  assert.match(live, /phase1-admin-evidence\/phase1-admin-live\.json/);
+  assert.match(live, /const evidenceDir = "phase1-admin-evidence"/);
+  assert.match(live, /phase1-admin-live\.json/);
 });
 
 test("Phase 1 admin live verification is a dedicated staging workflow", () => {
