@@ -38,7 +38,11 @@ export async function getIcaiSyncLiveStatus(
   const runQuery = client.from("icai_sync_runs").select(RUN_COLUMNS);
   const runPromise = requestedRunId
     ? runQuery.eq("id", requestedRunId).maybeSingle()
-    : runQuery.order("started_at", { ascending: false }).limit(1).maybeSingle();
+    : runQuery
+        .eq("status", "running")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
   const jobPromise = client
     .from("background_jobs")
     .select(JOB_COLUMNS)
