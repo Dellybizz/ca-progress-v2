@@ -17,19 +17,26 @@ export async function runIcaiSync({
   retryRunId=null,
   retryMode=null,
   retryItemId=null,
+  sourceIds=null,
+  syncGroup=null,
+  scheduleWindow=null,
 }:{
   trigger:"cron"|"manual"|"test";
   requestedBy?:string|null;
   retryRunId?:string|null;
   retryMode?:RetryMode|null;
   retryItemId?:string|null;
+  sourceIds?:string[]|null;
+  syncGroup?:string|null;
+  scheduleWindow?:string|null;
 }):Promise<IcaiSyncSummary>{
   const sync=getIcaiSyncConfig();
   if(!sync.enabled)throw new Error("ICAI synchronization is disabled for this environment.");
+  const selectedSources=sourceIds?.filter((value,index,all)=>value&&value.length<=200&&all.indexOf(value)===index).slice(0,20)??null;
   const response=await getService().fetch(new Request("https://icai-sync.internal/run",{
     method:"POST",
     headers:{"content-type":"application/json","x-ca-progress-internal":"ca-progress-v2-web","x-ca-progress-icai-user-agent":sync.userAgent,"x-ca-progress-icai-enabled":String(sync.enabled)},
-    body:JSON.stringify({trigger,requestedBy,retryRunId,retryMode,retryItemId}),
+    body:JSON.stringify({trigger,requestedBy,retryRunId,retryMode,retryItemId,sourceIds:selectedSources,syncGroup,scheduleWindow}),
   }));
   const text=await response.text();
   let payload:SyncPayload={};
