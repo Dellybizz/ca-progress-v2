@@ -190,15 +190,15 @@ try {
   pass("synthetic production sessions created");
 
   const guestAdmin = await request("/admin");
-  await assertRedirect(guestAdmin, "/login", "guest admin denial", ["Command Center", "Owner Command Center"]);
+  await assertRedirect(guestAdmin, "/dashboard", "guest admin denial", ["Operational monitoring and owner controls.", "Admin actions · 24h"]);
   pass("guest denied admin area", { status: guestAdmin.status });
 
   const studentAdmin = await request("/admin", fixtures.student);
-  await assertRedirect(studentAdmin, "/dashboard", "student admin denial", ["Command Center", "Owner Command Center"]);
+  await assertRedirect(studentAdmin, "/dashboard", "student admin denial", ["Operational monitoring and owner controls.", "Admin actions · 24h"]);
   pass("student denied admin area", { status: studentAdmin.status });
 
   const moderatorAdmin = await request("/admin", fixtures.moderator);
-  await assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction", ["Command Center", "Owner Command Center"]);
+  await assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction", ["Operational monitoring and owner controls.", "Admin actions · 24h"]);
   const moderatorCommunity = await request("/admin/community/moderation", fixtures.moderator);
   assert(moderatorCommunity.status === 200, `moderator moderation workspace returned ${moderatorCommunity.status}.`);
   pass("moderator limited to moderation workspace");
