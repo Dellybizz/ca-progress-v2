@@ -1,0 +1,44 @@
+name: Patch Phase 1 Guest Test Denial
+
+on:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/patch-phase1-guest-test-denial.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Patch live verifier
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/verify-admin-phase1-live.mjs')
+          text = path.read_text()
+          text = text.replace(
+            'await assertRedirect(guestAdmin, "/login", "guest admin denial", ["Command Center", "Owner Command Center"]);',
+            'await assertRedirect(guestAdmin, "/dashboard", "guest admin denial", ["Operational monitoring and owner controls.", "Admin actions · 24h"]);'
+          )
+          text = text.replace(
+            'await assertRedirect(studentAdmin, "/dashboard", "student admin denial", ["Command Center", "Owner Command Center"]);',
+            'await assertRedirect(studentAdmin, "/dashboard", "student admin denial", ["Operational monitoring and owner controls.", "Admin actions · 24h"]);'
+          )
+          text = text.replace(
+            'await assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction", ["Command Center", "Owner Command Center"]);',
+            'await assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction", ["Operational monitoring and owner controls.", "Admin actions · 24h"]);'
+          )
+          path.write_text(text)
+          PY
+          rm .github/workflows/patch-phase1-guest-test-denial.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/verify-admin-phase1-live.mjs .github/workflows/patch-phase1-guest-test-denial.yml
+          git commit -m "test(admin): verify guest-test denial as student redirect"
+          git push origin HEAD:phase-12-operations-admin-platform
