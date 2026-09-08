@@ -95,10 +95,25 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function assertRedirect(response, expectedFragment, label) {
+async function assertRedirect(response, expectedFragment, label, forbiddenMarkers = []) {
   const location = response.headers.get("location") || "";
-  assert([301, 302, 303, 307, 308].includes(response.status), `${label}: expected redirect, got ${response.status}.`);
-  assert(location.includes(expectedFragment), `${label}: expected redirect containing ${expectedFragment}, got ${location}.`);
+  if ([301, 302, 303, 307, 308].includes(response.status)) {
+    assert(location.includes(expectedFragment), `${label}: expected redirect containing ${expectedFragment}, got ${location}.`);
+    return;
+  }
+  const text = await response.text();
+  const decoded = htmlDecode(text).replaceAll("\u0026", "&").replaceAll("\u003d", "=");
+  const streamedRedirect = response.status === 200 && (
+    /NEXT_REDIRECT/i.test(decoded) ||
+    /__next-page-redirect/i.test(decoded) ||
+    /http-equiv=["']?refresh/i.test(decoded) ||
+    /redirect;(?:replace|push)/i.test(decoded)
+  );
+  assert(streamedRedirect, `${label}: expected HTTP or streamed Next redirect, got ${response.status}; body=${decoded.slice(0, 1200)}`);
+  assert(decoded.includes(expectedFragment), `${label}: streamed redirect did not target ${expectedFragment}; body=${decoded.slice(0, 1200)}`);
+  for (const marker of forbiddenMarkers) {
+    assert(!decoded.includes(marker), `${label}: protected content leaked during redirect (${marker}).`);
+  }
 }
 
 function htmlDecode(value) {
@@ -175,15 +190,15 @@ try {
   pass("synthetic production sessions created");
 
   const guestAdmin = await request("/admin");
-  assertRedirect(guestAdmin, "/login", "guest admin denial");
+  await assertRedirect(guestAdmin, "/login", "guest admin denial", ["Command Center", "Owner Command Center"]);
   pass("guest denied admin area", { status: guestAdmin.status });
 
   const studentAdmin = await request("/admin", fixtures.student);
-  assertRedirect(studentAdmin, "/dashboard", "student admin denial");
+  await assertRedirect(studentAdmin, "/dashboard", "student admin denial", ["Command Center", "Owner Command Center"]);
   pass("student denied admin area", { status: studentAdmin.status });
 
   const moderatorAdmin = await request("/admin", fixtures.moderator);
-  assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction");
+  await assertRedirect(moderatorAdmin, "/admin/community/moderation", "moderator command-center restriction", ["Command Center", "Owner Command Center"]);
   const moderatorCommunity = await request("/admin/community/moderation", fixtures.moderator);
   assert(moderatorCommunity.status === 200, `moderator moderation workspace returned ${moderatorCommunity.status}.`);
   pass("moderator limited to moderation workspace");
