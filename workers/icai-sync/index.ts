@@ -8,10 +8,21 @@ type SyncRequest = {
   retryRunId?: unknown;
   retryMode?: unknown;
   retryItemId?: unknown;
+  sourceIds?: unknown;
+  syncGroup?: unknown;
+  scheduleWindow?: unknown;
 };
 const INTERNAL_MARKER = "ca-progress-v2-web";
 function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"private, no-store"}});}
 function optionalId(value:unknown){return typeof value==="string"&&value.length>0&&value.length<=200?value:null;}
+function optionalLabel(value:unknown){return typeof value==="string"&&value.length>0&&value.length<=80?value:null;}
+function selectedSourceIds(value:unknown){
+  if(value===undefined||value===null)return null;
+  if(!Array.isArray(value)||value.length>20)return undefined;
+  const ids=value.filter((item):item is string=>typeof item==="string"&&item.length>0&&item.length<=200);
+  if(ids.length!==value.length)return undefined;
+  return [...new Set(ids)];
+}
 
 const icaiSyncWorker = {
   async fetch(request:Request,env:Env){
@@ -30,9 +41,14 @@ const icaiSyncWorker = {
     const retryRunId=optionalId(body?.retryRunId);
     const retryItemId=optionalId(body?.retryItemId);
     const retryMode=body?.retryMode;
+    const sourceIds=selectedSourceIds(body?.sourceIds);
+    if(sourceIds===undefined)return json({ok:false,error:"Invalid ICAI source selection."},400);
+    if(sourceIds&&sourceIds.length===0)return json({ok:false,error:"ICAI source selection cannot be empty."},400);
     if(retryMode!==undefined&&retryMode!==null&&retryMode!=="failed"&&retryMode!=="timed_out"&&retryMode!=="item")return json({ok:false,error:"Invalid ICAI retry mode."},400);
     if((retryMode&&!retryRunId)||(!retryMode&&retryRunId))return json({ok:false,error:"ICAI retry run and mode must be provided together."},400);
     if(retryMode==="item"&&!retryItemId)return json({ok:false,error:"A retry item id is required for item retry."},400);
+    const syncGroup=optionalLabel(body?.syncGroup);
+    const scheduleWindow=optionalLabel(body?.scheduleWindow);
     const userAgent=request.headers.get("x-ca-progress-icai-user-agent")?.trim()||"CA Progress V2 Official ICAI Monitor/phase8";
     const enabled=request.headers.get("x-ca-progress-icai-enabled")!=="false";
     try{
@@ -44,6 +60,9 @@ const icaiSyncWorker = {
           retryRunId,
           retryMode:retryMode==="failed"||retryMode==="timed_out"||retryMode==="item"?retryMode:null,
           retryItemId,
+          sourceIds,
+          syncGroup,
+          scheduleWindow,
         },
       );
       return json({ok:true,summary});
