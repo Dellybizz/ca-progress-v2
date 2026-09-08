@@ -30,13 +30,16 @@ test("updates page has attempt-aware notification preview and subject filtering"
   assert.match(page, /subject: param\(params\.subject\)/);
 });
 
-test("admin monitor enforces server authorization and exposes sync/review/source health", () => {
+test("admin monitor enforces named capabilities and exposes sync/review/source health", () => {
   const page = read("app/(admin)/admin/icai-sync/page.tsx");
   const actions = read("app/(admin)/admin/icai-sync/actions.ts");
   const monitor = read("components/icai/admin-sync-monitor.tsx");
-  assert.match(page, /getAdminOperator/);
-  assert.match(page, /Access denied/);
-  assert.match(actions, /requireAdminOperator/);
+  assert.match(page, /requireAdminPageCapability\("icai\.read"\)/);
+  assert.match(actions, /requireAdminCapability\("icai\.run"\)/);
+  assert.match(actions, /requireAdminCapability\("icai\.review"\)/);
+  assert.match(actions, /recordAdminAuditEvent/);
+  assert.doesNotMatch(page, /getAdminOperator|operator\.allowed/);
+  assert.doesNotMatch(actions, /requireAdminOperator/);
   assert.match(monitor, /Run Sync now/);
   assert.match(monitor, /Review queue/);
   assert.match(monitor, /Content hash/);
