@@ -1,6 +1,6 @@
 import { parseOfficialSource } from "../../lib/icai/adapters";
 import { detectAttemptKeys } from "../../lib/icai/classify";
-import { cleanText, isApprovedIcaiUrl } from "../../lib/icai/html";
+import { canonicalOfficialUrl, cleanText, isApprovedIcaiUrl } from "../../lib/icai/html";
 import type {
   IcaiLevelCode,
   IcaiResourceType,
@@ -16,6 +16,7 @@ const MAX_CHILD_PAGES = 80;
 const MAX_STUDY_DEPTH = 3;
 const MAX_CHILD_BYTES = 2_500_000;
 const MAX_REDIRECTS = 5;
+const ANCHOR_CONTEXT_BYTES = 1_500;
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 const EVIDENCE_TYPES = new Set<IcaiResourceType>(["schedule", "announcement"]);
 
@@ -63,18 +64,43 @@ function nestedPageIsInBootstrapWindow(resource: ParsedIcaiResource, source: Ica
   return true;
 }
 
+function applicabilityKeys(value: string) {
+  const applicability = [...value.matchAll(/Applicable\s+for\s+(.{1,180}?)(?:Exams?|Examinations?)(?:\s+Onwards)?/gi)];
+  return applicability.flatMap((match) => detectAttemptKeys(match[0]));
+}
+
 function applicabilityPageIsInBootstrapWindow(html: string, source: IcaiSourceConfig) {
   const attemptFloor = configString(source, "bootstrap_attempt_floor", "2026-05");
-  const text = cleanText(html);
-  const applicability = [...text.matchAll(/Applicable\s+for\s+(.{1,180}?)(?:Exams?|Examinations?)(?:\s+Onwards)?/gi)];
-  if (!applicability.length) return true;
-
-  const keys = applicability.flatMap((match) => detectAttemptKeys(match[0]));
+  const keys = applicabilityKeys(cleanText(html));
   // Some ICAI selectors contain several applicability branches. The selector is
   // traversable if at least one branch is in scope; each destination page is
   // checked again before any PDF is accepted, so an old May-2025/Jan-2026
   // terminal page cannot leak chapter PDFs into the current bootstrap.
   return keys.length === 0 || keys.some((key) => key >= attemptFloor);
+}
+
+function anchorApplicabilityIsInBootstrapWindow(
+  html: string,
+  baseUrl: string,
+  targetUrl: string,
+  source: IcaiSourceConfig,
+) {
+  const attemptFloor = configString(source, "bootstrap_attempt_floor", "2026-05");
+  const anchor = /<a\b[^>]*href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))[^>]*>[\s\S]*?<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = anchor.exec(html))) {
+    const href = match[1] ?? match[2] ?? match[3] ?? "";
+    const url = canonicalOfficialUrl(href, baseUrl);
+    if (url !== targetUrl) continue;
+
+    const context = cleanText(html.slice(Math.max(0, match.index - ANCHOR_CONTEXT_BYTES), match.index));
+    const phrases = [...context.matchAll(/Applicable\s+for\s+(.{1,180}?)(?:Exams?|Examinations?)(?:\s+Onwards)?/gi)];
+    const nearest = phrases.at(-1);
+    if (!nearest) return true;
+    const keys = detectAttemptKeys(nearest[0]);
+    return keys.length === 0 || keys.some((key) => key >= attemptFloor);
+  }
+  return true;
 }
 
 function isTraversableIcaiPage(url: string) {
@@ -199,7 +225,10 @@ export async function resolveDirectStudyMaterialPdfs(
     const landing = await parseLanding(resource);
     if (!landing || !applicabilityPageIsInBootstrapWindow(landing.html, source)) return [];
 
-    const direct = landing.resources.filter((child) => isDirectPdf(child.officialUrl));
+    const direct = landing.resources.filter((child) =>
+      isDirectPdf(child.officialUrl) &&
+      anchorApplicabilityIsInBootstrapWindow(landing.html, resource.officialUrl, child.officialUrl, source),
+    );
     const nested = landing.resources.filter((child) =>
       !isDirectPdf(child.officialUrl) &&
       isTraversableIcaiPage(child.officialUrl) &&
