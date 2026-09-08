@@ -33,6 +33,28 @@ export async function runIcaiSyncAction() {
   redirect(destination);
 }
 
+export async function recoverIcaiStartupJobAction(formData: FormData) {
+  let destination = "/admin/icai-sync";
+  try {
+    const operator = await requireAdminCapability("icai.run");
+    const jobId = String(formData.get("jobId") ?? "").trim().slice(0, 200);
+    if (!jobId) throw new Error("The stalled synchronization job was not identified.");
+    const admin = createD1AdminClient();
+    const current = await admin.from("background_jobs").select("id,status,created_at,started_at").eq("id", jobId).eq("job_type", "icai-sync").maybeSingle();
+    if (current.error) throw current.error;
+    if (!current.data || !["queued", "running"].includes(current.data.status)) throw new Error("This synchronization job is no longer active.");
+    const anchor = new Date(current.data.started_at ?? current.data.created_at).getTime();
+    if (!Number.isFinite(anchor) || Date.now() - anchor < 2 * 60_000) throw new Error("This job is still within its startup window.");
+    const now = new Date().toISOString();
+    const update = await admin.from("background_jobs").update({ status: "failed", finished_at: now, last_error: "Orphaned ICAI job recovered before a sync run started.", updated_at: now }).eq("id", jobId).in("status", ["queued", "running"]);
+    if (update.error) throw update.error;
+    await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.run", action: "icai.sync.recover_startup", targetType: "background_job", targetId: jobId, reason: "No ICAI run or heartbeat appeared within two minutes", previousValue: { status: current.data.status }, newValue: { status: "failed" }, traceId: traceId(), reversible: false });
+    revalidatePath("/admin/icai-sync");
+    destination = "/admin/icai-sync?notice=Stalled%20startup%20job%20recovered.";
+  } catch (error) { destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`; }
+  redirect(destination);
+}
+
 export async function controlIcaiSyncAction(formData: FormData) {
   let destination = "/admin/icai-sync";
   try {

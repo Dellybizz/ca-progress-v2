@@ -21,6 +21,16 @@ test("manual ICAI sync refuses a duplicate queued or running operation", () => {
   assert.match(action, /already queued or running/);
 });
 
+test("orphaned ICAI startup jobs can be recovered without a run record", () => {
+  const action = read("app/(admin)/admin/icai-sync/actions.ts");
+  const refresh = read("components/icai/sync-live-refresh.tsx");
+  const status = read("lib/icai/status-query.ts");
+  assert.match(action, /recoverIcaiStartupJobAction/);
+  assert.match(action, /icai\.sync\.recover_startup/);
+  assert.match(refresh, /Recover stalled startup/);
+  assert.match(status, /isJobStale/);
+});
+
 test("active ICAI sync pages use lightweight adaptive polling instead of full-page polling", () => {
   const refresh = read("components/icai/sync-live-refresh.tsx");
   const route = read("app/api/admin/icai-sync/status/route.ts");

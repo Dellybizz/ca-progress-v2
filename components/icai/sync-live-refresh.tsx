@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { controlIcaiSyncAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { controlIcaiSyncAction, recoverIcaiStartupJobAction } from "@/app/(admin)/admin/icai-sync/actions";
 import {
   ICAI_STAGE_PROGRESS,
   type IcaiSyncLiveStatus,
@@ -221,6 +221,15 @@ export function SyncLiveRefresh({
         {stale ? (
           <div className="auth-status auth-status--danger" role="alert">
             No heartbeat has been received for more than two minutes. Recovery can safely close the stale run without changing previously verified ICAI data.
+          </div>
+        ) : null}
+        {!run && status.job?.stale ? (
+          <div className="auth-status auth-status--danger" role="alert">
+            The worker did not create a sync run within two minutes. This startup job is stalled and can be closed safely.
+            <form action={recoverIcaiStartupJobAction}>
+              <input type="hidden" name="jobId" value={status.job.id} />
+              <button className="ui-button ui-button--primary">Recover stalled startup</button>
+            </form>
           </div>
         ) : null}
         {status.runId && runtime ? (

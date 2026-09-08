@@ -18,6 +18,7 @@ export type IcaiSyncLiveStatus = {
     createdAt: string;
     startedAt: string | null;
     lastError: string | null;
+    stale: boolean;
   } | null;
   run: {
     status: string;
