@@ -26,6 +26,18 @@ export class SyncSourceSkippedError extends Error {
     this.name = "SyncSourceSkippedError";
   }
 }
+export class SyncItemSkippedError extends Error {
+  constructor() {
+    super("Current item skipped by an administrator.");
+    this.name = "SyncItemSkippedError";
+  }
+}
+export class SyncRemainingItemsSkippedError extends Error {
+  constructor() {
+    super("Remaining items for this source were skipped by an administrator.");
+    this.name = "SyncRemainingItemsSkippedError";
+  }
+}
 
 export async function recoverStaleRuns(db: D1Database) {
   const cutoff = new Date(Date.now() - 2 * 60_000).toISOString();
@@ -41,6 +53,13 @@ export async function recoverStaleRuns(db: D1Database) {
     )
     .bind(cutoff)
     .run();
+  await db
+    .prepare(
+      "UPDATE icai_sync_items SET status='failed',stage='stale_recovery',completed_at=CURRENT_TIMESTAMP,failure_category='stale_recovery',failure_message=COALESCE(failure_message,'Item was active when its sync run became stale.'),retry_eligible=1,updated_at=CURRENT_TIMESTAMP WHERE status='running' AND run_id IN (SELECT id FROM icai_sync_runs WHERE status='failed' AND completed_at>=?1)",
+    )
+    .bind(cutoff)
+    .run()
+    .catch(() => undefined);
 }
 
 export async function initializeRuntime(db: D1Database, runId: string) {
@@ -51,6 +70,13 @@ export async function initializeRuntime(db: D1Database, runId: string) {
     )
     .bind(runId, now)
     .run();
+  await db
+    .prepare(
+      "INSERT OR IGNORE INTO icai_sync_item_controls(run_id,updated_at) VALUES(?1,?2)",
+    )
+    .bind(runId, now)
+    .run()
+    .catch(() => undefined);
 }
 
 export async function setStage(
@@ -78,7 +104,11 @@ export async function heartbeat(db: D1Database, runId: string) {
     .run();
 }
 
-export async function checkpoint(db: D1Database, runId: string) {
+export async function checkpoint(
+  db: D1Database,
+  runId: string,
+  scope: "source" | "item" = "source",
+) {
   const control = await db
     .prepare(
       "SELECT cancel_requested,skip_source_requested FROM icai_sync_runtime WHERE run_id=?1",
@@ -95,5 +125,37 @@ export async function checkpoint(db: D1Database, runId: string) {
       .run();
     throw new SyncSourceSkippedError();
   }
+
+  if (scope === "item") {
+    const itemControl = await db
+      .prepare(
+        "SELECT skip_item_requested,skip_remaining_requested FROM icai_sync_item_controls WHERE run_id=?1",
+      )
+      .bind(runId)
+      .first<{
+        skip_item_requested: number;
+        skip_remaining_requested: number;
+      }>()
+      .catch(() => null);
+    if (itemControl?.skip_remaining_requested) {
+      await db
+        .prepare(
+          "UPDATE icai_sync_item_controls SET skip_item_requested=0,skip_remaining_requested=0,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1",
+        )
+        .bind(runId)
+        .run();
+      throw new SyncRemainingItemsSkippedError();
+    }
+    if (itemControl?.skip_item_requested) {
+      await db
+        .prepare(
+          "UPDATE icai_sync_item_controls SET skip_item_requested=0,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1",
+        )
+        .bind(runId)
+        .run();
+      throw new SyncItemSkippedError();
+    }
+  }
+
   await heartbeat(db, runId);
 }

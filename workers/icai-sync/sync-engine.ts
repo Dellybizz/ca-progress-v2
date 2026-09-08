@@ -1,4 +1,3 @@
-import { parseOfficialSource } from "../../lib/icai/adapters";
 import { sha256Hex, stableJson } from "../../lib/icai/hash";
 import { isApprovedIcaiUrl } from "../../lib/icai/html";
 import type {
@@ -9,6 +8,13 @@ import type {
 } from "../../lib/icai/types";
 import { IcaiD1Client, type D1Database } from "./d1-client";
 import {
+  loadRetrySelection,
+  previousSourceItemCount,
+  processIsolatedSourceItems,
+  sourceIsPaused,
+  type RetrySelection,
+} from "./item-isolation";
+import {
   checkpoint,
   initializeRuntime,
   recoverStaleRuns,
@@ -17,7 +23,7 @@ import {
   SyncSourceSkippedError,
 } from "./runtime-control";
 
-const PARSER_VERSION = "phase8.1";
+const PARSER_VERSION = "phase8.1-item-isolation";
 const MAX_HTML_BYTES = 2_500_000;
 const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -39,7 +45,9 @@ type SourceRow = {
   last_content_hash: string | null;
   etag: string | null;
   last_modified: string | null;
+  last_success_at: string | null;
 };
+type SourceRuntimeConfig = IcaiSourceConfig & { lastSuccessAt: string | null };
 type LevelRow = { id: string; code: string; is_active?: boolean };
 type SubjectRow = {
   id: string;
@@ -67,6 +75,7 @@ type RunRow = {
   pending_reviews: number;
 };
 type AdminClient = IcaiD1Client;
+type RetryMode = "failed" | "timed_out" | "item";
 
 export class IcaiSyncAlreadyRunningError extends Error {
   constructor() {
@@ -80,6 +89,7 @@ export type IcaiSyncRuntime = {
   enabled: boolean;
   userAgent: string;
 };
+
 function adminClient(runtime: IcaiSyncRuntime): AdminClient {
   if (!runtime.db)
     throw new Error(
@@ -87,17 +97,20 @@ function adminClient(runtime: IcaiSyncRuntime): AdminClient {
     );
   return new IcaiD1Client(runtime.db);
 }
+
 function jsonObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
 }
+
 function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
 }
-function sourceDto(row: SourceRow): IcaiSourceConfig {
+
+function sourceDto(row: SourceRow): SourceRuntimeConfig {
   return {
     id: row.id,
     name: row.name,
@@ -117,17 +130,22 @@ function sourceDto(row: SourceRow): IcaiSourceConfig {
     lastContentHash: row.last_content_hash,
     etag: row.etag,
     lastModified: row.last_modified,
+    lastSuccessAt: row.last_success_at,
   };
 }
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
 function retryDelay(attempt: number) {
   return Math.min(8_000, 600 * 2 ** attempt) + Math.floor(Math.random() * 250);
 }
+
 function asErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
+
 function isApprovedHttpIcaiUrl(value: string) {
   if (!isApprovedIcaiUrl(value)) return false;
   try {
@@ -143,7 +161,7 @@ async function fetchFollowingApprovedRedirects(url: string, init: RequestInit) {
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     if (!isApprovedHttpIcaiUrl(current))
       throw new Error("Rejected redirect outside approved ICAI hosts.");
-    const response = await fetch(current, { ...init, redirect:"manual" });
+    const response = await fetch(current, { ...init, redirect: "manual" });
     if (!REDIRECT_STATUSES.has(response.status)) return response;
     if (hop === MAX_REDIRECTS)
       throw new Error(`ICAI source exceeded ${MAX_REDIRECTS} redirects.`);
@@ -168,6 +186,7 @@ async function fetchFollowingApprovedRedirects(url: string, init: RequestInit) {
 async function fetchOfficialPage(
   source: IcaiSourceConfig,
   runtime: IcaiSyncRuntime,
+  { force = false }: { force?: boolean } = {},
 ) {
   if (!isApprovedIcaiUrl(source.officialUrl))
     throw new Error(`Rejected non-ICAI source URL for ${source.id}.`);
@@ -182,18 +201,15 @@ async function fetchOfficialPage(
         Accept: "text/html,application/xhtml+xml",
         "User-Agent": runtime.userAgent,
       });
-      if (source.etag) headers.set("If-None-Match", source.etag);
-      if (source.lastModified)
+      if (!force && source.etag) headers.set("If-None-Match", source.etag);
+      if (!force && source.lastModified)
         headers.set("If-Modified-Since", source.lastModified);
-      const response = await fetchFollowingApprovedRedirects(
-        source.officialUrl,
-        {
-          method: "GET",
-          headers,
-          cache: "no-store",
-          signal: controller.signal,
-        },
-      );
+      const response = await fetchFollowingApprovedRedirects(source.officialUrl, {
+        method: "GET",
+        headers,
+        cache: "no-store",
+        signal: controller.signal,
+      });
       if (response.status === 304)
         return { response, html: "", bytes: 0, notModified: true };
       if (response.status === 429 || response.status >= 500) {
@@ -234,12 +250,15 @@ async function fetchOfficialPage(
     ? lastError
     : new Error("Official ICAI source could not be fetched.");
 }
+
 function attemptId(levelCode: IcaiLevelCode, attemptKey: string) {
   return `attempt-${levelCode}-${attemptKey}`;
 }
+
 function subjectLevelCode(subject: SubjectRow, levels: Map<string, LevelRow>) {
   return levels.get(subject.level_id)?.code as IcaiLevelCode | undefined;
 }
+
 async function resourcePayload(
   source: IcaiSourceConfig,
   item: ParsedIcaiResource,
@@ -278,15 +297,75 @@ async function resourcePayload(
   };
 }
 
+async function markSourcePartial(
+  runtime: IcaiSyncRuntime,
+  runId: string,
+  source: SourceRuntimeConfig,
+  message: string,
+) {
+  const now = new Date().toISOString();
+  const run = await runtime.db
+    .prepare("SELECT error_summary FROM icai_sync_runs WHERE id=?1")
+    .bind(runId)
+    .first<{ error_summary: string | null }>();
+  const summary = (
+    (run?.error_summary ? `${run.error_summary}\n` : "") +
+    `${source.id}: ${message}`
+  ).slice(0, 4_000);
+  await runtime.db.batch([
+    runtime.db
+      .prepare(
+        `UPDATE icai_sources SET
+          last_success_at=?1,last_content_hash=?2,etag=?3,last_modified=?4,
+          last_error_at=?5,last_error=?6,consecutive_failures=consecutive_failures+1,updated_at=?5
+        WHERE id=?7`,
+      )
+      .bind(
+        source.lastSuccessAt,
+        source.lastContentHash,
+        source.etag,
+        source.lastModified,
+        now,
+        message.slice(0, 2_000),
+        source.id,
+      ),
+    runtime.db
+      .prepare(
+        "UPDATE icai_sync_runs SET source_succeeded=MAX(source_succeeded-1,0),source_failed=source_failed+1,error_summary=?1 WHERE id=?2",
+      )
+      .bind(summary, runId),
+  ]);
+}
+
+async function restoreTargetedRetrySourceState(
+  runtime: IcaiSyncRuntime,
+  source: SourceRuntimeConfig,
+) {
+  await runtime.db
+    .prepare(
+      "UPDATE icai_sources SET last_success_at=?1,last_content_hash=?2,etag=?3,last_modified=?4 WHERE id=?5",
+    )
+    .bind(
+      source.lastSuccessAt,
+      source.lastContentHash,
+      source.etag,
+      source.lastModified,
+      source.id,
+    )
+    .run();
+}
+
 async function processSource(
   client: AdminClient,
   runtime: IcaiSyncRuntime,
   runId: string,
-  source: IcaiSourceConfig,
+  source: SourceRuntimeConfig,
   levels: LevelRow[],
   subjects: SubjectRow[],
   attempts: AttemptRow[],
+  allowedItemUrls: Set<string> | null,
 ) {
+  const targetedRetry = Boolean(allowedItemUrls);
   const deadline = Date.now() + 2 * 60_000;
   const stage = async (
     value: Parameters<typeof setStage>[2],
@@ -299,7 +378,9 @@ async function processSource(
   };
 
   await stage("fetching");
-  const fetched = await fetchOfficialPage(source, runtime);
+  const fetched = await fetchOfficialPage(source, runtime, {
+    force: targetedRetry,
+  });
   await stage("validating", fetched.response.url || source.officialUrl);
   const snapshotBase = {
     http_status: fetched.response.status,
@@ -310,8 +391,10 @@ async function processSource(
     metadata: {
       authoritative_listing: source.authoritativeListing,
       source_type: source.sourceType,
+      targeted_retry: targetedRetry,
     },
   };
+
   if (fetched.notModified) {
     await stage("writing");
     const { error } = await client.rpc("icai_sync_record_unchanged", {
@@ -326,6 +409,7 @@ async function processSource(
     if (error) throw error;
     return;
   }
+
   const levelById = new Map(levels.map((level) => [level.id, level]));
   const subjectLookups = subjects.flatMap((subject) => {
     const levelCode = subjectLevelCode(subject, levelById);
@@ -333,19 +417,70 @@ async function processSource(
       ? [{ id: subject.id, title: subject.title, levelCode }]
       : [];
   });
+
   await stage("parsing");
-  const parsed = parseOfficialSource(fetched.html, source, subjectLookups);
+  const isolated = await processIsolatedSourceItems(
+    runtime.db,
+    runId,
+    source,
+    fetched.html,
+    subjectLookups,
+    allowedItemUrls,
+  );
+  const parsed = isolated.parsed;
   const parsedItemCount =
     parsed.resources.length + parsed.attempts.length + parsed.events.length;
   const allowEmpty = source.adapterConfig.allow_empty === true;
   if (parsedItemCount === 0 && !allowEmpty)
     throw new Error(
-      "Parser returned zero academic items. Last verified data was preserved for review.",
+      isolated.failures.length
+        ? `No safe academic items were produced. ${isolated.failures[0]} Last verified data was preserved.`
+        : "Parser returned zero academic items. Last verified data was preserved for review.",
     );
+
+  if (!targetedRetry) {
+    const previousCount = await previousSourceItemCount(runtime.db, source.id);
+    if (
+      previousCount !== null &&
+      previousCount >= 10 &&
+      parsedItemCount < Math.floor(previousCount * 0.5)
+    ) {
+      throw new Error(
+        `Suspicious parser item-count drop (${previousCount} -> ${parsedItemCount}). Last verified data was preserved for manual review.`,
+      );
+    }
+  }
+
+  const incomplete = isolated.failedCount > 0 || isolated.skippedCount > 0;
+  if (isolated.successfulCount === 0 && incomplete) {
+    throw new Error(
+      `All selected items failed or were skipped. Last verified data was preserved. ${isolated.failures[0] ?? ""}`.trim(),
+    );
+  }
+
   await stage("comparing");
   const canonicalHash = await sha256Hex(stableJson(parsed));
-  const snapshot = { ...snapshotBase, canonical_hash: canonicalHash };
-  if (source.lastContentHash && source.lastContentHash === canonicalHash) {
+  const authoritativeListing =
+    source.authoritativeListing && !incomplete && !targetedRetry;
+  const snapshot = {
+    ...snapshotBase,
+    canonical_hash: canonicalHash,
+    metadata: {
+      ...snapshotBase.metadata,
+      authoritative_listing: authoritativeListing,
+      item_terminal_count: isolated.terminalCount,
+      item_success_count: isolated.successfulCount,
+      item_failed_count: isolated.failedCount,
+      item_skipped_count: isolated.skippedCount,
+    },
+  };
+
+  if (
+    !incomplete &&
+    !targetedRetry &&
+    source.lastContentHash &&
+    source.lastContentHash === canonicalHash
+  ) {
     await stage("writing");
     const { error } = await client.rpc("icai_sync_record_unchanged", {
       p_run_id: runId,
@@ -355,17 +490,20 @@ async function processSource(
     if (error) throw error;
     return;
   }
+
   const attemptIdsByIdentity = new Map<string, string>();
   const attemptRowsByIdentity = new Map<string, AttemptRow>();
   for (const attempt of attempts) {
     const levelCode = levelById.get(attempt.level_id)?.code as
-      IcaiLevelCode | undefined;
+      | IcaiLevelCode
+      | undefined;
     if (levelCode) {
       const identity = `${levelCode}:${attempt.attempt_key}`;
       attemptIdsByIdentity.set(identity, attempt.id);
       attemptRowsByIdentity.set(identity, attempt);
     }
   }
+
   const attemptPayloads: Record<string, unknown>[] = [];
   for (const parsedAttempt of parsed.attempts) {
     for (const levelCode of parsedAttempt.levelCodes) {
@@ -377,8 +515,9 @@ async function processSource(
         attemptIdsByIdentity.get(identity) ??
         attemptId(levelCode, parsedAttempt.attemptKey);
       attemptIdsByIdentity.set(identity, id);
-      const startDate = parsedAttempt.startDate??existingAttempt?.start_date??"";
-      const endDate = parsedAttempt.endDate??existingAttempt?.end_date??"";
+      const startDate =
+        parsedAttempt.startDate ?? existingAttempt?.start_date ?? "";
+      const endDate = parsedAttempt.endDate ?? existingAttempt?.end_date ?? "";
       const canonical = {
         attemptKey: parsedAttempt.attemptKey,
         levelCode,
@@ -401,11 +540,30 @@ async function processSource(
       });
     }
   }
-  const resourcePayloads = await Promise.all(
-    parsed.resources.map((resource) =>
-      resourcePayload(source, resource, attemptIdsByIdentity),
-    ),
-  );
+
+  const resourcePayloads: Record<string, unknown>[] = [];
+  for (const resource of parsed.resources) {
+    try {
+      resourcePayloads.push(
+        await resourcePayload(source, resource, attemptIdsByIdentity),
+      );
+    } catch (error) {
+      await runtime.db
+        .prepare(
+          "UPDATE icai_sync_items SET status='failed',stage='payload',completed_at=CURRENT_TIMESTAMP,failure_category='payload',failure_message=?1,retry_eligible=1,updated_at=CURRENT_TIMESTAMP WHERE run_id=?2 AND source_id=?3 AND item_url=?4",
+        )
+        .bind(
+          asErrorMessage(error).slice(0, 2_000),
+          runId,
+          source.id,
+          resource.officialUrl,
+        )
+        .run();
+      isolated.failedCount += 1;
+      isolated.failures.push(`${resource.officialUrl}: ${asErrorMessage(error)}`);
+    }
+  }
+
   const eventPayloads: Record<string, unknown>[] = [];
   for (const event of parsed.events) {
     const attemptIdValue = attemptIdsByIdentity.get(
@@ -434,16 +592,44 @@ async function processSource(
       metadata: { detected_from: source.id },
     });
   }
+
+  const unsafeAfterPayload = isolated.failedCount > 0 || isolated.skippedCount > 0;
+  if (!resourcePayloads.length && !attemptPayloads.length && !eventPayloads.length) {
+    throw new Error(
+      `No safe payload remained after per-item validation. Last verified data was preserved. ${isolated.failures[0] ?? ""}`.trim(),
+    );
+  }
+
   await stage("writing");
+  const safeSnapshot = {
+    ...snapshot,
+    metadata: {
+      ...snapshot.metadata,
+      authoritative_listing:
+        source.authoritativeListing && !unsafeAfterPayload && !targetedRetry,
+    },
+  };
   const { error } = await client.rpc("icai_sync_apply_source_batch", {
     p_run_id: runId,
     p_source_id: source.id,
-    p_snapshot: snapshot as Json,
+    p_snapshot: safeSnapshot as Json,
     p_resources: resourcePayloads as Json,
     p_attempts: attemptPayloads as Json,
     p_events: eventPayloads as Json,
   });
   if (error) throw error;
+
+  if (targetedRetry) {
+    await restoreTargetedRetrySourceState(runtime, source);
+  }
+  if (unsafeAfterPayload) {
+    await markSourcePartial(
+      runtime,
+      runId,
+      source,
+      `${isolated.failedCount} item(s) failed and ${isolated.skippedCount} item(s) were skipped; successful items were applied without authoritative removals. Last-known-good source validators were preserved.`,
+    );
+  }
 }
 
 async function acquireRun(
@@ -451,16 +637,25 @@ async function acquireRun(
   trigger: "cron" | "manual" | "test",
   requestedBy: string | null,
   sourceIds: string[],
+  retrySelection: RetrySelection | null,
 ) {
   const id = crypto.randomUUID();
   const startedAt = new Date().toISOString();
   const details = JSON.stringify({
-    engine: "phase8",
+    engine: "phase8-item-isolation",
     execution: "internal_worker",
     persistence: "cloudflare-d1",
     source_ids: sourceIds,
+    retry_origin_run_id: retrySelection?.originRunId ?? null,
+    retry_mode: retrySelection?.mode ?? null,
   });
-  const row = await runtime.db.prepare(`INSERT INTO icai_sync_runs(id,trigger_type,requested_by,parser_version,status,started_at,source_total,details) SELECT ?1,?2,?3,?4,'running',?5,?6,?7 WHERE NOT EXISTS (SELECT 1 FROM icai_sync_runs WHERE status IN ('queued','running')) RETURNING id`)
+  const row = await runtime.db
+    .prepare(
+      `INSERT INTO icai_sync_runs(id,trigger_type,requested_by,parser_version,status,started_at,source_total,details)
+       SELECT ?1,?2,?3,?4,'running',?5,?6,?7
+       WHERE NOT EXISTS (SELECT 1 FROM icai_sync_runs WHERE status IN ('queued','running'))
+       RETURNING id`,
+    )
     .bind(
       id,
       trigger,
@@ -480,12 +675,26 @@ export async function runIcaiSyncEngine(
   {
     trigger,
     requestedBy = null,
-  }: { trigger: "cron" | "manual" | "test"; requestedBy?: string | null },
+    retryRunId = null,
+    retryMode = null,
+    retryItemId = null,
+  }: {
+    trigger: "cron" | "manual" | "test";
+    requestedBy?: string | null;
+    retryRunId?: string | null;
+    retryMode?: RetryMode | null;
+    retryItemId?: string | null;
+  },
 ): Promise<IcaiSyncSummary> {
   if (!runtime.enabled)
     throw new Error("ICAI synchronization is disabled for this environment.");
   await recoverStaleRuns(runtime.db);
   const client = adminClient(runtime);
+  const retrySelection =
+    retryRunId && retryMode
+      ? await loadRetrySelection(runtime.db, retryRunId, retryMode, retryItemId)
+      : null;
+
   const [sourceResponse, levelResponse, subjectResponse, attemptResponse] =
     await Promise.all([
       client.from("icai_sources").select("*").eq("is_active", true).order("id"),
@@ -503,16 +712,32 @@ export async function runIcaiSyncEngine(
     attemptResponse.error,
   ].find(Boolean);
   if (firstError) throw firstError;
-  const sources = ((sourceResponse.data ?? []) as SourceRow[]).map(sourceDto);
+
+  const configuredSources = ((sourceResponse.data ?? []) as SourceRow[]).map(
+    sourceDto,
+  );
+  const sources: SourceRuntimeConfig[] = [];
+  for (const source of configuredSources) {
+    if (retrySelection && !retrySelection.urlsBySource.has(source.id)) continue;
+    if (await sourceIsPaused(runtime.db, source.id)) continue;
+    sources.push(source);
+  }
   if (!sources.length)
-    throw new Error("No active ICAI sources are configured.");
+    throw new Error(
+      retrySelection
+        ? "No retry-eligible ICAI sources are currently available."
+        : "No active ICAI sources are configured or all active sources are temporarily paused.",
+    );
+
   const runId = await acquireRun(
     runtime,
     trigger,
     requestedBy,
     sources.map((source) => source.id),
+    retrySelection,
   );
   await initializeRuntime(runtime.db, runId);
+
   try {
     for (const [index, source] of sources.entries()) {
       try {
@@ -524,6 +749,7 @@ export async function runIcaiSyncEngine(
           (levelResponse.data ?? []) as LevelRow[],
           (subjectResponse.data ?? []) as SubjectRow[],
           (attemptResponse.data ?? []) as AttemptRow[],
+          retrySelection?.urlsBySource.get(source.id) ?? null,
         );
       } catch (error) {
         if (error instanceof SyncCancelledError) throw error;
@@ -547,6 +773,7 @@ export async function runIcaiSyncEngine(
         await sleep(source.requestIntervalSeconds * 1_000);
       }
     }
+
     await setStage(runtime.db, runId, "finalizing");
     await checkpoint(runtime.db, runId);
     const { data: finalRun, error: finalReadError } = await client
@@ -568,7 +795,11 @@ export async function runIcaiSyncEngine(
       .update({ status, completed_at: new Date().toISOString() })
       .eq("id", runId);
     if (finishError) throw finishError;
-    await setStage(runtime.db, runId, status === "success" ? "completed" : status);
+    await setStage(
+      runtime.db,
+      runId,
+      status === "success" ? "completed" : status,
+    );
     return {
       runId,
       status,

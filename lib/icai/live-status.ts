@@ -5,6 +5,14 @@ export type IcaiSyncLiveSourceState =
   | "pending"
   | "not_run";
 
+export type IcaiSyncLiveItemState =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "timed_out"
+  | "skipped";
+
 export type IcaiSyncLiveStatus = {
   observedAt: string;
   active: boolean;
@@ -44,16 +52,41 @@ export type IcaiSyncLiveStatus = {
     stale: boolean;
     cancelRequested: boolean;
     skipSourceRequested: boolean;
+    skipItemRequested: boolean;
+    skipRemainingRequested: boolean;
   } | null;
   sourceResults: Array<{
     sourceId: string;
     sourceName: string;
+    officialUrl: string;
     state: IcaiSyncLiveSourceState;
     httpStatus: number | null;
     parsedItemCount: number | null;
     changed: boolean | null;
     fetchedAt: string | null;
     error: string | null;
+  }>;
+  itemResults: Array<{
+    id: string;
+    sourceId: string;
+    sourceName: string;
+    itemUrl: string;
+    itemType: string;
+    itemTitle: string | null;
+    status: IcaiSyncLiveItemState;
+    stage: string;
+    attempts: number;
+    httpStatus: number | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    durationMs: number | null;
+    bytesFetched: number;
+    parsedCount: number;
+    failureCategory: string | null;
+    failureMessage: string | null;
+    skipReason: string | null;
+    retryEligible: boolean;
+    adminNote: string | null;
   }>;
   latestFailure: string | null;
   nextScheduledGroup: {

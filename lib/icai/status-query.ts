@@ -3,6 +3,7 @@ import "server-only";
 import { createD1AdminClient } from "@/lib/data/d1/client";
 import {
   ICAI_TERMINAL_RUN_STATUSES,
+  type IcaiSyncLiveItemState,
   type IcaiSyncLiveSourceState,
   type IcaiSyncLiveStatus,
 } from "./live-status";
@@ -13,9 +14,13 @@ const RUNTIME_COLUMNS =
   "run_id,stage,current_source_id,current_item_url,stage_started_at,heartbeat_at,cancel_requested,skip_source_requested";
 const SNAPSHOT_COLUMNS =
   "source_id,http_status,parsed_item_count,is_changed,fetched_at";
-const SOURCE_COLUMNS = "id,name,last_error,last_error_at,is_active";
+const SOURCE_COLUMNS = "id,name,official_url,last_error,last_error_at,is_active";
 const JOB_COLUMNS =
   "id,status,attempts,max_attempts,created_at,started_at,last_error";
+const ITEM_COLUMNS =
+  "id,run_id,source_id,item_url,item_type,item_title,status,stage,attempts,http_status,started_at,completed_at,duration_ms,bytes_fetched,parsed_count,failure_category,failure_message,skip_reason,retry_eligible,admin_note,created_at";
+const ITEM_CONTROL_COLUMNS =
+  "run_id,skip_item_requested,skip_remaining_requested";
 
 function asString(value: unknown) {
   return value === null || value === undefined ? null : String(value);
@@ -26,9 +31,29 @@ function asNumber(value: unknown) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function nullableNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function isStale(value: unknown) {
   const timestamp = new Date(String(value ?? "")).getTime();
   return Number.isFinite(timestamp) && Date.now() - timestamp > 2 * 60_000;
+}
+
+function itemState(value: unknown): IcaiSyncLiveItemState {
+  const state = String(value ?? "pending");
+  return [
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "timed_out",
+    "skipped",
+  ].includes(state)
+    ? (state as IcaiSyncLiveItemState)
+    : "failed";
 }
 
 export async function getIcaiSyncLiveStatus(
@@ -80,12 +105,19 @@ export async function getIcaiSyncLiveStatus(
       run: null,
       runtime: null,
       sourceResults: [],
+      itemResults: [],
       latestFailure: asString(job?.last_error),
       nextScheduledGroup: null,
     };
   }
 
-  const [runtimeResponse, snapshotResponse, sourceResponse] = await Promise.all([
+  const [
+    runtimeResponse,
+    snapshotResponse,
+    sourceResponse,
+    itemResponse,
+    itemControlResponse,
+  ] = await Promise.all([
     client
       .from("icai_sync_runtime")
       .select(RUNTIME_COLUMNS)
@@ -100,17 +132,32 @@ export async function getIcaiSyncLiveStatus(
       .select(SOURCE_COLUMNS)
       .eq("is_active", true)
       .order("id"),
+    client
+      .from("icai_sync_items")
+      .select(ITEM_COLUMNS)
+      .eq("run_id", runId)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    client
+      .from("icai_sync_item_controls")
+      .select(ITEM_CONTROL_COLUMNS)
+      .eq("run_id", runId)
+      .maybeSingle(),
   ]);
   const firstError = [
     runtimeResponse.error,
     snapshotResponse.error,
     sourceResponse.error,
+    itemResponse.error,
+    itemControlResponse.error,
   ].find(Boolean);
   if (firstError) throw firstError;
 
   const runtime = runtimeResponse.data as Record<string, unknown> | null;
+  const itemControl = itemControlResponse.data as Record<string, unknown> | null;
   const snapshots = (snapshotResponse.data ?? []) as Array<Record<string, unknown>>;
   const sources = (sourceResponse.data ?? []) as Array<Record<string, unknown>>;
+  const items = (itemResponse.data ?? []) as Array<Record<string, unknown>>;
   const snapshotBySource = new Map(
     snapshots.map((snapshot) => [String(snapshot.source_id), snapshot]),
   );
@@ -129,7 +176,8 @@ export async function getIcaiSyncLiveStatus(
     const lastErrorAt = asString(source.last_error_at);
     const failedThisRun = Boolean(lastErrorAt && lastErrorAt >= startedAt);
     let state: IcaiSyncLiveSourceState;
-    if (snapshot) state = "fetched";
+    if (snapshot && failedThisRun) state = "failed";
+    else if (snapshot) state = "fetched";
     else if (failedThisRun) state = "failed";
     else if (sourceId === currentSourceId && active) state = "running";
     else if (terminal) state = "not_run";
@@ -137,6 +185,7 @@ export async function getIcaiSyncLiveStatus(
     return {
       sourceId,
       sourceName: String(source.name),
+      officialUrl: String(source.official_url),
       state,
       httpStatus: snapshot ? asNumber(snapshot.http_status) : null,
       parsedItemCount: snapshot ? asNumber(snapshot.parsed_item_count) : null,
@@ -146,10 +195,39 @@ export async function getIcaiSyncLiveStatus(
     };
   });
 
+  const itemResults = items.map((item) => {
+    const source = sourceById.get(String(item.source_id));
+    return {
+      id: String(item.id),
+      sourceId: String(item.source_id),
+      sourceName: source ? String(source.name) : String(item.source_id),
+      itemUrl: String(item.item_url),
+      itemType: String(item.item_type),
+      itemTitle: asString(item.item_title),
+      status: itemState(item.status),
+      stage: String(item.stage),
+      attempts: asNumber(item.attempts),
+      httpStatus: nullableNumber(item.http_status),
+      startedAt: asString(item.started_at),
+      completedAt: asString(item.completed_at),
+      durationMs: nullableNumber(item.duration_ms),
+      bytesFetched: asNumber(item.bytes_fetched),
+      parsedCount: asNumber(item.parsed_count),
+      failureCategory: asString(item.failure_category),
+      failureMessage: asString(item.failure_message),
+      skipReason: asString(item.skip_reason),
+      retryEligible: Boolean(item.retry_eligible),
+      adminNote: asString(item.admin_note),
+    };
+  });
+
   const sourceFailure = sources.find((source) => {
     const lastErrorAt = asString(source.last_error_at);
     return Boolean(lastErrorAt && lastErrorAt >= startedAt && source.last_error);
   });
+  const itemFailure = itemResults.find(
+    (item) => item.status === "failed" || item.status === "timed_out",
+  );
   const currentSource = currentSourceId
     ? sourceById.get(currentSourceId) ?? null
     : null;
@@ -196,10 +274,14 @@ export async function getIcaiSyncLiveStatus(
           stale: isStale(runtime.heartbeat_at),
           cancelRequested: Boolean(runtime.cancel_requested),
           skipSourceRequested: Boolean(runtime.skip_source_requested),
+          skipItemRequested: Boolean(itemControl?.skip_item_requested),
+          skipRemainingRequested: Boolean(itemControl?.skip_remaining_requested),
         }
       : null,
     sourceResults,
+    itemResults,
     latestFailure:
+      itemFailure?.failureMessage ??
       asString(run.error_summary) ??
       asString(job?.last_error) ??
       asString(sourceFailure?.last_error),
