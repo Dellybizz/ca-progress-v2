@@ -1,0 +1,50 @@
+name: Temporary Phase 2A 2B Repair
+
+on:
+  push:
+    branches: [icai-phase2-ab-finalizer-fix-20260910]
+    paths:
+      - scripts/__phase2_ab_fix.py
+      - .github/workflows/__phase2-ab-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: icai-phase2-ab-finalizer-fix-20260910
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Apply Phase 2A 2B repair
+        run: python3 scripts/__phase2_ab_fix.py
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Focused Phase 2 continuation tests
+        run: node --test tests/icai-phase2ab-continuation.test.mjs tests/icai-incremental-phase2.test.mjs tests/icai-queue-consumer-budget.test.mjs
+      - name: Focused ICAI suite
+        run: npm run test:icai:phase5
+      - name: Full repository tests
+        run: npm test
+      - name: Clean D1 double-migration validation
+        run: npm run d1:hot-indexes:validate
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Commit verified repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ca-progress-phase2-bot"
+          git config user.email "ca-progress-phase2-bot@users.noreply.github.com"
+          git checkout -- package-lock.json tsconfig.tsbuildinfo 2>/dev/null || true
+          git add custom-worker.ts lib/icai/sync.ts lib/jobs/execute.ts workers/icai-sync/index.ts workers/icai-sync/sync-engine.ts scripts/verify-icai-phase5-live.mjs scripts/verify-icai-phase2-live.mjs tests/icai-phase2ab-continuation.test.mjs package.json scripts/__phase2_ab_fix.py
+          git diff --cached --check
+          git commit -m "fix(icai): resume source batches before finalization"
+          git push origin HEAD:icai-phase2-ab-finalizer-fix-20260910
