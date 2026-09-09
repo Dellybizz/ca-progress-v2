@@ -5,6 +5,7 @@ on:
     branches: [icai-phase2-ab-finalizer-fix-20260910]
     paths:
       - scripts/__phase2_ab_fix.py
+      - tests/icai-sync-phase5.test.mjs
       - .github/workflows/__phase2-ab-fix.yml
 
 permissions:
