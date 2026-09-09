@@ -13,11 +13,12 @@ test("Phase 3B persists pause and temporary source exclusion without touching ca
 
 test("Phase 3B targeted and recovery controls are authorized audited and queue-idempotent",()=>{
   const actions=read("app/(admin)/admin/icai-sync/actions.ts");
-  for(const action of ["pause","resume","cancel","skip","recover","restore_item","exclude_source","failed_only","retry_batch","retry_source","force"]){assert.match(actions,new RegExp(action));}
+  for(const action of ["pause","resume","cancel","skip","recover","restore_item","exclude_source","restore_source","failed_only","retry_source","force"]){assert.match(actions,new RegExp(action));}
   assert.match(actions,/requireAdminCapability\("icai\.run"\)/);
   assert.match(actions,/recordAdminAuditEvent/);
   assert.match(actions,/jobKey\("icai-sync", "targeted"/);
   assert.match(actions,/Confirm stale-lock recovery/);
+  assert.match(actions,/excluded_until: null, exclusion_reason: null/);
   assert.doesNotMatch(actions,/delete\(/);
 });
 
@@ -30,10 +31,13 @@ test("Phase 3B pauses only after a durable batch and force recheck keeps canonic
   assert.doesNotMatch(engine,/forceRecheck[\s\S]{0,200}DELETE/);
 });
 
-test("Phase 3B exposes every operator recovery control",()=>{
+test("Phase 3B exposes truthful source and file recovery controls",()=>{
   const panel=read("components/icai/admin-sync-monitor.tsx");
   const live=read("components/icai/sync-live-refresh.tsx");
-  for(const label of ["Run failed sources","Run source","Force recheck","Retry failed batch","Retry failed source","Exclude 24h","Restore file","Open ICAI page"]){assert.match(panel,new RegExp(label));}
+  for(const label of ["Run failed sources","Run source","Force recheck","Retry failed source","Exclude 24h","Restore source","Restore file","Open ICAI page"]){assert.match(panel,new RegExp(label));}
+  assert.doesNotMatch(panel,/>Retry failed batch</);
+  assert.match(panel,/excludeIcaiSourceAction/);
+  assert.match(panel,/restoreIcaiSourceAction/);
   assert.match(read("components/icai/copy-failure-button.tsx"),/Copy failure details/);
   assert.match(live,/Pause after batch/);assert.match(live,/Resume/);assert.match(live,/Confirm stale lock/);
 });
