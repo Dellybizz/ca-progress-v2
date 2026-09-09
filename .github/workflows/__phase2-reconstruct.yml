@@ -58,14 +58,27 @@ jobs:
         run: npm run typecheck
       - name: Lint
         run: npm run lint
-      - name: Commit verified Phase 2 tree
+      - name: Persist verified non-workflow Phase 2 tree
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "ca-progress-phase2-bot"
           git config user.email "ca-progress-phase2-bot@users.noreply.github.com"
-          rm -f phase2-regression-failure.txt
+
+          # The reconstruction script intentionally deletes its temporary helper and
+          # workflow. Restore those two staging files here so this Actions token never
+          # attempts a workflow-file write; they are removed later through the connected
+          # GitHub API, which has the required repository permission.
+          git checkout -- scripts/__phase2_reconstruct.py .github/workflows/__phase2-reconstruct.yml
+
+          # deploy-staging.yml is the only real Phase 2 workflow edit. Leave it for the
+          # connected GitHub API for the same workflow-permission reason.
+          git checkout -- .github/workflows/deploy-staging.yml
+
+          # Never persist local build/install artifacts from the verification runner.
+          rm -f package-lock.json tsconfig.tsbuildinfo phase2-regression-failure.txt
+
           git add -A
           git diff --cached --check
-          git commit -m "feat(icai): lock bootstrap and certify incremental sync"
+          git commit -m "feat(icai): lock bootstrap and incremental state"
           git push origin HEAD:phase2-reconstruct-20260909
