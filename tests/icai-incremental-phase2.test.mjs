@@ -34,6 +34,14 @@ test("Phase 2 resource identity survives a changed direct ICAI PDF URL", () => {
   assert.match(engine, /sha256Hex\(semanticKey\)/);
   assert.doesNotMatch(engine, /sha256Hex\(`\$\{source\.id\}:\$\{item\.officialUrl\}`\)/);
   assert.match(engine, /semantic_key: semanticKey/);
+  assert.match(engine, /if \(!existingBySemantic\.has\(key\)\)/);
+  assert.doesNotMatch(engine, /Ambiguous ICAI semantic resource identity/);
+});
+
+test("Phase 2 skips stale nested ICAI leaves without failing the complete source", () => {
+  const resolver = read("workers/icai-sync/direct-resource-resolver.ts");
+  assert.match(resolver, /response\.status === 404 \|\| response\.status === 410/);
+  assert.match(resolver, /if \(html === null\) return null/);
 });
 
 test("Phase 2 retained migration and clean-D1 validator cover migration 0033", () => {
@@ -54,6 +62,7 @@ test("Phase 2 deployment proves a second real Queue sync is idempotent", () => {
   assert.match(verifier, /icai-phase5-real-run\.json/);
   assert.match(verifier, /baseline-recovery/);
   assert.match(verifier, /two \*complete\* runs/);
+  assert.match(verifier, /\["success", "partial"\]\.includes\(run\.status\)/);
   assert.match(verifier, /Phase 2 repeat sync was not idempotent/);
   assert.match(verifier, /repeatRun\.new_items/);
   assert.match(verifier, /bootstrap_completed_at !== before\.bootstrap_completed_at/);

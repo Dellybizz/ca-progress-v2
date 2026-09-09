@@ -266,6 +266,8 @@ type ExistingResourceIdentityRow = {
   official_url: string;
   metadata: unknown;
   subject_ids: string | null;
+  status: string;
+  last_seen_at: string;
 };
 
 type SourceWatermarkRow = {
@@ -310,7 +312,7 @@ async function existingResourceIdentityMaps(
 ) {
   const result = await runtime.db
     .prepare(
-      "SELECT r.id,r.resource_type,r.title,r.official_url,r.metadata,COALESCE(group_concat(m.subject_id, char(31)),'') AS subject_ids FROM icai_resources r LEFT JOIN resource_subject_map m ON m.resource_id=r.id WHERE r.source_id=?1 GROUP BY r.id,r.resource_type,r.title,r.official_url,r.metadata",
+      "SELECT r.id,r.resource_type,r.title,r.official_url,r.metadata,r.status,r.last_seen_at,COALESCE(group_concat(m.subject_id, char(31)),'') AS subject_ids FROM icai_resources r LEFT JOIN resource_subject_map m ON m.resource_id=r.id WHERE r.source_id=?1 GROUP BY r.id,r.resource_type,r.title,r.official_url,r.metadata,r.status,r.last_seen_at ORDER BY CASE WHEN r.status='active' THEN 0 ELSE 1 END,r.last_seen_at DESC,r.id ASC",
     )
     .bind(source.id)
     .all<ExistingResourceIdentityRow>();
@@ -332,10 +334,11 @@ async function existingResourceIdentityMaps(
       levelCodes,
       subjectIds,
     );
-    const previous = existingBySemantic.get(key);
-    if (previous && previous !== row.id)
-      throw new Error(`Ambiguous ICAI semantic resource identity for ${source.id}: ${row.title}`);
-    existingBySemantic.set(key, row.id);
+    // Phase 1 may contain two legacy rows with the same broad title (for
+    // example, "Initial Pages"). Exact URL identity still wins below; for a
+    // replaced URL, retain the first active/newest row selected by the query.
+    // Never abort the complete source merely because legacy data is ambiguous.
+    if (!existingBySemantic.has(key)) existingBySemantic.set(key, row.id);
   }
   return { existingByUrl, existingBySemantic };
 }

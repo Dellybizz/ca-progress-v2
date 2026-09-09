@@ -135,6 +135,10 @@ async function fetchApprovedHtml(url: string, userAgent: string, timeoutMs: numb
         current = new URL(location, current).toString();
         continue;
       }
+      // ICAI occasionally leaves a stale nested Study Material link in an
+      // otherwise valid listing. Treat that one missing leaf as unavailable;
+      // the caller will drop it without failing the whole official source.
+      if (response.status === 404 || response.status === 410) return null;
       if (!response.ok) throw new Error(`ICAI resource page returned ${response.status}`);
       const contentType = response.headers.get("content-type") ?? "";
       if (!/text\/html|application\/xhtml\+xml/i.test(contentType)) {
@@ -207,6 +211,7 @@ export async function resolveDirectStudyMaterialPdfs(
     visited.add(resource.officialUrl);
     childPages += 1;
     const html = await fetchApprovedHtml(resource.officialUrl, userAgent, source.timeoutMs);
+    if (html === null) return null;
     const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
     const parsed = parseOfficialSource(html, childSource, subjects).resources.map((child) =>
       mergeContext(resource, child),

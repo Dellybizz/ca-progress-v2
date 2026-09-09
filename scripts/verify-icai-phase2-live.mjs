@@ -89,7 +89,7 @@ async function waitForContinuation(startedAt, correlationId) {
     if (runIds.length === 1) {
       const run = d1(`SELECT id,status,started_at,completed_at,source_total,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary FROM icai_sync_runs WHERE id=${sqlText(runIds[0])} AND started_at>=${sqlText(startedAt)} LIMIT 1;`)[0];
       if (run && ["failed", "cancelled"].includes(run.status)) throw new Error(`Phase 2 repeat run ended ${run.status}: ${run.error_summary ?? "unknown error"}`);
-      if (run && run.status === "success" && childJobs.length === Number(run.source_total) && childJobs.every((row) => row.status === "succeeded")) return { run, childJobs };
+      if (run && ["success", "partial"].includes(run.status) && childJobs.length === Number(run.source_total) && childJobs.every((row) => row.status === "succeeded")) return { run, childJobs };
     }
     await sleep(POLL_MS);
   }
