@@ -306,6 +306,7 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
     reviewResponse,
     changeResponse,
     jobResponse,
+    skipResponse,
   ] = await Promise.all([
     client
       .from("icai_sync_runs")
@@ -330,6 +331,7 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
       .eq("job_type", "icai-sync")
       .order("created_at", { ascending: false })
       .limit(20),
+    client.from("icai_sync_item_skips").select("id,source_id,item_url,scope,skipped_until").eq("is_active", true).order("updated_at", { ascending: false }).limit(50),
   ]);
 
   const firstError = [
@@ -338,6 +340,7 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
     reviewResponse.error,
     changeResponse.error,
     jobResponse.error,
+    skipResponse.error,
   ].find(Boolean);
   if (firstError) throw firstError;
 
@@ -461,7 +464,9 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
       trustLevel: source.trust_level,
       authoritativeListing: source.authoritative_listing,
       isActive: source.is_active,
+      excludedUntil: (source as SourceRow & { excluded_until?: string | null }).excluded_until ?? null,
     })),
+    skippedItems: ((skipResponse.data ?? []) as Array<Record<string, unknown>>).map((item) => ({ id: String(item.id), sourceId: String(item.source_id), itemUrl: String(item.item_url), scope: String(item.scope), skippedUntil: item.skipped_until ? String(item.skipped_until) : null })),
     reviews: ((reviewResponse.data ?? []) as ReviewRow[]).map((review) => {
       const source = sourceById.get(review.source_id);
       const rawPatch = review.proposed_patch;

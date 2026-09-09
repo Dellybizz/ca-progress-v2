@@ -216,7 +216,9 @@ export type IcaiAdminDashboard = {
     trustLevel: string;
     authoritativeListing: boolean;
     isActive: boolean;
+    excludedUntil: string | null;
   }[];
+  skippedItems: { id: string; sourceId: string; itemUrl: string; scope: string; skippedUntil: string | null }[];
   reviews: {
     id: string;
     title: string;

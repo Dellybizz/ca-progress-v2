@@ -61,3 +61,28 @@ test("ICAI admin page no longer claims full-page auto refresh", () => {
   assert.match(panel, /Recover stalled run/);
   assert.doesNotMatch(panel, /refreshes automatically during a sync/);
 });
+
+test("Phase 3A derives one truthful queue, run and runtime status model", () => {
+  const query = read("lib/icai/status-query.ts");
+  const types = read("lib/icai/live-status.ts");
+  const monitor = read("components/icai/sync-live-refresh.tsx");
+  const worker = read("custom-worker.ts");
+
+  for (const state of ["queued", "discovering", "fetching", "comparing", "writing", "finalizing", "stalled", "skipped", "failed", "completed"]) {
+    assert.match(types, new RegExp(`\\| \\"${state}\\"`));
+  }
+  assert.match(query, /ICAI_STALL_THRESHOLD_MS/);
+  assert.match(query, /overallPercent/);
+  assert.match(query, /estimatedCompletionAt/);
+  assert.match(query, /nextDailySync/);
+  assert.match(query, /source_index,status,attempts,cursor_offset,cursor_total,continuation_count/);
+  assert.match(query, /sourceState\?\.status === "skipped"/);
+  assert.match(monitor, /Queued · worker pending/);
+  assert.doesNotMatch(monitor, /Waiting for run/);
+  assert.match(monitor, /Estimated completion/);
+  assert.match(monitor, /Next retry/);
+  assert.match(monitor, /another sync cannot start/);
+  assert.match(monitor, /remainingItems/);
+  assert.match(worker, /message\.retry\(\{ delaySeconds: retryDelaySeconds \}\)/);
+  assert.match(worker, /available_at=\?1/);
+});

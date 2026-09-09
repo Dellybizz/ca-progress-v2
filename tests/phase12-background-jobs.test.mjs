@@ -16,7 +16,7 @@ test("Phase 12 has durable queue job types and dead-letter persistence", () => {
     assert.match(worker, new RegExp(type.replace("-", "\\-")));
   }
   assert.match(worker, /background_job_dead_letters/);
-  assert.match(worker, /message\.retry\(\)/);
+  assert.match(worker, /message\.retry\(\{ delaySeconds: retryDelaySeconds \}\)/);
 });
 
 test("dashboard and planner use persisted data without doing AI work in page requests", () => {

@@ -11,6 +11,7 @@ import { IcaiD1Client, type D1Database } from "./d1-client";
 import {
   checkpoint,
   initializeRuntime,
+  pauseAfterBatchRequested,
   recoverStaleRuns,
   setStage,
   SyncCancelledError,
@@ -318,8 +319,8 @@ async function existingResourceIdentityMaps(
     .all<ExistingResourceIdentityRow>();
   const existingByUrl = new Map<string, string>();
   const existingBySemantic = new Map<string, string>();
+  const explicitRowsBySemantic = new Map<string, ExistingResourceIdentityRow[]>();
   for (const row of result.results ?? []) {
-    existingByUrl.set(row.official_url, row.id);
     const metadata = metadataObject(row.metadata);
     const levelCodes = Array.isArray(metadata.level_codes)
       ? metadata.level_codes.filter((value): value is string => typeof value === "string")
@@ -339,8 +340,25 @@ async function existingResourceIdentityMaps(
     // replaced URL, retain the first active/newest row selected by the query.
     // Never abort the complete source merely because legacy data is ambiguous.
     if (!existingBySemantic.has(key)) existingBySemantic.set(key, row.id);
+    const explicitKey = typeof metadata.semantic_key === "string" ? metadata.semantic_key : null;
+    if (explicitKey) {
+      const rows = explicitRowsBySemantic.get(explicitKey) ?? [];
+      rows.push(row);
+      explicitRowsBySemantic.set(explicitKey, rows);
+    }
   }
-  return { existingByUrl, existingBySemantic };
+  const legacyDuplicateReplacements: Array<{ duplicateId: string; canonicalId: string }> = [];
+  for (const row of result.results ?? []) {
+    const metadata = metadataObject(row.metadata);
+    const explicitKey = typeof metadata.semantic_key === "string" ? metadata.semantic_key : null;
+    const explicitRows = explicitKey ? explicitRowsBySemantic.get(explicitKey) ?? [] : [];
+    const canonicalId = explicitRows[0]?.id ?? row.id;
+    existingByUrl.set(row.official_url, canonicalId);
+    if (explicitRows.length > 1 && row.id !== canonicalId) {
+      legacyDuplicateReplacements.push({ duplicateId: row.id, canonicalId });
+    }
+  }
+  return { existingByUrl, existingBySemantic, legacyDuplicateReplacements };
 }
 
 async function resourcePayload(
@@ -405,7 +423,9 @@ async function processSource(
   levels: LevelRow[],
   subjects: SubjectRow[],
   attempts: AttemptRow[],
-) {
+): Promise<boolean> {
+  const MAX_SOURCE_CONTINUATIONS = 50;
+  const MAX_PARTIAL_PAYLOAD_BYTES = 1_500_000;
   const deadline = Date.now() + 2 * 60_000;
   const stage = async (
     value: Parameters<typeof setStage>[2],
@@ -443,7 +463,7 @@ async function processSource(
       } as Json,
     });
     if (error) throw error;
-    return;
+    return true;
   }
   const levelById = new Map(levels.map((level) => [level.id, level]));
   const subjectLookups = subjects.flatMap((subject) => {
@@ -462,13 +482,64 @@ async function processSource(
       "Parser returned zero academic items. Last verified data was preserved for review.",
     );
 
+  const sourceState = await runtime.db.prepare("SELECT cursor_offset,cursor_total,continuation_count,listing_hash,partial_resources,partial_events,resolved_count,dropped_count,unavailable_count FROM icai_sync_source_states WHERE run_id=?1 AND source_id=?2 LIMIT 1")
+    .bind(runId, source.id)
+    .first<{ cursor_offset:number;cursor_total:number;continuation_count:number;listing_hash:string|null;partial_resources:string;partial_events:string;resolved_count:number;dropped_count:number;unavailable_count:number }>();
+  const listingHash = await sha256Hex(stableJson(discovered.resources.map((item) => item.officialUrl)));
+  const cursorCompatible = Boolean(sourceState && (!sourceState.listing_hash || sourceState.listing_hash === listingHash));
+  const cursorOffset = cursorCompatible ? Math.min(Number(sourceState?.cursor_offset ?? 0), discovered.resources.length) : 0;
+  const chunkEnd = sourceState ? Math.min(cursorOffset + 4, discovered.resources.length) : discovered.resources.length;
+  let partialResources: typeof discovered.resources = [];
+  let partialEvents = discovered.events;
+  if (cursorCompatible && sourceState?.partial_resources) {
+    try { partialResources = JSON.parse(sourceState.partial_resources) as typeof discovered.resources; } catch { partialResources = []; }
+    try { partialEvents = JSON.parse(sourceState.partial_events) as typeof discovered.events; } catch { partialEvents = discovered.events; }
+  }
+  const discoveryChunk = {
+    ...discovered,
+    resources: discovered.resources.slice(cursorOffset, chunkEnd),
+    attempts: [],
+    events: partialEvents,
+  };
+
+  const skipRows = await runtime.db
+    .prepare("SELECT item_url FROM icai_sync_item_skips WHERE source_id=?1 AND is_active=1 AND (scope='permanent' OR skipped_until>CURRENT_TIMESTAMP)")
+    .bind(source.id)
+    .all<{ item_url: string }>();
+  const skippedUrls = new Set((skipRows.results ?? []).map((row) => row.item_url));
   const direct = await resolveDirectStudyMaterialPdfs(
-    discovered,
+    discoveryChunk,
     source,
     subjectLookups,
     runtime.userAgent,
+    skippedUrls,
+    async (itemUrl) => {
+      await setStage(runtime.db, runId, "parsing", source.id, itemUrl);
+      await checkpoint(runtime.db, runId);
+    },
   );
-  if (direct.unavailableLandingPages > 0) {
+  if (direct.itemFailures.length) {
+    await runtime.db.batch(direct.itemFailures.map((failure) => runtime.db
+      .prepare("INSERT INTO icai_sync_item_failures(id,run_id,source_id,item_url,stage,failure_kind,error_message,skipped,occurred_at) VALUES(?1,?2,?3,?4,'resolving_nested_pages',?5,?6,1,CURRENT_TIMESTAMP)")
+      .bind(crypto.randomUUID(), runId, source.id, failure.itemUrl, failure.kind, failure.message.slice(0, 1000))));
+  }
+  const accumulatedResources = new Map(partialResources.map((item) => [item.officialUrl, item]));
+  for (const item of direct.payload.resources) accumulatedResources.set(item.officialUrl, item);
+  const resolvedLandingPages = Number(cursorCompatible ? sourceState?.resolved_count ?? 0 : 0) + direct.resolvedLandingPages;
+  const droppedLandingPages = Number(cursorCompatible ? sourceState?.dropped_count ?? 0 : 0) + direct.droppedLandingPages;
+  const unavailableLandingPages = Number(cursorCompatible ? sourceState?.unavailable_count ?? 0 : 0) + direct.unavailableLandingPages;
+  if (sourceState && chunkEnd < discovered.resources.length) {
+    const continuationCount = cursorCompatible ? Number(sourceState.continuation_count) + 1 : 1;
+    if (continuationCount > MAX_SOURCE_CONTINUATIONS) throw new Error("Source exceeded the bounded continuation limit.");
+    const resourcesJson = JSON.stringify([...accumulatedResources.values()]);
+    const eventsJson = JSON.stringify(direct.payload.events);
+    if (resourcesJson.length + eventsJson.length > MAX_PARTIAL_PAYLOAD_BYTES) throw new Error("Source continuation payload exceeded the safe D1 checkpoint size.");
+    await runtime.db.prepare("UPDATE icai_sync_source_states SET cursor_offset=?1,cursor_total=?2,continuation_count=?3,listing_hash=?4,partial_resources=?5,partial_events=?6,resolved_count=?7,dropped_count=?8,unavailable_count=?9,updated_at=CURRENT_TIMESTAMP WHERE run_id=?10 AND source_id=?11")
+      .bind(chunkEnd, discovered.resources.length, continuationCount, listingHash, resourcesJson, eventsJson, resolvedLandingPages, droppedLandingPages, unavailableLandingPages, runId, source.id).run();
+    return false;
+  }
+  const resolvedPayload = { ...discovered, resources: [...accumulatedResources.values()], events: direct.payload.events };
+  if (unavailableLandingPages > 0) {
     const existing = await runtime.db
       .prepare("SELECT COUNT(*) AS count FROM icai_resources WHERE source_id=?1")
       .bind(source.id)
@@ -485,13 +556,13 @@ async function processSource(
             ...snapshotBase.metadata,
             authoritative_listing: false,
             incomplete_nested_traversal: true,
-            unavailable_study_material_pages: direct.unavailableLandingPages,
+            unavailable_study_material_pages: unavailableLandingPages,
             preserved_existing_resources: Number(existing?.count ?? 0),
           },
         } as Json,
       });
       if (error) throw error;
-      return;
+      return true;
     }
   }
   const watermark = await runtime.db
@@ -512,7 +583,7 @@ async function processSource(
         },
       }
     : source;
-  const windowed = applyIcaiWindowPolicy(direct.payload, policySource);
+  const windowed = applyIcaiWindowPolicy(resolvedPayload, policySource);
   const parsed = windowed.payload;
   const parsedItemCount =
     parsed.resources.length + parsed.attempts.length + parsed.events.length;
@@ -522,6 +593,7 @@ async function processSource(
   const snapshot = {
     ...snapshotBase,
     canonical_hash: canonicalHash,
+    listing_hash: listingHash,
     metadata: {
       ...snapshotBase.metadata,
       // A bounded window is intentionally not a complete historical listing.
@@ -529,15 +601,15 @@ async function processSource(
       authoritative_listing:
         source.authoritativeListing &&
         windowed.filteredCount === 0 &&
-        direct.droppedLandingPages === 0 &&
-        direct.unavailableLandingPages === 0,
+        droppedLandingPages === 0 &&
+        unavailableLandingPages === 0,
       window_mode: windowed.mode,
       bootstrap_attempt_floor: windowed.attemptFloor,
       published_floor: windowed.publishedFloor,
       filtered_item_count: windowed.filteredCount,
-      resolved_study_material_pages: direct.resolvedLandingPages,
-      dropped_study_material_pages: direct.droppedLandingPages,
-      unavailable_study_material_pages: direct.unavailableLandingPages,
+      resolved_study_material_pages: resolvedLandingPages,
+      dropped_study_material_pages: droppedLandingPages,
+      unavailable_study_material_pages: unavailableLandingPages,
       parsed_item_count_after_window: parsedItemCount,
     },
   };
@@ -549,7 +621,7 @@ async function processSource(
       p_snapshot: snapshot as Json,
     });
     if (error) throw error;
-    return;
+    return true;
   }
   const attemptIdsByIdentity = new Map<string, string>();
   const attemptRowsByIdentity = new Map<string, AttemptRow>();
@@ -597,7 +669,7 @@ async function processSource(
       });
     }
   }
-  const { existingByUrl, existingBySemantic } =
+  const { existingByUrl, existingBySemantic, legacyDuplicateReplacements } =
     await existingResourceIdentityMaps(runtime, source);
   const resourcePayloads = await Promise.all(
     parsed.resources.map((resource) =>
@@ -646,6 +718,7 @@ async function processSource(
     p_resources: resourcePayloads as Json,
     p_attempts: attemptPayloads as Json,
     p_events: eventPayloads as Json,
+    p_resource_duplicates: legacyDuplicateReplacements as Json,
   });
   if (error) throw error;
 
@@ -656,6 +729,7 @@ async function processSource(
       .bind(JSON.stringify(completedAdapterConfig(source, completedAt)), completedAt, source.id)
       .run();
   }
+  return true;
 }
 
 async function acquireRun(
@@ -696,9 +770,11 @@ export type IcaiSyncContinuationStart = {
 export type IcaiSyncContinuationSourceResult = {
   runId: string;
   sourceId: string;
-  status: "succeeded" | "failed" | "skipped" | "cancelled";
+  status: "continuing" | "paused" | "succeeded" | "failed" | "skipped" | "cancelled";
   requestIntervalSeconds: number;
   alreadyComplete: boolean;
+  cursorOffset?: number;
+  cursorTotal?: number;
 };
 
 function parseDetails(value: unknown): Record<string, unknown> {
@@ -723,24 +799,30 @@ async function ensureContinuationSourceStates(runtime: IcaiSyncRuntime, runId: s
 async function continuationSources(client: AdminClient) {
   const response = await client.from("icai_sources").select("*").eq("is_active", true).order("id");
   if (response.error) throw response.error;
-  const sources = ((response.data ?? []) as SourceRow[]).map(sourceDto);
+  const now = new Date().toISOString();
+  const sources = ((response.data ?? []) as Array<SourceRow & {excluded_until?:string|null}>).filter((row) => !row.excluded_until || row.excluded_until <= now).map(sourceDto);
   if (!sources.length) throw new Error("No active ICAI sources are configured.");
   return sources;
 }
 
 export async function startIcaiSyncContinuationEngine(
   runtime: IcaiSyncRuntime,
-  { trigger, requestedBy = null, orchestrationKey }: {
+  { trigger, requestedBy = null, orchestrationKey, requestedSourceIds = [], forceRecheck = false }: {
     trigger: "cron" | "manual" | "test";
     requestedBy?: string | null;
     orchestrationKey: string;
+    requestedSourceIds?: string[];
+    forceRecheck?: boolean;
   },
 ): Promise<IcaiSyncContinuationStart> {
   if (!runtime.enabled) throw new Error("ICAI synchronization is disabled for this environment.");
   await recoverStaleRuns(runtime.db);
   const client = adminClient(runtime);
   const sources = await continuationSources(client);
-  const sourceIds = sources.map((source) => source.id);
+  const requested = new Set(requestedSourceIds ?? []);
+  const selectedSources = requested.size ? sources.filter((source) => requested.has(source.id)) : sources;
+  const sourceIds = selectedSources.map((source) => source.id);
+  if (!sourceIds.length) throw new Error("No requested ICAI sources are currently available.");
 
   const active = await runtime.db.prepare("SELECT id,details FROM icai_sync_runs WHERE status IN ('queued','running') ORDER BY started_at DESC LIMIT 1")
     .first<{ id: string; details: unknown }>();
@@ -763,6 +845,7 @@ export async function startIcaiSyncContinuationEngine(
     persistence: "cloudflare-d1",
     orchestration_key: orchestrationKey,
     source_ids: sourceIds,
+    force_recheck: Boolean(forceRecheck),
   });
   const inserted = await runtime.db.prepare("INSERT INTO icai_sync_runs(id,trigger_type,requested_by,parser_version,status,started_at,source_total,details) SELECT ?1,?2,?3,?4,'running',?5,?6,?7 WHERE NOT EXISTS (SELECT 1 FROM icai_sync_runs WHERE status IN ('queued','running')) RETURNING id")
     .bind(runId, trigger, requestedBy, PARSER_VERSION, startedAt, sourceIds.length, details)
@@ -812,27 +895,39 @@ export async function runIcaiSyncContinuationSource(
       alreadyComplete: true,
     };
   }
-  const run = await runtime.db.prepare("SELECT status FROM icai_sync_runs WHERE id=?1 LIMIT 1").bind(runId).first<{ status: string }>();
+  const run = await runtime.db.prepare("SELECT status,details FROM icai_sync_runs WHERE id=?1 LIMIT 1").bind(runId).first<{ status: string; details:string }>();
   if (!run) throw new Error(`ICAI sync run ${runId} does not exist.`);
   if (run.status === "cancelled") {
     await runtime.db.prepare("UPDATE icai_sync_source_states SET status='cancelled',finished_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2").bind(runId, sourceId).run();
     return { runId, sourceId, status: "cancelled", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
   }
   if (run.status !== "running") throw new Error(`ICAI sync run ${runId} is not running (status=${run.status}).`);
+  const forceRecheck = Boolean(parseDetails(run.details).force_recheck);
+  const effectiveSource = forceRecheck ? { ...source, etag: null, lastModified: null } : source;
   await runtime.db.prepare("UPDATE icai_sync_source_states SET status='running',attempts=attempts+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2")
     .bind(runId, sourceId).run();
   try {
-    await processSource(
+    const complete = await processSource(
       client,
       runtime,
       runId,
-      source,
+      effectiveSource,
       (levelResponse.data ?? []) as LevelRow[],
       (subjectResponse.data ?? []) as SubjectRow[],
       (attemptResponse.data ?? []) as AttemptRow[],
     );
-    await runtime.db.prepare("UPDATE icai_sync_source_states SET status='succeeded',finished_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2")
-      .bind(runId, sourceId).run();
+    if (complete) {
+      await runtime.db.prepare("UPDATE icai_sync_source_states SET status='succeeded',finished_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2")
+        .bind(runId, sourceId).run();
+    }
+    if (await pauseAfterBatchRequested(runtime.db, runId)) {
+      await runtime.db.prepare("UPDATE icai_sync_runtime SET stage='paused',paused_at=CURRENT_TIMESTAMP,heartbeat_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1").bind(runId).run();
+      return { runId, sourceId, status: "paused", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
+    }
+    if (!complete) {
+      const cursor = await runtime.db.prepare("SELECT cursor_offset,cursor_total FROM icai_sync_source_states WHERE run_id=?1 AND source_id=?2 LIMIT 1").bind(runId, sourceId).first<{cursor_offset:number;cursor_total:number}>();
+      return { runId, sourceId, status: "continuing", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false, cursorOffset: Number(cursor?.cursor_offset ?? 0), cursorTotal: Number(cursor?.cursor_total ?? 0) };
+    }
     return { runId, sourceId, status: "succeeded", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
   } catch (error) {
     if (error instanceof SyncCancelledError) {

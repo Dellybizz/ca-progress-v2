@@ -8,7 +8,7 @@ import {
 import type { D1Database } from "./d1-client";
 
 type Env = { DB?: D1Database };
-type SyncRequest = { trigger?: unknown; requestedBy?: unknown; orchestrationKey?: unknown; runId?: unknown; sourceId?: unknown };
+type SyncRequest = { trigger?: unknown; requestedBy?: unknown; orchestrationKey?: unknown; runId?: unknown; sourceId?: unknown; requestedSourceIds?: unknown; forceRecheck?: unknown };
 const INTERNAL_MARKER = "ca-progress-v2-web";
 function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"private, no-store"}});}
 function runtime(request: Request, db: D1Database) {
@@ -52,7 +52,8 @@ const icaiSyncWorker = {
       if(url.pathname==="/start"){
         const orchestrationKey=boundedString(body?.orchestrationKey,180);
         if(!orchestrationKey)return json({ok:false,error:"orchestrationKey is required."},400);
-        const result=await startIcaiSyncContinuationEngine(config,{trigger,requestedBy,orchestrationKey});
+        const requestedSourceIds=Array.isArray(body?.requestedSourceIds)?body.requestedSourceIds.filter((value):value is string=>typeof value==="string"&&value.length<=200).slice(0,20):[];
+        const result=await startIcaiSyncContinuationEngine(config,{trigger,requestedBy,orchestrationKey,requestedSourceIds,forceRecheck:body?.forceRecheck===true});
         return json({ok:true,result});
       }
       const summary=await runIcaiSyncEngine(config,{trigger,requestedBy});

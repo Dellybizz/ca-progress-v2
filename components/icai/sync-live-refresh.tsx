@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { controlIcaiSyncAction, recoverIcaiStartupJobAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { controlIcaiSyncAction, recoverIcaiStartupJobAction, skipIcaiItemAction } from "@/app/(admin)/admin/icai-sync/actions";
 import {
   ICAI_STAGE_PROGRESS,
   type IcaiSyncLiveStatus,
@@ -24,7 +24,14 @@ function tone(status: string): "success" | "warning" | "danger" | "info" | "neut
   if (["success", "completed", "fetched"].includes(status)) return "success";
   if (["failed", "dead_letter"].includes(status)) return "danger";
   if (["running", "queued", "pending"].includes(status)) return "info";
-  return status === "partial" ? "warning" : "neutral";
+  return ["partial", "skipped", "stalled"].includes(status) ? "warning" : "neutral";
+}
+
+function timestamp(value: string | null | undefined) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }).format(parsed);
 }
 
 export function SyncLiveRefresh({
@@ -143,28 +150,29 @@ export function SyncLiveRefresh({
   const runtime = status.runtime;
   const processed = run?.processed ?? 0;
   const total = run?.total ?? 0;
-  const overallPercent = total ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+  const overallPercent = status.overallPercent;
   const stagePercent = runtime ? (ICAI_STAGE_PROGRESS[runtime.stage] ?? 0) : 0;
-  const stale = Boolean(runtime?.stale);
+  const stale = status.displayState === "stalled";
+  const remainingSources = Math.max(0, total - processed);
 
   return (
     <div className="icai-live-monitor" aria-live="polite">
       <section className="icai-admin-summary">
         <div>
           <span>Live state</span>
-          <strong>{status.job?.status ?? run?.status ?? "starting"}</strong>
+          <strong>{status.displayState.replaceAll("_", " ")}</strong>
         </div>
         <div>
           <span>Overall progress</span>
-          <strong>{run ? `${overallPercent}% · ${processed}/${total}` : "Waiting for run"}</strong>
+          <strong>{run ? `${overallPercent}% · ${processed}/${total}` : status.displayState === "queued" ? "Queued · worker pending" : status.displayState}</strong>
         </div>
         <div>
           <span>Heartbeat</span>
-          <strong>{runtime ? `${elapsed(runtime.heartbeatAt, status.observedAt)} ago` : "Waiting"}</strong>
+          <strong>{runtime ? `${elapsed(runtime.heartbeatAt, status.observedAt)} ago` : status.job ? `Job updated ${elapsed(status.job.startedAt ?? status.job.createdAt, status.observedAt)} ago` : "—"}</strong>
         </div>
         <div>
           <span>Next scheduled group</span>
-          <strong>{status.nextScheduledGroup?.label ?? "Not configured yet"}</strong>
+          <strong>{status.nextScheduledGroup ? `${status.nextScheduledGroup.label} · ${timestamp(status.nextScheduledGroup.dueAt)}` : "Not configured"}</strong>
         </div>
       </section>
 
@@ -185,9 +193,10 @@ export function SyncLiveRefresh({
                   ? `Job ${status.job.id.slice(0, 8)} · attempt ${status.job.attempts}/${status.job.maxAttempts}`
                   : "Worker startup in progress"}
             </p>
+            {status.anotherSyncActive ? <small>Exclusive sync lock active · another sync cannot start</small> : null}
           </span>
-          <Badge tone={tone(status.job?.status ?? run?.status ?? "queued")}>
-            {status.job?.status ?? run?.status ?? "queued"}
+          <Badge tone={tone(status.displayState)}>
+            {status.job?.status === "failed" ? "retry queued" : status.displayState}
           </Badge>
         </div>
         <div className="icai-progress" aria-label="Overall source progress">
@@ -199,24 +208,50 @@ export function SyncLiveRefresh({
         <div className="icai-section-heading">
           <div>
             <span className="eyebrow">{labels.live}</span>
-            <h2>{runtime ? runtime.stage.replaceAll("_", " ") : "Worker startup"}</h2>
+            <h2>{status.displayState.replaceAll("_", " ")}</h2>
             <p className="icai-muted">
               {runtime?.currentSourceName ?? "Preparing sources"}
               {runtime ? ` · stage ${elapsed(runtime.stageStartedAt, status.observedAt)} · heartbeat ${elapsed(runtime.heartbeatAt, status.observedAt)} ago` : ""}
             </p>
           </div>
-          <Badge tone={stale ? "danger" : "info"}>{stale ? "possibly stuck" : "live"}</Badge>
+          <Badge tone={stale ? "danger" : "info"}>{stale ? "stalled" : "live"}</Badge>
         </div>
         <div className="icai-progress" aria-label="Current source stage progress">
           <i style={{ width: `${stagePercent}%` }} />
         </div>
         <p className="icai-muted">
           Current-source workflow {stagePercent}% · overall {overallPercent}% ({processed}/{total} sources)
+          {runtime ? ` · ${remainingSources} sources remaining · batch ${runtime.batchNumber}` : ""}
+          {runtime?.cursorTotal ? ` · source items ${runtime.processedItems}/${runtime.cursorTotal} (${runtime.remainingItems} remaining)` : ""}
         </p>
+        <div className="icai-run-stats">
+          <div><span>Started</span><strong>{run ? timestamp(run.startedAt) : timestamp(status.job?.createdAt)}</strong></div>
+          <div><span>Estimated completion</span><strong>{timestamp(status.estimatedCompletionAt)}</strong></div>
+          <div><span>Retries</span><strong>{status.job ? `${status.job.attempts}/${status.job.maxAttempts}` : runtime ? `${runtime.continuationCount}` : "0"}</strong></div>
+          <div><span>Next retry</span><strong>{timestamp(status.job?.nextRetryAt)}</strong></div>
+        </div>
         {runtime?.currentItemUrl ? (
-          <a href={runtime.currentItemUrl} target="_blank" rel="noreferrer">
-            {runtime.currentItemUrl}
-          </a>
+          <div className="icai-runtime-item">
+            <a href={runtime.currentItemUrl} target="_blank" rel="noreferrer">{runtime.currentItemUrl}</a>
+            {status.runId && runtime.currentSourceId ? (
+              <div className="icai-runtime-actions">
+                <form action={skipIcaiItemAction}>
+                  <input type="hidden" name="runId" value={status.runId} />
+                  <input type="hidden" name="sourceId" value={runtime.currentSourceId} />
+                  <input type="hidden" name="itemUrl" value={runtime.currentItemUrl} />
+                  <input type="hidden" name="scope" value="temporary" />
+                  <button className="ui-button ui-button--sm" type="submit">Skip on future runs for 24h</button>
+                </form>
+                <form action={skipIcaiItemAction}>
+                  <input type="hidden" name="runId" value={status.runId} />
+                  <input type="hidden" name="sourceId" value={runtime.currentSourceId} />
+                  <input type="hidden" name="itemUrl" value={runtime.currentItemUrl} />
+                  <input type="hidden" name="scope" value="permanent" />
+                  <button className="ui-button ui-button--sm" type="submit">Skip on all future runs</button>
+                </form>
+              </div>
+            ) : null}
+          </div>
         ) : null}
         {stale ? (
           <div className="auth-status auth-status--danger" role="alert">
@@ -236,6 +271,11 @@ export function SyncLiveRefresh({
           <div className="icai-runtime-actions">
             <form action={controlIcaiSyncAction}>
               <input type="hidden" name="runId" value={status.runId} />
+              <input type="hidden" name="intent" value={runtime.stage === "paused" ? "resume" : "pause"} />
+              <button className="ui-button">{runtime.stage === "paused" ? "Resume" : "Pause after batch"}</button>
+            </form>
+            <form action={controlIcaiSyncAction}>
+              <input type="hidden" name="runId" value={status.runId} />
               <input type="hidden" name="intent" value="skip" />
               <button className="ui-button" disabled={!runtime.currentSourceId || runtime.skipSourceRequested}>
                 {runtime.skipSourceRequested ? "Skip requested" : labels.skip}
@@ -252,6 +292,7 @@ export function SyncLiveRefresh({
               <form action={controlIcaiSyncAction}>
                 <input type="hidden" name="runId" value={status.runId} />
                 <input type="hidden" name="intent" value="recover" />
+                <label><input required type="checkbox" name="confirm" value="clear"/> Confirm stale lock</label>
                 <button className="ui-button ui-button--primary">{labels.recover}</button>
               </form>
             ) : null}

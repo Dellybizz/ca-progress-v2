@@ -7,7 +7,7 @@ import { invalidateSharedPublicCache } from "@/lib/cache/public";
 
 type IcaiSyncService = { fetch(request: Request): Promise<Response> };
 export type IcaiSyncContinuationStart = { runId: string; sourceIds: string[] };
-export type IcaiSyncContinuationSourceResult = { runId:string;sourceId:string;status:"succeeded"|"failed"|"skipped"|"cancelled";requestIntervalSeconds:number;alreadyComplete:boolean };
+export type IcaiSyncContinuationSourceResult = { runId:string;sourceId:string;status:"continuing"|"succeeded"|"failed"|"skipped"|"cancelled";requestIntervalSeconds:number;alreadyComplete:boolean;cursorOffset?:number;cursorTotal?:number };
 type SyncPayload<T = unknown> = { ok?: boolean; result?: T; summary?: IcaiSyncSummary; error?: string };
 
 function getService():IcaiSyncService{try{const{env}=getCloudflareContext();const service=(env as unknown as Record<string,unknown>).ICAI_SYNC_SERVICE as IcaiSyncService|undefined;if(service&&typeof service.fetch==="function")return service;}catch{}throw new Error("ICAI sync service binding is unavailable. Use the Cloudflare multi-Worker runtime for sync operations.");}

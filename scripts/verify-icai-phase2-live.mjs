@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const required = (name) => {
@@ -57,7 +58,28 @@ async function cloudflare(path, init = {}) {
 }
 
 function watermarkRows() {
-  return d1(`SELECT w.source_id,w.bootstrap_complete,w.bootstrap_completed_at,w.last_success_at,w.published_high_watermark,w.attempt_high_watermark,w.last_content_hash,s.last_success_at AS source_last_success_at FROM icai_source_watermarks w JOIN icai_sources s ON s.id=w.source_id WHERE s.is_active=1 AND s.id IN (${sourceIds.map(sqlText).join(",")}) ORDER BY w.source_id;`);
+  return d1(`SELECT w.source_id,w.bootstrap_complete,w.bootstrap_completed_at,w.last_success_at,w.published_high_watermark,w.attempt_high_watermark,w.last_content_hash,w.last_listing_hash,s.last_success_at AS source_last_success_at FROM icai_source_watermarks w JOIN icai_sources s ON s.id=w.source_id WHERE s.is_active=1 AND s.id IN (${sourceIds.map(sqlText).join(",")}) ORDER BY w.source_id;`);
+}
+
+function stableDigest(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function certificationState() {
+  const resources = d1("SELECT id,source_id,content_hash,official_url,status,replaced_by_resource_id FROM icai_resources ORDER BY id;");
+  const reviews = d1("SELECT id,change_event_id,source_id,entity_type,entity_id,proposed_patch,status,created_at FROM icai_review_queue ORDER BY id;");
+  const duplicateReviews = d1("SELECT entity_type,entity_id,proposed_patch,COUNT(*) AS count FROM icai_review_queue WHERE status='pending' GROUP BY entity_type,entity_id,proposed_patch HAVING COUNT(*)>1;");
+  return {
+    resources,
+    reviews,
+    duplicateReviews,
+    resourceCount: resources.length,
+    resourceDigest: stableDigest(resources),
+    reviewCount: reviews.length,
+    pendingReviewCount: reviews.filter((row) => row.status === "pending").length,
+    reviewDigest: stableDigest(reviews),
+    watermarks: watermarkRows(),
+  };
 }
 
 function assertLockedWatermarks(rows, label) {
@@ -143,10 +165,11 @@ if (!isCompleteRun(baselineRun)) {
   }
 }
 
-const beforeWatermarks = watermarkRows();
+const beforeState = certificationState();
+writeFileSync(`${evidenceDir}/icai-phase2d-before.json`, JSON.stringify(beforeState, null, 2));
+const beforeWatermarks = beforeState.watermarks;
 assertLockedWatermarks(beforeWatermarks, "before repeat sync");
-const beforeResourceCount = Number(d1("SELECT COUNT(*) AS count FROM icai_resources;")[0]?.count ?? -1);
-if (beforeResourceCount < 0) throw new Error("Phase 2 could not read the baseline ICAI resource count.");
+if (beforeState.duplicateReviews.length) throw new Error(`Phase 2 baseline contains duplicate pending reviews: ${JSON.stringify(beforeState.duplicateReviews)}`);
 
 const repeatRun = await runSync(queue.queue_id, "repeat");
 
@@ -157,17 +180,22 @@ if (Number(repeatRun.new_items) !== 0 || Number(repeatRun.changed_items) !== 0 |
   throw new Error(`Phase 2 repeat sync was not idempotent: new=${repeatRun.new_items}, changed=${repeatRun.changed_items}, removed=${repeatRun.removed_items}, reviews=${repeatRun.pending_reviews}.`);
 }
 
-const afterResourceCount = Number(d1("SELECT COUNT(*) AS count FROM icai_resources;")[0]?.count ?? -1);
-if (afterResourceCount !== beforeResourceCount) throw new Error(`Phase 2 repeat sync changed resource cardinality (${beforeResourceCount} -> ${afterResourceCount}).`);
+const afterState = certificationState();
+writeFileSync(`${evidenceDir}/icai-phase2d-after.json`, JSON.stringify(afterState, null, 2));
+if (afterState.resourceCount !== beforeState.resourceCount) throw new Error(`Phase 2 repeat sync changed resource cardinality (${beforeState.resourceCount} -> ${afterState.resourceCount}).`);
+if (afterState.resourceDigest !== beforeState.resourceDigest) throw new Error("Phase 2 repeat sync changed resource identities, hashes, URLs, or lifecycle state.");
+if (afterState.reviewCount !== beforeState.reviewCount || afterState.pendingReviewCount !== beforeState.pendingReviewCount || afterState.reviewDigest !== beforeState.reviewDigest) throw new Error("Phase 2 repeat sync changed the review queue despite unchanged input.");
+if (afterState.duplicateReviews.length) throw new Error(`Phase 2 repeat sync left duplicate pending reviews: ${JSON.stringify(afterState.duplicateReviews)}`);
 
-const afterWatermarks = watermarkRows();
+const afterWatermarks = afterState.watermarks;
 assertLockedWatermarks(afterWatermarks, "after repeat sync");
 const beforeBySource = new Map(beforeWatermarks.map((row) => [String(row.source_id), row]));
 for (const row of afterWatermarks) {
   const before = beforeBySource.get(String(row.source_id));
   if (!before) throw new Error(`Phase 2 lost baseline watermark for ${row.source_id}.`);
   if (row.bootstrap_completed_at !== before.bootstrap_completed_at) throw new Error(`Phase 2 moved the immutable bootstrap boundary for ${row.source_id}.`);
-  if (!row.last_success_at || row.last_success_at !== row.source_last_success_at || row.last_success_at < String(before.last_success_at ?? "")) throw new Error(`Phase 2 success watermark did not advance safely for ${row.source_id}.`);
+  if (!row.last_success_at || row.last_success_at !== row.source_last_success_at || row.last_success_at <= String(before.last_success_at ?? "")) throw new Error(`Phase 2 success watermark did not advance safely for ${row.source_id}.`);
+  if (row.last_content_hash !== before.last_content_hash || row.last_listing_hash !== before.last_listing_hash) throw new Error(`Phase 2 unchanged-input hash moved for ${row.source_id}.`);
   if (before.published_high_watermark && row.published_high_watermark < before.published_high_watermark) throw new Error(`Phase 2 publication watermark regressed for ${row.source_id}.`);
   if (before.attempt_high_watermark && row.attempt_high_watermark < before.attempt_high_watermark) throw new Error(`Phase 2 attempt watermark regressed for ${row.source_id}.`);
 }
@@ -181,9 +209,15 @@ writeFileSync(`${evidenceDir}/icai-phase2-summary.json`, JSON.stringify({
   baselineRunId: baselineRun.id,
   repeatRunId: repeatRun.id,
   sources: sourceIds.length,
-  resourceCount: afterResourceCount,
+  resourceCount: afterState.resourceCount,
+  resourceDigest: afterState.resourceDigest,
+  reviewCount: afterState.reviewCount,
+  pendingReviewCount: afterState.pendingReviewCount,
+  duplicatePendingReviews: afterState.duplicateReviews.length,
   newItemsOnRepeat: Number(repeatRun.new_items),
   changedItemsOnRepeat: Number(repeatRun.changed_items),
+  removedItemsOnRepeat: Number(repeatRun.removed_items),
+  reviewsOnRepeat: Number(repeatRun.pending_reviews),
   bootstrapBoundary: "locked",
   watermarks: "advanced-on-success",
   foreignKeys: "clean",

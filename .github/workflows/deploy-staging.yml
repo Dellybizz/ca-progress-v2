@@ -196,6 +196,9 @@ jobs:
             exit "$result"
           fi
 
+      - name: Verify Phase 2D admin and student ICAI surfaces
+        run: node scripts/verify-icai-surfaces-live.mjs
+
       - name: Verify deployment and rollback web runtime on failure
         shell: bash
         run: |

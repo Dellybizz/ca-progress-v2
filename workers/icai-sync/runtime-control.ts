@@ -9,6 +9,7 @@ export type SyncStage =
   | "comparing"
   | "writing"
   | "finalizing"
+  | "paused"
   | "completed"
   | "partial"
   | "failed"
@@ -96,4 +97,9 @@ export async function checkpoint(db: D1Database, runId: string) {
     throw new SyncSourceSkippedError();
   }
   await heartbeat(db, runId);
+}
+
+export async function pauseAfterBatchRequested(db: D1Database, runId: string) {
+  const row = await db.prepare("SELECT pause_requested FROM icai_sync_runtime WHERE run_id=?1").bind(runId).first<{ pause_requested: number }>();
+  return Boolean(row?.pause_requested);
 }

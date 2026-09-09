@@ -2,13 +2,31 @@ export type IcaiSyncLiveSourceState =
   | "running"
   | "fetched"
   | "failed"
+  | "skipped"
   | "pending"
   | "not_run";
+
+export type IcaiSyncDisplayState =
+  | "queued"
+  | "discovering"
+  | "fetching"
+  | "comparing"
+  | "writing"
+  | "finalizing"
+  | "paused"
+  | "stalled"
+  | "skipped"
+  | "failed"
+  | "completed";
 
 export type IcaiSyncLiveStatus = {
   observedAt: string;
   active: boolean;
+  anotherSyncActive: boolean;
   terminal: boolean;
+  displayState: IcaiSyncDisplayState;
+  overallPercent: number;
+  estimatedCompletionAt: string | null;
   runId: string | null;
   job: {
     id: string;
@@ -19,6 +37,7 @@ export type IcaiSyncLiveStatus = {
     startedAt: string | null;
     lastError: string | null;
     stale: boolean;
+    nextRetryAt: string | null;
   } | null;
   run: {
     status: string;
@@ -45,6 +64,13 @@ export type IcaiSyncLiveStatus = {
     stale: boolean;
     cancelRequested: boolean;
     skipSourceRequested: boolean;
+    cursorOffset: number;
+    cursorTotal: number;
+    continuationCount: number;
+    sourceIndex: number;
+    batchNumber: number;
+    processedItems: number;
+    remainingItems: number;
   } | null;
   sourceResults: Array<{
     sourceId: string;
@@ -74,6 +100,7 @@ export const ICAI_STAGE_PROGRESS: Record<string, number> = {
   comparing: 65,
   writing: 85,
   finalizing: 95,
+  paused: 95,
   waiting_for_review: 98,
   completed: 100,
   success: 100,
@@ -81,6 +108,8 @@ export const ICAI_STAGE_PROGRESS: Record<string, number> = {
   failed: 100,
   cancelled: 100,
 };
+
+export const ICAI_STALL_THRESHOLD_MS = 2 * 60_000;
 
 export const ICAI_TERMINAL_RUN_STATUSES = new Set([
   "success",

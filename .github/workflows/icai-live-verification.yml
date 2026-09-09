@@ -1,4 +1,4 @@
-name: ICAI Live Admin and Fetch Verification
+name: ICAI Phase 2D Production Certification
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     environment: v2-staging
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -42,15 +42,15 @@ jobs:
         run: npm run test:icai:phase5
       - name: Prepare evidence
         run: mkdir -p deployment-evidence
-      - name: Apply ICAI continuation schema
-        run: npm run cf:migrate:icai-continuation
-      - name: Verify ICAI continuation schema
+      - name: Apply retained ICAI schema through Phase 3B
+        run: npm run cf:migrate:retained
+      - name: Verify ICAI Phase 2C schema
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --command "SELECT name FROM sqlite_master WHERE type='table' AND name='icai_sync_source_states'; SELECT version,description FROM _ca_schema_migrations WHERE version='0028';" > deployment-evidence/icai-continuation-schema.json
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --command "SELECT name FROM sqlite_master WHERE type='table' AND name='icai_sync_source_states'; SELECT version,description FROM _ca_schema_migrations WHERE version IN ('0028','0033','0034','0035','0036','0037') ORDER BY version;" > deployment-evidence/icai-continuation-schema.json
           grep -q 'icai_sync_source_states' deployment-evidence/icai-continuation-schema.json
-          grep -q '0028' deployment-evidence/icai-continuation-schema.json
+          for version in 0028 0033 0034 0035 0036 0037; do grep -q "$version" deployment-evidence/icai-continuation-schema.json; done
       - name: Deploy current ICAI service
         run: npx wrangler deploy --config=workers/icai-sync/wrangler.jsonc --name=ca-progress-v2-icai-sync
       - name: Deploy current web and Queue runtime
@@ -68,6 +68,11 @@ jobs:
             npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after isolated ICAI live verification failure" || true
           fi
           exit "$result"
+      - name: Run two-complete-run Phase 2D incremental proof
+        shell: bash
+        run: node scripts/verify-icai-phase2-live.mjs
+      - name: Verify Phase 2D admin and student ICAI surfaces
+        run: node scripts/verify-icai-surfaces-live.mjs
       - name: Capture final ICAI state
         if: always()
         shell: bash

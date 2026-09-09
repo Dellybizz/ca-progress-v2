@@ -22,6 +22,17 @@ export async function executeBackgroundJob(job: BackgroundJob) {
         const sourceId = sourceIds[sourceIndex];
         const result = await runIcaiSyncSource({ runId, sourceId });
         if (result.status === "cancelled") return result;
+        if (result.status === "continuing") {
+          const cursor = Number(result.cursorOffset ?? 0);
+          await enqueueBackgroundJob({
+            type: "icai-sync",
+            idempotencyKey: `icai-sync-source:${runId}:${sourceIndex}:${sourceId}:cursor:${cursor}`,
+            payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex },
+            createdBy: job.createdBy ?? null,
+            delaySeconds: result.requestIntervalSeconds,
+          });
+          return result;
+        }
         const nextIndex = sourceIndex + 1;
         if (nextIndex < sourceIds.length) {
           const nextSourceId = sourceIds[nextIndex];
@@ -54,52 +65,37 @@ export async function executeBackgroundJob(job: BackgroundJob) {
       return runIcaiPhase5ReviewProbe({ correlationId: String(job.payload.correlationId ?? "") });
     case "analytics-aggregate": {
       const date = typeof job.payload.date === "string" ? job.payload.date : new Date().toISOString().slice(0, 10);
-      const rows = await db().prepare("SELECT event_type, COUNT(*) AS event_count FROM dashboard_events WHERE occurred_at >= ?1 AND occurred_at < ?2 GROUP BY event_type")
-        .bind(`${date}T00:00:00.000Z`, `${date}T23:59:59.999Z`).all();
-      for (const row of (rows.results ?? []) as Array<{event_type:string;event_count:number}>) {
-        await db().prepare("INSERT INTO analytics_daily_rollups(rollup_date,event_type,event_count,updated_at) VALUES(?1,?2,?3,CURRENT_TIMESTAMP) ON CONFLICT(rollup_date,event_type) DO UPDATE SET event_count=excluded.event_count,updated_at=CURRENT_TIMESTAMP")
-          .bind(date, row.event_type, Number(row.event_count)).run();
-      }
-      return { date, eventTypes: (rows.results ?? []).length };
-    }
-    case "notification-fanout": {
-      const userId = typeof job.payload.userId === "string" ? job.payload.userId : null;
-      const kind = typeof job.payload.kind === "string" ? job.payload.kind.slice(0, 80) : "system";
-      if (!userId) throw new Error("Notification fan-out requires userId.");
-      await db().prepare("INSERT OR IGNORE INTO notification_outbox(id,user_id,kind,payload_json,idempotency_key) VALUES(?1,?2,?3,?4,?5)")
-        .bind(crypto.randomUUID(), userId, kind, json(job.payload), job.idempotencyKey).run();
-      return { queued: true };
-    }
-    case "attachment-process": {
-      const resourceId = typeof job.payload.resourceId === "string" ? job.payload.resourceId : null;
-      const userId = typeof job.payload.userId === "string" ? job.payload.userId : null;
-      if (!resourceId || !userId) throw new Error("Attachment processing requires resourceId and userId.");
-      await db().prepare("INSERT INTO attachment_processing_jobs(id,resource_id,user_id,status,attempts,updated_at) VALUES(?1,?2,?3,'ready',1,CURRENT_TIMESTAMP) ON CONFLICT(resource_id) DO UPDATE SET status='ready',attempts=attachment_processing_jobs.attempts+1,last_error=NULL,updated_at=CURRENT_TIMESTAMP")
-        .bind(crypto.randomUUID(), resourceId, userId).run();
-      return { resourceId, status: "ready" };
-    }
-    case "cleanup": {
-      const days = Math.max(1, Math.min(90, Number(job.payload.retentionDays ?? 30)));
-      await db().prepare("DELETE FROM background_jobs WHERE status='succeeded' AND updated_at < datetime('now', ?1)").bind(`-${days} days`).run();
-      await db().prepare("DELETE FROM notification_outbox WHERE status='sent' AND created_at < datetime('now', ?1)").bind(`-${days} days`).run();
-      const abandoned = await db().prepare("SELECT id,object_key FROM r2_upload_intents WHERE status='issued' AND expires_at < CURRENT_TIMESTAMP LIMIT 100").all();
-      try {
-        const bucket = getResourceR2Bucket();
-        for (const row of (abandoned.results ?? []) as Array<{id:string;object_key:string}>) {
-          await bucket.delete(row.object_key).catch(() => undefined);
-          await db().prepare("UPDATE r2_upload_intents SET status='abandoned' WHERE id=?1").bind(row.id).run();
-        }
-      } catch { /* R2 cleanup retries on the next scheduled run. */ }
-      return { retentionDays: days, abandonedUploads: abandoned.results?.length ?? 0 };
-    }
-    case "ai-plan-generation": {
-      const userId = typeof job.payload.userId === "string" ? job.payload.userId : null;
-      const planDate = typeof job.payload.planDate === "string" ? job.payload.planDate : new Date().toISOString().slice(0, 10);
-      if (!userId) throw new Error("AI plan generation requires userId.");
-      const generated = await generateTodayPlanForUser(userId, planDate);
-      await db().prepare("INSERT INTO student_plan_snapshots(id,user_id,plan_date,status,plan_json,generated_at,source_job_id,updated_at) VALUES(?1,?2,?3,'ready',?4,?5,?6,CURRENT_TIMESTAMP) ON CONFLICT(user_id,plan_date) DO UPDATE SET status='ready',plan_json=excluded.plan_json,generated_at=excluded.generated_at,source_job_id=excluded.source_job_id,error=NULL,updated_at=CURRENT_TIMESTAMP")
-        .bind(crypto.randomUUID(), userId, planDate, json({ plan: generated.plan, items: generated.items, forecast: generated.forecast }), generated.plan.generated_at ?? new Date().toISOString(), job.id).run();
-      return { userId, planDate, itemCount: generated.items.length };
-    }
-  }
-}
+      const rows = await db().prepare("SELECT event_type, COUNT(*) AS event_count FROM dashboard_events WHERE occurred_at >= ?1 AND occurred_aï¾­¢G§²ÚîÆ­yÛŠ
+NÂˆÛÛœİX˜[™Û™YH]ØZ]Š
+Kœ™\\™J”ÑSPÕYØš™XİÚÙ^H”“ÓHŒ—İ\ØYÚ[[ÈÒT‘Hİ]\ÏIÚ\ÜİYY	ÈS‘^\™\×Ø]ÕT”‘S•ÕSQTÕSTSRULŠK˜[
+
+NÂˆHÂˆÛÛœİXÚÙ]HÙ]™\Ûİ\˜ÙTŒXÚÙ]
+
+NÂˆ›Üˆ
+ÛÛœİ›İÈÙˆ
+X˜[™Û™Yœ™\İ[ÈÏÈ×JH\È\œ˜^OÚYœİš[™ÎÛØš™XİÚÙ^Nœİš[™ßOŠHÂˆ]ØZ]XÚÙ]™[]J›İË›Øš™XİÚÙ^JK˜Ø]Ú
+
+
+HOˆ[™Yš[™Y
+NÂˆ]ØZ]Š
+Kœ™\\™J•TUHŒ—İ\ØYÚ[[ÈÑUİ]\ÏIØX˜[™Û™Y	ÈÒT‘HYOÌHŠK˜š[™
+›İËšY
+Kœ[Š
+NÂˆBˆHØ]ÚÈÊˆŒˆÛX[\™]šY\ÈÛˆH™^ØÚY[Y[‹ˆ
+‹ÈBˆ™]\›ˆÈ™][[Û‘^\Îˆ^\ËX˜[™Û™Y\ØYÎˆX˜[™Û™Yœ™\İ[ÏË›[™İÏÈNÂˆBˆØ\ÙH˜ZK\[‹YÙ[™\˜][ÛˆˆÂˆÛÛœİ\Ù\’YH\[Ùˆ›Ø‹œ^[ØY\Ù\’YOOHœİš[™ÈˆÈ›Ø‹œ^[ØY\Ù\’Yˆ[ÂˆÛÛœİ[‘]HH\[Ùˆ›Ø‹œ^[ØYœ[‘]HOOHœİš[™ÈˆÈ›Ø‹œ^[ØYœ[‘]Hˆ™]È]J
+KÒTÓÔİš[™Ê
+KœÛXÙJL
+NÂˆYˆ
+]\Ù\’Y
+H›İÈ™]È\œ›ÜŠRH[ˆÙ[™\˜][Ûˆ™\]Z\™\È\Ù\’YˆŠNÂˆÛÛœİÙ[™\˜]YH]ØZ]Ù[™\˜]UÙ^T[‘›Ü•\Ù\Š\Ù\’Y[‘]JNÂˆ]ØZ]Š
+Kœ™\\™J’S”ÑT•S•ÈİY[Ü[—ÜÛ˜\ÚİÊY\Ù\—ÚY[—Ù]Kİ]\Ë[—ÚœÛÛ‹Ù[™\˜]YØ]Ûİ\˜ÙWÚ›Ø—ÚY\]YØ]
+HSQTÊÌKÌ‹ÌË	Ü™XYIËÍÍKÍ‹ÕT”‘S•ÕSQTÕST
+HÓˆÓÓ‘“PÕ
+\Ù\—ÚY[—Ù]JHÈTUHÑUİ]\ÏIÜ™XYIË[—ÚœÛÛY^ÛYYœ[—ÚœÛÛ‹Ù[™\˜]YØ]Y^ÛYY™Ù[™\˜]YØ]Ûİ\˜ÙWÚ›Ø—ÚYY^ÛYYœÛİ\˜ÙWÚ›Ø—ÚY\œ›ÜS•S\]YØ]PÕT”‘S•ÕSQTÕSTŠBˆ˜š[™
+Ü\Ëœ˜[™ÛUURQ
+
+K\Ù\’Y[‘]KœÛÛŠÈ[ˆÙ[™\˜]Yœ[‹][\ÎˆÙ[™\˜]Yš][\Ë›Ü™XØ\İˆÙ[™\˜]Y™›Ü™XØ\İJKÙ[™\˜]Yœ[‹™Ù[™\˜]YØ]ÏÈ™]È]J
+KÒTÓÔİš[™Ê
+K›Ø‹šY
+Kœ[Š
+NÂˆ™]\›ˆÈ\Ù\’Y[‘]K][PÛİ[ˆÙ[™\˜]Yš][\Ë›[™İNÂˆBˆBŸB

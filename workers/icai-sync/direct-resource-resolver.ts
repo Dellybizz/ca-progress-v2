@@ -11,6 +11,7 @@ import type {
 
 type SubjectLookup = { id: string; title: string; levelCode: IcaiLevelCode };
 type ParsedLanding = { html: string; resources: ParsedIcaiResource[] };
+export type IcaiItemFailure = { itemUrl: string; kind: string; message: string };
 
 const MAX_CHILD_PAGES = 80;
 const MAX_STUDY_DEPTH = 3;
@@ -18,6 +19,7 @@ const MAX_CHILD_BYTES = 2_500_000;
 const MAX_RESOLUTION_MS = 60_000;
 const MAX_CHILD_TIMEOUT_MS = 5_000;
 const MAX_REDIRECTS = 5;
+const MAX_RECORDED_ITEM_FAILURES = 25;
 const ANCHOR_CONTEXT_BYTES = 1_500;
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 const EVIDENCE_TYPES = new Set<IcaiResourceType>(["schedule", "announcement"]);
@@ -193,9 +195,11 @@ export async function resolveDirectStudyMaterialPdfs(
   source: IcaiSourceConfig,
   subjects: SubjectLookup[],
   userAgent: string,
+  skippedUrls: ReadonlySet<string> = new Set(),
+  onItem?: (itemUrl: string) => Promise<void>,
 ) {
   if (source.adapterConfig.direct_study_material_pdfs !== true) {
-    return { payload, resolvedLandingPages: 0, droppedLandingPages: 0, unavailableLandingPages: 0 };
+    return { payload, resolvedLandingPages: 0, droppedLandingPages: 0, unavailableLandingPages: 0, itemFailures: [] as IcaiItemFailure[] };
   }
 
   const resources: ParsedIcaiResource[] = [];
@@ -205,29 +209,43 @@ export async function resolveDirectStudyMaterialPdfs(
   let droppedLandingPages = 0;
   let unavailableLandingPages = 0;
   let childPages = 0;
+  const itemFailures: IcaiItemFailure[] = [];
+  const recordFailure = (failure: IcaiItemFailure) => {
+    if (itemFailures.length < MAX_RECORDED_ITEM_FAILURES) itemFailures.push(failure);
+  };
   const resolutionDeadline = Date.now() + MAX_RESOLUTION_MS;
 
   const parseLanding = async (resource: ParsedIcaiResource): Promise<ParsedLanding | null> => {
     if (visited.has(resource.officialUrl)) return null;
+    if (skippedUrls.has(resource.officialUrl)) {
+      unavailableLandingPages += 1;
+      recordFailure({ itemUrl: resource.officialUrl, kind: "operator_skip", message: "Skipped by an administrator." });
+      return null;
+    }
     if (Date.now() >= resolutionDeadline) {
       unavailableLandingPages += 1;
+      recordFailure({ itemUrl: resource.officialUrl, kind: "source_budget", message: "Nested resolution time budget reached." });
       return null;
     }
     if (childPages >= MAX_CHILD_PAGES) {
       unavailableLandingPages += 1;
+      recordFailure({ itemUrl: resource.officialUrl, kind: "page_limit", message: `Nested page limit ${MAX_CHILD_PAGES} reached.` });
       return null;
     }
     visited.add(resource.officialUrl);
     childPages += 1;
+    await onItem?.(resource.officialUrl);
     let html: string | null;
     try {
       html = await fetchApprovedHtml(resource.officialUrl, userAgent, Math.min(source.timeoutMs, MAX_CHILD_TIMEOUT_MS));
-    } catch {
+    } catch (error) {
       unavailableLandingPages += 1;
+      recordFailure({ itemUrl: resource.officialUrl, kind: "fetch_error", message: error instanceof Error ? error.message : "Nested ICAI page fetch failed." });
       return null;
     }
     if (html === null) {
       unavailableLandingPages += 1;
+      recordFailure({ itemUrl: resource.officialUrl, kind: "not_found", message: "ICAI nested page returned 404 or 410." });
       return null;
     }
     const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
@@ -316,5 +334,6 @@ export async function resolveDirectStudyMaterialPdfs(
     resolvedLandingPages,
     droppedLandingPages,
     unavailableLandingPages,
+    itemFailures,
   };
 }

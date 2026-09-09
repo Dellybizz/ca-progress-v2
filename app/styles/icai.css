@@ -396,10 +396,16 @@
   gap: 1rem;
 }
 
-.icai-runtime-panel > a {
+.icai-runtime-panel > a,
+.icai-runtime-item > a {
   color: var(--color-primary, #4f46e5);
   font-size: 0.82rem;
   overflow-wrap: anywhere;
+}
+
+.icai-runtime-item {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .icai-runtime-actions {

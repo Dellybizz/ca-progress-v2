@@ -95,6 +95,10 @@ try {
     ["0031", "0031_icai_phase1_exact_source_scope.sql"],
     ["0032", "0032_icai_resource_mapping_integrity.sql"],
     ["0033", "0033_icai_phase2_incremental_watermarks.sql"],
+    ["0034", "0034_icai_phase2a_source_stability.sql"],
+    ["0035", "0035_icai_phase2b_source_cursor.sql"],
+    ["0036", "0036_icai_phase2c_future_state.sql"],
+    ["0037", "0037_icai_phase3b_operator_controls.sql"],
   ]) {
     const journalRows = execute(`SELECT name FROM d1_migrations WHERE name='${filename}';`);
     assert(journalRows.length === 1, `${filename} Wrangler migration was not recorded exactly once`);
@@ -109,6 +113,22 @@ try {
   const freshWatermarks = execute("SELECT source_id,bootstrap_complete FROM icai_source_watermarks ORDER BY source_id;");
   assert(freshWatermarks.length === 6, "ICAI Phase 2 fresh D1 did not seed one watermark per active source");
   assert(freshWatermarks.every((row) => Number(row.bootstrap_complete) === 0), "Fresh D1 must remain bootstrap-unlocked until a successful source run");
+  for (const table of ["icai_sync_item_skips", "icai_sync_item_failures"]) {
+    assert(execute(`SELECT name FROM sqlite_master WHERE type='table' AND name='${table}';`).length === 1, `ICAI Phase 2A table ${table} is missing`);
+  }
+  const cursorColumns = execute("PRAGMA table_info(icai_sync_source_states);").map((row) => String(row.name));
+  for (const column of ["cursor_offset", "cursor_total", "continuation_count", "listing_hash", "partial_resources", "partial_events", "unavailable_count"]) {
+    assert(cursorColumns.includes(column), `ICAI Phase 2B cursor column ${column} is missing`);
+  }
+  const watermarkColumns = execute("PRAGMA table_info(icai_source_watermarks);").map((row) => String(row.name));
+  assert(watermarkColumns.includes("last_listing_hash"), "ICAI Phase 2C listing watermark is missing");
+  const sourceColumns = execute("PRAGMA table_info(icai_sources);").map((row) => String(row.name));
+  assert(sourceColumns.includes("last_listing_hash"), "ICAI Phase 2C atomic source listing hash is missing");
+  assert(execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name='icai_source_watermark_bootstrap_immutable';").length === 1, "ICAI Phase 2C immutable bootstrap trigger is missing");
+  assert(execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name='icai_source_listing_watermark_after_success';").length === 1, "ICAI Phase 2C listing watermark trigger is missing");
+  const runtimeColumns = execute("PRAGMA table_info(icai_sync_runtime);").map((row) => row.name);
+  assert(runtimeColumns.includes("pause_requested") && runtimeColumns.includes("paused_at"), "ICAI Phase 3B pause controls are missing");
+  assert(sourceColumns.includes("excluded_until") && sourceColumns.includes("exclusion_reason"), "ICAI Phase 3B source exclusion controls are missing");
 
   const auditTables = execute("SELECT name FROM sqlite_master WHERE type='table' AND name='icai_review_decisions';");
   assert(auditTables.length === 1, "ICAI review decision audit table is missing");

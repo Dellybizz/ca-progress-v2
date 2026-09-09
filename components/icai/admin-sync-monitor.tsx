@@ -5,7 +5,8 @@ import { Icon } from "@/components/ui/icon";
 import { SyncLiveRefresh } from "./sync-live-refresh";
 import type { AppRole } from "@/lib/authorization/roles";
 import type { IcaiAdminDashboard } from "@/lib/icai/types";
-import { runIcaiSyncAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { excludeIcaiSourceAction, restoreIcaiItemAction, runIcaiSyncAction, runTargetedIcaiSyncAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { CopyFailureButton } from "./copy-failure-button";
 
 function time(value: string | null) {
   if (!value) return "—";
@@ -146,6 +147,23 @@ export function IcaiAdminSyncMonitor({
       ) : !active ? (
         <EmptyState icon="clock" title="No synchronization run yet" description="Run it now or wait for the configured Cloudflare schedule." />
       ) : null}
+
+      <section className="icai-section">
+        <div className="icai-section-heading"><div><span className="eyebrow">Recovery controls</span><h2>Sources and files</h2><p className="icai-muted">Targeted runs preserve canonical data and are disabled while another sync owns the lock.</p></div>
+          <form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="failed_only"/><button disabled={active} className="ui-button ui-button--sm">Run failed sources</button></form>
+        </div>
+        <div className="icai-result-list">
+          {dashboard.sources.filter(source=>source.isActive).map(source=><article key={source.id}><span><span><strong>{source.name}</strong><small>{source.excludedUntil ? `Excluded until ${time(source.excludedUntil)}` : source.lastError ?? "Ready"}</small></span></span><span className="icai-runtime-actions">
+            <a className="ui-button ui-button--sm" href={source.officialUrl} target="_blank" rel="noreferrer">Open ICAI page</a>
+            {source.lastError ? <CopyFailureButton detail={source.lastError}/> : null}
+            <form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="one"/><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Run source</button></form>
+            <form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="force"/><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Force recheck</button></form>
+            {source.lastError ? <><form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="retry_batch"/><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Retry failed batch</button></form><form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="retry_source"/><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Retry failed source</button></form></> : null}
+            <form action={excludeIcaiSourceAction}><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Exclude 24h</button></form>
+          </span></article>)}
+        </div>
+        {dashboard.skippedItems.length ? <div className="icai-result-list">{dashboard.skippedItems.map(item=><article key={item.id}><span><span><strong>{item.itemUrl}</strong><small>{item.scope}{item.skippedUntil ? ` · until ${time(item.skippedUntil)}` : ""}</small></span></span><form action={restoreIcaiItemAction}><input type="hidden" name="skipId" value={item.id}/><button className="ui-button ui-button--sm">Restore file</button></form></article>)}</div> : null}
+      </section>
 
       <section className="icai-section">
         <div className="icai-section-heading">

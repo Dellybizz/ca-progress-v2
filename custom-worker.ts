@@ -12,7 +12,7 @@ type D1Database = { prepare(query: string): D1Statement };
 type WorkerEnv = { ICAI_SYNC_SERVICE?: ServiceBinding; BACKGROUND_JOBS?: QueueBinding; DB?: D1Database; ICAI_SYNC_ENABLED?: string; ICAI_SYNC_USER_AGENT?: string };
 type WorkerContext = { waitUntil(promise: Promise<unknown>): void };
 type ScheduledController = { scheduledTime: number; cron: string };
-type QueueMessage<T> = { id: string; attempts: number; body: T; ack(): void; retry(): void };
+type QueueMessage<T> = { id: string; attempts: number; body: T; ack(): void; retry(options?: { delaySeconds?: number }): void };
 type QueueBatch<T> = { messages: QueueMessage<T>[] };
 type JobType = "icai-sync" | "icai-phase5-review-probe" | "notification-fanout" | "analytics-aggregate" | "attachment-process" | "cleanup" | "ai-plan-generation";
 type BackgroundJob = { id: string; type: JobType; idempotencyKey: string; payload: Record<string, unknown>; createdBy?: string | null };
@@ -75,6 +75,12 @@ async function callIcaiService(env: WorkerEnv, path: "/start" | "/source" | "/fi
 async function executeIcaiQueueJob(job: BackgroundJob, env: WorkerEnv) {
   if (!env.BACKGROUND_JOBS) throw new Error("Background Queue binding is unavailable for ICAI continuation.");
   const mode = job.payload.mode;
+  if (mode === "finalize") {
+    const runId = typeof job.payload.runId === "string" ? job.payload.runId : null;
+    if (!runId) throw new Error("Invalid ICAI finalization payload.");
+    await callIcaiService(env, "/finalize", { runId });
+    return;
+  }
   if (mode === "source") {
     const runId = typeof job.payload.runId === "string" ? job.payload.runId : null;
     const sourceIds = Array.isArray(job.payload.sourceIds)
@@ -88,7 +94,7 @@ async function executeIcaiQueueJob(job: BackgroundJob, env: WorkerEnv) {
     const payload = await callIcaiService(env, "/source", { runId, sourceId });
     const result = payload.result;
     if (!result) throw new Error("ICAI service returned no source result.");
-    if (result.status === "cancelled") return;
+    if (result.status === "cancelled" || result.status === "paused") return;
     const nextIndex = sourceIndex + 1;
     if (nextIndex < sourceIds.length) {
       const nextSourceId = sourceIds[nextIndex];
@@ -107,7 +113,7 @@ async function executeIcaiQueueJob(job: BackgroundJob, env: WorkerEnv) {
 
   const trigger = job.payload.trigger === "manual" ? "manual" : job.payload.trigger === "test" ? "test" : "cron";
   const requestedBy = typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null;
-  const payload = await callIcaiService(env, "/start", { trigger, requestedBy, orchestrationKey: job.idempotencyKey });
+  const payload = await callIcaiService(env, "/start", { trigger, requestedBy, orchestrationKey: job.idempotencyKey, requestedSourceIds: job.payload.requestedSourceIds, forceRecheck: job.payload.forceRecheck === true });
   const runId = payload.result?.runId;
   const sourceIds = payload.result?.sourceIds?.filter((value): value is string => typeof value === "string") ?? [];
   const firstSourceId = sourceIds[0];
@@ -179,8 +185,10 @@ async function runQueuedJob(message: QueueMessage<unknown>, env: WorkerEnv) {
       await env.DB.prepare("INSERT OR IGNORE INTO background_job_dead_letters(id,job_id,idempotency_key,job_type,payload_json,attempts,error) SELECT ?1,id,idempotency_key,job_type,payload_json,attempts,?2 FROM background_jobs WHERE idempotency_key=?3").bind(crypto.randomUUID(), detail, job.idempotencyKey).run();
       message.ack();
     } else {
-      await env.DB.prepare("UPDATE background_jobs SET status='failed',last_error=?1,updated_at=CURRENT_TIMESTAMP WHERE idempotency_key=?2").bind(detail, job.idempotencyKey).run();
-      message.retry();
+      const retryDelaySeconds = Math.min(300, 15 * (2 ** Math.max(0, attempts - 1)));
+      const nextRetryAt = new Date(Date.now() + retryDelaySeconds * 1_000).toISOString();
+      await env.DB.prepare("UPDATE background_jobs SET status='failed',available_at=?1,last_error=?2,updated_at=CURRENT_TIMESTAMP WHERE idempotency_key=?3").bind(nextRetryAt, detail, job.idempotencyKey).run();
+      message.retry({ delaySeconds: retryDelaySeconds });
     }
   }
 }
