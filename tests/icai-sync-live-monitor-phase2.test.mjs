@@ -75,7 +75,7 @@ test("Phase 3A derives one truthful queue, run and runtime status model", () => 
   assert.match(query, /overallPercent/);
   assert.match(query, /estimatedCompletionAt/);
   assert.match(query, /nextDailySync/);
-  assert.match(query, /source_index,status,attempts,cursor_offset,cursor_total,continuation_count/);
+  assert.match(query, /source_index,status,attempts,started_at,finished_at,cursor_offset,cursor_total,continuation_count/);
   assert.match(query, /sourceState\?\.status === "skipped"/);
   assert.match(monitor, /Queued · worker pending/);
   assert.doesNotMatch(monitor, /Waiting for run/);

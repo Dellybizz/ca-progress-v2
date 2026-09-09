@@ -323,6 +323,28 @@
 .icai-run-stats strong {
   font-size: var(--text-xl);
 }
+.icai-run-stats--compact {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.icai-disclosure {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.icai-disclosure summary {
+  padding: var(--space-4);
+  cursor: pointer;
+  color: var(--color-text-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.icai-disclosure[open] summary {
+  border-bottom: 1px solid var(--color-border);
+}
+.icai-disclosure > .icai-run-stats,
+.icai-disclosure > p {
+  margin: var(--space-4);
+}
 .icai-run-error {
   display: flex;
   gap: var(--space-3);
@@ -568,6 +590,32 @@
   display: flex;
   gap: var(--space-2);
   flex: 0 0 auto;
+}
+.icai-content-filters .icai-filters {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.icai-evidence-details {
+  max-width: 100%;
+  color: var(--color-text-soft);
+  font-size: var(--text-xs);
+}
+.icai-evidence-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.icai-evidence-details pre {
+  max-height: 260px;
+  overflow: auto;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.icai-student-preview {
+  border-color: color-mix(in srgb, var(--color-success) 28%, var(--color-border));
 }
 .icai-change-list {
   border: 1px solid var(--color-border);

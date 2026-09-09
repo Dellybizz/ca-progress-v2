@@ -81,6 +81,13 @@ export type IcaiSyncLiveStatus = {
     changed: boolean | null;
     fetchedAt: string | null;
     error: string | null;
+    pagesChecked: number;
+    pdfsResolved: number;
+    unavailablePages: number;
+    skippedPages: number;
+    attempts: number;
+    startedAt: string | null;
+    finishedAt: string | null;
   }>;
   latestFailure: string | null;
   nextScheduledGroup: {

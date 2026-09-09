@@ -153,7 +153,7 @@ export async function getIcaiSyncLiveStatus(
       .order("id"),
     client
       .from("icai_sync_source_states")
-      .select("source_id,source_index,status,attempts,cursor_offset,cursor_total,continuation_count,updated_at")
+      .select("source_id,source_index,status,attempts,started_at,finished_at,cursor_offset,cursor_total,continuation_count,resolved_count,dropped_count,unavailable_count,updated_at")
       .eq("run_id", runId),
   ]);
   const firstError = [
@@ -205,6 +205,13 @@ export async function getIcaiSyncLiveStatus(
       changed: snapshot ? Boolean(snapshot.is_changed) : null,
       fetchedAt: snapshot ? asString(snapshot.fetched_at) : null,
       error: failedThisRun ? asString(source.last_error) : null,
+      pagesChecked: asNumber(sourceState?.cursor_offset),
+      pdfsResolved: asNumber(sourceState?.resolved_count),
+      unavailablePages: asNumber(sourceState?.unavailable_count),
+      skippedPages: asNumber(sourceState?.dropped_count),
+      attempts: asNumber(sourceState?.attempts),
+      startedAt: asString(sourceState?.started_at),
+      finishedAt: asString(sourceState?.finished_at),
     };
   });
 

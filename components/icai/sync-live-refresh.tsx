@@ -154,6 +154,12 @@ export function SyncLiveRefresh({
   const stagePercent = runtime ? (ICAI_STAGE_PROGRESS[runtime.stage] ?? 0) : 0;
   const stale = status.displayState === "stalled";
   const remainingSources = Math.max(0, total - processed);
+  const liveMetrics = status.sourceResults.reduce((total, result) => ({
+    pages: total.pages + result.pagesChecked,
+    pdfs: total.pdfs + result.pdfsResolved,
+    unavailable: total.unavailable + result.unavailablePages,
+    skipped: total.skipped + result.skippedPages,
+  }), { pages: 0, pdfs: 0, unavailable: 0, skipped: 0 });
 
   return (
     <div className="icai-live-monitor" aria-live="polite">
@@ -230,6 +236,17 @@ export function SyncLiveRefresh({
           <div><span>Retries</span><strong>{status.job ? `${status.job.attempts}/${status.job.maxAttempts}` : runtime ? `${runtime.continuationCount}` : "0"}</strong></div>
           <div><span>Next retry</span><strong>{timestamp(status.job?.nextRetryAt)}</strong></div>
         </div>
+        <details className="icai-disclosure">
+          <summary>Live performance metrics</summary>
+          <div className="icai-run-stats">
+            <div><span>Pages checked</span><strong>{liveMetrics.pages}</strong></div>
+            <div><span>PDFs resolved</span><strong>{liveMetrics.pdfs}</strong></div>
+            <div><span>Unavailable</span><strong>{liveMetrics.unavailable}</strong></div>
+            <div><span>Skipped</span><strong>{liveMetrics.skipped}</strong></div>
+            <div><span>New / changed</span><strong>{run ? `${run.newItems} / ${run.changedItems}` : "—"}</strong></div>
+            <div><span>Unchanged</span><strong>{run?.unchangedItems ?? 0}</strong></div>
+          </div>
+        </details>
         {runtime?.currentItemUrl ? (
           <div className="icai-runtime-item">
             <a href={runtime.currentItemUrl} target="_blank" rel="noreferrer">{runtime.currentItemUrl}</a>
@@ -316,12 +333,14 @@ export function SyncLiveRefresh({
                 <span>
                   <strong>{result.sourceName}</strong>
                   <small>{result.error ?? (result.fetchedAt ? `Fetched ${elapsed(result.fetchedAt, status.observedAt)} ago` : "Awaiting result")}</small>
+                  <small>{result.pagesChecked} checked · {result.pdfsResolved} PDFs · {result.unavailablePages + result.skippedPages} unavailable/skipped</small>
                 </span>
               </span>
               <span>
                 <Badge tone={tone(result.state)}>{result.state.replaceAll("_", " ")}</Badge>
                 <small>{result.httpStatus ? `HTTP ${result.httpStatus}` : "No response yet"}</small>
                 <small>{result.parsedItemCount === null ? "—" : `${result.parsedItemCount} items`}</small>
+                <small>{result.startedAt ? `${elapsed(result.startedAt, result.finishedAt ?? status.observedAt)} · ${result.attempts} attempt${result.attempts === 1 ? "" : "s"}` : "Not started"}</small>
               </span>
             </article>
           ))}

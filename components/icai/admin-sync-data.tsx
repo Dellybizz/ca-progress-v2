@@ -26,6 +26,15 @@ function isPdf(url: string | null) {
   try { return /\.pdf$/i.test(new URL(url).pathname); } catch { return false; }
 }
 
+function changeState(firstSeenAt: string, lastChangedAt: string) {
+  return firstSeenAt === lastChangedAt ? "new" : "changed";
+}
+
+function duplicateKey(resource: IcaiPublicCatalog["resources"][number]) {
+  const title = resource.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return [resource.type, title, [...resource.levelCodes].sort().join(","), resource.subjects.map((item) => item.id).sort().join(",")].join("|");
+}
+
 function reviewPreview(
   review: IcaiAdminDashboard["reviews"][number],
   catalog: IcaiPublicCatalog,
@@ -79,6 +88,12 @@ export function IcaiAdminSyncData({
   error?: string | null;
 }) {
   const directPdfs = catalog.resources.filter((item) => isPdf(item.officialUrl)).length;
+  const duplicateGroups = [...catalog.resources.reduce((groups, resource) => {
+    const key = duplicateKey(resource);
+    groups.set(key, [...(groups.get(key) ?? []), resource]);
+    return groups;
+  }, new Map<string, typeof catalog.resources>()).values()].filter((group) => group.length > 1);
+  const unavailableSources = dashboard.sources.filter((source) => source.failures > 0 || source.excludedUntil);
 
   return (
     <div className="icai-page icai-admin-page">
@@ -102,6 +117,17 @@ export function IcaiAdminSyncData({
         <div><span>Direct PDFs</span><strong>{directPdfs}</strong></div>
         <div><span>Exam dates</span><strong>{catalog.events.length}</strong></div>
         <div><span>Needs review</span><strong>{dashboard.reviews.length}</strong></div>
+      </section>
+
+      <section className="icai-section icai-content-filters">
+        <div className="icai-section-heading"><div><span className="eyebrow">Content filters</span><h2>Find synced information</h2></div></div>
+        <form method="get" className="icai-filters">
+          <label>Level<select name="level" defaultValue={catalog.filters.level}><option value="">All levels</option>{catalog.levels.map((level) => <option key={level.code} value={level.code}>{level.name}</option>)}</select></label>
+          <label>Attempt<select name="attempt" defaultValue={catalog.filters.attempt}><option value="">All attempts</option>{catalog.attempts.map((attempt) => <option key={attempt.id} value={attempt.key}>{attempt.label}</option>)}</select></label>
+          <label>Subject<select name="subject" defaultValue={catalog.filters.subject}><option value="">All subjects</option>{catalog.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
+          <button className="ui-button ui-button--primary" type="submit">Apply filters</button>
+          <Link className="ui-button ui-button--secondary" href="/admin/icai-sync/data">Clear</Link>
+        </form>
       </section>
 
       <section className="icai-section">
@@ -132,6 +158,7 @@ export function IcaiAdminSyncData({
                         {preview.urlLabel} <Icon name="arrow" size={14} />
                       </a>
                     ) : null}
+                    <details className="icai-evidence-details"><summary>Technical evidence</summary><pre>{JSON.stringify(review.proposedPatch, null, 2)}</pre></details>
                   </div>
                   <div className="icai-review-actions">
                     <form action={decideIcaiReviewAction}>
@@ -158,7 +185,7 @@ export function IcaiAdminSyncData({
         <div className="icai-section-heading">
           <div>
             <span className="eyebrow">Student-facing exam information</span>
-            <h2>Exam dates</h2>
+            <h2>Exam dates and countdown sources</h2>
           </div>
         </div>
         {catalog.events.length ? (
@@ -173,6 +200,7 @@ export function IcaiAdminSyncData({
                 </span>
                 <span>
                   <strong>{time(event.eventDate)}</strong>
+                  <Badge tone="info">countdown evidence</Badge>
                   <a href={event.sourceUrl} target="_blank" rel="noreferrer">Official notification <Icon name="arrow" size={14} /></a>
                 </span>
               </article>
@@ -181,6 +209,24 @@ export function IcaiAdminSyncData({
         ) : (
           <EmptyState compact icon="clock" title="No verified exam dates yet" description="Exam dates appear here after ICAI sync verifies them." />
         )}
+        {catalog.attempts.filter((attempt) => attempt.startDate || attempt.endDate).length ? (
+          <details className="icai-disclosure">
+            <summary>Attempt dates used by student countdowns</summary>
+            <div className="icai-result-list">
+              {catalog.attempts.filter((attempt) => attempt.startDate || attempt.endDate).map((attempt) => <article key={attempt.id}><span><span><strong>{attempt.label}</strong><small>{attempt.levelCode}</small></span></span><span><strong>{time(attempt.startDate ?? attempt.endDate)}</strong><a href={attempt.sourceUrl} target="_blank" rel="noreferrer">Official evidence <Icon name="arrow" size={14}/></a></span></article>)}
+            </div>
+          </details>
+        ) : null}
+      </section>
+
+      <section className="icai-section icai-student-preview">
+        <div className="icai-section-heading"><div><span className="eyebrow">Student preview</span><h2>What students currently see</h2><p className="icai-muted">This uses the same verified catalog and active filters as the student ICAI surfaces.</p></div><Badge tone="success">verified content</Badge></div>
+        <div className="icai-run-stats">
+          <div><span>Resources visible</span><strong>{catalog.resources.length}</strong></div>
+          <div><span>Exam dates visible</span><strong>{catalog.events.length}</strong></div>
+          <div><span>Direct PDFs</span><strong>{directPdfs}</strong></div>
+          <div><span>Latest verification</span><strong>{time(catalog.verifiedAt)}</strong></div>
+        </div>
       </section>
 
       <section className="icai-section">
@@ -202,6 +248,7 @@ export function IcaiAdminSyncData({
                   </span>
                 </span>
                 <span>
+                  <Badge tone={changeState(resource.firstSeenAt, resource.lastChangedAt) === "new" ? "info" : "warning"}>{changeState(resource.firstSeenAt, resource.lastChangedAt)}</Badge>
                   <Badge tone={isPdf(resource.officialUrl) ? "success" : "neutral"}>{isPdf(resource.officialUrl) ? "direct PDF" : "official link"}</Badge>
                   <a href={resource.officialUrl} target="_blank" rel="noreferrer">{isPdf(resource.officialUrl) ? "Open PDF" : "Open"} <Icon name="arrow" size={14} /></a>
                 </span>
@@ -214,13 +261,19 @@ export function IcaiAdminSyncData({
       </section>
 
       <section className="icai-section">
-        <div className="icai-section-heading"><div><span className="eyebrow">Source health</span><h2>Official ICAI sources</h2></div></div>
+        <div className="icai-section-heading"><div><span className="eyebrow">Duplicate inspection</span><h2>Possible duplicate groups</h2><p className="icai-muted">Items are grouped by student-facing title, type, level and subject. Nothing is merged from this view.</p></div><Badge tone={duplicateGroups.length ? "warning" : "success"}>{duplicateGroups.length} groups</Badge></div>
+        {duplicateGroups.length ? <div className="icai-review-list">{duplicateGroups.map((group) => <article key={duplicateKey(group[0])}><div><h3>{group[0].title}</h3><p>{group.length} matching resources</p><details className="icai-evidence-details"><summary>Inspect links and identifiers</summary>{group.map((item) => <p key={item.id}><a href={item.officialUrl} target="_blank" rel="noreferrer">{item.id} · {item.officialUrl}</a></p>)}</details></div></article>)}</div> : <EmptyState compact icon="check" title="No possible duplicates" description="The current filtered catalog contains no matching content groups."/>}
+      </section>
+
+      <details className="icai-section icai-disclosure">
+        <summary>Official source evidence and availability</summary>
+        <div className="icai-section-heading"><div><span className="eyebrow">Supporting evidence</span><h2>Official ICAI sources</h2></div><Badge tone={unavailableSources.length ? "warning" : "success"}>{unavailableSources.length ? `${unavailableSources.length} unavailable` : "all available"}</Badge></div>
         <div className="icai-source-table">
           {dashboard.sources.map((source) => (
             <article key={source.id} className={source.failures ? "has-error" : ""}>
               <div>
                 <span className="icai-source-health"><i />{source.name}</span>
-                <a href={source.officialUrl} target="_blank" rel="noreferrer">Discovery source</a>
+                <a href={source.officialUrl} target="_blank" rel="noreferrer">Official source page</a>
               </div>
               <dl>
                 <div><dt>Last success</dt><dd>{time(source.lastSuccessAt)}</dd></div>
@@ -230,7 +283,7 @@ export function IcaiAdminSyncData({
             </article>
           ))}
         </div>
-      </section>
+      </details>
     </div>
   );
 }

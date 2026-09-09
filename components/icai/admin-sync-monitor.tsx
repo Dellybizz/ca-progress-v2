@@ -28,6 +28,14 @@ function duration(start: string, end: string | null) {
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
+function averageLatency(start: string | null, end: string | null, pages: number) {
+  if (!start || !end || pages < 1) return "—";
+  const milliseconds = new Date(end).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
+  const average = milliseconds / pages;
+  return average < 1_000 ? `${Math.round(average)}ms` : `${(average / 1_000).toFixed(1)}s`;
+}
+
 function tone(status: string): "success" | "warning" | "danger" | "info" | "neutral" {
   if (["success", "completed", "succeeded", "fetched"].includes(status)) return "success";
   if (["failed", "dead_letter"].includes(status)) return "danger";
@@ -55,6 +63,8 @@ export function IcaiAdminSyncMonitor({
 }) {
   const run = dashboard.latestRun;
   const active = Boolean(dashboard.activeJob || run?.status === "running");
+  const metrics = dashboard.operationalMetrics;
+  const sourceMetrics = new Map(dashboard.sourceMetrics.map((item) => [item.sourceId, item]));
 
   return (
     <div className="icai-page icai-admin-page">
@@ -82,7 +92,7 @@ export function IcaiAdminSyncMonitor({
         <div><span>Operator</span><strong>{role.replaceAll("_", " ")}</strong></div>
         <div><span>System</span><strong>{active ? "sync active" : run?.status ?? "ready"}</strong></div>
         <div><span>Sources</span><strong>{dashboard.sources.filter((source) => source.isActive).length} active</strong></div>
-        <div><span>Schedule</span><strong>Daily</strong></div>
+        <div><span>Schedule</span><strong>Daily · 06:00 IST</strong></div>
       </section>
 
       <SyncLiveRefresh
@@ -102,31 +112,46 @@ export function IcaiAdminSyncMonitor({
             <Badge tone={tone(run.status)}>{run.status}</Badge>
           </div>
 
-          <div className="icai-run-stats">
+          <div className="icai-run-stats icai-run-stats--compact">
             <div><span>Sources</span><strong>{run.sourceProcessed}/{run.sourceTotal}</strong></div>
-            <div><span>Succeeded</span><strong>{run.sourceSucceeded}</strong></div>
-            <div><span>Failed</span><strong>{run.sourceFailed}</strong></div>
+            <div><span>Pages checked</span><strong>{metrics.pagesChecked}</strong></div>
+            <div><span>PDFs resolved</span><strong>{metrics.pdfsResolved}</strong></div>
             <div><span>New</span><strong>{run.newItems}</strong></div>
             <div><span>Changed</span><strong>{run.changedItems}</strong></div>
-            <div><span>Reviews</span><strong>{run.pendingReviews}</strong></div>
+            <div><span>Unchanged</span><strong>{run.unchangedItems}</strong></div>
           </div>
 
+          <details className="icai-disclosure">
+            <summary>Performance and write details</summary>
+            <div className="icai-run-stats">
+              <div><span>Unavailable pages</span><strong>{metrics.unavailablePages}</strong></div>
+              <div><span>Skipped pages</span><strong>{metrics.skippedPages}</strong></div>
+              <div><span>Affected rows</span><strong>{metrics.affectedRows}</strong></div>
+              <div><span>Reviews created</span><strong>{metrics.reviewsCreated}</strong></div>
+              <div><span>Reviews suppressed</span><strong>{metrics.reviewsSuppressed}</strong></div>
+              <div><span>Total duration</span><strong>{duration(run.startedAt, run.completedAt)}</strong></div>
+            </div>
+            <p className="icai-muted">D1 request counts are not shown because they are not currently persisted; affected rows is the reliable stored database metric.</p>
+          </details>
+
           <div className="icai-result-list">
-            {dashboard.sourceResults.map((result) => (
-              <article key={result.sourceId}>
+            {dashboard.sourceResults.map((result) => {
+              const sourceMetric = sourceMetrics.get(result.sourceId);
+              return <article key={result.sourceId}>
                 <span>
                   <i className={`is-${result.state}`} />
                   <span>
                     <strong>{result.sourceName}</strong>
                     <small>{result.error ?? (result.fetchedAt ? `Fetched ${time(result.fetchedAt)}` : "Not fetched in this run")}</small>
+                    {sourceMetric ? <small>{sourceMetric.pagesChecked} checked · {sourceMetric.pdfsResolved} PDFs · {sourceMetric.unavailablePages + sourceMetric.skippedPages} unavailable/skipped</small> : null}
                   </span>
                 </span>
                 <span>
                   <Badge tone={tone(result.state)}>{result.state.replaceAll("_", " ")}</Badge>
-                  <small>{result.parsedItemCount === null ? "—" : `${result.parsedItemCount} eligible items`}</small>
+                  <small>{sourceMetric?.startedAt ? `${duration(sourceMetric.startedAt, sourceMetric.finishedAt)} · avg ${averageLatency(sourceMetric.startedAt, sourceMetric.finishedAt, sourceMetric.pagesChecked)}/page` : result.parsedItemCount === null ? "—" : `${result.parsedItemCount} eligible items`}</small>
                 </span>
-              </article>
-            ))}
+              </article>;
+            })}
           </div>
 
           {run.errorSummary ? (
@@ -163,6 +188,13 @@ export function IcaiAdminSyncMonitor({
           </span></article>)}
         </div>
         {dashboard.skippedItems.length ? <div className="icai-result-list">{dashboard.skippedItems.map(item=><article key={item.id}><span><span><strong>{item.itemUrl}</strong><small>{item.scope}{item.skippedUntil ? ` · until ${time(item.skippedUntil)}` : ""}</small></span></span><form action={restoreIcaiItemAction}><input type="hidden" name="skipId" value={item.id}/><button className="ui-button ui-button--sm">Restore file</button></form></article>)}</div> : null}
+      </section>
+
+      <section className="icai-section">
+        <div className="icai-section-heading">
+          <div><span className="eyebrow">Upcoming schedule</span><h2>Next sync window</h2><p className="icai-muted">The deployed Worker currently runs the complete source group daily. Two-hour source distribution is not enabled, so this panel does not claim otherwise.</p></div>
+          <Badge tone="info">06:00 IST daily</Badge>
+        </div>
       </section>
 
       <section className="icai-section">

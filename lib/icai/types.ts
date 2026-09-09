@@ -130,7 +130,7 @@ export type IcaiPublicCatalog = {
   resources: IcaiResourceCard[];
   events: IcaiExamEventCard[];
   levels: { code: string; name: string }[];
-  attempts: { id: string; key: string; label: string; levelCode: string }[];
+  attempts: { id: string; key: string; label: string; levelCode: string; startDate: string | null; endDate: string | null; sourceUrl: string }[];
   subjects: { id: string; title: string; levelCode: string }[];
   filters: IcaiNormalizedFilters;
   verifiedAt: string | null;
@@ -202,6 +202,26 @@ export type IcaiAdminDashboard = {
     fetchedAt: string | null;
     error: string | null;
   }[];
+  sourceMetrics: {
+    sourceId: string;
+    status: string;
+    pagesChecked: number;
+    pdfsResolved: number;
+    unavailablePages: number;
+    skippedPages: number;
+    attempts: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }[];
+  operationalMetrics: {
+    pagesChecked: number;
+    pdfsResolved: number;
+    unavailablePages: number;
+    skippedPages: number;
+    affectedRows: number;
+    reviewsCreated: number;
+    reviewsSuppressed: number;
+  };
   sources: {
     id: string;
     name: string;

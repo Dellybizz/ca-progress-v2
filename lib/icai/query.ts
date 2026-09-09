@@ -285,6 +285,9 @@ export async function getIcaiPublicCatalog(
           key: row.attempt_key,
           label: row.label,
           levelCode: levelById.get(row.level_id)?.code ?? "",
+          startDate: row.start_date,
+          endDate: row.end_date,
+          sourceUrl: row.source_url,
         })),
         subjects: subjects.map((row: SubjectRow) => ({
           id: row.id,
@@ -348,21 +351,23 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
   const sourceById = new Map(sources.map((source) => [source.id, source]));
   const runs = (runResponse.data ?? []) as SyncRunRow[];
   const run = runs[0] ?? null;
-  const snapshotResponse = run
-    ? await client
-        .from("icai_source_snapshots")
-        .select("*")
-        .eq("run_id", run.id)
-    : { data: [], error: null };
-  if (snapshotResponse.error) throw snapshotResponse.error;
-  const runtimeResponse = run
-    ? await client
-        .from("icai_sync_runtime")
-        .select("*")
-        .eq("run_id", run.id)
-        .maybeSingle()
-    : { data: null, error: null };
-  if (runtimeResponse.error) throw runtimeResponse.error;
+  const [snapshotResponse, runtimeResponse, sourceStateResponse] = run
+    ? await Promise.all([
+        client.from("icai_source_snapshots").select("*").eq("run_id", run.id),
+        client.from("icai_sync_runtime").select("*").eq("run_id", run.id).maybeSingle(),
+        client
+          .from("icai_sync_source_states")
+          .select("source_id,status,attempts,started_at,finished_at,cursor_offset,cursor_total,resolved_count,dropped_count,unavailable_count")
+          .eq("run_id", run.id)
+          .order("source_index"),
+      ])
+    : [
+        { data: [], error: null },
+        { data: null, error: null },
+        { data: [], error: null },
+      ];
+  const runDetailError = [snapshotResponse.error, runtimeResponse.error, sourceStateResponse.error].find(Boolean);
+  if (runDetailError) throw runDetailError;
   const runtime = runtimeResponse.data as Record<string, unknown> | null;
   const snapshots = (snapshotResponse.data ?? []) as Array<
     Record<string, unknown>
@@ -371,6 +376,20 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
     snapshots.map((snapshot) => [String(snapshot.source_id), snapshot]),
   );
   const jobs = (jobResponse.data ?? []) as Array<Record<string, unknown>>;
+  const sourceStates = (sourceStateResponse.data ?? []) as Array<Record<string, unknown>>;
+  const sourceMetrics = sourceStates.map((state) => ({
+    sourceId: String(state.source_id),
+    status: String(state.status),
+    pagesChecked: Number(state.cursor_offset ?? 0),
+    pdfsResolved: Number(state.resolved_count ?? 0),
+    unavailablePages: Number(state.unavailable_count ?? 0),
+    skippedPages: Number(state.dropped_count ?? 0),
+    attempts: Number(state.attempts ?? 0),
+    startedAt: state.started_at ? String(state.started_at) : null,
+    finishedAt: state.finished_at ? String(state.finished_at) : null,
+  }));
+  const sumMetric = (key: "pagesChecked" | "pdfsResolved" | "unavailablePages" | "skippedPages") =>
+    sourceMetrics.reduce((total, item) => total + item[key], 0);
   const activeJob =
     jobs.find((job) => job.status === "queued" || job.status === "running") ??
     null;
@@ -450,6 +469,16 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
         error: failedThisRun ? source.last_error : null,
       };
     }),
+    sourceMetrics,
+    operationalMetrics: {
+      pagesChecked: sumMetric("pagesChecked"),
+      pdfsResolved: sumMetric("pdfsResolved"),
+      unavailablePages: sumMetric("unavailablePages"),
+      skippedPages: sumMetric("skippedPages"),
+      affectedRows: run ? Number(run.new_items) + Number(run.changed_items) + Number(run.unchanged_items) + Number(run.removed_items) : 0,
+      reviewsCreated: run ? Number(run.pending_reviews) : 0,
+      reviewsSuppressed: ((changeResponse.data ?? []) as ChangeRow[]).filter((change) => change.decision_status === "duplicate_suppressed").length,
+    },
     sources: sources.map((source) => ({
       id: source.id,
       name: source.name,

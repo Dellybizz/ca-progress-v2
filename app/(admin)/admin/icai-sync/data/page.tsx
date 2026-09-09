@@ -15,11 +15,18 @@ export default async function IcaiSyncDataPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdminPageCapability("icai.read");
-  const [dashboard, catalog, params] = await Promise.all([
-    getIcaiAdminDashboard(),
-    getIcaiPublicCatalog(),
+  const [, params] = await Promise.all([
+    requireAdminPageCapability("icai.read"),
     searchParams,
+  ]);
+  const filters = {
+    level: param(params.level),
+    attempt: param(params.attempt),
+    subject: param(params.subject),
+  };
+  const [dashboard, catalog] = await Promise.all([
+    getIcaiAdminDashboard(),
+    getIcaiPublicCatalog(filters),
   ]);
 
   return (
