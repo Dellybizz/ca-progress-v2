@@ -19,7 +19,10 @@ type BackgroundJob = { id: string; type: JobType; idempotencyKey: string; payloa
 type LegacyIcaiJob = { type: "icai-sync"; idempotencyKey: string; scheduledTime: number };
 
 const ICAI_SERVICE_TIMEOUT_MS = 20_000;
-const ICAI_SOURCE_TIMEOUT_MS = 60_000;
+// A source may traverse the bounded ICAI study-material hierarchy for up to
+// two minutes. The caller must outlive that engine budget (plus D1 finalization)
+// or it will retry healthy work and eventually dead-letter it.
+const ICAI_SOURCE_TIMEOUT_MS = 150_000;
 
 type IcaiServicePayload = {
   ok?: boolean;

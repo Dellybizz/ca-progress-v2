@@ -27,7 +27,7 @@ test("background jobs are isolated from concurrent D1 writes inside queue batche
 test("official ICAI source discovery gets a dedicated service-binding wall-time budget", () => {
   const worker = read("custom-worker.ts");
   assert.match(worker, /const ICAI_SERVICE_TIMEOUT_MS = 20_000/);
-  assert.match(worker, /const ICAI_SOURCE_TIMEOUT_MS = 60_000/);
+  assert.match(worker, /const ICAI_SOURCE_TIMEOUT_MS = 150_000/);
   assert.match(worker, /path === "\/source" \? ICAI_SOURCE_TIMEOUT_MS : ICAI_SERVICE_TIMEOUT_MS/);
 });
 
