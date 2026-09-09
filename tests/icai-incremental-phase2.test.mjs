@@ -48,6 +48,9 @@ test("Phase 2 skips stale nested ICAI leaves without failing the complete source
   assert.doesNotMatch(resolver, /throw new Error\(`Direct-PDF resolver exceeded/);
   const engine = read("workers/icai-sync/sync-engine.ts");
   assert.match(engine, /direct\.unavailableLandingPages === 0/);
+  assert.match(engine, /direct\.unavailableLandingPages > 0/);
+  assert.match(engine, /preserved_existing_resources/);
+  assert.match(engine, /icai_sync_record_unchanged/);
 });
 
 test("Phase 2 retained migration and clean-D1 validator cover migration 0033", () => {

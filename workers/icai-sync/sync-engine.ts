@@ -468,6 +468,32 @@ async function processSource(
     subjectLookups,
     runtime.userAgent,
   );
+  if (direct.unavailableLandingPages > 0) {
+    const existing = await runtime.db
+      .prepare("SELECT COUNT(*) AS count FROM icai_resources WHERE source_id=?1")
+      .bind(source.id)
+      .first<{ count: number }>();
+    if (Number(existing?.count ?? 0) > 0) {
+      await stage("writing");
+      const { error } = await client.rpc("icai_sync_record_unchanged", {
+        p_run_id: runId,
+        p_source_id: source.id,
+        p_snapshot: {
+          ...snapshotBase,
+          canonical_hash: source.lastContentHash ?? await sha256Hex(fetched.html),
+          metadata: {
+            ...snapshotBase.metadata,
+            authoritative_listing: false,
+            incomplete_nested_traversal: true,
+            unavailable_study_material_pages: direct.unavailableLandingPages,
+            preserved_existing_resources: Number(existing?.count ?? 0),
+          },
+        } as Json,
+      });
+      if (error) throw error;
+      return;
+    }
+  }
   const watermark = await runtime.db
     .prepare(
       "SELECT bootstrap_complete,bootstrap_completed_at,last_success_at,published_high_watermark,attempt_high_watermark FROM icai_source_watermarks WHERE source_id=?1 LIMIT 1",
