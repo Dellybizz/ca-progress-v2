@@ -42,7 +42,7 @@ test("Phase 2 skips stale nested ICAI leaves without failing the complete source
   const resolver = read("workers/icai-sync/direct-resource-resolver.ts");
   assert.match(resolver, /response\.status === 404 \|\| response\.status === 410/);
   assert.match(resolver, /if \(html === null\) \{/);
-  assert.match(resolver, /MAX_RESOLUTION_MS = 105_000/);
+  assert.match(resolver, /MAX_RESOLUTION_MS = 60_000/);
   assert.match(resolver, /Math\.min\(source\.timeoutMs, MAX_CHILD_TIMEOUT_MS\)/);
   assert.match(resolver, /unavailableLandingPages \+= 1/);
   assert.doesNotMatch(resolver, /throw new Error\(`Direct-PDF resolver exceeded/);
