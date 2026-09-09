@@ -34,7 +34,28 @@ jobs:
       - name: Lint
         run: npm run lint
       - name: Full repository regression suite
-        run: npm test
+        shell: bash
+        run: |
+          set +e
+          npm test 2>&1 | tee /tmp/npm-test.log
+          result=${PIPESTATUS[0]}
+          if [ "$result" -ne 0 ]; then
+            {
+              echo "Full repository regression failure diagnostic"
+              echo "============================================"
+              grep -nE 'not ok|AssertionError|ERR_ASSERTION|failureType|error:|expected:|actual:|tests? failed|fail [0-9]+' /tmp/npm-test.log | tail -240 || true
+              echo
+              echo "Last 180 lines"
+              echo "=============="
+              tail -180 /tmp/npm-test.log
+            } > phase2-regression-failure.txt
+            git config user.name "ca-progress-phase2-bot"
+            git config user.email "ca-progress-phase2-bot@users.noreply.github.com"
+            git add phase2-regression-failure.txt
+            git commit -m "chore: capture phase2 regression diagnostic"
+            git push origin HEAD:phase2-reconstruct-20260909
+            exit "$result"
+          fi
       - name: Commit verified Phase 2 tree
         shell: bash
         run: |
