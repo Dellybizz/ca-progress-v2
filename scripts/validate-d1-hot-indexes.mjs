@@ -99,6 +99,7 @@ try {
     ["0035", "0035_icai_phase2b_source_cursor.sql"],
     ["0036", "0036_icai_phase2c_future_state.sql"],
     ["0037", "0037_icai_phase3b_operator_controls.sql"],
+    ["0038", "0038_icai_phase3ef_item_isolation.sql"],
   ]) {
     const journalRows = execute(`SELECT name FROM d1_migrations WHERE name='${filename}';`);
     assert(journalRows.length === 1, `${filename} Wrangler migration was not recorded exactly once`);
@@ -129,6 +130,11 @@ try {
   const runtimeColumns = execute("PRAGMA table_info(icai_sync_runtime);").map((row) => row.name);
   assert(runtimeColumns.includes("pause_requested") && runtimeColumns.includes("paused_at"), "ICAI Phase 3B pause controls are missing");
   assert(sourceColumns.includes("excluded_until") && sourceColumns.includes("exclusion_reason"), "ICAI Phase 3B source exclusion controls are missing");
+  assert(execute("SELECT name FROM sqlite_master WHERE type='table' AND name='icai_sync_items';").length === 1, "ICAI Phase 3E item lifecycle table is missing");
+  const itemColumns = execute("PRAGMA table_info(icai_sync_items);").map((row) => String(row.name));
+  for (const column of ["status", "attempts", "duration_ms", "bytes_fetched", "parsed_count", "failure_category", "retry_eligible"]) assert(itemColumns.includes(column), `ICAI Phase 3E item column ${column} is missing`);
+  assert(runtimeColumns.includes("current_item_id"), "ICAI Phase 3E runtime item identity is missing");
+  for (const index of ["icai_sync_items_run_status_idx", "icai_sync_items_source_status_idx"]) assert(indexes.includes(index), `ICAI Phase 3E index ${index} is missing`);
 
   const auditTables = execute("SELECT name FROM sqlite_master WHERE type='table' AND name='icai_review_decisions';");
   assert(auditTables.length === 1, "ICAI review decision audit table is missing");

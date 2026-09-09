@@ -19,6 +19,7 @@ import {
 } from "./runtime-control";
 import { applyIcaiWindowPolicy, completedAdapterConfig } from "./bootstrap-policy";
 import { resolveDirectStudyMaterialPdfs } from "./direct-resource-resolver";
+import { beginIcaiItemExecution, finishIcaiItemExecution } from "./item-isolation";
 
 const PARSER_VERSION = "phase8.1";
 const MAX_HTML_BYTES = 2_500_000;
@@ -423,6 +424,7 @@ async function processSource(
   levels: LevelRow[],
   subjects: SubjectRow[],
   attempts: AttemptRow[],
+  retryItemUrls: string[] = [],
 ): Promise<boolean> {
   const MAX_SOURCE_CONTINUATIONS = 50;
   const MAX_PARTIAL_PAYLOAD_BYTES = 1_500_000;
@@ -507,15 +509,20 @@ async function processSource(
     .bind(source.id)
     .all<{ item_url: string }>();
   const skippedUrls = new Set((skipRows.results ?? []).map((row) => row.item_url));
+  for (const retryUrl of retryItemUrls) skippedUrls.delete(retryUrl);
   const direct = await resolveDirectStudyMaterialPdfs(
     discoveryChunk,
     source,
     subjectLookups,
     runtime.userAgent,
     skippedUrls,
-    async (itemUrl) => {
+    async (itemUrl, resource) => {
       await setStage(runtime.db, runId, "parsing", source.id, itemUrl);
       await checkpoint(runtime.db, runId);
+      await beginIcaiItemExecution(runtime.db, runId, source.id, itemUrl, resource.title, "nested_page");
+    },
+    async (result) => {
+      await finishIcaiItemExecution(runtime.db, runId, source.id, result);
     },
   );
   if (direct.itemFailures.length) {
@@ -807,12 +814,13 @@ async function continuationSources(client: AdminClient) {
 
 export async function startIcaiSyncContinuationEngine(
   runtime: IcaiSyncRuntime,
-  { trigger, requestedBy = null, orchestrationKey, requestedSourceIds = [], forceRecheck = false }: {
+  { trigger, requestedBy = null, orchestrationKey, requestedSourceIds = [], forceRecheck = false, retryItemUrls = [] }: {
     trigger: "cron" | "manual" | "test";
     requestedBy?: string | null;
     orchestrationKey: string;
     requestedSourceIds?: string[];
     forceRecheck?: boolean;
+    retryItemUrls?: string[];
   },
 ): Promise<IcaiSyncContinuationStart> {
   if (!runtime.enabled) throw new Error("ICAI synchronization is disabled for this environment.");
@@ -846,6 +854,7 @@ export async function startIcaiSyncContinuationEngine(
     orchestration_key: orchestrationKey,
     source_ids: sourceIds,
     force_recheck: Boolean(forceRecheck),
+    retry_item_urls: [...new Set(retryItemUrls)].slice(0, 50),
   });
   const inserted = await runtime.db.prepare("INSERT INTO icai_sync_runs(id,trigger_type,requested_by,parser_version,status,started_at,source_total,details) SELECT ?1,?2,?3,?4,'running',?5,?6,?7 WHERE NOT EXISTS (SELECT 1 FROM icai_sync_runs WHERE status IN ('queued','running')) RETURNING id")
     .bind(runId, trigger, requestedBy, PARSER_VERSION, startedAt, sourceIds.length, details)
@@ -902,7 +911,9 @@ export async function runIcaiSyncContinuationSource(
     return { runId, sourceId, status: "cancelled", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
   }
   if (run.status !== "running") throw new Error(`ICAI sync run ${runId} is not running (status=${run.status}).`);
-  const forceRecheck = Boolean(parseDetails(run.details).force_recheck);
+  const runDetails = parseDetails(run.details);
+  const forceRecheck = Boolean(runDetails.force_recheck);
+  const retryItemUrls = stringArray(runDetails.retry_item_urls).slice(0, 50);
   const effectiveSource = forceRecheck ? { ...source, etag: null, lastModified: null } : source;
   await runtime.db.prepare("UPDATE icai_sync_source_states SET status='running',attempts=attempts+1,started_at=COALESCE(started_at,CURRENT_TIMESTAMP),last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2")
     .bind(runId, sourceId).run();
@@ -915,6 +926,7 @@ export async function runIcaiSyncContinuationSource(
       (levelResponse.data ?? []) as LevelRow[],
       (subjectResponse.data ?? []) as SubjectRow[],
       (attemptResponse.data ?? []) as AttemptRow[],
+      retryItemUrls,
     );
     if (complete) {
       await runtime.db.prepare("UPDATE icai_sync_source_states SET status='succeeded',finished_at=CURRENT_TIMESTAMP,last_error=NULL,updated_at=CURRENT_TIMESTAMP WHERE run_id=?1 AND source_id=?2")

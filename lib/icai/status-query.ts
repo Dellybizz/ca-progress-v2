@@ -11,7 +11,7 @@ import {
 } from "./live-status";
 
 const RUN_COLUMNS =
-  "id,status,trigger_type,started_at,completed_at,source_total,source_processed,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary";
+  "id,status,trigger_type,started_at,completed_at,source_total,source_processed,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary,details";
 const RUNTIME_COLUMNS =
   "run_id,stage,current_source_id,current_item_url,stage_started_at,heartbeat_at,cancel_requested,skip_source_requested";
 const SNAPSHOT_COLUMNS =
@@ -49,6 +49,17 @@ function jobRunId(job: Record<string, unknown>) {
     const payload = JSON.parse(String(job.payload_json ?? "{}")) as Record<string, unknown>;
     return asString(payload.runId);
   } catch { return null; }
+}
+
+function selectedRunSourceIds(run: Record<string, unknown>) {
+  try {
+    const details = JSON.parse(String(run.details ?? "{}")) as Record<string, unknown>;
+    return Array.isArray(details.source_ids)
+      ? details.source_ids.filter((value): value is string => typeof value === "string" && value.length > 0)
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function displayState(job: Record<string, unknown> | null, runStatus: string | null, stage: string | null, stale: boolean): IcaiSyncDisplayState {
@@ -181,7 +192,12 @@ export async function getIcaiSyncLiveStatus(
   const currentSourceId = asString(runtime?.current_source_id);
   const startedAt = String(run.started_at);
 
-  const sourceResults = sources.map((source) => {
+  const selectedSourceIds = new Set(selectedRunSourceIds(run));
+  const visibleSources = selectedSourceIds.size
+    ? sources.filter((source) => selectedSourceIds.has(String(source.id)))
+    : sources;
+
+  const sourceResults = visibleSources.map((source) => {
     const sourceId = String(source.id);
     const snapshot = snapshotBySource.get(sourceId);
     const sourceState = stateBySource.get(sourceId);
@@ -215,7 +231,7 @@ export async function getIcaiSyncLiveStatus(
     };
   });
 
-  const sourceFailure = sources.find((source) => {
+  const sourceFailure = visibleSources.find((source) => {
     const lastErrorAt = asString(source.last_error_at);
     return Boolean(lastErrorAt && lastErrorAt >= startedAt && source.last_error);
   });

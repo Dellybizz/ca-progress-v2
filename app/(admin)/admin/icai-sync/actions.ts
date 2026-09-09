@@ -141,6 +141,26 @@ export async function excludeIcaiSourceAction(formData: FormData) {
   revalidatePath("/admin/icai-sync"); redirect(destination);
 }
 
+export async function restoreIcaiSourceAction(formData: FormData) {
+  let destination = "/admin/icai-sync";
+  try {
+    const operator = await requireAdminCapability("icai.run");
+    const sourceId = String(formData.get("sourceId") ?? "").trim();
+    if (!sourceId || sourceId.length > 200) throw new Error("Invalid ICAI source restore request.");
+    const admin = createD1AdminClient();
+    const source = await admin.from("icai_sources").select("id,excluded_until,exclusion_reason").eq("id", sourceId).maybeSingle();
+    if (source.error) throw source.error;
+    if (!source.data) throw new Error("ICAI source was not found.");
+    if (source.data.excluded_until || source.data.exclusion_reason) {
+      const update = await admin.from("icai_sources").update({ excluded_until: null, exclusion_reason: null, updated_at: new Date().toISOString() }).eq("id", sourceId);
+      if (update.error) throw update.error;
+      await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.run", action: "icai.sync.restore_source", targetType: "icai_source", targetId: sourceId, previousValue: { excludedUntil: source.data.excluded_until, reason: source.data.exclusion_reason }, newValue: { excludedUntil: null, reason: null }, traceId: traceId(), reversible: false });
+    }
+    destination = "/admin/icai-sync?notice=ICAI%20source%20restored.";
+  } catch (error) { destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`; }
+  revalidatePath("/admin/icai-sync"); redirect(destination);
+}
+
 export async function runTargetedIcaiSyncAction(formData: FormData) {
   let destination = "/admin/icai-sync";
   try {
@@ -165,6 +185,73 @@ export async function runTargetedIcaiSyncAction(formData: FormData) {
     const job = await enqueueBackgroundJob({ type: "icai-sync", idempotencyKey: jobKey("icai-sync", "targeted", scope), payload: { trigger: "manual", requestedBy: operator.user.id, requestedSourceIds: sourceIds, forceRecheck }, createdBy: operator.user.id });
     await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.run", action: `icai.sync.${mode}`, targetType: "background_job", targetId: job.id, newValue: { sourceIds, forceRecheck }, traceId: traceId(), reversible: false });
     destination = `/admin/icai-sync?notice=${encodeURIComponent(`Targeted sync queued for ${sourceIds.length} source(s).`)}`;
+  } catch (error) { destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`; }
+  revalidatePath("/admin/icai-sync"); redirect(destination);
+}
+
+export async function retryIcaiItemsAction(formData: FormData) {
+  let destination = "/admin/icai-sync";
+  try {
+    const operator = await requireAdminCapability("icai.run");
+    const mode = String(formData.get("mode") ?? "failed");
+    const requestedRunId = String(formData.get("runId") ?? "").trim();
+    const itemId = String(formData.get("itemId") ?? "").trim();
+    if (!["one", "failed", "timed_out"].includes(mode)) throw new Error("Invalid ICAI item retry request.");
+    const admin = createD1AdminClient();
+    const active = await admin.from("icai_sync_runs").select("id").eq("status", "running").limit(1).maybeSingle();
+    if (active.error) throw active.error;
+    if (active.data) throw new Error("Another ICAI synchronization is already active.");
+    let originRunId = requestedRunId;
+    let rows: Array<{ id: string; run_id: string; source_id: string; item_url: string }> = [];
+    if (mode === "one") {
+      if (!itemId) throw new Error("The ICAI item was not identified.");
+      const item = await admin.from("icai_sync_items").select("id,run_id,source_id,item_url,retry_eligible").eq("id", itemId).maybeSingle();
+      if (item.error) throw item.error;
+      if (!item.data || !item.data.retry_eligible) throw new Error("This ICAI item is not eligible for retry.");
+      originRunId = String(item.data.run_id);
+      rows = [{ id: String(item.data.id), run_id: String(item.data.run_id), source_id: String(item.data.source_id), item_url: String(item.data.item_url) }];
+    } else {
+      if (!originRunId) {
+        const latest = await admin.from("icai_sync_runs").select("id").order("started_at", { ascending: false }).limit(1).maybeSingle();
+        if (latest.error) throw latest.error;
+        originRunId = latest.data ? String(latest.data.id) : "";
+      }
+      if (!originRunId) throw new Error("No ICAI run is available for item retry.");
+      const items = await admin.from("icai_sync_items").select("id,run_id,source_id,item_url,retry_eligible,status").eq("run_id", originRunId).eq("status", mode).eq("retry_eligible", true).order("updated_at", { ascending: false }).limit(50);
+      if (items.error) throw items.error;
+      rows = (items.data ?? []).map((item: Record<string, unknown>) => ({ id: String(item.id), run_id: String(item.run_id), source_id: String(item.source_id), item_url: String(item.item_url) }));
+    }
+    if (!rows.length) throw new Error(`No ${mode === "timed_out" ? "timed-out" : "failed"} ICAI items are eligible for retry.`);
+    const sourceIds = [...new Set(rows.map((row) => row.source_id))];
+    const retryItemUrls = [...new Set(rows.map((row) => row.item_url))].slice(0, 50);
+    const scope = `${mode}:${originRunId}:${itemId || retryItemUrls.length}:${new Date().toISOString().slice(0, 16)}`;
+    const job = await enqueueBackgroundJob({ type: "icai-sync", idempotencyKey: jobKey("icai-sync", "item-retry", scope), payload: { trigger: "manual", requestedBy: operator.user.id, requestedSourceIds: sourceIds, forceRecheck: true, retryItemUrls, retryOriginRunId: originRunId }, createdBy: operator.user.id });
+    await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.run", action: `icai.sync.retry_items.${mode}`, targetType: "background_job", targetId: job.id, reason: "Targeted ICAI item recovery", newValue: { originRunId, itemCount: retryItemUrls.length, sourceIds }, traceId: traceId(), reversible: false });
+    destination = `/admin/icai-sync?notice=${encodeURIComponent(`Queued retry for ${retryItemUrls.length} item(s) across ${sourceIds.length} source(s).`)}`;
+  } catch (error) { destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`; }
+  revalidatePath("/admin/icai-sync"); redirect(destination);
+}
+
+export async function excludeIcaiDiagnosticItemAction(formData: FormData) {
+  let destination = "/admin/icai-sync";
+  try {
+    const operator = await requireAdminCapability("icai.run");
+    const sourceId = String(formData.get("sourceId") ?? "").trim();
+    const itemUrl = String(formData.get("itemUrl") ?? "").trim();
+    const scope = formData.get("scope") === "permanent" ? "permanent" : "temporary";
+    if (!sourceId || itemUrl.length > 2000 || !isApprovedIcaiUrl(itemUrl)) throw new Error("Invalid ICAI item exclusion request.");
+    const admin = createD1AdminClient();
+    const existing = await admin.from("icai_sync_item_skips").select("id,is_active,scope,skipped_until").eq("source_id", sourceId).eq("item_url", itemUrl).maybeSingle();
+    if (existing.error) throw existing.error;
+    const now = new Date();
+    const skippedUntil = scope === "temporary" ? new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString() : null;
+    const values = { scope, reason: "Excluded from Phase 3 item diagnostics", skipped_until: skippedUntil, is_active: true, created_by: operator.user.id, updated_at: now.toISOString() };
+    const saved = existing.data
+      ? await admin.from("icai_sync_item_skips").update(values).eq("id", existing.data.id)
+      : await admin.from("icai_sync_item_skips").insert({ id: crypto.randomUUID(), source_id: sourceId, item_url: itemUrl, ...values, created_at: now.toISOString() });
+    if (saved.error) throw saved.error;
+    await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.run", action: "icai.sync.exclude_item", targetType: "icai_source_item", targetId: itemUrl, reason: `${scope} item exclusion`, previousValue: existing.data ?? null, newValue: { sourceId, scope, skippedUntil }, traceId: traceId(), reversible: true });
+    destination = `/admin/icai-sync?notice=${encodeURIComponent(scope === "permanent" ? "ICAI item excluded until restored." : "ICAI item excluded for 24 hours.")}`;
   } catch (error) { destination = `/admin/icai-sync?error=${encodeURIComponent(message(error))}`; }
   revalidatePath("/admin/icai-sync"); redirect(destination);
 }

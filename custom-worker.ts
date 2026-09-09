@@ -162,7 +162,7 @@ async function executeIcaiQueueJob(job: BackgroundJob, env: WorkerEnv) {
 
   const trigger = job.payload.trigger === "manual" ? "manual" : job.payload.trigger === "test" ? "test" : "cron";
   const requestedBy = typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null;
-  const payload = await callIcaiService(env, "/start", { trigger, requestedBy, orchestrationKey: job.idempotencyKey, requestedSourceIds: job.payload.requestedSourceIds, forceRecheck: job.payload.forceRecheck === true });
+  const payload = await callIcaiService(env, "/start", { trigger, requestedBy, orchestrationKey: job.idempotencyKey, requestedSourceIds: job.payload.requestedSourceIds, forceRecheck: job.payload.forceRecheck === true, retryItemUrls: job.payload.retryItemUrls });
   const runId = payload.result?.runId;
   const sourceIds = payload.result?.sourceIds?.filter((value): value is string => typeof value === "string") ?? [];
   const firstSourceId = sourceIds[0];

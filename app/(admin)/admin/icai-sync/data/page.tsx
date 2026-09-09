@@ -23,6 +23,7 @@ export default async function IcaiSyncDataPage({
     level: param(params.level),
     attempt: param(params.attempt),
     subject: param(params.subject),
+    type: param(params.type),
   };
   const [dashboard, catalog] = await Promise.all([
     getIcaiAdminDashboard(),

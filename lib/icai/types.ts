@@ -238,6 +238,7 @@ export type IcaiAdminDashboard = {
     isActive: boolean;
     excludedUntil: string | null;
   }[];
+  itemDiagnostics: { id: string; runId: string; sourceId: string; itemUrl: string; itemType: string; itemTitle: string | null; status: string; stage: string; attempts: number; startedAt: string | null; completedAt: string | null; durationMs: number | null; bytesFetched: number; parsedCount: number; failureCategory: string | null; failureMessage: string | null; skipReason: string | null; retryEligible: boolean }[];
   skippedItems: { id: string; sourceId: string; itemUrl: string; scope: string; skippedUntil: string | null }[];
   reviews: {
     id: string;
