@@ -12,7 +12,7 @@ const token = required("CLOUDFLARE_API_TOKEN");
 const sha = required("GITHUB_SHA");
 const githubRunId = required("GITHUB_RUN_ID");
 const runAttempt = process.env.GITHUB_RUN_ATTEMPT || "1";
-const correlationId = `${sha.slice(0, 12)}-${githubRunId}-${runAttempt}-phase2-repeat`.replace(/[^A-Za-z0-9._-]/g, "-");
+const correlationPrefix = `${sha.slice(0, 12)}-${githubRunId}-${runAttempt}-phase2`.replace(/[^A-Za-z0-9._-]/g, "-");
 const queueName = "ca-progress-v2-phase3-background";
 const databaseName = "ca-progress-v2-phase4-shadow";
 const evidenceDir = "deployment-evidence";
@@ -78,7 +78,7 @@ async function waitForRoot(key) {
   throw new Error("Phase 2 repeat root job did not succeed within the bounded poll window.");
 }
 
-async function waitForContinuation(startedAt) {
+async function waitForContinuation(startedAt, correlationId) {
   for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
     const childJobs = d1(`SELECT idempotency_key,status,attempts,last_error,json_extract(payload_json,'$.runId') AS run_id FROM background_jobs WHERE job_type='icai-sync' AND json_extract(payload_json,'$.mode')='source' AND json_extract(payload_json,'$.phase2Correlation')=${sqlText(correlationId)} AND json_extract(payload_json,'$.gitSha')=${sqlText(sha)} ORDER BY idempotency_key;`);
     writeFileSync(`${evidenceDir}/icai-phase2-repeat-source-jobs.json`, JSON.stringify(childJobs, null, 2));
@@ -96,35 +96,59 @@ async function waitForContinuation(startedAt) {
   throw new Error("Phase 2 repeat continuation did not reach verified success within the bounded poll window.");
 }
 
+async function runSync(queueId, purpose) {
+  const correlationId = `${correlationPrefix}-${purpose}`;
+  const startedAt = new Date(Date.now() - 5_000).toISOString();
+  const rootKey = `icai-phase2-${purpose}:${correlationId}`;
+  const push = await cloudflare(`/accounts/${accountId}/queues/${queueId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({
+      body: {
+        id: `phase2-${purpose}-${correlationId}`,
+        type: "icai-sync",
+        idempotencyKey: rootKey,
+        payload: { trigger: "manual", requestedBy: null, phase2Correlation: correlationId, gitSha: sha },
+        createdBy: null,
+      },
+    }),
+  });
+  writeFileSync(`${evidenceDir}/icai-phase2-${purpose}-push.json`, JSON.stringify(push, null, 2));
+  await waitForRoot(rootKey);
+  return (await waitForContinuation(startedAt, correlationId)).run;
+}
+
+function isCompleteRun(run) {
+  return run?.status === "success" &&
+    Number(run.source_total) === sourceIds.length &&
+    Number(run.source_succeeded) === sourceIds.length &&
+    Number(run.source_failed) === 0;
+}
+
 const phase5Baseline = JSON.parse(readFileSync(`${evidenceDir}/icai-phase5-real-run.json`, "utf8"));
 if (!phase5Baseline?.id || !["success", "partial"].includes(phase5Baseline.status)) throw new Error("Phase 2 requires the same-deployment Phase 5 real sync as its first baseline run.");
+
+const queueList = await cloudflare(`/accounts/${accountId}/queues`);
+const queue = (queueList.result ?? []).find((item) => item.queue_name === queueName);
+if (!queue?.queue_id) throw new Error(`Cloudflare Queue ${queueName} was not found.`);
+
+// Phase 5 intentionally accepts a partial run so one transient ICAI endpoint does
+// not hide the state of the other sources. Phase 2 needs two *complete* runs.
+// If Phase 5 was partial, use one bounded recovery run as the baseline instead of
+// asserting that its failed source already owns a successful-only watermark.
+let baselineRun = phase5Baseline;
+if (!isCompleteRun(baselineRun)) {
+  baselineRun = await runSync(queue.queue_id, "baseline-recovery");
+  if (!isCompleteRun(baselineRun)) {
+    throw new Error(`Phase 2 could not establish a complete six-source baseline: ${JSON.stringify(baselineRun)}`);
+  }
+}
 
 const beforeWatermarks = watermarkRows();
 assertLockedWatermarks(beforeWatermarks, "before repeat sync");
 const beforeResourceCount = Number(d1("SELECT COUNT(*) AS count FROM icai_resources;")[0]?.count ?? -1);
 if (beforeResourceCount < 0) throw new Error("Phase 2 could not read the baseline ICAI resource count.");
 
-const queueList = await cloudflare(`/accounts/${accountId}/queues`);
-const queue = (queueList.result ?? []).find((item) => item.queue_name === queueName);
-if (!queue?.queue_id) throw new Error(`Cloudflare Queue ${queueName} was not found.`);
-
-const startedAt = new Date(Date.now() - 5_000).toISOString();
-const repeatKey = `icai-phase2-repeat:${correlationId}`;
-const push = await cloudflare(`/accounts/${accountId}/queues/${queue.queue_id}/messages`, {
-  method: "POST",
-  body: JSON.stringify({
-    body: {
-      id: `phase2-repeat-${correlationId}`,
-      type: "icai-sync",
-      idempotencyKey: repeatKey,
-      payload: { trigger: "manual", requestedBy: null, phase2Correlation: correlationId, gitSha: sha },
-      createdBy: null,
-    },
-  }),
-});
-writeFileSync(`${evidenceDir}/icai-phase2-repeat-push.json`, JSON.stringify(push, null, 2));
-await waitForRoot(repeatKey);
-const { run: repeatRun } = await waitForContinuation(startedAt);
+const repeatRun = await runSync(queue.queue_id, "repeat");
 
 if (Number(repeatRun.source_total) !== sourceIds.length || Number(repeatRun.source_succeeded) !== sourceIds.length || Number(repeatRun.source_failed) !== 0) {
   throw new Error(`Phase 2 repeat sync did not succeed across all six sources: ${JSON.stringify(repeatRun)}`);
@@ -154,7 +178,7 @@ if (fk.length) throw new Error(`Phase 2 repeat sync left D1 foreign-key violatio
 writeFileSync(`${evidenceDir}/icai-phase2-summary.json`, JSON.stringify({
   status: "pass",
   gitSha: sha,
-  baselineRunId: phase5Baseline.id,
+  baselineRunId: baselineRun.id,
   repeatRunId: repeatRun.id,
   sources: sourceIds.length,
   resourceCount: afterResourceCount,
@@ -164,4 +188,4 @@ writeFileSync(`${evidenceDir}/icai-phase2-summary.json`, JSON.stringify({
   watermarks: "advanced-on-success",
   foreignKeys: "clean",
 }, null, 2));
-console.log(`ICAI Phase 2 incremental idempotency verification PASS (${correlationId}).`);
+console.log(`ICAI Phase 2 incremental idempotency verification PASS (${correlationPrefix}).`);

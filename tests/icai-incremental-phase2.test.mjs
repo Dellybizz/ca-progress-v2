@@ -52,6 +52,8 @@ test("Phase 2 deployment proves a second real Queue sync is idempotent", () => {
   assert.match(workflow, /ICAI Phase 2 incremental idempotency proof/);
   assert.match(workflow, /verify-icai-phase2-live\.mjs/);
   assert.match(verifier, /icai-phase5-real-run\.json/);
+  assert.match(verifier, /baseline-recovery/);
+  assert.match(verifier, /two \*complete\* runs/);
   assert.match(verifier, /Phase 2 repeat sync was not idempotent/);
   assert.match(verifier, /repeatRun\.new_items/);
   assert.match(verifier, /bootstrap_completed_at !== before\.bootstrap_completed_at/);
