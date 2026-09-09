@@ -23,6 +23,15 @@ jobs:
           node-version: 22
       - name: Apply Phase 3A-3D closure
         run: python3 scripts/__phase3_abcd_finish.py
+      - name: Correct optional-chain regression assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/icai-phase3-admin.test.mjs')
+          s = p.read_text()
+          s = s.replace(r'assert.match(live, /runtime\.currentSourceName/);', r'assert.match(live, /runtime\?\.currentSourceName/);')
+          p.write_text(s)
+          PY
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Phase 3A-3D regression contract
