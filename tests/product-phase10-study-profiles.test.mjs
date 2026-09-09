@@ -141,9 +141,11 @@ test("Product Phase 10 owner UI exposes granular visibility and exact-ID buddy g
 
 test("Product Phase 10 deployment remains additive after Study Buddy is introduced", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
   const migration = read("d1/migrations/0020_product_phase10_study_profiles.sql");
-  assert.match(workflow, /0020_product_phase10_study_profiles\.sql/);
-  assert.match(workflow, /'0020'/);
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0020_product_phase10_study_profiles\.sql/);
+  assert.match(retainedMigrations, /\["0020"/);
   assert.match(workflow, /phase10_study_profiles/);
   assert.match(workflow, /phase10_study_profile_buddies/);
   assert.doesNotMatch(migration, /study_buddy_relationships|study_together_sessions|study_buddy_goals/);

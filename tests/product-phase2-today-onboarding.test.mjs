@@ -111,6 +111,8 @@ test("Product Phase 2 Today completion continues updating source planner, progre
 
 test("Product Phase 2 production deployment applies the additive onboarding experience migration", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
-  assert.match(workflow, /0013_product_phase2_onboarding_experience\.sql/);
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0013_product_phase2_onboarding_experience\.sql/);
   assert.match(workflow, /onboarding_experience/);
 });

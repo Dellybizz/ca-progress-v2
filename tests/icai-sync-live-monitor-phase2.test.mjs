@@ -53,8 +53,8 @@ test("ICAI live monitor refreshes the full page only after active work ends", ()
 
 test("ICAI admin page no longer claims full-page auto refresh", () => {
   const panel = read("components/icai/admin-sync-monitor.tsx");
-  assert.match(panel, /compact live-status feed/);
-  assert.match(panel, /5s → 15s adaptive/);
+  assert.match(panel, /watch its progress/);
+  assert.match(panel, /Synced resources and approval work live on a separate, simpler page/);
   assert.match(panel, /Live worker state/);
   assert.match(panel, /Skip current source/);
   assert.match(panel, /Cancel run/);

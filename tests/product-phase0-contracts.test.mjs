@@ -100,11 +100,13 @@ test("stable resource open endpoint prefers the verified direct document and nev
 
 test("deployment preserves the idempotent Product Phase 0 migration in the retained additive product migration chain", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(workflow, /- d1\/\*\*/);
-  assert.match(workflow, /Apply additive Product D1 migrations/);
-  assert.match(workflow, /wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler\.jsonc --file=d1\/migrations\/0012_product_phase0_autofetch_contracts\.sql/);
+  assert.match(workflow, /Apply missing retained D1 migrations/);
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0012_product_phase0_autofetch_contracts\.sql/);
   assert.doesNotMatch(workflow, /wrangler d1 migrations apply ca-progress-v2-phase4-shadow --remote/);
-  assert.match(workflow, /version IN \([^)]*'0012'[^)]*\)/);
+  assert.match(retainedMigrations, /version IN \(\$\{versions\}\)/);
   assert.match(workflow, /autofetch_content_targets/);
   assert.match(workflow, /PRAGMA foreign_key_check/);
 });

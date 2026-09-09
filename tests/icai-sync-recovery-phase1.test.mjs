@@ -47,5 +47,7 @@ test("ICAI admin exposes live stage, skip, cancel and stale recovery controls", 
 
 test("Cloudflare deployment applies the ICAI recovery migration before rollout", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
-  assert.match(workflow, /0026_icai_sync_recovery\.sql/);
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0026_icai_sync_recovery\.sql/);
 });

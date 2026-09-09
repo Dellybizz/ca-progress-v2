@@ -111,9 +111,11 @@ test("Product Phase 3 asks for pending reflection from Study and Today without b
 
 test("Product Phase 3 production deployment applies the additive idempotent session-reflection migration", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
   const migration = read("d1/migrations/0014_product_phase3_study_sessions_reflection.sql");
-  assert.match(workflow, /0014_product_phase3_study_sessions_reflection\.sql/);
-  assert.match(workflow, /'0012','0013','0014'/);
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0014_product_phase3_study_sessions_reflection\.sql/);
+  assert.match(retainedMigrations, /\["0012"[\s\S]*\["0013"[\s\S]*\["0014"/);
   assert.match(workflow, /phase3_session_rows/);
   assert.match(workflow, /phase3_doubt_rows/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS/);

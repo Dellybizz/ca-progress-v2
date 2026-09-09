@@ -99,9 +99,11 @@ test("Product Phase 4 exposes the same progress truth to Today, Analytics and Ch
 
 test("Product Phase 4 production deployment applies and verifies migration 0015 before web rollout", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
   const migration = read("d1/migrations/0015_product_phase4_progress_test_integration.sql");
-  assert.match(workflow, /0015_product_phase4_progress_test_integration\.sql/);
-  assert.match(workflow, /'0012','0013','0014','0015'/);
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0015_product_phase4_progress_test_integration\.sql/);
+  assert.match(retainedMigrations, /\["0012"[\s\S]*\["0013"[\s\S]*\["0014"[\s\S]*\["0015"/);
   assert.match(workflow, /phase4_test_stage_records/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS/);
   assert.match(migration, /CREATE TRIGGER IF NOT EXISTS/);

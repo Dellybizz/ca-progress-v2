@@ -102,8 +102,10 @@ test("notification privacy includes dedupe, local-day rate limits, preferences a
 
 test("Cloudflare deployment applies and verifies Product Phase 8 migration 0019", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
-  assert.match(workflow, /0019_product_phase8_planning_notifications\.sql/);
-  assert.match(workflow, /'0019'/);
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0019_product_phase8_planning_notifications\.sql/);
+  assert.match(retainedMigrations, /\["0019"/);
   assert.match(workflow, /phase8_task_extensions/);
   assert.match(workflow, /phase8_goal_extensions/);
   assert.match(workflow, /phase8_notification_preferences/);

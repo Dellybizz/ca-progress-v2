@@ -135,8 +135,10 @@ test("Product Phase 11 UI stays an accountability workspace rather than a generi
 
 test("Product Phase 11 deployment applies migration 0021 and Phase 12 remains untouched", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
-  assert.match(workflow, /0021_product_phase11_study_buddy\.sql/);
-  assert.match(workflow, /'0021'/);
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0021_product_phase11_study_buddy\.sql/);
+  assert.match(retainedMigrations, /\["0021"/);
   assert.match(workflow, /phase11_study_buddy_relationships/);
   assert.match(workflow, /phase11_study_buddy_goals/);
   assert.match(workflow, /phase11_study_together_sessions/);

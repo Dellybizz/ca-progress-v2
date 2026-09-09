@@ -100,11 +100,13 @@ test("Product Phase 7 preserves Community to Notes attribution and discussion li
 });
 
 test("Product Phase 7 production deployment applies and verifies migration 0018 before web rollout", () => {
-  assert.match(deploy, /0018_product_phase7_community_verification\.sql/);
-  assert.match(deploy, /'0017','0018'/);
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(deploy, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0018_product_phase7_community_verification\.sql/);
+  assert.match(retainedMigrations, /\["0017"[\s\S]*\["0018"/);
   assert.match(deploy, /phase7_verifications/);
   assert.match(deploy, /phase7_follows/);
   assert.match(deploy, /phase7_saved_messages/);
-  assert.ok(deploy.indexOf("0018_product_phase7_community_verification.sql") < deploy.indexOf("Deploy web runtime"));
+  assert.ok(deploy.indexOf("Apply missing retained D1 migrations") < deploy.indexOf("Deploy web runtime"));
   assert.match(migration, /VALUES \('0018','product phase 7 community verification filters and structured doubt reconciliation'/);
 });

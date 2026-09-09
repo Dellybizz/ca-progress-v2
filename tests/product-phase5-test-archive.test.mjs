@@ -125,9 +125,11 @@ test("Product Phase 5 reopen and review surfaces do not mutate historical attemp
 
 test("Product Phase 5 production deployment applies and verifies migration 0016 before web rollout", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
   const migration = read("d1/migrations/0016_product_phase5_test_archive.sql");
-  assert.match(workflow, /0016_product_phase5_test_archive\.sql/);
-  assert.match(workflow, /'0012','0013','0014','0015','0016'/);
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0016_product_phase5_test_archive\.sql/);
+  assert.match(retainedMigrations, /\["0015"[\s\S]*\["0016"/);
   assert.match(workflow, /phase5_test_attempts/);
   assert.match(workflow, /phase5_test_mistakes/);
   assert.match(workflow, /phase5_test_attachments/);

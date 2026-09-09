@@ -133,8 +133,10 @@ test("Product Phase 12 private API and Activity UI expose motivation metrics wit
 
 test("Product Phase 12 deployment applies and verifies additive migration 0022", () => {
   const workflow = read(".github/workflows/deploy-staging.yml");
-  assert.match(workflow, /0022_product_phase12_gamification\.sql/);
-  assert.match(workflow, /'0022'/);
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(workflow, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0022_product_phase12_gamification\.sql/);
+  assert.match(retainedMigrations, /\["0022"/);
   assert.match(workflow, /phase12_xp_ledger/);
   assert.match(workflow, /phase12_streak_days/);
   assert.match(workflow, /phase12_achievements/);

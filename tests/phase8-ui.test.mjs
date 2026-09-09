@@ -41,9 +41,10 @@ test("admin monitor enforces named capabilities and exposes sync/review/source h
   assert.doesNotMatch(page, /getAdminOperator|operator\.allowed/);
   assert.doesNotMatch(actions, /requireAdminOperator/);
   assert.match(monitor, /Run Sync now/);
-  assert.match(monitor, /Review queue/);
-  assert.match(monitor, /Content hash/);
-  assert.match(monitor, /Parser/);
+  assert.match(monitor, /Synced data & review/);
+  assert.match(monitor, /direct ICAI PDFs/);
+  assert.match(monitor, /exam dates/);
+  assert.doesNotMatch(monitor, /Content hash|Parser/);
 });
 
 test("Phase 8 navigation and responsive stylesheet are wired into both shells", () => {

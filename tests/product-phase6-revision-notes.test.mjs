@@ -96,10 +96,12 @@ test("Product Phase 6 notes remain discoverable from Notes and the owner-scoped 
 });
 
 test("Product Phase 6 production deployment applies and verifies migration 0017 before web rollout", () => {
-  assert.match(deploy, /0017_product_phase6_revision_notes\.sql/);
-  assert.match(deploy, /'0016','0017'/);
+  const retainedMigrations = read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(deploy, /npm run cf:migrate:retained/);
+  assert.match(retainedMigrations, /0017_product_phase6_revision_notes\.sql/);
+  assert.match(retainedMigrations, /\["0016"[\s\S]*\["0017"/);
   assert.match(deploy, /phase6_revision_notes/);
   assert.match(deploy, /phase6_note_files/);
-  assert.ok(deploy.indexOf("0017_product_phase6_revision_notes.sql") < deploy.indexOf("Deploy web runtime"));
+  assert.ok(deploy.indexOf("Apply missing retained D1 migrations") < deploy.indexOf("Deploy web runtime"));
   assert.match(migration, /VALUES \('0017','product phase 6 revision notes tables and community attribution'/);
 });
