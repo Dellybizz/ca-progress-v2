@@ -6,12 +6,17 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 
 test("Phase 3C keeps the ICAI dashboard operational and progressively disclosed", () => {
   const monitor = read("components/icai/admin-sync-monitor.tsx");
-  for (const label of ["Pages checked", "PDFs resolved", "Unavailable pages", "Skipped pages", "Affected rows", "Reviews created", "Reviews suppressed", "Recent runs", "Upcoming schedule"]) {
-    assert.match(monitor, new RegExp(label));
-  }
-  assert.match(monitor, /<details className="icai-disclosure">/);
+  assert.match(monitor, /ICAI sync operations/i);
+  assert.match(monitor, /SyncLiveRefresh/);
+  assert.match(monitor, /Review queue/);
+  assert.match(monitor, /Source & file recovery/);
+  assert.match(monitor, /Recent run history/);
+  assert.match(monitor, /<details/);
   assert.match(monitor, /averageLatency/);
   assert.match(monitor, /D1 request counts are not shown/);
+  assert.doesNotMatch(monitor, /Upcoming schedule/);
+  assert.doesNotMatch(monitor, />Approve</);
+  assert.doesNotMatch(monitor, />Reject</);
 });
 
 test("Phase 3C metrics reuse durable source-state counters", () => {
@@ -29,8 +34,11 @@ test("Phase 3C metrics reuse durable source-state counters", () => {
   assert.match(liveMonitor, /liveMetrics/);
 });
 
-test("Phase 3C reports the deployed schedule honestly", () => {
+test("Phase 3C reports schedule in the live runtime model instead of duplicating a dashboard panel", () => {
   const monitor = read("components/icai/admin-sync-monitor.tsx");
-  assert.match(monitor, /Daily · 06:00 IST/);
-  assert.match(monitor, /Two-hour source distribution is not enabled/);
+  const live = read("components/icai/sync-live-refresh.tsx");
+  const status = read("lib/icai/status-query.ts");
+  assert.doesNotMatch(monitor, /Upcoming schedule/);
+  assert.match(live, /nextScheduledGroup|nextDailySync/);
+  assert.match(status, /nextDailySync/);
 });
