@@ -22,6 +22,7 @@ const migrations = [
   ["0028", "d1/migrations/0028_icai_sync_continuation.sql"],
   ["0029", "d1/migrations/0029_icai_bootstrap_window.sql"],
   ["0030", "d1/migrations/0030_icai_phase1_current_sources.sql"],
+  ["0031", "d1/migrations/0031_icai_phase1_exact_source_scope.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
@@ -57,7 +58,7 @@ function query(sql) {
   return JSON.parse(output.slice(start));
 }
 
-const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0030' ORDER BY version;");
+const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0031' ORDER BY version;");
 const applied = new Set((ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)));
 
 for (const [version, file] of migrations) {

@@ -128,7 +128,24 @@ function retryDelay(attempt: number) {
   return Math.min(8_000, 600 * 2 ** attempt) + Math.floor(Math.random() * 250);
 }
 function asErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const candidate = error as Record<string, unknown>;
+    if (typeof candidate.message === "string" && candidate.message.trim())
+      return candidate.message;
+    if (candidate.error && typeof candidate.error === "object") {
+      const nested = candidate.error as Record<string, unknown>;
+      if (typeof nested.message === "string" && nested.message.trim())
+        return nested.message;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return "Unknown ICAI sync failure (non-serializable error).";
+    }
+  }
+  return String(error ?? "Unknown ICAI sync failure.");
 }
 function isApprovedHttpIcaiUrl(value: string) {
   if (!isApprovedIcaiUrl(value)) return false;

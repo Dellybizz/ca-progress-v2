@@ -50,6 +50,7 @@ test("retained Cloudflare D1 deployment applies and verifies ICAI source bootstr
   const workerIndex = workflow.indexOf("- name: Deploy ICAI service");
   assert.match(migrator, /\["0024", "d1\/migrations\/0024_icai_source_bootstrap\.sql"\]/);
   assert.match(migrator, /\["0030", "d1\/migrations\/0030_icai_phase1_current_sources\.sql"\]/);
+  assert.match(migrator, /\["0031", "d1\/migrations\/0031_icai_phase1_exact_source_scope\.sql"\]/);
   assert.match(migrator, /_ca_schema_migrations/);
   assert.ok(migrationStep >= 0, "retained D1 deployment must invoke the ledger-aware migrator");
   assert.ok(workerIndex > migrationStep, "retained migrations, including the current Phase 1 source registry, must be verified before the ICAI Worker is deployed");

@@ -92,6 +92,7 @@ try {
     ["0025", "0025_icai_review_audit.sql"],
     ["0029", "0029_icai_bootstrap_window.sql"],
     ["0030", "0030_icai_phase1_current_sources.sql"],
+    ["0031", "0031_icai_phase1_exact_source_scope.sql"],
   ]) {
     const journalRows = execute(`SELECT name FROM d1_migrations WHERE name='${filename}';`);
     assert(journalRows.length === 1, `${filename} Wrangler migration was not recorded exactly once`);

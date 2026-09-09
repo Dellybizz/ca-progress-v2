@@ -41,6 +41,23 @@ test("Phase 1 Study Material traversal ends at direct ICAI PDFs and is bounded",
   assert.match(resolver, /Study Material list\/subject page is never student-facing/);
 });
 
+test("Phase 1 migration restricts production work to the exact six approved sources", () => {
+  const migration = read("d1/migrations/0031_icai_phase1_exact_source_scope.sql");
+  assert.match(migration, /UPDATE icai_sources[\s\S]*SET is_active = 0[\s\S]*WHERE id NOT IN/);
+  for (const id of ["icai-foundation-course", "icai-intermediate-course", "icai-final-course", "icai-exam-may-2026", "icai-exam-sep-nov-2026", "icai-bos-important-announcements"])
+    assert.match(migration, new RegExp(`'${id}'`));
+  assert.match(migration, /VALUES \('0031'/);
+});
+
+test("ICAI sync preserves structured error detail instead of object coercion", () => {
+  const engine = read("workers/icai-sync/sync-engine.ts");
+  const client = read("workers/icai-sync/d1-client.ts");
+  assert.match(engine, /JSON\.stringify\(error\)/);
+  assert.match(engine, /typeof nested\.message === "string"/);
+  assert.match(client, /errorText\(args\.p_error\)/);
+  assert.doesNotMatch(client, /message=String\(args\.p_error/);
+});
+
 test("Phase 1 keeps direct selector PDFs only when their nearest ICAI applicability branch is current", () => {
   const resolver = read("workers/icai-sync/direct-resource-resolver.ts");
 
