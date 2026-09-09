@@ -1,0 +1,250 @@
+Full repository regression failure diagnostic
+============================================
+361:not ok 60 - retained D1 deployment applies and verifies ICAI mapping integrity migration 0032
+366:  failureType: 'testCodeFailure'
+367:  error: |-
+459:  code: 'ERR_ASSERTION'
+460:  name: 'AssertionError'
+461:  expected:
+462:  actual: |-
+1551:not ok 225 - unchanged resources use deterministic identities
+1556:  failureType: 'testCodeFailure'
+1557:  error: |-
+1689:      'function asErrorMessage(error: unknown) {\n' +
+1864:  code: 'ERR_ASSERTION'
+1865:  name: 'AssertionError'
+1866:  expected:
+1867:  actual: |-
+1997:    function asErrorMessage(error: unknown) {
+2687:        const { error: failureError } = await client.rpc("icai_sync_mark_source_failure", {
+2690:          p_error: message,
+2722:      const { data: finalRun, error: finalReadError } = await client.from("icai_sync_runs").select("*").eq("id", runId).single();
+2736:      const { error: finishError } = await client.from("icai_sync_runs")
+2796:            const { error: failureError } = await client.rpc(
+2801:                p_error:
+2817:        const { data: finalRun, error: finalReadError } = await client
+2831:        const { error: finishError } = await client
+4547:# fail 2
+
+Last 220 lines
+==============
+  ...
+# Subtest: Product Phase 8 migration is additive, idempotent and preserves historical task and goal rows
+ok 469 - Product Phase 8 migration is additive, idempotent and preserves historical task and goal rows
+  ---
+  duration_ms: 1.287967
+  type: 'test'
+  ...
+# Subtest: fixed commitments and flexible study tasks coexist with the complete Phase 8 task vocabulary
+ok 470 - fixed commitments and flexible study tasks coexist with the complete Phase 8 task vocabulary
+  ---
+  duration_ms: 1.335915
+  type: 'test'
+  ...
+# Subtest: Today keeps fixed anchors and explicitly releases flexible task clock times
+ok 471 - Today keeps fixed anchors and explicitly releases flexible task clock times
+  ---
+  duration_ms: 0.265185
+  type: 'test'
+  ...
+# Subtest: goals use recorded study and progress rows and the same service feeds Planner Today and Analytics
+ok 472 - goals use recorded study and progress rows and the same service feeds Planner Today and Analytics
+  ---
+  duration_ms: 0.545089
+  type: 'test'
+  ...
+# Subtest: countdown is derived only from the selected applicable verified attempt with threshold states
+ok 473 - countdown is derived only from the selected applicable verified attempt with threshold states
+  ---
+  duration_ms: 0.456824
+  type: 'test'
+  ...
+# Subtest: timezone behavior uses the profile zone for local dates and calendar month boundaries
+ok 474 - timezone behavior uses the profile zone for local dates and calendar month boundaries
+  ---
+  duration_ms: 0.249336
+  type: 'test'
+  ...
+# Subtest: actionable notifications are user-owned, preference controlled and do not invent Buddy activity
+ok 475 - actionable notifications are user-owned, preference controlled and do not invent Buddy activity
+  ---
+  duration_ms: 0.475328
+  type: 'test'
+  ...
+# Subtest: notification privacy includes dedupe, local-day rate limits, preferences and actionable links
+ok 476 - notification privacy includes dedupe, local-day rate limits, preferences and actionable links
+  ---
+  duration_ms: 0.39081
+  type: 'test'
+  ...
+# Subtest: Cloudflare deployment applies and verifies Product Phase 8 migration 0019
+ok 477 - Cloudflare deployment applies and verifies Product Phase 8 migration 0019
+  ---
+  duration_ms: 0.429753
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 withholds forecast without a verified exam date
+ok 478 - Product Phase 9 withholds forecast without a verified exam date
+  ---
+  duration_ms: 2.702499
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 withholds forecast when chapter-completion count is too small
+ok 479 - Product Phase 9 withholds forecast when chapter-completion count is too small
+  ---
+  duration_ms: 0.360534
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 requires elapsed observation and multiple completion days
+ok 480 - Product Phase 9 requires elapsed observation and multiple completion days
+  ---
+  duration_ms: 0.297135
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 rejects stale recent-pace evidence
+ok 481 - Product Phase 9 rejects stale recent-pace evidence
+  ---
+  duration_ms: 0.270466
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 produces a deterministic baseline only after evidence gates pass
+ok 482 - Product Phase 9 produces a deterministic baseline only after evidence gates pass
+  ---
+  duration_ms: 0.410998
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 treats complete First Coverage as deterministic without inventing a pace forecast
+ok 483 - Product Phase 9 treats complete First Coverage as deterministic without inventing a pace forecast
+  ---
+  duration_ms: 0.191207
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 analytics are derived from canonical student rows and exclude XP from readiness calculations
+ok 484 - Product Phase 9 analytics are derived from canonical student rows and exclude XP from readiness calculations
+  ---
+  duration_ms: 0.793783
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 uses verified attempt dates only and the forecast route exposes insufficient-data behavior
+ok 485 - Product Phase 9 uses verified attempt dates only and the forecast route exposes insufficient-data behavior
+  ---
+  duration_ms: 0.327422
+  type: 'test'
+  ...
+# Subtest: Product Phase 9 keeps every displayed insight explainable and does not start Product Phase 10
+ok 486 - Product Phase 9 keeps every displayed insight explainable and does not start Product Phase 10
+  ---
+  duration_ms: 0.687574
+  type: 'test'
+  ...
+# Subtest: test archive ships a scoped responsive form layout
+ok 487 - test archive ships a scoped responsive form layout
+  ---
+  duration_ms: 1.566897
+  type: 'test'
+  ...
+# Subtest: Today ignores malformed historical dates and optional enhancement failures
+ok 488 - Today ignores malformed historical dates and optional enhancement failures
+  ---
+  duration_ms: 0.671595
+  type: 'test'
+  ...
+# Subtest: Activity filters invalid evidence timestamps and isolates optional gamification from the server render
+ok 489 - Activity filters invalid evidence timestamps and isolates optional gamification from the server render
+  ---
+  duration_ms: 2.404783
+  type: 'test'
+  ...
+# Subtest: shared cache is versioned, observable, and TTL bounded
+ok 490 - shared cache is versioned, observable, and TTL bounded
+  ---
+  duration_ms: 1.671964
+  type: 'test'
+  ...
+# Subtest: public catalog loaders use separate cache namespaces without user identity
+ok 491 - public catalog loaders use separate cache namespaces without user identity
+  ---
+  duration_ms: 2.316929
+  type: 'test'
+  ...
+# Subtest: private data paths remain outside shared cache
+ok 492 - private data paths remain outside shared cache
+  ---
+  duration_ms: 0.948312
+  type: 'test'
+  ...
+# Subtest: ICAI sync and review writes invalidate only affected public keys
+ok 493 - ICAI sync and review writes invalidate only affected public keys
+  ---
+  duration_ms: 0.353971
+  type: 'test'
+  ...
+# Subtest: page navigation is not charged to the API rate limiter
+ok 494 - page navigation is not charged to the API rate limiter
+  ---
+  duration_ms: 1.511013
+  type: 'test'
+  ...
+# Subtest: read and write APIs use independent limits and buckets
+ok 495 - read and write APIs use independent limits and buckets
+  ---
+  duration_ms: 0.255096
+  type: 'test'
+  ...
+# Subtest: Study page uses one clear hierarchy instead of repeated questions
+ok 496 - Study page uses one clear hierarchy instead of repeated questions
+  ---
+  duration_ms: 1.225429
+  type: 'test'
+  ...
+# Subtest: Pomodoro presets show focus and break together
+ok 497 - Pomodoro presets show focus and break together
+  ---
+  duration_ms: 1.097972
+  type: 'test'
+  ...
+# Subtest: desktop Study uses a right rail with metrics stacked above recent study
+ok 498 - desktop Study uses a right rail with metrics stacked above recent study
+  ---
+  duration_ms: 0.412741
+  type: 'test'
+  ...
+# Subtest: Supabase migration and compatibility machinery stays retired
+ok 499 - Supabase migration and compatibility machinery stays retired
+  ---
+  duration_ms: 2.755789
+  type: 'test'
+  ...
+# Subtest: active runtime and CI have no Supabase SDK, env, client or compat blockers
+ok 500 - active runtime and CI have no Supabase SDK, env, client or compat blockers
+  ---
+  duration_ms: 23.250677
+  type: 'test'
+  ...
+# Subtest: package scripts expose one canonical post-retirement Cloudflare web config
+ok 501 - package scripts expose one canonical post-retirement Cloudflare web config
+  ---
+  duration_ms: 0.368529
+  type: 'test'
+  ...
+# Subtest: canonical root Wrangler config remains Cloudflare-only
+ok 502 - canonical root Wrangler config remains Cloudflare-only
+  ---
+  duration_ms: 0.285434
+  type: 'test'
+  ...
+# Subtest: permanent closure and V2 CI enforce retirement before and after build validation
+ok 503 - permanent closure and V2 CI enforce retirement before and after build validation
+  ---
+  duration_ms: 0.318305
+  type: 'test'
+  ...
+1..503
+# tests 503
+# suites 0
+# pass 501
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3388.794687
