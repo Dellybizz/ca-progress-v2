@@ -25,14 +25,6 @@ jobs:
         run: python3 scripts/__phase2_reconstruct.py
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Focused ICAI verification
-        run: npm run test:icai:phase5
-      - name: Clean D1 double-migration verification
-        run: npm run d1:hot-indexes:validate
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
       - name: Full repository regression suite
         shell: bash
         run: |
@@ -45,9 +37,9 @@ jobs:
               echo "============================================"
               grep -nE 'not ok|AssertionError|ERR_ASSERTION|failureType|error:|expected:|actual:|tests? failed|fail [0-9]+' /tmp/npm-test.log | tail -240 || true
               echo
-              echo "Last 180 lines"
+              echo "Last 220 lines"
               echo "=============="
-              tail -180 /tmp/npm-test.log
+              tail -220 /tmp/npm-test.log
             } > phase2-regression-failure.txt
             git config user.name "ca-progress-phase2-bot"
             git config user.email "ca-progress-phase2-bot@users.noreply.github.com"
@@ -56,6 +48,14 @@ jobs:
             git push origin HEAD:phase2-reconstruct-20260909
             exit "$result"
           fi
+      - name: Focused ICAI verification
+        run: npm run test:icai:phase5
+      - name: Clean D1 double-migration verification
+        run: npm run d1:hot-indexes:validate
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
       - name: Commit verified Phase 2 tree
         shell: bash
         run: |
