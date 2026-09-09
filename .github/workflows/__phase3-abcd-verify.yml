@@ -1,0 +1,52 @@
+name: Temporary Phase 3A-3D Verification
+
+on:
+  push:
+    branches: [icai-phase3-abcd-20260910]
+    paths:
+      - scripts/__phase3_abcd_finish.py
+      - .github/workflows/__phase3-abcd-verify.yml
+
+permissions:
+  contents: write
+
+jobs:
+  phase3-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: icai-phase3-abcd-20260910
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Apply Phase 3A-3D closure
+        run: python3 scripts/__phase3_abcd_finish.py
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Phase 3A-3D regression contract
+        run: node --test tests/icai-phase3-admin.test.mjs
+      - name: Focused ICAI suite
+        run: npm run test:icai:phase5
+      - name: Repository tests
+        run: npm test
+      - name: Clean D1 double-migration validation
+        run: npm run d1:hot-indexes:validate
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Next.js production build
+        run: npm run build
+      - name: Commit verified Phase 3 closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ca-progress-phase3-bot"
+          git config user.email "ca-progress-phase3-bot@users.noreply.github.com"
+          git checkout -- package-lock.json tsconfig.tsbuildinfo 2>/dev/null || true
+          git add lib/icai/status-query.ts app/'(admin)'/admin/icai-sync/actions.ts components/icai/admin-sync-monitor.tsx app/'(admin)'/admin/icai-sync/data/page.tsx components/icai/admin-sync-data.tsx tests/icai-phase3-admin.test.mjs package.json scripts/__phase3_abcd_finish.py .github/workflows/__phase3-abcd-verify.yml
+          git diff --cached --check
+          git commit -m "feat(icai): complete Phase 3 admin operations"
+          git push origin HEAD:icai-phase3-abcd-20260910
