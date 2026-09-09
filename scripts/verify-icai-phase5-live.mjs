@@ -19,6 +19,7 @@ const databaseName = "ca-progress-v2-phase4-shadow";
 const evidenceDir = "deployment-evidence";
 const JOB_POLL_INTERVAL_MS = 5_000;
 const JOB_POLL_ATTEMPTS = 90;
+const runReviewProbe = process.env.ICAI_PHASE5_REVIEW_PROBE === "true";
 mkdirSync(evidenceDir, { recursive: true });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -142,6 +143,8 @@ writeFileSync(`${evidenceDir}/icai-phase5-source-snapshots.json`, JSON.stringify
 // intentionally single-concurrency queue. A diagnostic job must never delay the
 // production source continuation chain.
 const reviewKey = `icai-phase5-review:${correlationId}`;
+let reviewStatus = "deferred_to_phase3";
+if (runReviewProbe) {
 await publish(queue.queue_id, {
   id: `phase5-review-${correlationId}`,
   type: "icai-phase5-review-probe",
@@ -170,6 +173,8 @@ const rejectedAfter = JSON.parse(rejected.canonical_after);
 if (approvedBefore.status !== "active" || approvedAfter.status !== "removed") throw new Error("Phase 5 approval audit before/after snapshots are inconsistent.");
 if (JSON.stringify(rejectedBefore) !== JSON.stringify(rejectedAfter)) throw new Error("Phase 5 rejection audit shows a canonical mutation.");
 writeFileSync(`${evidenceDir}/icai-phase5-review-outcomes.json`, JSON.stringify(reviewRows, null, 2));
+reviewStatus = "approved_and_rejected_paths_verified";
+}
 
 const duplicates = d1(`SELECT idempotency_key,COUNT(*) AS row_count FROM background_jobs WHERE idempotency_key IN (${sqlText(syncKey)},${sqlText(reviewKey)}) GROUP BY idempotency_key HAVING COUNT(*)<>1;`);
 if (duplicates.length) throw new Error("Phase 5 detected duplicate queue persistence for an idempotency key.");
@@ -201,8 +206,7 @@ writeFileSync(`${evidenceDir}/icai-phase5-summary.json`, JSON.stringify({
   realSyncStatus: realRun.status,
   sourceSucceeded: Number(realRun.source_succeeded),
   sourceFailed: Number(realRun.source_failed),
-  reviewApproval: "approved_and_applied",
-  reviewRejection: "rejected_without_mutation",
+  reviewCertification: reviewStatus,
   frontend: "verified",
   publicInternalRoute: "blocked",
 }, null, 2));
