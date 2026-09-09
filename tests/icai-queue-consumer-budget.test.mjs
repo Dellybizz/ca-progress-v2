@@ -24,6 +24,13 @@ test("background jobs are isolated from concurrent D1 writes inside queue batche
   assert.doesNotMatch(worker, /Promise\.all\(batch\.messages\.map/);
 });
 
+test("official ICAI source discovery gets a dedicated service-binding wall-time budget", () => {
+  const worker = read("custom-worker.ts");
+  assert.match(worker, /const ICAI_SERVICE_TIMEOUT_MS = 20_000/);
+  assert.match(worker, /const ICAI_SOURCE_TIMEOUT_MS = 60_000/);
+  assert.match(worker, /path === "\/source" \? ICAI_SOURCE_TIMEOUT_MS : ICAI_SERVICE_TIMEOUT_MS/);
+});
+
 test("live ICAI proof waits beyond the configured 5-minute CPU ceiling without masking dead letters", () => {
   const proof = read("scripts/verify-icai-phase5-live.mjs");
   assert.match(proof, /const JOB_POLL_INTERVAL_MS = 5_000/);
@@ -32,4 +39,13 @@ test("live ICAI proof waits beyond the configured 5-minute CPU ceiling without m
   assert.match(proof, /await sleep\(JOB_POLL_INTERVAL_MS\)/);
   assert.ok(90 * 5_000 > 300_000, "live proof must allow more wall time than the configured CPU ceiling");
   assert.ok(90 * 5_000 < 15 * 60_000, "live proof must remain below Cloudflare Queue's 15-minute wall-time ceiling");
+});
+
+test("live ICAI proof binds continuation evidence to its exact deployment correlation and SHA", () => {
+  const proof = read("scripts/verify-icai-phase5-live.mjs");
+  assert.match(proof, /json_extract\(payload_json,'\$\.phase5Correlation'\)=\$\{sqlText\(correlationId\)\}/);
+  assert.match(proof, /json_extract\(payload_json,'\$\.gitSha'\)=\$\{sqlText\(sha\)\}/);
+  assert.match(proof, /json_extract\(payload_json,'\$\.runId'\) AS run_id/);
+  assert.match(proof, /WHERE id=\$\{sqlText\(matchingRunId\)\}/);
+  assert.doesNotMatch(proof, /FROM icai_sync_runs WHERE trigger_type='manual'.*ORDER BY started_at DESC LIMIT 1/);
 });

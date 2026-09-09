@@ -19,6 +19,7 @@ type BackgroundJob = { id: string; type: JobType; idempotencyKey: string; payloa
 type LegacyIcaiJob = { type: "icai-sync"; idempotencyKey: string; scheduledTime: number };
 
 const ICAI_SERVICE_TIMEOUT_MS = 20_000;
+const ICAI_SOURCE_TIMEOUT_MS = 60_000;
 
 type IcaiServicePayload = {
   ok?: boolean;
@@ -57,7 +58,7 @@ async function callIcaiService(env: WorkerEnv, path: "/start" | "/source" | "/fi
       "x-ca-progress-icai-enabled": String(env.ICAI_SYNC_ENABLED !== "false"),
     },
     body: JSON.stringify(body),
-  })), ICAI_SERVICE_TIMEOUT_MS, `ICAI service ${path}`);
+  })), path === "/source" ? ICAI_SOURCE_TIMEOUT_MS : ICAI_SERVICE_TIMEOUT_MS, `ICAI service ${path}`);
   const text = await response.text();
   let payload: IcaiServicePayload = {};
   if (text) {
