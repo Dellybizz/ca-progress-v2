@@ -1,5 +1,6 @@
 import {
   IcaiSyncAlreadyRunningError,
+  failIcaiSyncContinuationSource,
   finalizeIcaiSyncContinuationEngine,
   runIcaiSyncContinuationSource,
   runIcaiSyncEngine,
@@ -8,7 +9,7 @@ import {
 import type { D1Database } from "./d1-client";
 
 type Env = { DB?: D1Database };
-type SyncRequest = { trigger?: unknown; requestedBy?: unknown; orchestrationKey?: unknown; runId?: unknown; sourceId?: unknown; requestedSourceIds?: unknown; forceRecheck?: unknown };
+type SyncRequest = { trigger?: unknown; requestedBy?: unknown; orchestrationKey?: unknown; runId?: unknown; sourceId?: unknown; errorMessage?: unknown; requestedSourceIds?: unknown; forceRecheck?: unknown };
 const INTERNAL_MARKER = "ca-progress-v2-web";
 function json(data:unknown,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"private, no-store"}});}
 function runtime(request: Request, db: D1Database) {
@@ -27,16 +28,21 @@ const icaiSyncWorker = {
       if(request.headers.get("x-ca-progress-internal")!==INTERNAL_MARKER)return json({ok:false,error:"Internal service request required."},403);
       return json({ok:true,databaseConfigured:Boolean(env.DB),persistence:"cloudflare-d1"});
     }
-    if(request.method!=="POST"||!["/run","/start","/source","/finalize"].includes(url.pathname))return json({ok:false,error:"Not found."},404);
+    if(request.method!=="POST"||!["/run","/start","/source","/source/fail","/finalize"].includes(url.pathname))return json({ok:false,error:"Not found."},404);
     if(request.headers.get("x-ca-progress-internal")!==INTERNAL_MARKER)return json({ok:false,error:"Internal service request required."},403);
     if(!env.DB)return json({ok:false,error:"Internal D1 sync runtime is not configured."},503);
     const body=await request.json().catch(()=>null) as SyncRequest|null;
     const config=runtime(request,env.DB);
     try{
-      if(url.pathname==="/source"){
+      if(url.pathname==="/source"||url.pathname==="/source/fail"){
         const runId=boundedString(body?.runId);
         const sourceId=boundedString(body?.sourceId);
         if(!runId||!sourceId)return json({ok:false,error:"runId and sourceId are required."},400);
+        if(url.pathname==="/source/fail"){
+          const errorMessage=boundedString(body?.errorMessage,2000)||"ICAI source batch exhausted its retry limit.";
+          const result=await failIcaiSyncContinuationSource(config,{runId,sourceId,errorMessage});
+          return json({ok:true,result});
+        }
         const result=await runIcaiSyncContinuationSource(config,{runId,sourceId});
         return json({ok:true,result});
       }

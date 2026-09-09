@@ -2,7 +2,7 @@ import "server-only";
 
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { getResourceR2Bucket } from "@/lib/resources/r2";
-import { finalizeIcaiSyncContinuation, runIcaiSyncSource, startIcaiSyncContinuation } from "@/lib/icai/sync";
+import { failIcaiSyncSource, finalizeIcaiSyncContinuation, runIcaiSyncSource, startIcaiSyncContinuation } from "@/lib/icai/sync";
 import { runIcaiPhase5ReviewProbe } from "@/lib/icai/phase5";
 import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
 import { enqueueBackgroundJob, type BackgroundJob } from "./queue";
@@ -14,39 +14,54 @@ export async function executeBackgroundJob(job: BackgroundJob) {
   switch (job.type) {
     case "icai-sync": {
       const mode = job.payload.mode;
-      if (mode === "source") {
-        const runId = typeof job.payload.runId === "string" ? job.payload.runId : null;
-        const sourceIds = Array.isArray(job.payload.sourceIds) ? job.payload.sourceIds.filter((value): value is string => typeof value === "string") : [];
-        const sourceIndex = Number(job.payload.sourceIndex);
-        if (!runId || !Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sourceIds.length) throw new Error("Invalid ICAI source continuation payload.");
-        const sourceId = sourceIds[sourceIndex];
-        const result = await runIcaiSyncSource({ runId, sourceId });
-        if (result.status === "cancelled") return result;
-        if (result.status === "continuing") {
-          const cursor = Number(result.cursorOffset ?? 0);
-          await enqueueBackgroundJob({
-            type: "icai-sync",
-            idempotencyKey: `icai-sync-source:${runId}:${sourceIndex}:${sourceId}:cursor:${cursor}`,
-            payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex },
-            createdBy: job.createdBy ?? null,
-            delaySeconds: result.requestIntervalSeconds,
-          });
-          return result;
-        }
+      const sourceIds = Array.isArray(job.payload.sourceIds) ? job.payload.sourceIds.filter((value): value is string => typeof value === "string") : [];
+      const queueFollowing = async (runId: string, sourceIndex: number, delaySeconds = 0) => {
         const nextIndex = sourceIndex + 1;
         if (nextIndex < sourceIds.length) {
           const nextSourceId = sourceIds[nextIndex];
           await enqueueBackgroundJob({
             type: "icai-sync",
-            idempotencyKey: `icai-sync-source:${runId}:${nextIndex}:${nextSourceId}`,
-            payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex: nextIndex },
+            idempotencyKey: `icai-sync-source:${runId}:${nextIndex}:${nextSourceId}:cursor:0`,
+            payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex: nextIndex, cursorOffset: 0 },
+            createdBy: job.createdBy ?? null,
+            delaySeconds,
+          });
+        } else {
+          await enqueueBackgroundJob({
+            type: "icai-sync",
+            idempotencyKey: `icai-sync-finalize:${runId}`,
+            payload: { ...job.payload, mode: "finalize", runId, sourceIds },
+            createdBy: job.createdBy ?? null,
+          });
+        }
+      };
+      if (mode === "finalize") {
+        const runId = typeof job.payload.runId === "string" ? job.payload.runId : null;
+        if (!runId) throw new Error("Invalid ICAI finalization payload.");
+        return finalizeIcaiSyncContinuation({ runId });
+      }
+      if (mode === "source" || mode === "source-fail") {
+        const runId = typeof job.payload.runId === "string" ? job.payload.runId : null;
+        const sourceIndex = Number(job.payload.sourceIndex);
+        if (!runId || !Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex >= sourceIds.length) throw new Error("Invalid ICAI source continuation payload.");
+        const sourceId = sourceIds[sourceIndex];
+        const result = mode === "source-fail"
+          ? await failIcaiSyncSource({ runId, sourceId, errorMessage: String(job.payload.terminalError ?? "ICAI source batch exhausted its retry limit.") })
+          : await runIcaiSyncSource({ runId, sourceId });
+        if (result.status === "cancelled" || result.status === "paused") return result;
+        if (result.status === "continuing") {
+          const cursor = Number(result.cursorOffset ?? 0);
+          await enqueueBackgroundJob({
+            type: "icai-sync",
+            idempotencyKey: `icai-sync-source:${runId}:${sourceIndex}:${sourceId}:cursor:${cursor}`,
+            payload: { ...job.payload, mode: "source", runId, sourceIds, sourceIndex, cursorOffset: cursor },
             createdBy: job.createdBy ?? null,
             delaySeconds: result.requestIntervalSeconds,
           });
-          return { ...result, nextSourceId };
+          return result;
         }
-        const summary = await finalizeIcaiSyncContinuation({ runId });
-        return { ...result, summary };
+        await queueFollowing(runId, sourceIndex, result.requestIntervalSeconds);
+        return result;
       }
       const trigger = job.payload.trigger === "manual" ? "manual" : job.payload.trigger === "test" ? "test" : "cron";
       const requestedBy = typeof job.payload.requestedBy === "string" ? job.payload.requestedBy : null;
@@ -55,8 +70,8 @@ export async function executeBackgroundJob(job: BackgroundJob) {
       if (!firstSourceId) throw new Error("ICAI continuation returned no active sources.");
       await enqueueBackgroundJob({
         type: "icai-sync",
-        idempotencyKey: `icai-sync-source:${started.runId}:0:${firstSourceId}`,
-        payload: { ...job.payload, mode: "source", runId: started.runId, sourceIds: started.sourceIds, sourceIndex: 0 },
+        idempotencyKey: `icai-sync-source:${started.runId}:0:${firstSourceId}:cursor:0`,
+        payload: { ...job.payload, mode: "source", runId: started.runId, sourceIds: started.sourceIds, sourceIndex: 0, cursorOffset: 0 },
         createdBy: job.createdBy ?? null,
       });
       return started;
