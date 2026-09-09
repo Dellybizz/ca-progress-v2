@@ -259,12 +259,105 @@ function attemptId(levelCode: IcaiLevelCode, attemptKey: string) {
 function subjectLevelCode(subject: SubjectRow, levels: Map<string, LevelRow>) {
   return levels.get(subject.level_id)?.code as IcaiLevelCode | undefined;
 }
+type ExistingResourceIdentityRow = {
+  id: string;
+  resource_type: string;
+  title: string;
+  official_url: string;
+  metadata: unknown;
+  subject_ids: string | null;
+};
+
+type SourceWatermarkRow = {
+  bootstrap_complete: number | boolean;
+  bootstrap_completed_at: string | null;
+  last_success_at: string | null;
+  published_high_watermark: string | null;
+  attempt_high_watermark: string | null;
+};
+
+function metadataObject(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value))
+    return value as Record<string, unknown>;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function resourceSemanticKey(
+  sourceId: string,
+  resourceType: string,
+  title: string,
+  levelCodes: string[],
+  subjectIds: string[],
+) {
+  const levels = [...new Set(levelCodes)].sort().join(",");
+  const subjects = [...new Set(subjectIds)].sort().join(",");
+  return ["v1", sourceId, resourceType, title.trim().toLowerCase(), levels, subjects].join("|");
+}
+
+async function existingResourceIdentityMaps(
+  runtime: IcaiSyncRuntime,
+  source: IcaiSourceConfig,
+) {
+  const result = await runtime.db
+    .prepare(
+      "SELECT r.id,r.resource_type,r.title,r.official_url,r.metadata,COALESCE(group_concat(m.subject_id, char(31)),'') AS subject_ids FROM icai_resources r LEFT JOIN resource_subject_map m ON m.resource_id=r.id WHERE r.source_id=?1 GROUP BY r.id,r.resource_type,r.title,r.official_url,r.metadata",
+    )
+    .bind(source.id)
+    .all<ExistingResourceIdentityRow>();
+  const existingByUrl = new Map<string, string>();
+  const existingBySemantic = new Map<string, string>();
+  for (const row of result.results ?? []) {
+    existingByUrl.set(row.official_url, row.id);
+    const metadata = metadataObject(row.metadata);
+    const levelCodes = Array.isArray(metadata.level_codes)
+      ? metadata.level_codes.filter((value): value is string => typeof value === "string")
+      : [];
+    const subjectIds = String(row.subject_ids ?? "")
+      .split(String.fromCharCode(31))
+      .filter(Boolean);
+    const key = resourceSemanticKey(
+      source.id,
+      row.resource_type,
+      row.title,
+      levelCodes,
+      subjectIds,
+    );
+    const previous = existingBySemantic.get(key);
+    if (previous && previous !== row.id)
+      throw new Error(`Ambiguous ICAI semantic resource identity for ${source.id}: ${row.title}`);
+    existingBySemantic.set(key, row.id);
+  }
+  return { existingByUrl, existingBySemantic };
+}
+
 async function resourcePayload(
   source: IcaiSourceConfig,
   item: ParsedIcaiResource,
   attemptIdsByIdentity: Map<string, string>,
+  existingByUrl: Map<string, string>,
+  existingBySemantic: Map<string, string>,
 ) {
-  const id = `icai-resource-${(await sha256Hex(`${source.id}:${item.officialUrl}`)).slice(0, 32)}`;
+  const semanticKey = resourceSemanticKey(
+    source.id,
+    item.resourceType,
+    item.title,
+    item.levelCodes,
+    item.subjectIds,
+  );
+  const id =
+    existingByUrl.get(item.officialUrl) ??
+    existingBySemantic.get(semanticKey) ??
+    `icai-resource-${(await sha256Hex(semanticKey)).slice(0, 32)}`;
   const attemptIds = item.attemptKeys
     .flatMap((key) =>
       item.levelCodes.map((level) =>
@@ -293,7 +386,11 @@ async function resourcePayload(
     parser_version: PARSER_VERSION,
     attempt_ids: attemptIds,
     subject_ids: item.subjectIds,
-    metadata: { level_codes: item.levelCodes, attempt_keys: item.attemptKeys },
+    metadata: {
+      level_codes: item.levelCodes,
+      attempt_keys: item.attemptKeys,
+      semantic_key: semanticKey,
+    },
   };
 }
 
@@ -368,7 +465,25 @@ async function processSource(
     subjectLookups,
     runtime.userAgent,
   );
-  const windowed = applyIcaiWindowPolicy(direct.payload, source);
+  const watermark = await runtime.db
+    .prepare(
+      "SELECT bootstrap_complete,bootstrap_completed_at,last_success_at,published_high_watermark,attempt_high_watermark FROM icai_source_watermarks WHERE source_id=?1 LIMIT 1",
+    )
+    .bind(source.id)
+    .first<SourceWatermarkRow>();
+  const policySource = watermark?.bootstrap_complete
+    ? {
+        ...source,
+        adapterConfig: {
+          ...source.adapterConfig,
+          bootstrap_complete: true,
+          bootstrap_completed_at:
+            watermark.bootstrap_completed_at ??
+            source.adapterConfig.bootstrap_completed_at,
+        },
+      }
+    : source;
+  const windowed = applyIcaiWindowPolicy(direct.payload, policySource);
   const parsed = windowed.payload;
   const parsedItemCount =
     parsed.resources.length + parsed.attempts.length + parsed.events.length;
@@ -451,9 +566,17 @@ async function processSource(
       });
     }
   }
+  const { existingByUrl, existingBySemantic } =
+    await existingResourceIdentityMaps(runtime, source);
   const resourcePayloads = await Promise.all(
     parsed.resources.map((resource) =>
-      resourcePayload(source, resource, attemptIdsByIdentity),
+      resourcePayload(
+        source,
+        resource,
+        attemptIdsByIdentity,
+        existingByUrl,
+        existingBySemantic,
+      ),
     ),
   );
   const eventPayloads: Record<string, unknown>[] = [];

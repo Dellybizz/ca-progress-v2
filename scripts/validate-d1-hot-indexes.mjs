@@ -93,12 +93,22 @@ try {
     ["0029", "0029_icai_bootstrap_window.sql"],
     ["0030", "0030_icai_phase1_current_sources.sql"],
     ["0031", "0031_icai_phase1_exact_source_scope.sql"],
+    ["0032", "0032_icai_resource_mapping_integrity.sql"],
+    ["0033", "0033_icai_phase2_incremental_watermarks.sql"],
   ]) {
     const journalRows = execute(`SELECT name FROM d1_migrations WHERE name='${filename}';`);
     assert(journalRows.length === 1, `${filename} Wrangler migration was not recorded exactly once`);
     const schemaRows = execute(`SELECT version FROM _ca_schema_migrations WHERE version='${version}';`);
     assert(schemaRows.length === 1, `Retained schema migration ${version} was not recorded exactly once`);
   }
+
+  const watermarkTables = execute("SELECT name FROM sqlite_master WHERE type='table' AND name='icai_source_watermarks';");
+  assert(watermarkTables.length === 1, "ICAI Phase 2 watermark table is missing");
+  const watermarkTriggers = execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name='icai_source_watermark_after_success';");
+  assert(watermarkTriggers.length === 1, "ICAI Phase 2 successful-only watermark trigger is missing");
+  const freshWatermarks = execute("SELECT source_id,bootstrap_complete FROM icai_source_watermarks ORDER BY source_id;");
+  assert(freshWatermarks.length === 6, "ICAI Phase 2 fresh D1 did not seed one watermark per active source");
+  assert(freshWatermarks.every((row) => Number(row.bootstrap_complete) === 0), "Fresh D1 must remain bootstrap-unlocked until a successful source run");
 
   const auditTables = execute("SELECT name FROM sqlite_master WHERE type='table' AND name='icai_review_decisions';");
   assert(auditTables.length === 1, "ICAI review decision audit table is missing");
