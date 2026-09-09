@@ -45,6 +45,7 @@ test("Phase 2 skips stale nested ICAI leaves without failing the complete source
   assert.match(resolver, /MAX_RESOLUTION_MS = 105_000/);
   assert.match(resolver, /Math\.min\(source\.timeoutMs, MAX_CHILD_TIMEOUT_MS\)/);
   assert.match(resolver, /unavailableLandingPages \+= 1/);
+  assert.doesNotMatch(resolver, /throw new Error\(`Direct-PDF resolver exceeded/);
   const engine = read("workers/icai-sync/sync-engine.ts");
   assert.match(engine, /direct\.unavailableLandingPages === 0/);
 });

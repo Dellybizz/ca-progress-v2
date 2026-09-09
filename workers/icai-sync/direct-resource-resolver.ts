@@ -214,7 +214,8 @@ export async function resolveDirectStudyMaterialPdfs(
       return null;
     }
     if (childPages >= MAX_CHILD_PAGES) {
-      throw new Error(`Direct-PDF resolver exceeded ${MAX_CHILD_PAGES} ICAI landing pages.`);
+      unavailableLandingPages += 1;
+      return null;
     }
     visited.add(resource.officialUrl);
     childPages += 1;
