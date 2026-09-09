@@ -25,7 +25,7 @@ test("ICAI resources have a real parent-specific mapping path without weakening 
   assert.match(repair, /INSTEAD OF DELETE ON resource_subject_map/);
 });
 
-test("retained D1 deployment preserves migration 0032 integrity through Phase 3B migration 0037", () => {
+test("retained D1 deployment preserves migration 0032 integrity through Phase 3EF migration 0038", () => {
   const runner = read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(runner, /\["0032", "d1\/migrations\/0032_icai_resource_mapping_integrity\.sql"\]/);
   assert.match(runner, /\["0033", "d1\/migrations\/0033_icai_phase2_incremental_watermarks\.sql"\]/);
@@ -33,7 +33,7 @@ test("retained D1 deployment preserves migration 0032 integrity through Phase 3B
   assert.match(runner, /\["0035", "d1\/migrations\/0035_icai_phase2b_source_cursor\.sql"\]/);
   assert.match(runner, /\["0036", "d1\/migrations\/0036_icai_phase2c_future_state\.sql"\]/);
   assert.match(runner, /\["0037", "d1\/migrations\/0037_icai_phase3b_operator_controls\.sql"\]/);
-  assert.match(runner, /BETWEEN '0012' AND '0037'/);
+  assert.match(runner, /BETWEEN '0012' AND '0038'/);
   assert.match(runner, /PRAGMA foreign_key_check/);
 });
 

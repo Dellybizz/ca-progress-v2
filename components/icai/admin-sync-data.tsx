@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
-import type { IcaiAdminDashboard, IcaiPublicCatalog } from "@/lib/icai/types";
+import { ICAI_RESOURCE_TYPES, type IcaiAdminDashboard, type IcaiPublicCatalog } from "@/lib/icai/types";
 import { decideIcaiReviewAction } from "@/app/(admin)/admin/icai-sync/actions";
 
 function time(value: string | null) {
@@ -125,6 +125,7 @@ export function IcaiAdminSyncData({
           <label>Level<select name="level" defaultValue={catalog.filters.level}><option value="">All levels</option>{catalog.levels.map((level) => <option key={level.code} value={level.code}>{level.name}</option>)}</select></label>
           <label>Attempt<select name="attempt" defaultValue={catalog.filters.attempt}><option value="">All attempts</option>{catalog.attempts.map((attempt) => <option key={attempt.id} value={attempt.key}>{attempt.label}</option>)}</select></label>
           <label>Subject<select name="subject" defaultValue={catalog.filters.subject}><option value="">All subjects</option>{catalog.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
+          <label>Resource type<select name="type" defaultValue={catalog.filters.type}><option value="">All resource types</option>{ICAI_RESOURCE_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll("_", " ")}</option>)}</select></label>
           <button className="ui-button ui-button--primary" type="submit">Apply filters</button>
           <Link className="ui-button ui-button--secondary" href="/admin/icai-sync/data">Clear</Link>
         </form>

@@ -12,6 +12,7 @@ import type {
 type SubjectLookup = { id: string; title: string; levelCode: IcaiLevelCode };
 type ParsedLanding = { html: string; resources: ParsedIcaiResource[] };
 export type IcaiItemFailure = { itemUrl: string; kind: string; message: string };
+export type IcaiResolverItemResult = { itemUrl: string; status: "succeeded" | "failed" | "timed_out" | "skipped"; stage: string; bytesFetched?: number; parsedCount?: number; failureCategory?: string | null; failureMessage?: string | null; skipReason?: string | null; retryEligible?: boolean };
 
 const MAX_CHILD_PAGES = 80;
 const MAX_STUDY_DEPTH = 3;
@@ -196,7 +197,8 @@ export async function resolveDirectStudyMaterialPdfs(
   subjects: SubjectLookup[],
   userAgent: string,
   skippedUrls: ReadonlySet<string> = new Set(),
-  onItem?: (itemUrl: string) => Promise<void>,
+  onItem?: (itemUrl: string, resource: ParsedIcaiResource) => Promise<void>,
+  onItemResult?: (result: IcaiResolverItemResult) => Promise<void>,
 ) {
   if (source.adapterConfig.direct_study_material_pdfs !== true) {
     return { payload, resolvedLandingPages: 0, droppedLandingPages: 0, unavailableLandingPages: 0, itemFailures: [] as IcaiItemFailure[] };
@@ -217,42 +219,60 @@ export async function resolveDirectStudyMaterialPdfs(
 
   const parseLanding = async (resource: ParsedIcaiResource): Promise<ParsedLanding | null> => {
     if (visited.has(resource.officialUrl)) return null;
+    visited.add(resource.officialUrl);
+    await onItem?.(resource.officialUrl, resource);
+    const finish = async (result: Omit<IcaiResolverItemResult, "itemUrl">) => {
+      await onItemResult?.({ itemUrl: resource.officialUrl, ...result });
+    };
     if (skippedUrls.has(resource.officialUrl)) {
       unavailableLandingPages += 1;
       recordFailure({ itemUrl: resource.officialUrl, kind: "operator_skip", message: "Skipped by an administrator." });
+      await finish({ status: "skipped", stage: "excluded", skipReason: "operator_skip", retryEligible: false });
       return null;
     }
     if (Date.now() >= resolutionDeadline) {
       unavailableLandingPages += 1;
       recordFailure({ itemUrl: resource.officialUrl, kind: "source_budget", message: "Nested resolution time budget reached." });
+      await finish({ status: "skipped", stage: "budget", skipReason: "source_budget", retryEligible: true });
       return null;
     }
     if (childPages >= MAX_CHILD_PAGES) {
       unavailableLandingPages += 1;
       recordFailure({ itemUrl: resource.officialUrl, kind: "page_limit", message: `Nested page limit ${MAX_CHILD_PAGES} reached.` });
+      await finish({ status: "skipped", stage: "budget", skipReason: "page_limit", retryEligible: true });
       return null;
     }
-    visited.add(resource.officialUrl);
     childPages += 1;
-    await onItem?.(resource.officialUrl);
     let html: string | null;
     try {
       html = await fetchApprovedHtml(resource.officialUrl, userAgent, Math.min(source.timeoutMs, MAX_CHILD_TIMEOUT_MS));
     } catch (error) {
       unavailableLandingPages += 1;
-      recordFailure({ itemUrl: resource.officialUrl, kind: "fetch_error", message: error instanceof Error ? error.message : "Nested ICAI page fetch failed." });
+      const detail = error instanceof Error ? error.message : "Nested ICAI page fetch failed.";
+      const timedOut = /abort|timeout|timed out/i.test(detail);
+      recordFailure({ itemUrl: resource.officialUrl, kind: timedOut ? "timeout" : "fetch_error", message: detail });
+      await finish({ status: timedOut ? "timed_out" : "failed", stage: "fetching", failureCategory: timedOut ? "timeout" : "fetch_error", failureMessage: detail, retryEligible: true });
       return null;
     }
     if (html === null) {
       unavailableLandingPages += 1;
       recordFailure({ itemUrl: resource.officialUrl, kind: "not_found", message: "ICAI nested page returned 404 or 410." });
+      await finish({ status: "failed", stage: "fetching", failureCategory: "not_found", failureMessage: "ICAI nested page returned 404 or 410.", retryEligible: false });
       return null;
     }
-    const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
-    const parsed = parseOfficialSource(html, childSource, subjects).resources.map((child) =>
-      mergeContext(resource, child),
-    );
-    return { html, resources: parsed };
+    try {
+      const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
+      const parsed = parseOfficialSource(html, childSource, subjects).resources.map((child) =>
+        mergeContext(resource, child),
+      );
+      await finish({ status: "succeeded", stage: "parsed", bytesFetched: new TextEncoder().encode(html).byteLength, parsedCount: parsed.length, retryEligible: false });
+      return { html, resources: parsed };
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Nested ICAI page parsing failed.";
+      recordFailure({ itemUrl: resource.officialUrl, kind: "parse_error", message: detail });
+      await finish({ status: "failed", stage: "parsing", failureCategory: "parse_error", failureMessage: detail, retryEligible: true });
+      return null;
+    }
   };
 
   const resolveStudyMaterial = async (
