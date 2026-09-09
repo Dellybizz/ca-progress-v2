@@ -50,14 +50,18 @@ test("Phase 5 live verifier pushes through Cloudflare Queues and proves official
   assert.match(live, /PRAGMA foreign_key_check/);
 });
 
-test("Phase 5 live proof completes its review probe before starting the single-concurrency ICAI continuation chain", () => {
+test("Phase 5 live proof certifies the real sync before adding its review probe to the single-concurrency queue", () => {
   const live = read("scripts/verify-icai-phase5-live.mjs");
-  const reviewWait = live.indexOf("await waitForJobs([reviewKey]);");
   const syncPublish = live.indexOf('"icai-phase5-sync-push.json"');
   const syncWait = live.indexOf("await waitForJobs([syncKey]);");
-  assert.ok(reviewWait >= 0);
-  assert.ok(syncPublish > reviewWait);
+  const continuationWait = live.indexOf("await waitForIcaiContinuation(startedAt)");
+  const reviewPublish = live.indexOf('"icai-phase5-review-push.json"');
+  const reviewWait = live.indexOf("await waitForJobs([reviewKey]);");
+  assert.ok(syncPublish >= 0);
   assert.ok(syncWait > syncPublish);
+  assert.ok(continuationWait > syncWait);
+  assert.ok(reviewPublish > continuationWait);
+  assert.ok(reviewWait > reviewPublish);
   assert.doesNotMatch(live, /waitForJobs\(\[reviewKey, syncKey\]\)/);
 });
 
