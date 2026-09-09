@@ -23,6 +23,12 @@ test("Phase 1 live admin verifier exercises real deployed authorization and Serv
   assert.match(live, /trace_id/);
 });
 
+test("ICAI admin live verification accepts the current idle and active sync controls", () => {
+  const verifier = read("scripts/verify-icai-admin-live.mjs");
+  assert.match(verifier, /Run Sync now/);
+  assert.match(verifier, /Sync in progress/);
+});
+
 test("Phase 1 live admin verifier proves negative permissions and Parent Owner safety", () => {
   const live = read("scripts/verify-admin-phase1-live.mjs");
   assert.match(live, /guest admin denial/);

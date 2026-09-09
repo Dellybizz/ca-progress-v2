@@ -23,7 +23,7 @@ const evidence = {
   redirected: Boolean(location),
   destination: location ? new URL(location, baseUrl).pathname : null,
   hasIcaiSyncHeading: html.includes("ICAI Sync"),
-  hasRunControl: html.includes("Run ICAI sync") || html.includes("Sync in progress"),
+  hasRunControl: html.includes("Run Sync now") || html.includes("Run ICAI sync") || html.includes("Sync in progress"),
 };
 mkdirSync("deployment-evidence", { recursive: true });
 writeFileSync("deployment-evidence/icai-admin-live.json", JSON.stringify(evidence, null, 2));
