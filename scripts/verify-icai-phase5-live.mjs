@@ -108,15 +108,7 @@ if (!queue?.queue_id) throw new Error(`Cloudflare Queue ${queueName} was not fou
 writeFileSync(`${evidenceDir}/icai-phase5-queue.json`, JSON.stringify({ queue_id: queue.queue_id, queue_name: queue.queue_name }, null, 2));
 
 const startedAt = new Date(Date.now() - 5_000).toISOString();
-const syncKey = `icai-phase5-sync:${correlationId}`;
 const reviewKey = `icai-phase5-review:${correlationId}`;
-await publish(queue.queue_id, {
-  id: `phase5-sync-${correlationId}`,
-  type: "icai-sync",
-  idempotencyKey: syncKey,
-  payload: { trigger: "manual", requestedBy: null, phase5Correlation: correlationId, gitSha: sha },
-  createdBy: null,
-}, "icai-phase5-sync-push.json");
 await publish(queue.queue_id, {
   id: `phase5-review-${correlationId}`,
   type: "icai-phase5-review-probe",
@@ -124,8 +116,20 @@ await publish(queue.queue_id, {
   payload: { correlationId, gitSha: sha },
   createdBy: null,
 }, "icai-phase5-review-push.json");
+await waitForJobs([reviewKey]);
 
-await waitForJobs([reviewKey, syncKey]);
+// Keep the review proof ahead of the continuation chain. The production queue is
+// intentionally single-concurrency, so starting the real sync first can place its
+// bounded per-source jobs ahead of this independent verification job.
+const syncKey = `icai-phase5-sync:${correlationId}`;
+await publish(queue.queue_id, {
+  id: `phase5-sync-${correlationId}`,
+  type: "icai-sync",
+  idempotencyKey: syncKey,
+  payload: { trigger: "manual", requestedBy: null, phase5Correlation: correlationId, gitSha: sha },
+  createdBy: null,
+}, "icai-phase5-sync-push.json");
+await waitForJobs([syncKey]);
 const { realRun, childJobs } = await waitForIcaiContinuation(startedAt);
 if (Number(realRun.source_succeeded) < 1) {
   throw new Error(`Phase 5 real ICAI sync did not verify an official source: status=${realRun.status}, succeeded=${realRun.source_succeeded}, failed=${realRun.source_failed}.`);
