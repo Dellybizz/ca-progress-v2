@@ -15,6 +15,8 @@ type ParsedLanding = { html: string; resources: ParsedIcaiResource[] };
 const MAX_CHILD_PAGES = 80;
 const MAX_STUDY_DEPTH = 3;
 const MAX_CHILD_BYTES = 2_500_000;
+const MAX_RESOLUTION_MS = 105_000;
+const MAX_CHILD_TIMEOUT_MS = 5_000;
 const MAX_REDIRECTS = 5;
 const ANCHOR_CONTEXT_BYTES = 1_500;
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
@@ -193,7 +195,7 @@ export async function resolveDirectStudyMaterialPdfs(
   userAgent: string,
 ) {
   if (source.adapterConfig.direct_study_material_pdfs !== true) {
-    return { payload, resolvedLandingPages: 0, droppedLandingPages: 0 };
+    return { payload, resolvedLandingPages: 0, droppedLandingPages: 0, unavailableLandingPages: 0 };
   }
 
   const resources: ParsedIcaiResource[] = [];
@@ -201,17 +203,32 @@ export async function resolveDirectStudyMaterialPdfs(
   const visited = new Set<string>();
   let resolvedLandingPages = 0;
   let droppedLandingPages = 0;
+  let unavailableLandingPages = 0;
   let childPages = 0;
+  const resolutionDeadline = Date.now() + MAX_RESOLUTION_MS;
 
   const parseLanding = async (resource: ParsedIcaiResource): Promise<ParsedLanding | null> => {
     if (visited.has(resource.officialUrl)) return null;
+    if (Date.now() >= resolutionDeadline) {
+      unavailableLandingPages += 1;
+      return null;
+    }
     if (childPages >= MAX_CHILD_PAGES) {
       throw new Error(`Direct-PDF resolver exceeded ${MAX_CHILD_PAGES} ICAI landing pages.`);
     }
     visited.add(resource.officialUrl);
     childPages += 1;
-    const html = await fetchApprovedHtml(resource.officialUrl, userAgent, source.timeoutMs);
-    if (html === null) return null;
+    let html: string | null;
+    try {
+      html = await fetchApprovedHtml(resource.officialUrl, userAgent, Math.min(source.timeoutMs, MAX_CHILD_TIMEOUT_MS));
+    } catch {
+      unavailableLandingPages += 1;
+      return null;
+    }
+    if (html === null) {
+      unavailableLandingPages += 1;
+      return null;
+    }
     const childSource: IcaiSourceConfig = { ...source, officialUrl: resource.officialUrl };
     const parsed = parseOfficialSource(html, childSource, subjects).resources.map((child) =>
       mergeContext(resource, child),
@@ -297,5 +314,6 @@ export async function resolveDirectStudyMaterialPdfs(
     },
     resolvedLandingPages,
     droppedLandingPages,
+    unavailableLandingPages,
   };
 }

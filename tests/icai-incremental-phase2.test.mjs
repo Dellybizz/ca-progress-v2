@@ -41,7 +41,12 @@ test("Phase 2 resource identity survives a changed direct ICAI PDF URL", () => {
 test("Phase 2 skips stale nested ICAI leaves without failing the complete source", () => {
   const resolver = read("workers/icai-sync/direct-resource-resolver.ts");
   assert.match(resolver, /response\.status === 404 \|\| response\.status === 410/);
-  assert.match(resolver, /if \(html === null\) return null/);
+  assert.match(resolver, /if \(html === null\) \{/);
+  assert.match(resolver, /MAX_RESOLUTION_MS = 105_000/);
+  assert.match(resolver, /Math\.min\(source\.timeoutMs, MAX_CHILD_TIMEOUT_MS\)/);
+  assert.match(resolver, /unavailableLandingPages \+= 1/);
+  const engine = read("workers/icai-sync/sync-engine.ts");
+  assert.match(engine, /direct\.unavailableLandingPages === 0/);
 });
 
 test("Phase 2 retained migration and clean-D1 validator cover migration 0033", () => {

@@ -503,13 +503,15 @@ async function processSource(
       authoritative_listing:
         source.authoritativeListing &&
         windowed.filteredCount === 0 &&
-        direct.droppedLandingPages === 0,
+        direct.droppedLandingPages === 0 &&
+        direct.unavailableLandingPages === 0,
       window_mode: windowed.mode,
       bootstrap_attempt_floor: windowed.attemptFloor,
       published_floor: windowed.publishedFloor,
       filtered_item_count: windowed.filteredCount,
       resolved_study_material_pages: direct.resolvedLandingPages,
       dropped_study_material_pages: direct.droppedLandingPages,
+      unavailable_study_material_pages: direct.unavailableLandingPages,
       parsed_item_count_after_window: parsedItemCount,
     },
   };
