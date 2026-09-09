@@ -86,8 +86,8 @@ async function waitForIcaiContinuation(startedAt) {
         if (deadLetter) throw new Error(`Phase 5 ICAI source continuation dead-lettered: ${deadLetter.idempotency_key}: ${deadLetter.last_error ?? "unknown error"}`);
         if (["failed", "cancelled"].includes(realRun.status)) throw new Error(`Phase 5 real ICAI continuation ended ${realRun.status}: ${realRun.error_summary ?? "unknown error"}`);
         const sourceTotal = Number(realRun.source_total);
-        if (["success", "partial"].includes(realRun.status) && childJobs.length === sourceTotal && childJobs.every((row) => row.status === "succeeded")) {
-          const sourceStates = d1(`SELECT source_id,source_index,status,attempts,last_error,started_at,finished_at FROM icai_sync_source_states WHERE run_id=${sqlText(realRun.id)} ORDER BY source_index;`);
+        if (["success", "partial"].includes(realRun.status) && childJobs.length >= sourceTotal && childJobs.every((row) => row.status === "succeeded")) {
+          const sourceStates = d1(`SELECT source_id,source_index,status,attempts,last_error,started_at,finished_at,cursor_offset,cursor_total,continuation_count FROM icai_sync_source_states WHERE run_id=${sqlText(realRun.id)} ORDER BY source_index;`);
           writeFileSync(`${evidenceDir}/icai-phase5-source-states.json`, JSON.stringify(sourceStates, null, 2));
           if (sourceStates.length !== sourceTotal || sourceStates.some((row) => !["succeeded", "failed", "skipped"].includes(row.status))) throw new Error("Phase 5 continuation source states are incomplete.");
           return { realRun, childJobs, sourceStates };
@@ -127,7 +127,7 @@ const { realRun, childJobs } = await waitForIcaiContinuation(startedAt);
 if (Number(realRun.source_succeeded) < 1) {
   throw new Error(`Phase 5 real ICAI sync did not verify an official source: status=${realRun.status}, succeeded=${realRun.source_succeeded}, failed=${realRun.source_failed}.`);
 }
-if (childJobs.length !== Number(realRun.source_total)) throw new Error("Phase 5 did not persist exactly one bounded source job per configured source.");
+if (childJobs.length < Number(realRun.source_total)) throw new Error("Phase 5 did not persist at least one bounded source job per configured source.");
 writeFileSync(`${evidenceDir}/icai-phase5-real-run.json`, JSON.stringify(realRun, null, 2));
 
 const snapshots = d1(`SELECT ss.id,ss.source_id,ss.fetched_at,ss.http_status,ss.canonical_hash,ss.parsed_item_count,s.official_url FROM icai_source_snapshots ss JOIN icai_sources s ON s.id=ss.source_id WHERE ss.run_id=${sqlText(realRun.id)} ORDER BY ss.source_id;`);

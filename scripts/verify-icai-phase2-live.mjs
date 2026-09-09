@@ -111,7 +111,11 @@ async function waitForContinuation(startedAt, correlationId) {
     if (runIds.length === 1) {
       const run = d1(`SELECT id,status,started_at,completed_at,source_total,source_succeeded,source_failed,new_items,changed_items,unchanged_items,removed_items,pending_reviews,error_summary FROM icai_sync_runs WHERE id=${sqlText(runIds[0])} AND started_at>=${sqlText(startedAt)} LIMIT 1;`)[0];
       if (run && ["failed", "cancelled"].includes(run.status)) throw new Error(`Phase 2 repeat run ended ${run.status}: ${run.error_summary ?? "unknown error"}`);
-      if (run && ["success", "partial"].includes(run.status) && childJobs.length === Number(run.source_total) && childJobs.every((row) => row.status === "succeeded")) return { run, childJobs };
+      if (run && ["success", "partial"].includes(run.status) && childJobs.length >= Number(run.source_total) && childJobs.every((row) => row.status === "succeeded")) {
+        const sourceStates = d1(`SELECT source_id,source_index,status,cursor_offset,cursor_total,continuation_count,last_error FROM icai_sync_source_states WHERE run_id=${sqlText(run.id)} ORDER BY source_index;`);
+        if (sourceStates.length !== Number(run.source_total) || sourceStates.some((row) => !["succeeded","failed","skipped"].includes(row.status))) throw new Error("Phase 2 continuation source states are incomplete.");
+        return { run, childJobs, sourceStates };
+      }
     }
     await sleep(POLL_MS);
   }

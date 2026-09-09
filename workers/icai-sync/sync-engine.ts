@@ -943,16 +943,61 @@ export async function runIcaiSyncContinuationSource(
     const message = skipped
       ? "Skipped by an administrator. Last verified data was preserved."
       : asErrorMessage(error);
-    const { error: failureError } = await client.rpc("icai_sync_mark_source_failure", {
-      p_run_id: runId,
-      p_source_id: source.id,
-      p_error: message,
-    });
-    if (failureError) throw failureError;
-    await runtime.db.prepare("UPDATE icai_sync_source_states SET status=?1,finished_at=CURRENT_TIMESTAMP,last_error=?2,updated_at=CURRENT_TIMESTAMP WHERE run_id=?3 AND source_id=?4")
-      .bind(skipped ? "skipped" : "failed", message.slice(0, 2000), runId, sourceId).run();
-    return { runId, sourceId, status: skipped ? "skipped" : "failed", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
+    if (skipped) {
+      const { error: failureError } = await client.rpc("icai_sync_mark_source_failure", {
+        p_run_id: runId,
+        p_source_id: source.id,
+        p_error: message,
+      });
+      if (failureError) throw failureError;
+      await runtime.db.prepare("UPDATE icai_sync_source_states SET status='skipped',finished_at=CURRENT_TIMESTAMP,last_error=?1,updated_at=CURRENT_TIMESTAMP WHERE run_id=?2 AND source_id=?3")
+        .bind(message.slice(0, 2000), runId, sourceId).run();
+      return { runId, sourceId, status: "skipped", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
+    }
+    const failureContext = await runtime.db.prepare("SELECT stage,current_item_url FROM icai_sync_runtime WHERE run_id=?1 LIMIT 1")
+      .bind(runId).first<{ stage: string | null; current_item_url: string | null }>();
+    await runtime.db.batch([
+      runtime.db.prepare("INSERT INTO icai_sync_item_failures(id,run_id,source_id,item_url,stage,failure_kind,error_message,skipped,occurred_at) VALUES(?1,?2,?3,?4,?5,'batch_retry',?6,0,CURRENT_TIMESTAMP)")
+        .bind(crypto.randomUUID(), runId, source.id, failureContext?.current_item_url ?? source.officialUrl, failureContext?.stage ?? "unknown", message.slice(0, 1000)),
+      runtime.db.prepare("UPDATE icai_sync_source_states SET last_error=?1,updated_at=CURRENT_TIMESTAMP WHERE run_id=?2 AND source_id=?3")
+        .bind(message.slice(0, 2000), runId, sourceId),
+    ]);
+    throw error instanceof Error ? error : new Error(message);
   }
+}
+
+export async function failIcaiSyncContinuationSource(
+  runtime: IcaiSyncRuntime,
+  { runId, sourceId, errorMessage }: { runId: string; sourceId: string; errorMessage: string },
+): Promise<IcaiSyncContinuationSourceResult> {
+  if (!runtime.enabled) throw new Error("ICAI synchronization is disabled for this environment.");
+  const client = adminClient(runtime);
+  const sourceResponse = await client.from("icai_sources").select("*").eq("id", sourceId).eq("is_active", true).single();
+  if (sourceResponse.error) throw sourceResponse.error;
+  if (!sourceResponse.data) throw new Error(`ICAI source ${sourceId} is not active or does not exist.`);
+  const source = sourceDto(sourceResponse.data as SourceRow);
+  const state = await runtime.db.prepare("SELECT status FROM icai_sync_source_states WHERE run_id=?1 AND source_id=?2 LIMIT 1")
+    .bind(runId, sourceId).first<{ status: string }>();
+  if (!state) throw new Error(`ICAI continuation source state is missing for ${sourceId}.`);
+  if (["succeeded", "failed", "skipped", "cancelled"].includes(state.status)) {
+    return { runId, sourceId, status: state.status as IcaiSyncContinuationSourceResult["status"], requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: true };
+  }
+  const message = String(errorMessage || "ICAI source batch exhausted its retry limit.").slice(0, 2000);
+  const failureContext = await runtime.db.prepare("SELECT stage,current_item_url FROM icai_sync_runtime WHERE run_id=?1 LIMIT 1")
+    .bind(runId).first<{ stage: string | null; current_item_url: string | null }>();
+  const { error: failureError } = await client.rpc("icai_sync_mark_source_failure", {
+    p_run_id: runId,
+    p_source_id: source.id,
+    p_error: message,
+  });
+  if (failureError) throw failureError;
+  await runtime.db.batch([
+    runtime.db.prepare("INSERT INTO icai_sync_item_failures(id,run_id,source_id,item_url,stage,failure_kind,error_message,skipped,occurred_at) VALUES(?1,?2,?3,?4,?5,'retry_exhausted',?6,0,CURRENT_TIMESTAMP)")
+      .bind(crypto.randomUUID(), runId, source.id, failureContext?.current_item_url ?? source.officialUrl, failureContext?.stage ?? "unknown", message.slice(0, 1000)),
+    runtime.db.prepare("UPDATE icai_sync_source_states SET status='failed',finished_at=CURRENT_TIMESTAMP,last_error=?1,updated_at=CURRENT_TIMESTAMP WHERE run_id=?2 AND source_id=?3")
+      .bind(message, runId, sourceId),
+  ]);
+  return { runId, sourceId, status: "failed", requestIntervalSeconds: source.requestIntervalSeconds, alreadyComplete: false };
 }
 
 function summaryFromRun(runId: string, result: RunRow, status: IcaiSyncSummary["status"]): IcaiSyncSummary {
