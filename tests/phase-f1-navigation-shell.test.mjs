@@ -13,9 +13,11 @@ test("F1 keeps the shared shell above student route content", () => {
   assert.doesNotMatch(read("components/shell/app-shell.tsx"), /await loadViewer/);
 });
 
-test("F1 prefetches desktop and mobile navigation", () => {
+test("F1 prefetches desktop and canonical mobile navigation", () => {
   assert.match(read("components/shell/navigation.tsx"), /prefetch=\{true\}/);
-  assert.match(read("components/shell/mobile-nav-placeholder.tsx"), /prefetch=\{true\}/);
+  assert.equal(existsSync(join(root, "components/shell/mobile-nav-placeholder.tsx")), false);
+  assert.match(read("components/shell/mobile-navigation.tsx"), /prefetch=\{true\}/);
+  assert.match(read("components/shell/app-shell.tsx"), /from "\.\/mobile-navigation"/);
   assert.match(read("components/shell/navigation-progress.tsx"), /document\.addEventListener\("click"/);
 });
 
