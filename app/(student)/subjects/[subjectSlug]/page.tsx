@@ -17,5 +17,5 @@ export default async function SubjectPage({ params, searchParams }: { params: Pr
     ? await getSubjectBySlugForContext(subjectSlug, context)
     : await getSubjectBySlug(subjectSlug, typeof query.attempt === "string" ? query.attempt : null);
   if (!subject) notFound();
-  return <SubjectDetail subject={subject}/>;
+  return <SubjectDetail subject={subject} context={context.selection ? { level: context.selection.level, group: context.selection.group, attempt: context.selection.attemptKey } : { attempt: typeof query.attempt === "string" ? query.attempt : null }}/>;
 }

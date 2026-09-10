@@ -4,17 +4,19 @@ import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import type { AcademicSubject } from "@/lib/academic/types";
+import { AcademicBreadcrumbs, AcademicContextBar, AcademicEntityMark } from "./academic-navigation";
 
 function sectionLabel(value: string) {
   return value.split("-").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
-export function SubjectDetail({ subject }: { subject: AcademicSubject }) {
+export function SubjectDetail({ subject, context }: { subject: AcademicSubject; context?: { level?: string | null; group?: string | null; attempt?: string | null } }) {
   return <div className="academic-page academic-subject-page" id="top">
-    <Link href="/syllabus" className="academic-back-link"><Icon name="arrow" size={15}/>Back to syllabus explorer</Link>
+    <AcademicBreadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Syllabus", href: "/syllabus" }, { label: subject.title }]}/>
+    <AcademicContextBar level={context?.level || subject.paperLabel} group={context?.group} attempt={context?.attempt} syllabus={subject.version.title}/>
     <section className="academic-subject-hero">
       <div>
-        <div className="academic-subject-hero__badges"><Badge tone="brand">{subject.paperLabel}</Badge><Badge tone={subject.version.status === "published" ? "success" : "neutral"}>{subject.version.status}</Badge></div>
+        <div className="academic-subject-hero__badges"><AcademicEntityMark label={subject.paperLabel}/><Badge tone={subject.version.status === "published" ? "success" : "neutral"}>{subject.version.status}</Badge></div>
         <h1>{subject.title}</h1>
         <p>{subject.version.title}. Every published chapter now opens through its stable canonical academic ID, so the workspace survives title and source-link refreshes.</p>
       </div>

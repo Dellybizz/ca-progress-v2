@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import type { IcaiPublicCatalog, IcaiResourceType } from "@/lib/icai/types";
+import { AcademicBreadcrumbs, AcademicContextBar, AcademicEntityMark, AcademicStateBadge, type AcademicContentState } from "@/components/academic/academic-navigation";
 
 const TYPE_LABELS: Record<IcaiResourceType, string> = {
   rtp: "RTP",
@@ -22,9 +26,19 @@ function dateLabel(value: string | null) {
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
+function resourceState(resource: IcaiPublicCatalog["resources"][number]): AcademicContentState {
+  if (["unavailable", "withdrawn", "inactive"].includes(resource.status)) return "Unavailable";
+  if (resource.status === "historical") return "Historical";
+  if (resource.status === "changed") return "Changed";
+  if (resource.status === "new") return "New";
+  return "Current";
+}
+
 export function IcaiResourceBrowser({ catalog }: { catalog: IcaiPublicCatalog }) {
+  const [view, setView] = useState<"folders" | "list">("folders");
   return (
     <div className="icai-page">
+      <AcademicBreadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Resources", href: "/resources" }, { label: "ICAI" }]}/>
       <section className="icai-hero">
         <div>
           <Badge tone="success">Official-source verified</Badge>
@@ -36,6 +50,8 @@ export function IcaiResourceBrowser({ catalog }: { catalog: IcaiPublicCatalog })
           <span><strong>Last verified dataset</strong><small>{catalog.verifiedAt ? dateLabel(catalog.verifiedAt) : "Awaiting first successful source sync"}</small></span>
         </div>
       </section>
+
+      <AcademicContextBar level={catalog.levels.find((level) => level.code === catalog.filters.level)?.name ?? "All levels"} attempt={catalog.filters.attempt || null}/>
 
       <form className="icai-filters" method="get">
         <label><span>Level</span><select name="level" defaultValue={catalog.filters.level}><option value="">All levels</option>{catalog.levels.map((level) => <option key={level.code} value={level.code}>{level.name}</option>)}</select></label>
@@ -59,11 +75,11 @@ export function IcaiResourceBrowser({ catalog }: { catalog: IcaiPublicCatalog })
       ) : null}
 
       <section className="icai-section">
-        <div className="icai-section-heading"><div><span className="eyebrow">Verified resource library</span><h2>Official ICAI links</h2></div><Badge tone="neutral">{catalog.resources.length} results</Badge></div>
+        <div className="icai-section-heading"><div><span className="eyebrow">Verified resource library</span><h2>Official ICAI links</h2></div><div className="academic-view-controls" role="group" aria-label="Resource view"><button type="button" className={view === "folders" ? "is-active" : ""} onClick={() => setView("folders")}>Folders</button><button type="button" className={view === "list" ? "is-active" : ""} onClick={() => setView("list")}>List</button><Badge tone="neutral">{catalog.resources.length} results</Badge></div></div>
         {catalog.resources.length ? (
-          <div className="icai-resource-grid">{catalog.resources.map((resource) => (
+          <div className={`icai-resource-grid ${view === "list" ? "is-list" : ""}`}>{catalog.resources.map((resource) => (
             <article className="icai-resource-card" key={resource.id}>
-              <div className="icai-resource-card__top"><Badge tone="brand">{TYPE_LABELS[resource.type]}</Badge><span className="icai-official-mark"><Icon name="shield" size={14}/> Official</span></div>
+              <div className="icai-resource-card__top"><AcademicEntityMark kind="resource" label={TYPE_LABELS[resource.type]}/><AcademicStateBadge state={resourceState(resource)}/><span className="icai-official-mark"><Icon name="shield" size={14}/> Official</span></div>
               <h3>{resource.title}</h3>
               {resource.summary ? <p>{resource.summary}</p> : <p>Metadata verified from the linked official ICAI source.</p>}
               <div className="icai-tags">{resource.levelCodes.map((level) => <span key={level}>{level}</span>)}{resource.attemptKeys.slice(0, 3).map((attempt) => <span key={attempt}>{attempt}</span>)}{resource.subjects.slice(0, 2).map((subject) => <span key={subject.id}>{subject.title}</span>)}</div>

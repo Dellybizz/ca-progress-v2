@@ -7,6 +7,7 @@ import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import type { AcademicCatalog, AcademicSearchResult } from "@/lib/academic/types";
+import { AcademicBreadcrumbs, AcademicContextBar } from "./academic-navigation";
 
 function labelFromKey(value: string) {
   return value.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
@@ -60,7 +61,10 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
   }
 
   return <div className="academic-page">
+    <AcademicBreadcrumbs items={[{ label: "Dashboard", href: "/dashboard" }, { label: "Syllabus" }]}/>
     <section className="academic-hero"><div><Badge tone="brand">Verified academic catalog</Badge><h1>CA Syllabus Explorer</h1><p>Explore the ICAI New Scheme by level, group, subject, chapter and unit. Structure is versioned so historical syllabi can remain intact.</p></div><div className="academic-source-chip"><Icon name="shield" size={18}/><span><strong>ICAI source metadata</strong><small>{catalog.sourceVerifiedAt ? `Verified ${new Date(catalog.sourceVerifiedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : "Verification date unavailable"}</small></span></div></section>
+
+    <AcademicContextBar level={catalog.selectedLevel.name} group={catalog.groups.find((group) => group.code === catalog.selectedGroup)?.name ?? catalog.selectedGroup} attempt={catalog.selectedAttempt}/>
 
     <nav className="academic-level-tabs" aria-label="CA level">{catalog.levels.map((level) => <Link key={level.id} href={selectionHref(catalog, { level: level.code, group: "all", attempt: null })} className={level.id === catalog.selectedLevel.id ? "is-active" : ""}>{level.name}</Link>)}</nav>
 
