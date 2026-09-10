@@ -42,6 +42,10 @@ function routeMatches(pathname: string, href: string, exact = false) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function progressRouteMatches(pathname: string) {
+  return routeMatches(pathname, "/progress") || /^\/subjects\/[^/]+\/progress(?:\/|$)/.test(pathname);
+}
+
 export function MobileNavigation({ area }: { area: "student" | "admin" }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -58,16 +62,17 @@ export function MobileNavigation({ area }: { area: "student" | "admin" }) {
     );
   }
 
+  const dashboardActive = routeMatches(pathname, "/dashboard");
   const todayActive = routeMatches(pathname, "/planner/today");
   const studyActive = routeMatches(pathname, "/study");
-  const progressActive = ["/progress", "/analytics", "/goals", "/tests", "/planner/revision-settings"].some((href) => routeMatches(pathname, href));
+  const progressActive = progressRouteMatches(pathname);
   const secondaryActive = moreGroups.some((group) => group.items.some((item) => routeMatches(pathname, item.href, item.exact)));
   const moreActive = secondaryActive && !todayActive && !studyActive && !progressActive;
 
   return (
     <>
       <nav className="mobile-bottom-nav" aria-label="Student mobile navigation">
-        <Link prefetch={true} href="/dashboard" className={pathname === "/dashboard" ? "is-active" : ""} aria-current={pathname === "/dashboard" ? "page" : undefined}>
+        <Link prefetch={true} href="/dashboard" className={dashboardActive ? "is-active" : ""} aria-current={dashboardActive ? "page" : undefined}>
           <Icon name="home" size={18}/><span>Home</span>
         </Link>
         <Link prefetch={true} href="/planner/today" className={todayActive ? "is-active" : ""} aria-current={todayActive ? "page" : undefined}>
@@ -76,10 +81,10 @@ export function MobileNavigation({ area }: { area: "student" | "admin" }) {
         <Link prefetch={true} href="/study" className={studyActive ? "is-active" : ""} aria-current={studyActive ? "page" : undefined}>
           <Icon name="timer" size={18}/><span>Study</span>
         </Link>
-        <Link prefetch={true} href="/progress" className={progressActive ? "is-active" : ""} aria-current={pathname.startsWith("/progress") ? "page" : undefined}>
+        <Link prefetch={true} href="/progress" className={progressActive ? "is-active" : ""} aria-current={progressActive ? "page" : undefined}>
           <Icon name="chart" size={18}/><span>Progress</span>
         </Link>
-        <button type="button" className={moreActive ? "is-active" : ""} onClick={() => setMoreOpen(true)} aria-label="Open more navigation" aria-haspopup="dialog">
+        <button type="button" className={moreActive ? "is-active" : ""} onClick={() => setMoreOpen(true)} aria-label="Open more navigation" aria-haspopup="dialog" aria-expanded={moreOpen}>
           <Icon name="more" size={18}/><span>More</span>
         </button>
       </nav>
