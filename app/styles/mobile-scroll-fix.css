@@ -47,10 +47,10 @@
     overflow-x: clip;
   }
 
-  /* Reserve only enough room for the fixed mobile navigation. */
+  /* Reserve room for the edge-to-edge mobile navigation. */
   .content-wrap {
     margin: 0 auto;
-    padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(var(--bottom-nav-height) + 16px + env(safe-area-inset-bottom)) !important;
   }
 
   .content-wrap > [class*="-page"],
@@ -65,9 +65,9 @@
   .mobile-bottom-nav {
     position: fixed !important;
     z-index: 60 !important;
-    left: 8px !important;
-    right: 8px !important;
-    bottom: 8px !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
     margin: 0 !important;
     transform: none !important;
   }
