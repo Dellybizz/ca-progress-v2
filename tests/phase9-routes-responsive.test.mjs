@@ -34,7 +34,7 @@ test("Phase 9 surfaces have tablet and mobile responsive breakpoints", () => {
 
 test("navigation exposes smart planning on desktop and mobile without removing classic Planner", () => {
   const nav = read("components/shell/navigation.tsx");
-  const mobile = read("components/shell/mobile-nav-placeholder.tsx");
+  const mobile = read("components/shell/mobile-navigation.tsx");
   assert.match(nav, /Today Plan/);
   assert.match(nav, /href: "\/planner"/);
   assert.match(nav, /Revision Settings/);
