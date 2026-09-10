@@ -1,0 +1,27 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Card, CardBody } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Icon } from "@/components/ui/icon";
+import { PageHeader } from "@/components/ui/page-header";
+import { getDashboardPageModel } from "@/lib/dashboard/service";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Exam countdown | CA Progress" };
+
+function dateLabel(value: string | null) {
+  if (!value) return "Date not yet approved";
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" }).format(new Date(`${value}T00:00:00+05:30`));
+}
+
+export default async function ExamCountdownPage() {
+  const model = await getDashboardPageModel();
+  if (model.mode !== "ready") return <EmptyState icon="clock" title="Exam details are not available" description="Sign in and complete your academic setup to see the exam date for your selected attempt."/>;
+  const countdown = model.countdown;
+  return <div className="dashboard-exam-page">
+    <Link href="/dashboard" className="ui-text-link">← Back to dashboard</Link>
+    <PageHeader preview={false} eyebrow={`${model.context.levelName} · ${model.context.groupLabel}`} title={model.context.attemptLabel} description="Only approved ICAI evidence mapped to your current academic context can appear here."/>
+    {countdown.status === "awaiting_verified_date" ? <EmptyState icon="clock" title="Official exam date is awaiting approval" description="The countdown will appear after a matching ICAI exam event is verified and approved. No estimated date is shown."/> : <Card><CardBody><div className="dashboard-exam-detail"><span><Icon name="calendar" size={22}/></span><div><small>Approved exam date</small><h2>{dateLabel(countdown.targetDate)}</h2><p>{countdown.daysRemaining === null ? "This exam date has passed." : `${countdown.daysRemaining} day${countdown.daysRemaining === 1 ? "" : "s"} remaining in IST.`}</p></div></div>{countdown.sourceUrl ? <a className="ui-button ui-button--secondary" href={countdown.sourceUrl} target="_blank" rel="noreferrer">Open official ICAI evidence <Icon name="arrow" size={14}/></a> : null}</CardBody></Card>}
+    {countdown.conflictWarning ? <div className="auth-status auth-status--warning" role="alert">{countdown.conflictWarning}</div> : null}
+  </div>;
+}

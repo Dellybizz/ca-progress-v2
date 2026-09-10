@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { recordAdminAuditEvent } from "@/lib/admin/audit";
 import { requireAdminCapability } from "@/lib/authorization/server";
 import { createD1AdminClient } from "@/lib/data/d1/client";
@@ -295,8 +295,42 @@ export async function decideIcaiReviewAction(formData: FormData) {
     const result = await decideIcaiReview({ reviewId, decision, reviewerUserId: operator.user.id, notes: "" });
     await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.review", action: `icai.review.${decision}`, targetType: "icai_review", targetId: reviewId, reason: "ICAI high-impact review decision", newValue: { status: result.status }, traceId: traceId(), reversible: false });
     await invalidateSharedPublicCache(["icai"]);
+    updateTag("dashboard-live");
     revalidatePath("/admin/icai-sync"); revalidatePath("/admin/icai-sync/data"); revalidatePath("/updates"); revalidatePath("/resources/icai");
     destination = `/admin/icai-sync/data?notice=${encodeURIComponent(`Review ${result.status}. Student-facing data and audit history are now consistent.`)}`;
+  } catch (error) { destination = `/admin/icai-sync/data?error=${encodeURIComponent(message(error))}`; }
+  redirect(destination);
+}
+
+export async function manageExamEventAction(formData: FormData) {
+  let destination = "/admin/icai-sync/data";
+  try {
+    const operator = await requireAdminCapability("icai.review");
+    const eventId = String(formData.get("eventId") ?? "").trim().slice(0, 160);
+    const intent = String(formData.get("intent") ?? "");
+    if (!eventId || !["replace", "withdraw"].includes(intent)) throw new Error("Invalid exam-event request.");
+    const admin = createD1AdminClient();
+    const current = await admin.from("exam_events").select("id,title,event_date,source_url,verification_status,updated_at").eq("id", eventId).maybeSingle();
+    if (current.error) throw current.error;
+    if (!current.data) throw new Error("Exam event was not found.");
+    const now = new Date().toISOString();
+    const next = intent === "withdraw" ? { verification_status: "withdrawn", updated_at: now, last_changed_at: now } : (() => {
+      const eventDate = String(formData.get("eventDate") ?? "").trim();
+      const sourceUrl = String(formData.get("sourceUrl") ?? "").trim();
+      const title = String(formData.get("title") ?? current.data.title).trim().slice(0, 300);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || Number.isNaN(Date.parse(`${eventDate}T00:00:00+05:30`))) throw new Error("A valid replacement date is required.");
+      if (!isApprovedIcaiUrl(sourceUrl)) throw new Error("Replacement evidence must use an official ICAI URL.");
+      if (!title) throw new Error("An exam-event title is required.");
+      return { event_date: eventDate, source_url: sourceUrl, title, verification_status: "verified", updated_at: now, last_changed_at: now };
+    })();
+    const update = await admin.from("exam_events").update(next).eq("id", eventId).eq("updated_at", current.data.updated_at).select("id").maybeSingle();
+    if (update.error) throw update.error;
+    if (!update.data) throw new Error("This exam event changed while you were reviewing it. Reload and try again.");
+    await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.review", action: `icai.exam_event.${intent}`, targetType: "exam_event", targetId: eventId, reason: intent === "withdraw" ? "Withdraw approved exam event" : "Replace approved exam-event evidence", previousValue: current.data, newValue: next, traceId: traceId(), reversible: false });
+    await invalidateSharedPublicCache(["icai"]);
+    updateTag("dashboard-live");
+    revalidatePath("/dashboard"); revalidatePath("/dashboard/exam"); revalidatePath("/admin/icai-sync/data");
+    destination = `/admin/icai-sync/data?notice=${encodeURIComponent(`Exam event ${intent === "withdraw" ? "withdrawn" : "replaced"}.`)}`;
   } catch (error) { destination = `/admin/icai-sync/data?error=${encodeURIComponent(message(error))}`; }
   redirect(destination);
 }

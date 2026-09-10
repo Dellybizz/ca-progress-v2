@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { ICAI_RESOURCE_TYPES, type IcaiAdminDashboard, type IcaiPublicCatalog } from "@/lib/icai/types";
-import { decideIcaiReviewAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { decideIcaiReviewAction, manageExamEventAction } from "@/app/(admin)/admin/icai-sync/actions";
 
 function time(value: string | null) {
   if (!value) return "—";
@@ -94,6 +94,11 @@ export function IcaiAdminSyncData({
     return groups;
   }, new Map<string, typeof catalog.resources>()).values()].filter((group) => group.length > 1);
   const unavailableSources = dashboard.sources.filter((source) => source.failures > 0 || source.excludedUntil);
+  const examConflicts = [...catalog.events.reduce((groups, event) => {
+    const key = `${event.levelCode}:${event.attemptKey}:${event.eventType}`;
+    groups.set(key, new Set([...(groups.get(key) ?? []), event.eventDate]));
+    return groups;
+  }, new Map<string, Set<string>>()).entries()].filter(([, dates]) => dates.size > 1);
 
   return (
     <div className="icai-page icai-admin-page">
@@ -189,6 +194,7 @@ export function IcaiAdminSyncData({
             <h2>Exam dates and countdown sources</h2>
           </div>
         </div>
+        {examConflicts.length ? <div className="auth-status auth-status--warning" role="alert">{examConflicts.length} conflicting exam-date mapping{examConflicts.length === 1 ? "" : "s"} detected. Compare the official evidence before replacing or withdrawing a date.</div> : null}
         {catalog.events.length ? (
           <div className="icai-result-list">
             {catalog.events.map((event) => (
@@ -203,6 +209,10 @@ export function IcaiAdminSyncData({
                   <strong>{time(event.eventDate)}</strong>
                   <Badge tone="info">countdown evidence</Badge>
                   <a href={event.sourceUrl} target="_blank" rel="noreferrer">Official notification <Icon name="arrow" size={14} /></a>
+                  <details className="icai-evidence-details"><summary>Replace or withdraw</summary>
+                    <form action={manageExamEventAction}><input type="hidden" name="eventId" value={event.id}/><input type="hidden" name="intent" value="replace"/><label>Title<input name="title" defaultValue={event.title} required/></label><label>Exam date<input name="eventDate" type="date" defaultValue={event.eventDate} required/></label><label>Official evidence URL<input name="sourceUrl" type="url" defaultValue={event.sourceUrl} required/></label><button className="ui-button ui-button--secondary ui-button--sm" type="submit">Replace</button></form>
+                    <form action={manageExamEventAction}><input type="hidden" name="eventId" value={event.id}/><input type="hidden" name="intent" value="withdraw"/><button className="ui-button ui-button--danger ui-button--sm" type="submit">Withdraw</button></form>
+                  </details>
                 </span>
               </article>
             ))}

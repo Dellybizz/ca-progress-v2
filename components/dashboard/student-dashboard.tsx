@@ -177,7 +177,9 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
         <div className="dashboard-attempt-card__meta">
           <span><Icon name="clock" size={13}/>{formatVerifiedAt(model.countdown.lastVerifiedAt)}</span>
           {model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={13}/></a> : null}
+          <Link href="/dashboard/exam">View exam details <Icon name="arrow" size={13}/></Link>
         </div>
+        {model.countdown.conflictWarning ? <p className="dashboard-attempt-card__warning" role="alert">{model.countdown.conflictWarning}</p> : null}
       </div>
 
       <div className="dashboard-attempt-card__summary" aria-label="Academic selection">

@@ -9,19 +9,7 @@ import { getProgressDashboardSummary } from "@/lib/progress/service";
 import { getStudyAnalytics } from "@/lib/study/service";
 import { getDashboardAcademicReference, getDashboardLiveReference } from "./reference";
 import type { DashboardPageModel, DashboardReadyModel } from "./types";
-
-const DAY_MS = 86_400_000;
-
-function dateKey(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function daysBetween(from: string, to: string) {
-  const fromMs = Date.parse(`${from}T00:00:00Z`);
-  const toMs = Date.parse(`${to}T00:00:00Z`);
-  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return null;
-  return Math.ceil((toMs - fromMs) / DAY_MS);
-}
+import { dateKeyInIst, daysBetweenDateKeys } from "./countdown";
 
 function groupLabel(groupChoice: string, groups: Array<{ code: string; name: string }>) {
   if (groupChoice === "both") return "Both groups";
@@ -46,7 +34,7 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
   const displayName = context.displayName;
   if (context.mode !== "ready" || !context.selection) return setupRequired(identity, displayName, generatedAt);
 
-  const today = dateKey(now);
+  const today = dateKeyInIst(now);
   const caLevel = context.selection.level;
   const groupChoice = context.selection.group;
   const attemptKey = context.selection.attemptKey;
@@ -70,8 +58,10 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
   const live = await livePromise;
 
   const upcomingExam = live.examEvents[0] ?? null;
-  const targetDate = upcomingExam?.eventDate ?? live.attempt?.startDate ?? null;
-  const remaining = targetDate ? daysBetween(today, targetDate) : null;
+  const targetDate = upcomingExam?.eventDate ?? null;
+  const startDates = new Set(live.examEvents.filter((event) => event.eventType === "exam_start").map((event) => event.eventDate));
+  const conflictWarning = startDates.size > 1 ? "Multiple verified exam-start dates exist for this attempt. Check the official evidence." : null;
+  const remaining = targetDate ? daysBetweenDateKeys(today, targetDate) : null;
   const countdown: DashboardReadyModel["countdown"] = !targetDate
     ? {
         status: "awaiting_verified_date",
@@ -81,6 +71,7 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
         sourceUrl: live.attempt?.sourceUrl ?? null,
         lastVerifiedAt: live.attempt?.lastVerifiedAt ?? null,
         sourceKind: "none",
+        conflictWarning,
       }
     : {
         status: remaining !== null && remaining < 0 ? "past" : "scheduled",
@@ -89,7 +80,8 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
         title: upcomingExam?.title ?? live.attempt?.label ?? attemptKey,
         sourceUrl: upcomingExam?.sourceUrl ?? live.attempt?.sourceUrl ?? null,
         lastVerifiedAt: upcomingExam?.lastVerifiedAt ?? live.attempt?.lastVerifiedAt ?? null,
-        sourceKind: upcomingExam ? "exam_event" : "attempt",
+        sourceKind: "exam_event",
+        conflictWarning,
       };
 
   const progressGroup = new Map(progressModel.groups.map((group) => [group.code, group]));
