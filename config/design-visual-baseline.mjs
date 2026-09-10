@@ -1,8 +1,8 @@
 export const designBaseline = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   programme: "CA Progress agency-quality UI programme",
   baselineSha: "9e991b08c413240e070119c42ec18aeefa8d041b",
-  note: "Phase 0 was retrofitted after design Phases 1 and 2. This is the canonical post-Phase-2 baseline, not a reconstruction of the earlier UI.",
+  note: "This historical visual baseline was captured after the first Phase 2 pass and is retained for comparison. The reimplemented canonical Phase 1/2 architecture now lives in tokens.css, shell.css and components.css.",
   viewports: Object.freeze({
     desktop: Object.freeze({ width: 1440, height: 1000 }),
     mobile: Object.freeze({ width: 390, height: 844 }),
@@ -92,7 +92,7 @@ export const designBaselineRoutes = Object.freeze([
     "/admin",
     "app/(admin)/admin/page.tsx",
     "Operational command centre for user, staff, ICAI, jobs and audit attention states.",
-    ["app/styles/shell-phase2.css"],
+    ["app/styles/shell.css"],
     ["operational health", "attention queue", "owner workspaces", "dense utility navigation"],
     ["The admin overview still carries substantial inline React styles, so its visual ownership is partly outside the stylesheet system."],
   ),
@@ -100,8 +100,8 @@ export const designBaselineRoutes = Object.freeze([
 
 export const globalDesignOwners = Object.freeze([
   "app/styles/tokens.css",
+  "app/styles/shell.css",
   "app/styles/components.css",
-  "app/styles/shell-phase2.css",
 ]);
 
 export const designPrinciples = Object.freeze([
