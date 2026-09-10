@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EnvironmentBanner } from "./environment-banner";
-import { MobileNavigation } from "./mobile-nav-placeholder";
+import { MobileNavigation } from "./mobile-navigation";
 import { MobileOverscrollGuard } from "./mobile-overscroll-guard";
 import { DesktopNavigation } from "./navigation";
 import { TopbarControls } from "./topbar-controls";
