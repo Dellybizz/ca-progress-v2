@@ -17,11 +17,13 @@ const globals = read("app/globals.css");
 test("Phase 2 uses shell.css as the single application-chrome authority", () => {
   assert.equal(existsSync(join(root, "app/styles/shell-phase2.css")), false, "temporary Phase 2 override must not return");
   assert.doesNotMatch(globals, /shell-phase2\.css/);
-  assert.match(globals, /@import "\.\/styles\/shell\.css";/);
+  const shellIndex = globals.indexOf('@import "./styles/shell.css";');
+  const mobileScrollIndex = globals.indexOf('@import "./styles/mobile-scroll-fix.css";');
+  assert.ok(shellIndex > mobileScrollIndex, "shell.css must load after route-era/mobile patch styles");
   assert.match(shellCss, /\/\* Canonical application shell and navigation \*\//);
 });
 
-test("Phase 2 shell removes fake production chrome and decorative shell treatments", () => {
+test("Phase 2 removes fake production chrome and decorative shell treatments", () => {
   assert.doesNotMatch(shell, /Workspace ready/);
   assert.doesNotMatch(shell, /Focused\. Clear\. Consistent\./);
   assert.match(shell, /Student workspace/);
@@ -41,11 +43,14 @@ test("Phase 2 desktop navigation keeps the primary study flow visible and every 
 });
 
 test("Phase 2 mobile navigation exposes the core flow and keeps secondary pages under More", () => {
-  for (const label of [">Home</, ">Today</, ">Study</, ">Progress</, ">More</, "Analytics", "Forecast", "Goals", "Tests", "Study Buddy", "Settings"]) {
-    assert.ok(mobileNav.includes(label.replace(">", "<span>").replace("</", "</span>")) || mobileNav.includes(label), `Missing mobile navigation contract: ${label}`);
+  for (const label of ["Home", "Today", "Study", "Progress", "More"]) {
+    assert.ok(mobileNav.includes(`<span>${label}</span>`), `Missing primary mobile item: ${label}`);
+  }
+  for (const label of ["Analytics", "Forecast", "Goals", "Tests", "Study Buddy", "Settings"]) {
+    assert.ok(mobileNav.includes(`label: "${label}"`), `Missing secondary mobile item: ${label}`);
   }
   assert.match(mobileNav, /progressRouteMatches/);
-  assert.doesNotMatch(mobileNav, /\["\/progress", "\/analytics", "\/goals", "\/tests"/);
+  assert.match(mobileNav, /const moreActive = secondaryActive/);
   assert.match(mobileNav, /aria-expanded=\{moreOpen\}/);
 });
 
