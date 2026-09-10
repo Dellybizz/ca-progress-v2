@@ -43,16 +43,22 @@ test("Design Phase 0 keeps the representative route baseline complete", () => {
   }
 });
 
-test("Design Phase 0 points to the canonical shared foundation", () => {
+test("Design Phase 0 points to the canonical shared foundation and cascade", () => {
   assert.deepEqual(globalDesignOwners, [
     "app/styles/tokens.css",
-    "app/styles/shell.css",
     "app/styles/components.css",
+    "app/styles/shell.css",
   ]);
   for (const owner of globalDesignOwners) assert.ok(existsSync(join(root, owner)), `Missing canonical design owner: ${owner}`);
   assert.equal(existsSync(join(root, "app/styles/shell-phase2.css")), false);
-  assert.ok(globals.indexOf('@import "./styles/tokens.css";') < globals.indexOf('@import "./styles/shell.css";'));
-  assert.ok(globals.indexOf('@import "./styles/shell.css";') < globals.indexOf('@import "./styles/components.css";'));
+
+  const tokensIndex = globals.indexOf('@import "./styles/tokens.css";');
+  const componentsIndex = globals.indexOf('@import "./styles/components.css";');
+  const mobileScrollIndex = globals.indexOf('@import "./styles/mobile-scroll-fix.css";');
+  const shellIndex = globals.indexOf('@import "./styles/shell.css";');
+  assert.ok(tokensIndex >= 0 && componentsIndex > tokensIndex, "tokens must load before shared components");
+  assert.ok(shellIndex > componentsIndex, "shell must load after shared components");
+  assert.ok(shellIndex > mobileScrollIndex, "canonical shell must load after legacy route/mobile patch styles");
 });
 
 test("Design Phase 0 locks the anti-slop design intent in executable and written form", () => {
