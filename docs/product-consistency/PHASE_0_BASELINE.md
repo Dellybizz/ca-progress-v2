@@ -1,6 +1,6 @@
 # Product Consistency Programme — Phase 0 Baseline
 
-Status: complete and production recovery certified  
+Status: complete and production recovery certified
 Branch: `phase-12-operations-admin-platform`  
 Baseline date: 2026-09-10
 
