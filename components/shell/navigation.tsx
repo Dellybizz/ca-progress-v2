@@ -23,6 +23,7 @@ export const studentNavigation: NavItem[] = [
   { label: "Planner", href: "/planner", icon: "calendar", exact: true },
   { label: "Calendar", href: "/calendar", icon: "calendar" },
   { label: "Revision Settings", href: "/planner/revision-settings", icon: "settings" },
+  { label: "Analytics", href: "/analytics", icon: "chart", exact: true },
   { label: "Forecast", href: "/analytics/forecast", icon: "chart" },
   { label: "Goals", href: "/goals", icon: "target" },
   { label: "Tests", href: "/tests", icon: "tests" },
@@ -51,6 +52,7 @@ const studentGroups: StudentNavGroup[] = [
   { key: "tools", label: "Study tools", icon: "target", items: [
     { label: "Calendar", href: "/calendar", icon: "calendar" },
     { label: "Revision Settings", href: "/planner/revision-settings", icon: "settings" },
+    { label: "Analytics", href: "/analytics", icon: "chart", exact: true },
     { label: "Forecast", href: "/analytics/forecast", icon: "chart" },
     { label: "Goals", href: "/goals", icon: "target" },
     { label: "Tests", href: "/tests", icon: "tests" },
