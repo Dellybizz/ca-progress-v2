@@ -1,7 +1,4 @@
-/* Global mobile scroll normalization.
-   Keep document height content-driven and stop iOS/Safari rubber-band scrolling
-   once the real page content reaches its top or bottom boundary. */
-
+/* Mobile document and fixed-navigation contract. */
 @media (max-width: 899px) {
   html,
   body {
@@ -11,7 +8,6 @@
     max-height: none !important;
     margin: 0;
     overscroll-behavior-x: none;
-    overscroll-behavior-y: none;
   }
 
   html {
@@ -47,10 +43,9 @@
     overflow-x: clip;
   }
 
-  /* Reserve room for the edge-to-edge mobile navigation. */
   .content-wrap {
     margin: 0 auto;
-    padding-bottom: calc(var(--bottom-nav-height) + 16px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(var(--bottom-nav-height) + 20px + env(safe-area-inset-bottom)) !important;
   }
 
   .content-wrap > [class*="-page"],
@@ -59,12 +54,10 @@
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
-    padding-bottom: 16px !important;
   }
 
   .mobile-bottom-nav {
     position: fixed !important;
-    z-index: 60 !important;
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
