@@ -1,6 +1,6 @@
 # Product Consistency Programme — Phase 0 Baseline
 
-Status: implementation complete; production backup certification pending  
+Status: complete and production recovery certified  
 Branch: `phase-12-operations-admin-platform`  
 Baseline date: 2026-09-10
 
@@ -58,11 +58,11 @@ All 38 migrations applied to a fresh temporary local D1 database. All nine diagn
 
 ## Production recovery gate
 
-The local environment did not contain `CLOUDFLARE_API_TOKEN` or `CLOUDFLARE_ACCOUNT_ID`, so it could not truthfully certify a production checkpoint. The repository now contains the non-mutating `Product Consistency Phase 0 D1 Backup` workflow.
+The non-mutating `Product Consistency Phase 0 D1 Backup` workflow passed in [GitHub Actions run 34453468706](https://github.com/Dellybizz/ca-progress-v2/actions/runs/34453468706) on 2026-09-10.
 
-The workflow uses the existing Cloudflare secrets to capture a D1 Time Travel bookmark, validates that the bookmark exists, runs the read-only integrity pack, and retains the recovery/evidence artifact. It does not export personal rows into a GitHub artifact and does not mutate the database.
+The workflow used the existing Cloudflare secrets to capture and validate a D1 Time Travel bookmark, execute the read-only integrity pack, and retain the recovery/evidence artifact `product-consistency-phase0-recovery-34453468706` with digest `sha256:66420e8ef32885871b2634b1ab9415d16f0435044c2194244981b89e526af2a5`. It did not export personal rows into the artifact and did not mutate the database.
 
-Phase 0 must not be marked fully certified until that workflow passes and its recovery bookmark and integrity output are retained.
+The production recovery gate is certified.
 
 ## Verification completed
 
@@ -71,7 +71,8 @@ Phase 0 must not be marked fully certified until that workflow passes and its re
 - Targeted ESLint: passed.
 - Fresh local D1 migrations: 38/38 applied.
 - Read-only local D1 diagnostics: 9/9 executed successfully.
+- Production D1 recovery/integrity workflow: passed; recovery artifact retained.
 
 ## Next phase
 
-Phase 1 may begin only after the production backup gate above is satisfied. Phase 1 will introduce the canonical academic model and quarantine path; Phase 0 made no such schema or data changes.
+Phase 1 may begin. It will introduce the canonical academic model and quarantine path; Phase 0 made no such schema or data changes.
