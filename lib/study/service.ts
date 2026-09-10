@@ -1,11 +1,11 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { getStudentContext, selectionForAcademicQuery } from "@/lib/academic/student-context";
+import { optionalUser } from "@/lib/auth/server";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { getHotStudySessions, getHotStudyTimer } from "@/lib/data/d1/hot-screens";
 import type { Database } from "@/lib/data/database.types";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { getPendingStudyReflection } from "./phase3";
 import type {
   StudyAnalytics,
@@ -57,10 +57,6 @@ function groupLabel(groupChoice: string, groups: Array<{ code: string; name: str
   if (groupChoice === "both") return "Both groups";
   if (groupChoice === "not_applicable") return groups[0]?.name ?? "All papers";
   return groups.find((group) => group.code === groupChoice)?.name ?? groupChoice.replaceAll("_", " ");
-}
-
-function viewerLabel(name: string | null, email: string | null, phone: string | null) {
-  return name?.trim() || email || phone || "Student";
 }
 
 function elapsedTimer(row: TimerRow, now: Date) {
@@ -150,13 +146,12 @@ export async function getStudyAnalytics(userId: string, options?: { now?: Date; 
 }
 
 export async function getStudyPageModel(now = new Date(), preferredReflectionSessionId?: string | null): Promise<StudyPageModel> {
-  const identity = await optionalUser();
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (!profile?.onboarding_completed_at || !isCALevel(profile.ca_level) || !isGroupChoice(profile.group_choice) || !profile.attempt_key || profile.attempt_key === "undecided") return { mode: "setup", viewerName: name };
-
-  const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest" };
+  const name = context.displayName;
+  if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: name };
+  const identity = { id: context.userId };
+  const catalog = await getAcademicCatalog(selectionForAcademicQuery(context));
   const subjects: StudySubjectOption[] = catalog.subjects.map((subject) => ({ id: subject.id, slug: subject.slug, title: subject.title, chapters: subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title })) }));
   const subjectNames = new Map(subjects.map((subject) => [subject.id, subject.title]));
   const chapterNames = new Map(subjects.flatMap((subject) => subject.chapters.map((chapter) => [chapter.id, chapter.title] as const)));
@@ -207,7 +202,7 @@ export async function getStudyPageModel(now = new Date(), preferredReflectionSes
     endedAt: pendingRow.ended_at,
   } : null;
 
-  return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, groupLabel: groupLabel(profile.group_choice, catalog.groups), attemptKey: profile.attempt_key, subjects, tasks, timer, pendingReflection, analytics };
+  return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, groupLabel: groupLabel(context.selection.group, catalog.groups), attemptKey: context.selection.attemptKey, subjects, tasks, timer, pendingReflection, analytics };
 }
 
 export async function getPendingStudyReflectionPrompt(preferredSessionId?: string | null) {

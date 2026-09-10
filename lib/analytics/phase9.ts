@@ -1,9 +1,8 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { getStudentContext, selectionForAcademicQuery } from "@/lib/academic/student-context";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { evaluateBaselineForecast, type Phase9ForecastResult } from "./phase9-policy.mjs";
 
 const DAY_MS = 86_400_000;
@@ -106,10 +105,6 @@ export type Phase9AnalyticsModel =
   | { mode: "setup"; viewerName: string }
   | Phase9ReadyModel;
 
-function viewerLabel(name: string | null, email: string | null, phone: string | null) {
-  return name?.trim() || email || phone || "Student";
-}
-
 function safeTimezone(timezone: string | null | undefined) {
   if (!timezone) return "UTC";
   try {
@@ -171,19 +166,16 @@ function testSignal(row: TestRow | null, subjectTitles: Map<string, string>, cha
 }
 
 export async function getPhase9AnalyticsModel(now = new Date()): Promise<Phase9AnalyticsModel> {
-  const identity = await optionalUser();
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (!profile?.onboarding_completed_at || !isCALevel(profile.ca_level) || !isGroupChoice(profile.group_choice) || !profile.attempt_key || profile.attempt_key === "undecided") {
-    return { mode: "setup", viewerName: name };
-  }
-
-  const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest" };
+  const name = context.displayName;
+  if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: name };
+  const identity = { id: context.userId };
+  const catalog = await getAcademicCatalog(selectionForAcademicQuery(context));
   const chapterIds = catalog.subjects.flatMap((subject) => subject.chapters.map((chapter) => chapter.id));
   const subjectTitles = new Map(catalog.subjects.map((subject) => [subject.id, subject.title]));
   const chapterTitles = new Map(catalog.subjects.flatMap((subject) => subject.chapters.map((chapter) => [chapter.id, chapter.title] as const)));
-  const timezone = safeTimezone(profile.timezone);
+  const timezone = safeTimezone(context.timezone);
   const db = getD1RuntimeDatabase();
   const fourteenDaysAgo = new Date(now.valueOf() - 14 * DAY_MS).toISOString();
   const sixtyDaysAgo = new Date(now.valueOf() - 60 * DAY_MS).toISOString();
@@ -195,7 +187,7 @@ export async function getPhase9AnalyticsModel(now = new Date()): Promise<Phase9A
       FROM study_sessions ss JOIN study_session_phase3 x ON x.session_id=ss.id AND x.user_id=ss.user_id
       WHERE ss.user_id=?1 AND x.understanding_score IS NOT NULL AND ss.ended_at>=?2
       ORDER BY ss.ended_at DESC LIMIT 800`).bind(identity.id, sixtyDaysAgo).all<ReflectionRow>(),
-    verifiedAttemptDate(profile.attempt_key, catalog.selectedLevel.id),
+    verifiedAttemptDate(context.selection.attemptKey, catalog.selectedLevel.id),
   ]);
 
   let progressRows: ProgressRow[] = [];
@@ -315,8 +307,8 @@ export async function getPhase9AnalyticsModel(now = new Date()): Promise<Phase9A
     mode: "ready",
     viewerName: name,
     levelName: catalog.selectedLevel.name,
-    groupLabel: groupLabel(profile.group_choice, catalog.groups),
-    attemptKey: profile.attempt_key,
+    groupLabel: groupLabel(context.selection.group, catalog.groups),
+    attemptKey: context.selection.attemptKey,
     timezone,
     weeklyStudy,
     consistency,

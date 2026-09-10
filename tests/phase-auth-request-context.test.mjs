@@ -31,9 +31,9 @@ test("identity, authorization, and canonical D1 client consume the shared contex
   assert.equal(existsSync(join(root, "lib/data/d1/supabase-compat.ts")), false);
 });
 
-test("personalized loaders obtain identity from the request context", () => {
+test("personalized academic loaders obtain identity and scope from the canonical student context", () => {
   for (const file of ["lib/dashboard/service.ts", "lib/planner/service.ts", "lib/community/service.ts"]) {
-    assert.match(read(file), /getRequestAuthContext/);
+    assert.match(read(file), /getStudentContext/);
     assert.doesNotMatch(read(file), /optionalUser/);
   }
 });

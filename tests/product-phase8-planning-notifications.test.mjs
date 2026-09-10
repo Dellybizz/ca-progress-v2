@@ -58,7 +58,7 @@ test("countdown is derived only from the selected applicable verified attempt wi
   assert.match(service, /first_event_date/);
   assert.doesNotMatch(service, /attempt.*month.*fallback|synthetic.*attempt/i);
   for (const threshold of [7, 15, 30, 60, 90]) assert.match(service, new RegExp(`days <= ${threshold}`));
-  assert.match(read("lib/planner/calendar.ts"), /\.eq\("level_id", level\.data\.id\)\.eq\("attempt_key", profile\.attempt_key\)/);
+  assert.match(read("lib/planner/calendar.ts"), /\.eq\("level_id", context\.levelId\)\.eq\("attempt_key", context\.selection\.attemptKey\)/);
 });
 
 test("timezone behavior uses the profile zone for local dates and calendar month boundaries", () => {
@@ -68,7 +68,7 @@ test("timezone behavior uses the profile zone for local dates and calendar month
   assert.match(service, /timeZone: safeTimeZone\(timezone\)/);
   assert.match(service, /const today = dateKeyInTimezone\(row\.timezone, now\)/);
   assert.match(calendar, /localMonthKey/);
-  assert.match(calendar, /profile\.timezone/);
+  assert.match(calendar, /context\.timezone/);
   assert.match(calendar, /36 \* HOUR_MS/);
   assert.match(calendar, /extension\.target_date\.slice\(0, 7\) === month/);
 });

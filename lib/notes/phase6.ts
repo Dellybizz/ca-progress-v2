@@ -1,10 +1,10 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { getStudentContext, selectionForAcademicQuery } from "@/lib/academic/student-context";
+import { optionalUser } from "@/lib/auth/server";
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 import { saveHotNote } from "@/lib/data/d1/hot-screens";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import type { CommunityNoteDraft, NotePhase6Extra, NoteSubjectOption } from "./types";
 
 type TopicRow = { id: string; chapter_id: string; title: string; topic_kind: string; unit_number: string | null; sort_order: number };
@@ -39,14 +39,10 @@ type MetadataRow = {
 };
 type LinkRow = { note_id: string; resource_id: string };
 
-function profileReady(profile: Awaited<ReturnType<typeof getProfileForUser>>) {
-  return Boolean(profile?.onboarding_completed_at && isCALevel(profile.ca_level) && isGroupChoice(profile.group_choice) && profile.attempt_key && profile.attempt_key !== "undecided");
-}
-
 export async function getPhase6AcademicOptions(userId: string): Promise<NoteSubjectOption[]> {
-  const profile = await getProfileForUser(userId);
-  if (!profile || !profileReady(profile) || !isCALevel(profile.ca_level) || !isGroupChoice(profile.group_choice) || !profile.attempt_key) return [];
-  const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
+  const context = await getStudentContext();
+  if (context.mode !== "ready" || context.userId !== userId) return [];
+  const catalog = await getAcademicCatalog(selectionForAcademicQuery(context));
   const chapterIds = catalog.subjects.flatMap((subject) => subject.chapters.map((chapter) => chapter.id));
   const db = getHotD1Database();
   const topics = chapterIds.length

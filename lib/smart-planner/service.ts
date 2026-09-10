@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
+import { getStudentContext, selectionForAcademicQuery } from "@/lib/academic/student-context";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
 import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { createD1AdminClient } from "@/lib/data/d1/client";
@@ -110,16 +111,14 @@ function rulesDto(row: RulesRow | null): RevisionSettings {
 }
 
 async function readyContext() {
-  const identity = await optionalUser();
-  if (!identity) return { mode: "guest" as const };
+  const studentContext = await getStudentContext();
+  if (studentContext.mode === "guest") return { mode: "guest" as const };
+  const viewerName = studentContext.displayName;
+  if (studentContext.mode !== "ready" || !studentContext.userId) return { mode: "setup" as const, viewerName };
+  const identity = { id: studentContext.userId, email: null, phone: null } as NonNullable<Awaited<ReturnType<typeof optionalUser>>>;
   const profile = await getProfileForUser(identity.id);
-  const viewerName = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
   if (!validProfile(profile)) return { mode: "setup" as const, viewerName };
-  const catalog = await getAcademicCatalog({
-    level: profile!.ca_level!,
-    group: profile!.group_choice!,
-    attempt: profile!.attempt_key!,
-  });
+  const catalog = await getAcademicCatalog(selectionForAcademicQuery(studentContext));
   const chapterToSubject = new Map<string, string>();
   const chapterTitles = new Map<string, string>();
   const subjectTitles = new Map<string, string>();

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { searchAcademicCatalog } from "@/lib/academic/query";
+import { getStudentContext, selectionForAcademicQuery } from "@/lib/academic/student-context";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +10,10 @@ export async function GET(request: NextRequest) {
   if (q.length < 2) return NextResponse.json({ ok: true, results: [] }, { headers: { "Cache-Control": "private, no-store" } });
 
   try {
-    const results = await searchAcademicCatalog(q, {
-      level: request.nextUrl.searchParams.get("level"),
-      group: request.nextUrl.searchParams.get("group"),
-      attempt: request.nextUrl.searchParams.get("attempt"),
+    const context = await getStudentContext();
+    if (context.mode === "invalid" || context.mode === "setup") return NextResponse.json({ ok: true, results: [] }, { headers: { "Cache-Control": "private, no-store" } });
+    const results = await searchAcademicCatalog(q, context.mode === "ready" ? selectionForAcademicQuery(context) : {
+      level: request.nextUrl.searchParams.get("level"), group: request.nextUrl.searchParams.get("group"), attempt: request.nextUrl.searchParams.get("attempt"),
     });
     return NextResponse.json({ ok: true, results }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {

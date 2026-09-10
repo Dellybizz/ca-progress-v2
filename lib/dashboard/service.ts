@@ -1,13 +1,11 @@
 import "server-only";
 
-import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
+import { getStudentContext } from "@/lib/academic/student-context";
 import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
 import { getLatestStoredPlanRecommendation, getPlannerDashboardSummary } from "@/lib/planner/dashboard";
 import { getProgressDashboardSummary } from "@/lib/progress/service";
 
 // Compatibility marker for the source contract: the optimized path replaces getProgressPageModel while retaining the same onboarding guard semantics.
-// if (!academic || progressModel.mode !== "ready") return setupRequired
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import { getStudyAnalytics } from "@/lib/study/service";
 import { getDashboardAcademicReference, getDashboardLiveReference } from "./reference";
 import type { DashboardPageModel, DashboardReadyModel } from "./types";
@@ -23,10 +21,6 @@ function daysBetween(from: string, to: string) {
   const toMs = Date.parse(`${to}T00:00:00Z`);
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return null;
   return Math.ceil((toMs - fromMs) / DAY_MS);
-}
-
-function studentLabel(profileName: string | null, email: string | null, phone: string | null) {
-  return profileName?.trim() || email || phone || "Student";
 }
 
 function groupLabel(groupChoice: string, groups: Array<{ code: string; name: string }>) {
@@ -46,26 +40,16 @@ function setupRequired(identity: { id: string }, displayName: string, generatedA
 
 async function getDashboardPageModelUncached(now = new Date()): Promise<DashboardPageModel> {
   const generatedAt = now.toISOString();
-  const identity = (await getRequestAuthContext()).identity;
-  if (!identity) return { mode: "guest", generatedAt, viewer: { authenticated: false, displayName: "Guest" } };
-
-  const profile = await getProfileForUser(identity.id);
-  const displayName = studentLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (
-    !profile?.onboarding_completed_at ||
-    !isCALevel(profile.ca_level) ||
-    !isGroupChoice(profile.group_choice) ||
-    !profile.attempt_key ||
-    profile.attempt_key === "undecided" ||
-    !profile.daily_target_minutes
-  ) {
-    return setupRequired(identity, displayName, generatedAt);
-  }
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest", generatedAt, viewer: { authenticated: false, displayName: "Guest" } };
+  const identity = { id: context.userId! };
+  const displayName = context.displayName;
+  if (context.mode !== "ready" || !context.selection) return setupRequired(identity, displayName, generatedAt);
 
   const today = dateKey(now);
-  const caLevel = profile.ca_level!;
-  const groupChoice = profile.group_choice!;
-  const attemptKey = profile.attempt_key!;
+  const caLevel = context.selection.level;
+  const groupChoice = context.selection.group;
+  const attemptKey = context.selection.attemptKey;
   const academic = await measureServerPerformance("dashboard.academic", () => getDashboardAcademicReference(caLevel, groupChoice, attemptKey));
   if (!academic) return setupRequired(identity, displayName, generatedAt);
 
@@ -79,8 +63,8 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
   }));
   const [progressModel, studyAnalytics, planner, storedPlan] = await Promise.all([
     measureServerPerformance("dashboard.progress", () => getProgressDashboardSummary(identity.id, academic.subjects)),
-    measureServerPerformance("dashboard.study", () => getStudyAnalytics(identity.id, { now, timezone: profile.timezone })),
-    measureServerPerformance("dashboard.planner", () => getPlannerDashboardSummary(identity.id, profile.timezone, now)),
+    measureServerPerformance("dashboard.study", () => getStudyAnalytics(identity.id, { now, timezone: context.timezone })),
+    measureServerPerformance("dashboard.planner", () => getPlannerDashboardSummary(identity.id, context.timezone, now)),
     measureServerPerformance("dashboard.stored_plan", () => getLatestStoredPlanRecommendation(identity.id)),
   ]);
   const live = await livePromise;
@@ -93,7 +77,7 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
         status: "awaiting_verified_date",
         daysRemaining: null,
         targetDate: null,
-        title: live.attempt?.label ?? profile.attempt_key,
+        title: live.attempt?.label ?? attemptKey,
         sourceUrl: live.attempt?.sourceUrl ?? null,
         lastVerifiedAt: live.attempt?.lastVerifiedAt ?? null,
         sourceKind: "none",
@@ -102,7 +86,7 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
         status: remaining !== null && remaining < 0 ? "past" : "scheduled",
         daysRemaining: remaining !== null && remaining >= 0 ? remaining : null,
         targetDate,
-        title: upcomingExam?.title ?? live.attempt?.label ?? profile.attempt_key,
+        title: upcomingExam?.title ?? live.attempt?.label ?? attemptKey,
         sourceUrl: upcomingExam?.sourceUrl ?? live.attempt?.sourceUrl ?? null,
         lastVerifiedAt: upcomingExam?.lastVerifiedAt ?? live.attempt?.lastVerifiedAt ?? null,
         sourceKind: upcomingExam ? "exam_event" : "attempt",
@@ -129,10 +113,10 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
     context: {
       levelCode: academic.level.code,
       levelName: academic.level.name,
-      groupChoice: profile.group_choice,
-      groupLabel: groupLabel(profile.group_choice, academic.groups),
-      attemptKey: profile.attempt_key,
-      attemptLabel: live.attempt?.label ?? profile.attempt_key,
+      groupChoice,
+      groupLabel: groupLabel(groupChoice, academic.groups),
+      attemptKey,
+      attemptLabel: live.attempt?.label ?? attemptKey,
       subjectCount: academic.subjects.length,
       chapterCount: academic.totalChapters,
     },
@@ -155,8 +139,8 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
     },
     study: {
       status: "tracked",
-      dailyTargetMinutes: profile.daily_target_minutes,
-      weeklyTargetMinutes: profile.daily_target_minutes * 7,
+      dailyTargetMinutes: context.dailyTargetMinutes,
+      weeklyTargetMinutes: context.dailyTargetMinutes * 7,
       studiedThisWeekMinutes: Math.round(studyAnalytics.last7DaysSeconds / 60),
       studiedTodayMinutes: Math.round(studyAnalytics.todaySeconds / 60),
       streakDays: studyAnalytics.streakDays,

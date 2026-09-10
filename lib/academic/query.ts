@@ -15,6 +15,7 @@ import {
   type AcademicVersion,
   type AcademicVersionPreview,
 } from "./types";
+import { contextAllowsSubject, type StudentContextContract } from "./student-context";
 
 type LevelRow = Database["public"]["Tables"]["course_levels"]["Row"];
 type GroupRow = Database["public"]["Tables"]["course_groups"]["Row"];
@@ -119,6 +120,12 @@ export async function getSubjectBySlug(slug: string, attempt?: string | null): P
   if (!subject) return null;
   const version = versionForSubject(raw, subject.id, attempt);
   return version ? subjectDto(raw, subject, version) : null;
+}
+
+export async function getSubjectBySlugForContext(slug: string, context: StudentContextContract): Promise<AcademicSubject | null> {
+  if (context.mode !== "ready" || !context.selection) return null;
+  const subject = await getSubjectBySlug(slug, context.selection.attemptKey);
+  return subject && contextAllowsSubject(context, subject.id) ? subject : null;
 }
 
 export async function searchAcademicCatalog(query: string, selection: AcademicSelection = {}, limit = 24): Promise<AcademicSearchResult[]> {

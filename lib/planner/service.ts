@@ -1,8 +1,7 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
+import { getStudentContext, selectionForAcademicQuery, type StudentContextContract } from "@/lib/academic/student-context";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { getHotActivityRows, getHotPlannerRows } from "@/lib/data/d1/hot-screens";
 import type { Database } from "@/lib/data/database.types";
@@ -16,14 +15,9 @@ type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type SessionRow = Database["public"]["Tables"]["study_sessions"]["Row"];
 type ProgressEventRow = Database["public"]["Tables"]["progress_events"]["Row"];
 
-function viewerLabel(name: string | null, email: string | null, phone: string | null) { return name?.trim() || email || phone || "Student"; }
-function validProfile(profile: Awaited<ReturnType<typeof getProfileForUser>>) {
-  return Boolean(profile?.onboarding_completed_at && isCALevel(profile.ca_level) && isGroupChoice(profile.group_choice) && profile.attempt_key && profile.attempt_key !== "undecided");
-}
-
-async function academicOptions(profile: NonNullable<Awaited<ReturnType<typeof getProfileForUser>>>) {
-  if (!isCALevel(profile.ca_level) || !isGroupChoice(profile.group_choice) || !profile.attempt_key) return [] as StudySubjectOption[];
-  const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
+async function academicOptions(context: StudentContextContract) {
+  if (context.mode !== "ready") return [] as StudySubjectOption[];
+  const catalog = await getAcademicCatalog(selectionForAcademicQuery(context));
   return catalog.subjects.map((subject) => ({ id: subject.id, slug: subject.slug, title: subject.title, chapters: subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title })) }));
 }
 
@@ -54,13 +48,13 @@ function taskDto(row: TaskRow, subjectNames: Map<string, string>, chapterNames: 
 }
 
 export async function getPlannerPageModel(): Promise<PlannerPageModel> {
-  const identity = (await getRequestAuthContext()).identity;
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (!validProfile(profile)) return { mode: "setup", viewerName: name };
-  const timezone = profile!.timezone || "Asia/Kolkata";
-  const subjects = await academicOptions(profile!);
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest" };
+  const name = context.displayName;
+  if (context.mode !== "ready" || !context.userId) return { mode: "setup", viewerName: name };
+  const identity = { id: context.userId };
+  const timezone = context.timezone;
+  const subjects = await academicOptions(context);
   const names = maps(subjects);
   const hot = await getHotPlannerRows(identity.id);
   const [extensions, goals, countdown] = await Promise.all([
@@ -114,13 +108,19 @@ async function loadActivityNames(sessions: SessionRow[], progress: ProgressEvent
 }
 
 export async function getActivityPageModel(): Promise<ActivityPageModel> {
-  const identity = (await getRequestAuthContext()).identity;
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest" };
+  if (!context.userId) return { mode: "guest" };
+  const identity = { id: context.userId };
+  const name = context.displayName;
   const { sessions, progress } = await loadActivityRows(identity.id);
-  const sessionRows = (sessions ?? []) as SessionRow[];
-  const progressRows = (progress ?? []) as ProgressEventRow[];
+  const allowedSubjects = new Set(context.subjectIds);
+  const allowedVersions = new Set(context.syllabusVersionIds);
+  const db = getD1RuntimeDatabase();
+  const allowedChapterRows = context.mode === "ready" && allowedVersions.size ? (await db.prepare(`SELECT id FROM chapters WHERE syllabus_version_id IN (${[...allowedVersions].map((_,i)=>`?${i+1}`).join(",")})`).bind(...allowedVersions).all<{id:string}>()).results ?? [] : [];
+  const allowedChapters = new Set(allowedChapterRows.map((row)=>row.id));
+  const sessionRows = ((sessions ?? []) as SessionRow[]).filter((row)=>!row.subject_id || allowedSubjects.has(row.subject_id)).filter((row)=>!row.chapter_id || allowedChapters.has(row.chapter_id));
+  const progressRows = ((progress ?? []) as ProgressEventRow[]).filter((row)=>allowedChapters.has(row.chapter_id));
   const names = await loadActivityNames(sessionRows, progressRows);
   const items: ActivityItem[] = [];
   for (const row of sessionRows) {

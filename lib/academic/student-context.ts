@@ -19,6 +19,7 @@ export type StudentContextContract = {
   role: string;
   entitlements: readonly string[];
   timezone: string;
+  dailyTargetMinutes: number;
   locale: "en-IN";
   selection: AcademicContextSelection | null;
   levelId: string | null;
@@ -80,14 +81,14 @@ export async function validateAcademicContextSelection(input: { level: unknown; 
 async function resolveStudentContextUncached(): Promise<StudentContextContract> {
   const auth = await getRequestAuthContext();
   if (!auth.identity) return {
-    mode: "guest", userId: null, displayName: "Guest", role: auth.role, entitlements: [], timezone: "Asia/Kolkata", locale: "en-IN",
+    mode: "guest", userId: null, displayName: "Guest", role: auth.role, entitlements: [], timezone: "Asia/Kolkata", dailyTargetMinutes: 120, locale: "en-IN",
     selection: null, levelId: null, groupIds: [], subjectIds: [], syllabusVersionIds: [], contextKey: "guest:en-IN", issue: null,
   };
   const profile = await getProfileForUser(auth.identity.id);
   const displayName = profile?.display_name || auth.identity.displayName || auth.identity.email || "Student";
   const base = {
     userId: auth.identity.id, displayName, role: auth.role, entitlements: auth.entitlements,
-    timezone: profile?.timezone || "Asia/Kolkata", locale: "en-IN" as const,
+    timezone: profile?.timezone || "Asia/Kolkata", dailyTargetMinutes: profile?.daily_target_minutes || 120, locale: "en-IN" as const,
   };
   if (!profile?.onboarding_completed_at) return {
     ...base, mode: "setup", selection: null, levelId: null, groupIds: [], subjectIds: [], syllabusVersionIds: [],
@@ -114,7 +115,7 @@ export async function getAdminPreviewContext(input: { level: unknown; group: unk
   const checked = await validateAcademicContextSelection(input);
   if (!checked.ok) throw new Error(checked.error);
   return {
-    mode: "admin_preview", userId: null, displayName: "Admin preview", role: actor.role, entitlements: [], timezone: "Asia/Kolkata", locale: "en-IN",
+    mode: "admin_preview", userId: null, displayName: "Admin preview", role: actor.role, entitlements: [], timezone: "Asia/Kolkata", dailyTargetMinutes: 120, locale: "en-IN",
     selection: checked.selection, ...checked.scope,
     contextKey: `preview:${checked.selection.level}:${checked.selection.group}:${checked.selection.attemptKey}`,
     issue: null,
@@ -123,4 +124,12 @@ export async function getAdminPreviewContext(input: { level: unknown; group: unk
 
 export function academicFeatureCacheKey(context: Pick<StudentContextContract, "contextKey">, feature: string) {
   return `${context.contextKey}:${feature}`;
+}
+
+export function selectionForAcademicQuery(context: Pick<StudentContextContract, "selection">) {
+  return context.selection ? { level: context.selection.level, group: context.selection.group, attempt: context.selection.attemptKey } : {};
+}
+
+export function contextAllowsSubject(context: Pick<StudentContextContract, "subjectIds">, subjectId: string) {
+  return context.subjectIds.includes(subjectId);
 }

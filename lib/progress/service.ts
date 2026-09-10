@@ -1,9 +1,8 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
+import { getStudentContext, selectionForAcademicQuery } from "@/lib/academic/student-context";
 import { getHotProgressRows, getHotDashboardProgress } from "@/lib/data/d1/hot-screens";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import type { Database } from "@/lib/data/database.types";
 import type {
   ProgressAnalytics,
@@ -113,10 +112,6 @@ function buildAnalytics(chapters: ProgressChapter[], events: EventRow[], now = n
   };
 }
 
-function viewerLabel(profileName: string | null, email: string | null, phone: string | null) {
-  return profileName?.trim() || email || phone || "Student";
-}
-
 function groupLabel(groupChoice: string, groups: Array<{ code: string; name: string }>) {
   if (groupChoice === "both") return "Both groups";
   if (groupChoice === "not_applicable") return groups[0]?.name ?? "All papers";
@@ -124,17 +119,15 @@ function groupLabel(groupChoice: string, groups: Array<{ code: string; name: str
 }
 
 export async function getProgressPageModel(subjectSlug?: string | null): Promise<ProgressPageModel> {
-  const identity = (await getRequestAuthContext()).identity;
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (!profile?.onboarding_completed_at || !isCALevel(profile.ca_level) || !isGroupChoice(profile.group_choice) || !profile.attempt_key || profile.attempt_key === "undecided") return { mode: "setup", viewerName: name };
-
-  const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest" };
+  const name = context.displayName;
+  if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: name };
+  const catalog = await getAcademicCatalog(selectionForAcademicQuery(context));
   const subjects = subjectSlug ? catalog.subjects.filter((subject) => subject.slug === subjectSlug) : catalog.subjects;
   const chapterIds = subjects.flatMap((subject) => subject.chapters.map((chapter) => chapter.id));
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
-  const hot = await getHotProgressRows(identity.id, chapterIds, sevenDaysAgo);
+  const hot = await getHotProgressRows(context.userId, chapterIds, sevenDaysAgo);
   const rowByChapter = new Map(hot.progress.map((row) => [row.chapter_id, row]));
   const groupsById = new Map(catalog.groups.map((group) => [group.id, group]));
   const chapters: ProgressChapter[] = subjects.flatMap((subject) => {
@@ -142,7 +135,7 @@ export async function getProgressPageModel(subjectSlug?: string | null): Promise
     return subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title, subjectId: subject.id, subjectTitle: subject.title, subjectSlug: subject.slug, groupCode: group?.code ?? "all", groupName: group?.name ?? "All papers", state: stateFromRow(rowByChapter.get(chapter.id) as ProgressRow | undefined), updatedAt: rowByChapter.get(chapter.id)?.updated_at ?? null }));
   });
   const titleByChapter = new Map(chapters.map((chapter) => [chapter.id, chapter.title]));
-  return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, attemptKey: profile.attempt_key, groupLabel: groupLabel(profile.group_choice, catalog.groups), chapters, analytics: buildAnalytics(chapters, hot.weeklyEvents as EventRow[]), history: (hot.events as EventRow[]).slice(0, 20).map((event) => ({ id: event.id, chapterId: event.chapter_id, chapterTitle: titleByChapter.get(event.chapter_id) ?? "Chapter", stage: event.stage as ProgressHistoryItem["stage"], action: event.action as ProgressHistoryItem["action"], createdAt: event.created_at, canUndo: event.action !== "undo" && !event.undone_at })) } satisfies ProgressReadyModel;
+  return { mode: "ready", viewerName: name, levelName: catalog.selectedLevel.name, attemptKey: context.selection.attemptKey, groupLabel: groupLabel(context.selection.group, catalog.groups), chapters, analytics: buildAnalytics(chapters, hot.weeklyEvents as EventRow[]), history: (hot.events as EventRow[]).slice(0, 20).map((event) => ({ id: event.id, chapterId: event.chapter_id, chapterTitle: titleByChapter.get(event.chapter_id) ?? "Chapter", stage: event.stage as ProgressHistoryItem["stage"], action: event.action as ProgressHistoryItem["action"], createdAt: event.created_at, canUndo: event.action !== "undo" && !event.undone_at })) } satisfies ProgressReadyModel;
 }
 
 export async function getProgressAnalyticsForDashboard(userId: string, chapterIds: string[]) {

@@ -1,10 +1,10 @@
 import "server-only";
 
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { optionalUser } from "@/lib/auth/server";
+import { getStudentContext } from "@/lib/academic/student-context";
 import { getServerAppRole } from "@/lib/authorization/server";
 import { isPrivilegedRole } from "@/lib/authorization/roles";
 import { getIcaiPublicCatalog } from "@/lib/icai/query";
-import { isCALevel } from "@/lib/profile/validation";
 import { createD1AdminClient, createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/data/database.types";
 import { getHotResourceLibraryRows, getHotResourceDetail } from "@/lib/data/d1/hot-screens";
@@ -18,14 +18,6 @@ type TagMapRow = Database["public"]["Tables"]["note_tag_map"]["Row"];
 type UploadRow = Database["public"]["Tables"]["uploaded_resources"]["Row"];
 type ReportRow = Database["public"]["Tables"]["resource_reports"]["Row"];
 type NamedRow = { id: string; title: string };
-
-function viewerLabel(name: string | null, email: string | null, phone: string | null) {
-  return name?.trim() || email || phone || "Student";
-}
-
-function profileReady(profile: Awaited<ReturnType<typeof getProfileForUser>>) {
-  return Boolean(profile?.onboarding_completed_at && isCALevel(profile.ca_level) && profile.attempt_key && profile.attempt_key !== "undecided");
-}
 
 function excerpt(text: string) {
   const value = text.replace(/\s+/g, " ").trim();
@@ -120,13 +112,11 @@ async function tagsForOwnNotes(client: Awaited<ReturnType<typeof createD1ServerC
 }
 
 export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
-  const identity = await optionalUser();
-  const profile = identity ? await getProfileForUser(identity.id) : null;
-  const official = await getIcaiPublicCatalog(profileReady(profile) && profile && isCALevel(profile.ca_level)
-    ? { level: profile.ca_level, attempt: profile.attempt_key }
-    : {});
-  const officialResources = officialCards(official);
-  if (!identity) return { mode: "guest", officialResources };
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest", officialResources: officialCards(await getIcaiPublicCatalog({})) };
+  if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: context.displayName, officialResources: [] };
+  const officialResources = officialCards(await getIcaiPublicCatalog({ level: context.selection.level, attempt: context.selection.attemptKey }));
+  const identity = { id: context.userId };
 
   const client = await createD1ServerClient();
   const [names, tagsByNote, rows, subjects] = await Promise.all([
@@ -137,14 +127,16 @@ export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
   ]);
   const allNoteIds = [...rows.ownNotes, ...rows.sharedNotes].map((row) => row.id);
   const extras = await getPhase6NoteExtras(allNoteIds, identity.id);
+  const subjectIds = new Set(context.subjectIds);
+  const scoped = <T extends { subject_id?: string | null }>(items: T[]) => items.filter((row) => !row.subject_id || subjectIds.has(row.subject_id));
   return {
     mode: "ready",
-    viewerName: viewerLabel(profile?.display_name ?? null, identity.email, identity.phone),
-    subjects,
-    myNotes: rows.ownNotes.map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id, extras.get(row.id))),
-    myUploads: rows.ownUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
-    sharedNotes: rows.sharedNotes.map((row) => noteDto(row as NoteRow, names, [], identity.id, extras.get(row.id))),
-    sharedUploads: rows.sharedUploads.map((row) => uploadDto(row as UploadRow, names, identity.id)),
+    viewerName: context.displayName,
+    subjects: subjects.filter((subject)=>subjectIds.has(subject.id)),
+    myNotes: scoped(rows.ownNotes).map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id, extras.get(row.id))),
+    myUploads: scoped(rows.ownUploads).map((row) => uploadDto(row as UploadRow, names, identity.id)),
+    sharedNotes: scoped(rows.sharedNotes).map((row) => noteDto(row as NoteRow, names, [], identity.id, extras.get(row.id))),
+    sharedUploads: scoped(rows.sharedUploads).map((row) => uploadDto(row as UploadRow, names, identity.id)),
     officialResources,
   };
 }

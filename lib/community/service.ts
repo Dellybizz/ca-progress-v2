@@ -1,9 +1,9 @@
 import "server-only";
 
 import { getProfileForUser, getRequestAuthContext } from "@/lib/auth/server";
+import { getStudentContext } from "@/lib/academic/student-context";
 import { getServerAppRole } from "@/lib/authorization/server";
 import { isPrivilegedRole } from "@/lib/authorization/roles";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import type { Database } from "@/lib/data/database.types";
 import { createD1AdminClient, createD1ServerClient, type D1ApplicationClient } from "@/lib/data/d1/client";
 import { createHotCommunityMessage, getHotCommunityChannel, getHotCommunityMessages, getHotCommunityChannels, markHotCommunityRead, moderateHotCommunity, reportHotCommunityMessage, toggleHotCommunityReaction } from "@/lib/data/d1/hot-screens";
@@ -38,10 +38,6 @@ const PAGE_SIZE = 30;
 
 function viewerLabel(name: string | null, email: string | null, phone: string | null) {
   return name?.trim() || email || phone || "Student";
-}
-
-function profileReady(profile: Awaited<ReturnType<typeof getProfileForUser>>) {
-  return Boolean(profile?.onboarding_completed_at && isCALevel(profile.ca_level) && isGroupChoice(profile.group_choice));
 }
 
 function cleanSearch(value: string | null | undefined) {
@@ -89,20 +85,20 @@ async function publicCommunityContext() {
 }
 
 async function baseCommunityContext() {
-  const identity = (await getRequestAuthContext()).identity;
-  if (!identity) return publicCommunityContext();
-  const profile = await getProfileForUser(identity.id);
-  const viewerName = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (!profileReady(profile)) return { mode: "setup" as const, viewerName };
+  const context = await getStudentContext();
+  if (context.mode === "guest") return publicCommunityContext();
+  const viewerName = context.displayName;
+  if (context.mode !== "ready" || !context.userId || !context.selection) return { mode: "setup" as const, viewerName };
+  const identity = { id: context.userId };
   const client = await createD1ServerClient();
   const [directRows, levelResult, role] = await Promise.all([
     getHotCommunityChannels(identity.id),
-    client.from("course_levels").select("name,code").eq("code", profile!.ca_level!).maybeSingle(),
+    client.from("course_levels").select("name,code").eq("code", context.selection.level).maybeSingle(),
     getServerAppRole(),
   ]);
   const channels = directRows.map((row) => channelDto(row as never));
-  const levelLabel = levelResult.data?.name ?? profile!.ca_level ?? "Your level";
-  return { mode: "ready" as const, identity, profile: profile!, viewerName, role, channels, groups: groupChannels(channels, levelLabel), client };
+  const levelLabel = levelResult.data?.name ?? context.selection.level;
+  return { mode: "ready" as const, identity, viewerName, role, channels, groups: groupChannels(channels, levelLabel), client };
 }
 
 export async function getCommunityChannelAccess(channelSlug: string): Promise<{ allowed: boolean; status: number; reason: string }> {
