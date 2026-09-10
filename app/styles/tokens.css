@@ -110,6 +110,9 @@
 :root[data-accent="violet"] { --color-brand: #7456cf; --color-brand-strong: #6346bc; --color-brand-soft: #f2edfc; }
 :root[data-accent="emerald"] { --color-brand: #0e8a7b; --color-brand-strong: #0f7166; --color-brand-soft: #eaf7f4; }
 :root[data-accent="rose"] { --color-brand: #d94d6d; --color-brand-strong: #bd3d5b; --color-brand-soft: #fff0f4; }
+:root[data-theme="dark"][data-accent="violet"] { --color-brand: #9a83e6; --color-brand-strong: #b19cef; --color-brand-soft: #2b243e; }
+:root[data-theme="dark"][data-accent="emerald"] { --color-brand: #55b8a9; --color-brand-strong: #72c9bc; --color-brand-soft: #17312e; }
+:root[data-theme="dark"][data-accent="rose"] { --color-brand: #e47b94; --color-brand-strong: #ec95aa; --color-brand-soft: #38212a; }
 :root[data-density="compact"] { --topbar-height: 60px; --space-6: 20px; --space-8: 26px; }
 
 * { box-sizing: border-box; }
