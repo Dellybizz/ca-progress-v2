@@ -92,26 +92,40 @@ export async function ensureUserBootstrap() {
 
 export async function loadAttemptOptions(): Promise<AttemptOption[]> {
   const client = await createD1ServerClient();
-  const [attempts, levels] = await Promise.all([
+  const [attempts, levels, mappings, groups] = await Promise.all([
     client.from("exam_attempts").select("attempt_key, label, level_id").eq("verification_status", "verified"),
     client.from("course_levels").select("id, code").eq("is_active", true),
+    client.from("attempt_syllabus_map").select("attempt_key,level_id,group_id"),
+    client.from("course_groups").select("id,code"),
   ]);
   const attemptRows = (attempts.data ?? []) as Array<{ attempt_key: string; label: string; level_id: string }>;
   const levelRows = (levels.data ?? []) as Array<{ id: string; code: CALevel }>;
-  if (attempts.error || levels.error || !attemptRows.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
+  const mappingRows = (mappings.data ?? []) as Array<{ attempt_key: string; level_id: string; group_id: string }>;
+  const groupRows = (groups.data ?? []) as Array<{ id: string; code: string }>;
+  if (attempts.error || levels.error || mappings.error || groups.error || !attemptRows.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
   const levelById = new Map<string, CALevel>(levelRows.map((level) => [level.id, level.code]));
-  const grouped = new Map<string, { label: string; levels: Set<CALevel> }>();
+  const groupById = new Map(groupRows.map((group) => [group.id, group.code]));
+  const grouped = new Map<string, { label: string; levels: Set<CALevel>; groupsByLevel: Map<CALevel, Set<string>> }>();
   for (const row of attemptRows) {
     const level = levelById.get(row.level_id);
     if (!level) continue;
-    const current = grouped.get(row.attempt_key) ?? { label: row.label, levels: new Set<CALevel>() };
+    const current = grouped.get(row.attempt_key) ?? { label: row.label, levels: new Set<CALevel>(), groupsByLevel: new Map<CALevel, Set<string>>() };
     current.levels.add(level);
     if (row.label) current.label = row.label;
     grouped.set(row.attempt_key, current);
   }
+  for (const row of mappingRows) {
+    const level = levelById.get(row.level_id);
+    const group = groupById.get(row.group_id);
+    const current = grouped.get(row.attempt_key);
+    if (!level || !group || !current) continue;
+    const levelGroups = current.groupsByLevel.get(level) ?? new Set<string>();
+    levelGroups.add(group);
+    current.groupsByLevel.set(level, levelGroups);
+  }
   return [...grouped.entries()]
     .sort(([a], [b]) => b.localeCompare(a))
-    .map(([key, value]) => ({ key, label: value.label, kind: "verified_exam_attempt", levels: [...value.levels] }));
+    .map(([key, value]) => ({ key, label: value.label, kind: "verified_exam_attempt", levels: [...value.levels], groupsByLevel: Object.fromEntries([...value.groupsByLevel].map(([level, choices]) => [level, [...choices].sort()])) }));
 }
 
 export async function resolvePostAuthDestination(next: string) {

@@ -5,7 +5,7 @@ export type CALevel = (typeof CA_LEVELS)[number];
 export type GroupChoice = (typeof GROUP_CHOICES)[number];
 export type PreparationState = (typeof PREPARATION_STATES)[number];
 
-export type AttemptOption = { key: string; label: string; kind?: string; levels?: CALevel[] };
+export type AttemptOption = { key: string; label: string; kind?: string; levels?: CALevel[]; groupsByLevel?: Partial<Record<CALevel, string[]>> };
 
 export function isCALevel(value: unknown): value is CALevel {
   return typeof value === "string" && CA_LEVELS.includes(value as CALevel);
@@ -32,6 +32,15 @@ export function normalizeDailyTarget(value: unknown) {
 
 export function attemptAppliesToLevel(option: AttemptOption, level: CALevel) {
   return !option.levels?.length || option.levels.includes(level);
+}
+
+export function attemptAppliesToSelection(option: AttemptOption, level: CALevel, group: GroupChoice | "") {
+  if (!attemptAppliesToLevel(option, level)) return false;
+  if (!group || level === "foundation" || group === "not_applicable") return true;
+  const groups = option.groupsByLevel?.[level];
+  if (!groups?.length) return true;
+  if (group === "both") return groups.includes("group_1") && groups.includes("group_2");
+  return groups.includes(group);
 }
 
 function validateLevelGroupAttempt(input: { level: unknown; group: unknown; attemptKey: unknown }, attempts: AttemptOption[]) {

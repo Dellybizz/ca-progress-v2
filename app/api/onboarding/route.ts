@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { optionalUser, loadAttemptOptions } from "@/lib/auth/server";
 import { saveOnboardingPreparationState } from "@/lib/profile/onboarding-experience";
 import { saveProfilePatch, type ProfilePatch } from "@/lib/profile/service";
 import { attemptAppliesToLevel, isCALevel, isGroupChoice, isPreparationState, validateOnboardingSelection } from "@/lib/profile/validation";
+import { validateAcademicContextSelection } from "@/lib/academic/student-context";
+import { invalidateUserFeatureCache } from "@/lib/cache/public";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +21,8 @@ export async function POST(request: Request) {
     if (body.action === "complete") {
       const selection = validateOnboardingSelection({ level: body.level, group: body.group, attemptKey: body.attemptKey, preparationState: body.preparationState }, attempts);
       if (!selection.ok) return NextResponse.json({ ok: false, error: selection.error }, { status: 400 });
+      const canonical = await validateAcademicContextSelection(selection.value);
+      if (!canonical.ok) return NextResponse.json({ ok: false, error: canonical.error }, { status: 400 });
       await saveOnboardingPreparationState(user.id, selection.value.preparationState);
       update.caLevel = selection.value.level;
       update.groupChoice = selection.value.group;
@@ -48,6 +53,8 @@ export async function POST(request: Request) {
     }
 
     const profile = await saveProfilePatch(user.id, update);
+    await invalidateUserFeatureCache(user.id);
+    revalidatePath("/", "layout");
     return NextResponse.json({ ok: true, profile }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ ok: false, error: "Could not save onboarding right now." }, { status: 500, headers: { "Cache-Control": "private, no-store" } });
