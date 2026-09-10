@@ -20,11 +20,11 @@ const expectedRoutes = [
   "/admin",
 ];
 
-test("Design Phase 0 records the honest post-Phase-2 baseline and fixed comparison viewports", () => {
+test("Design Phase 0 preserves a historical comparison baseline and fixed viewports", () => {
   assert.equal(designBaseline.baselineSha, "9e991b08c413240e070119c42ec18aeefa8d041b");
   assert.deepEqual(designBaseline.viewports.desktop, { width: 1440, height: 1000 });
   assert.deepEqual(designBaseline.viewports.mobile, { width: 390, height: 844 });
-  assert.match(designBaseline.note, /post-Phase-2 baseline/);
+  assert.match(designBaseline.note, /historical visual baseline/i);
 });
 
 test("Design Phase 0 keeps the representative route baseline complete", () => {
@@ -43,15 +43,16 @@ test("Design Phase 0 keeps the representative route baseline complete", () => {
   }
 });
 
-test("Design Phase 0 preserves one canonical shared foundation", () => {
+test("Design Phase 0 points to the canonical shared foundation", () => {
   assert.deepEqual(globalDesignOwners, [
     "app/styles/tokens.css",
+    "app/styles/shell.css",
     "app/styles/components.css",
-    "app/styles/shell-phase2.css",
   ]);
   for (const owner of globalDesignOwners) assert.ok(existsSync(join(root, owner)), `Missing canonical design owner: ${owner}`);
-  assert.ok(globals.indexOf('@import "./styles/tokens.css";') < globals.indexOf('@import "./styles/components.css";'));
-  assert.ok(globals.indexOf('@import "./styles/shell-phase2.css";') > globals.indexOf('@import "./styles/mobile-scroll-fix.css";'));
+  assert.equal(existsSync(join(root, "app/styles/shell-phase2.css")), false);
+  assert.ok(globals.indexOf('@import "./styles/tokens.css";') < globals.indexOf('@import "./styles/shell.css";'));
+  assert.ok(globals.indexOf('@import "./styles/shell.css";') < globals.indexOf('@import "./styles/components.css";'));
 });
 
 test("Design Phase 0 locks the anti-slop design intent in executable and written form", () => {
@@ -64,10 +65,10 @@ test("Design Phase 0 locks the anti-slop design intent in executable and written
   assert.match(designDoc, /Quizlet-level educational clarity/);
   assert.match(designDoc, /Dub-level density/);
   assert.match(designDoc, /Cal\.com-style scheduling clarity/);
-  assert.match(designDoc, /dashboard stack is the highest-priority consolidation target/i);
+  assert.match(designDoc, /There is no late Phase 2 override stylesheet/);
 });
 
-test("Design Phase 0 explicitly records current legacy ownership risks instead of hiding them", () => {
+test("Design Phase 0 explicitly records current route-level legacy risks", () => {
   const dashboard = designBaselineRoutes.find((item) => item.id === "dashboard");
   const admin = designBaselineRoutes.find((item) => item.id === "admin");
   const settings = designBaselineRoutes.find((item) => item.id === "settings");
