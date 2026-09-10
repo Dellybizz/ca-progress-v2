@@ -64,34 +64,30 @@ function progressRouteMatches(pathname: string) {
 }
 
 function MobileMenu({ groups, pathname, close }: { groups: MobileMoreGroup[]; pathname: string; close: () => void }) {
-  return (
-    <div className="mobile-section-menu">
-      {groups.map((group) => (
-        <section className="mobile-section-menu__group" key={group.label} aria-label={group.label}>
-          <h3>{group.label}</h3>
-          <div className="mobile-section-menu__list">
-            {group.items.map((item) => {
-              const active = routeMatches(pathname, item.href, item.exact);
-              return (
-                <Link
-                  prefetch={true}
-                  key={item.href}
-                  href={item.href}
-                  onClick={close}
-                  className={active ? "is-active" : ""}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span className="mobile-section-menu__icon"><Icon name={item.icon} size={17}/></span>
-                  <span><strong>{item.label}</strong><small>{item.description}</small></span>
-                  <Icon name="chevron" size={14}/>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
+  return <>{groups.map((group) => (
+    <section className="mobile-section-menu__group" key={group.label} aria-label={group.label}>
+      <h3>{group.label}</h3>
+      <div className="mobile-section-menu__list">
+        {group.items.map((item) => {
+          const active = routeMatches(pathname, item.href, item.exact);
+          return (
+            <Link
+              prefetch={true}
+              key={item.href}
+              href={item.href}
+              onClick={close}
+              className={active ? "is-active" : ""}
+              aria-current={active ? "page" : undefined}
+            >
+              <span className="mobile-section-menu__icon"><Icon name={item.icon} size={17}/></span>
+              <span><strong>{item.label}</strong><small>{item.description}</small></span>
+              <Icon name="chevron" size={14}/>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  ))}</>;
 }
 
 export function MobileNavigation({ area }: { area: "student" | "admin" }) {
@@ -116,7 +112,10 @@ export function MobileNavigation({ area }: { area: "student" | "admin" }) {
           <button type="button" className={adminMoreActive ? "is-active" : ""} onClick={() => setMoreOpen(true)} aria-label="Open admin navigation" aria-haspopup="dialog" aria-expanded={moreOpen}><Icon name="more" size={18}/><span>More</span></button>
         </nav>
         <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Admin navigation">
-          <MobileMenu groups={adminMoreGroups} pathname={pathname} close={() => setMoreOpen(false)}/>
+          <div className="mobile-section-menu">
+            <p className="mobile-section-menu__intro">Admin tools, organised by responsibility.</p>
+            <MobileMenu groups={adminMoreGroups} pathname={pathname} close={() => setMoreOpen(false)}/>
+          </div>
         </BottomSheet>
       </>
     );
