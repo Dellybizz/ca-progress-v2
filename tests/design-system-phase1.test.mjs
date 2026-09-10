@@ -54,13 +54,13 @@ test("Phase 1 primitives avoid generic floating SaaS treatments", () => {
   assert.match(components, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test("canonical tokens, shell and components load before route styles", () => {
+test("Phase 1 foundation loads before route styles while Phase 2 shell remains final chrome authority", () => {
   const tokensIndex = globals.indexOf('@import "./styles/tokens.css";');
-  const shellIndex = globals.indexOf('@import "./styles/shell.css";');
   const componentsIndex = globals.indexOf('@import "./styles/components.css";');
   const dashboardIndex = globals.indexOf('@import "./styles/dashboard.css";');
+  const shellIndex = globals.indexOf('@import "./styles/shell.css";');
   assert.ok(tokensIndex >= 0, "tokens.css must remain globally imported");
-  assert.ok(shellIndex > tokensIndex, "shell.css must load after tokens.css");
-  assert.ok(componentsIndex > shellIndex, "components.css must load after shell.css");
+  assert.ok(componentsIndex > tokensIndex, "components.css must load after tokens.css");
   assert.ok(dashboardIndex > componentsIndex, "route styles must load after shared primitives");
+  assert.ok(shellIndex > dashboardIndex, "canonical shell must load after route-era styles");
 });
