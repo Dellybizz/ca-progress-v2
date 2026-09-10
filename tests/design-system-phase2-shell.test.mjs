@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -9,45 +9,52 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 const shell = read("components/shell/app-shell.tsx");
 const desktopNav = read("components/shell/navigation.tsx");
 const mobileNav = read("components/shell/mobile-nav-placeholder.tsx");
-const shellCss = read("app/styles/shell-phase2.css");
+const shellCss = read("app/styles/shell.css");
 const mobileScroll = read("app/styles/mobile-scroll-fix.css");
+const environmentBanner = read("components/shell/environment-banner.tsx");
 const globals = read("app/globals.css");
 
-test("Phase 2 shell removes fake readiness chrome and marketing-like shell copy", () => {
+test("Phase 2 uses shell.css as the single application-chrome authority", () => {
+  assert.equal(existsSync(join(root, "app/styles/shell-phase2.css")), false, "temporary Phase 2 override must not return");
+  assert.doesNotMatch(globals, /shell-phase2\.css/);
+  assert.match(globals, /@import "\.\/styles\/shell\.css";/);
+  assert.match(shellCss, /\/\* Canonical application shell and navigation \*\//);
+});
+
+test("Phase 2 shell removes fake production chrome and decorative shell treatments", () => {
   assert.doesNotMatch(shell, /Workspace ready/);
   assert.doesNotMatch(shell, /Focused\. Clear\. Consistent\./);
-  assert.doesNotMatch(shell, />Staging</);
   assert.match(shell, /Student workspace/);
   assert.match(shell, /Admin workspace/);
-});
-
-test("Phase 2 desktop navigation keeps primary study actions visible and secondary tools grouped", () => {
-  assert.match(desktopNav, /studentPrimaryNavigation/);
-  assert.match(desktopNav, /Today Plan/);
-  assert.match(desktopNav, /Study tools/);
-  assert.match(desktopNav, /Library/);
-  assert.match(desktopNav, /Study Buddy/);
-  assert.match(desktopNav, /sidebar-nav-primary/);
-});
-
-test("Phase 2 mobile navigation exposes the core flow directly and retains secondary destinations", () => {
-  assert.match(mobileNav, />Home<\/span>/);
-  assert.match(mobileNav, />Today<\/span>/);
-  assert.match(mobileNav, />Study<\/span>/);
-  assert.match(mobileNav, />Progress<\/span>/);
-  assert.match(mobileNav, /Open more navigation/);
-  assert.match(mobileNav, /Study Buddy/);
-  assert.match(mobileNav, /Settings/);
-});
-
-test("Phase 2 chrome is flat, edge-to-edge on mobile and loaded after legacy page styles", () => {
+  assert.match(environmentBanner, /if \(appEnv === "production"\) return null;/);
+  assert.doesNotMatch(shellCss, /backdrop-filter/);
   assert.match(shellCss, /\.sidebar-brand__mark\s*\{[\s\S]*?background:\s*var\(--color-brand\);/);
-  assert.match(shellCss, /\.mobile-bottom-nav\s*\{[\s\S]*?border-radius:\s*0;/);
+});
+
+test("Phase 2 desktop navigation keeps the primary study flow visible and every secondary area reachable", () => {
+  assert.match(desktopNav, /studentPrimaryNavigation/);
+  for (const label of ["Dashboard", "Today Plan", "Study", "Progress", "Planner", "Study tools", "Library", "Community", "Account", "Analytics", "Study Buddy"]) {
+    assert.ok(desktopNav.includes(label), `Missing desktop navigation contract: ${label}`);
+  }
+  assert.match(desktopNav, /pathname\.startsWith\("\/dashboard\/"\)/);
+  assert.match(desktopNav, /aria-controls=\{regionId\}/);
+});
+
+test("Phase 2 mobile navigation exposes the core flow and keeps secondary pages under More", () => {
+  for (const label of [">Home</, ">Today</, ">Study</, ">Progress</, ">More</, "Analytics", "Forecast", "Goals", "Tests", "Study Buddy", "Settings"]) {
+    assert.ok(mobileNav.includes(label.replace(">", "<span>").replace("</", "</span>")) || mobileNav.includes(label), `Missing mobile navigation contract: ${label}`);
+  }
+  assert.match(mobileNav, /progressRouteMatches/);
+  assert.doesNotMatch(mobileNav, /\["\/progress", "\/analytics", "\/goals", "\/tests"/);
+  assert.match(mobileNav, /aria-expanded=\{moreOpen\}/);
+});
+
+test("Phase 2 mobile chrome is flat, edge-to-edge and respects fixed-nav clearance", () => {
+  assert.match(shellCss, /\.mobile-bottom-nav\s*\{[\s\S]*?left:\s*0;/);
+  assert.match(shellCss, /\.mobile-bottom-nav\s*\{[\s\S]*?right:\s*0;/);
+  assert.match(shellCss, /\.mobile-bottom-nav\s*\{[\s\S]*?border-top:\s*1px solid var\(--color-border\);/);
   assert.match(shellCss, /\.mobile-bottom-nav\s*\{[\s\S]*?box-shadow:\s*none;/);
-  assert.match(shellCss, /backdrop-filter:\s*none;/);
+  assert.match(mobileScroll, /padding-bottom:\s*calc\(var\(--bottom-nav-height\)/);
   assert.match(mobileScroll, /left:\s*0 !important;/);
   assert.match(mobileScroll, /bottom:\s*0 !important;/);
-  const shellPhase2Index = globals.indexOf('@import "./styles/shell-phase2.css";');
-  const legacyMobileIndex = globals.indexOf('@import "./styles/mobile-scroll-fix.css";');
-  assert.ok(shellPhase2Index > legacyMobileIndex, "Phase 2 shell must remain the final application-chrome authority");
 });
