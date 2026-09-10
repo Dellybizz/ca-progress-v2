@@ -14,6 +14,7 @@ const moreGroups: MobileMoreGroup[] = [
     { label: "Planner", description: "Plan upcoming study work", href: "/planner", icon: "calendar", exact: true },
     { label: "Calendar", description: "See your study schedule", href: "/calendar", icon: "calendar" },
     { label: "Revision Settings", description: "Control your revision cycle", href: "/planner/revision-settings", icon: "settings" },
+    { label: "Analytics", description: "Review study patterns and trends", href: "/analytics", icon: "chart", exact: true },
     { label: "Forecast", description: "See your study outlook", href: "/analytics/forecast", icon: "chart" },
     { label: "Goals", description: "Set and review study goals", href: "/goals", icon: "target" },
     { label: "Tests", description: "Track test preparation", href: "/tests", icon: "tests" },
