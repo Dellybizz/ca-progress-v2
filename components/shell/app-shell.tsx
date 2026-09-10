@@ -9,6 +9,9 @@ import { NavigationProgress } from "./navigation-progress";
 import { Icon } from "@/components/ui/icon";
 
 export function AppShell({ children, area = "student" }: { children: React.ReactNode; area?: "student" | "admin" }) {
+  const workspaceLabel = area === "admin" ? "Admin workspace" : "Student workspace";
+  const homeHref = area === "admin" ? "/admin" : "/dashboard";
+
   return (
     <>
       <NavigationProgress/>
@@ -16,11 +19,10 @@ export function AppShell({ children, area = "student" }: { children: React.React
       <EnvironmentBanner/>
       <div className="app-shell">
         <aside className="desktop-sidebar" aria-label={`${area} workspace`}>
-          <Link href={area === "admin" ? "/admin" : "/dashboard"} className="sidebar-brand">
+          <Link href={homeHref} className="sidebar-brand">
             <span className="sidebar-brand__mark">CP</span>
-            <span><strong>CA Progress</strong><small>Focused. Clear. Consistent.</small></span>
+            <span><strong>CA Progress</strong><small>{workspaceLabel}</small></span>
           </Link>
-          <div className="sidebar-section-label">Workspace</div>
           <DesktopNavigation area={area}/>
           <div className="sidebar-spacer"/>
           <ViewerStatus/>
@@ -29,13 +31,12 @@ export function AppShell({ children, area = "student" }: { children: React.React
 
         <div className="app-main">
           <header className="topbar">
-            <Link href={area === "admin" ? "/admin" : "/dashboard"} className="mobile-brand">
+            <Link href={homeHref} className="mobile-brand">
               <span className="sidebar-brand__mark">CP</span>
-              <span><strong>{area === "admin" ? "Admin" : "CA Progress"}</strong><small>Staging</small></span>
+              <span><strong>CA Progress</strong><small>{workspaceLabel}</small></span>
             </Link>
             <div className="topbar-context">
-              <span className="topbar-context__dot"/>
-              <div><strong>{area === "admin" ? "Admin workspace" : "Student workspace"}</strong><span>Workspace ready</span></div>
+              <div><strong>{workspaceLabel}</strong><span>CA Progress</span></div>
             </div>
             <TopbarControls/>
           </header>
