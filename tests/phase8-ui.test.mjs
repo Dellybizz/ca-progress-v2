@@ -49,7 +49,7 @@ test("admin monitor enforces named capabilities and exposes sync/review/source h
 
 test("Phase 8 navigation and responsive stylesheet are wired into both shells", () => {
   const nav = read("components/shell/navigation.tsx");
-  const mobile = read("components/shell/mobile-nav-placeholder.tsx");
+  const mobile = read("components/shell/mobile-navigation.tsx");
   const globals = read("app/globals.css");
   const css = read("app/styles/icai.css");
   assert.match(nav, /\/updates/);
