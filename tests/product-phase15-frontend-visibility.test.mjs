@@ -40,7 +40,7 @@ test("Dashboard subject discovery targets the real syllabus route", () => {
 test("Phase 13 leaderboard is discoverable without adding another top-level destination", () => {
   const dashboard = read("components/dashboard/student-dashboard.tsx");
   const navigation = read("components/shell/navigation.tsx");
-  const mobile = read("components/shell/mobile-nav-placeholder.tsx");
+  const mobile = read("components/shell/mobile-navigation.tsx");
   const panel = read("components/gamification/phase13-panel.tsx");
   assert.match(dashboard, /href="\/activity#leaderboard">Leaderboard/);
   assert.match(navigation, /Activity & Leaderboard/);
