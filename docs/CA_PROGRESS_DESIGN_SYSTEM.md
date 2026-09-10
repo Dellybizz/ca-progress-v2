@@ -4,7 +4,7 @@
 
 This document is the canonical design direction for the CA Progress agency-quality UI programme.
 
-Phase 0 was added after design Phases 1 and 2, so the visual baseline is intentionally anchored to commit `9e991b08c413240e070119c42ec18aeefa8d041b`. It records the current post-Phase-2 product state rather than attempting to recreate the older pre-redesign UI.
+Phase 0 was added after the first Phase 1/2 implementation. Its baseline commit `9e991b08c413240e070119c42ec18aeefa8d041b` is retained as a historical comparison point. The reimplemented Phase 1/2 architecture is now canonical: `tokens.css` owns design tokens, `components.css` owns reusable primitives, and `shell.css` owns application chrome. There is no late Phase 2 override stylesheet.
 
 The executable baseline lives in `config/design-visual-baseline.mjs`.
 
@@ -39,11 +39,11 @@ These are behavioural references, not themes to mix visually. CA Progress keeps 
 
 ## Canonical foundation
 
-`app/styles/tokens.css` owns the colour, spacing, type, radius, elevation and responsive design tokens.
+`app/styles/tokens.css` owns colour, spacing, type, radius, elevation, responsive and theme tokens. Existing token names remain compatibility contracts until their consumers are deliberately migrated.
 
-`app/styles/components.css` owns reusable buttons, inputs, cards, badges, progress, tabs, skeletons, empty states and related primitives.
+`app/styles/components.css` owns reusable buttons, inputs, selects, cards, badges, progress, tabs, skeletons, empty states, overlays, dialogs and toasts. Existing class names are preserved; changing the visual system must not silently break component contracts.
 
-`app/styles/shell-phase2.css` is the current authority for application chrome after the Phase 2 navigation redesign. It intentionally loads after legacy route styles until those route layers are consolidated.
+`app/styles/shell.css` owns student/admin application chrome: desktop sidebar, topbar, account controls, navigation groups, mobile bottom navigation and public-shell framing. Phase 2 must be implemented here rather than through a later override file.
 
 New page work should use these foundations rather than introducing a new local mini-design-system.
 
@@ -67,13 +67,13 @@ The baseline route set is intentionally small and representative:
 | `/chapters/[chapterId]` | Chapter study workspace | `academic.css`, `chapter-hub.css` | Must feel connected to Study/Progress without becoming another dashboard. |
 | `/community` | Peer/community entry | `phase7.css`, `product-phase7-community.css` | Needs conversational composition without adopting a second design system. |
 | `/settings` | Account, academic profile, plan and export controls | `surfaces.css`, `phase10.css`, `phase11.css`, `phase11-lock.css` | Still contains preview-era presentation and accumulated phase styling. |
-| `/admin` | Operations command centre | `shell-phase2.css` plus route-level inline styles | Admin overview has substantial inline styling that must eventually move into canonical utility components. |
+| `/admin` | Operations command centre | `shell.css` plus route-level inline styles | Admin overview has substantial inline styling that must eventually move into canonical utility components. |
 
 All route-specific ownership is also encoded in `config/design-visual-baseline.mjs` so it can be checked automatically.
 
 ## Baseline capture contract
 
-For each baseline route, later visual QA should compare both desktop and mobile at the fixed sizes above. Use a deterministic account/data fixture where the route depends on user state. Dynamic values such as current countdown numbers, timestamps and live community content should be treated as content variance rather than visual-regression failures.
+For each baseline route, visual QA should compare both desktop and mobile at the fixed sizes above. Use a deterministic account/data fixture where the route depends on user state. Dynamic values such as current countdown numbers, timestamps and live community content should be treated as content variance rather than visual-regression failures.
 
 Each comparison should inspect:
 
@@ -87,7 +87,32 @@ Each comparison should inspect:
 - mobile touch targets, overflow and bottom-navigation clearance;
 - dark-mode legibility when the page supports it.
 
-Phase 0 itself does not redesign these pages. It gives every later phase an explicit before/after contract.
+## Phase 1 implementation contract
+
+Phase 1 changes the visual system without breaking the component API.
+
+- Preserve established CSS variable names used by production pages.
+- Preserve established primitive class names used by React components.
+- Use a compact 8–12px default radius hierarchy.
+- Use borders as the default grouping mechanism and reserve shadows for overlays/popovers.
+- Avoid lift transforms on ordinary buttons/cards.
+- Use a solid brand progress treatment, semantic status colours and restrained typography weights.
+- Ensure dark mode and accent variants remain complete.
+- Keep reduced-motion behaviour.
+
+## Phase 2 implementation contract
+
+Phase 2 changes shared navigation and chrome without creating a second styling authority.
+
+- `shell.css` is the only application-shell stylesheet.
+- Desktop primary flow stays directly visible: Dashboard, Today Plan, Study, Progress and Planner.
+- Secondary destinations are grouped by job: Study tools, Library, Community and Account.
+- Existing student destinations must remain reachable, including Analytics and Study Buddy.
+- Dashboard subroutes keep Dashboard active.
+- Secondary tools such as Forecast, Goals and Tests activate More on mobile rather than pretending to be Progress.
+- Mobile uses Home / Today / Study / Progress / More with a flat edge-to-edge bottom rail.
+- Production does not display environment/debug chrome; non-production environments may.
+- No glass blur, floating bottom-nav pill or decorative shell gradients.
 
 ## Page-specific composition guidance
 
@@ -125,17 +150,17 @@ Admin should use compact operational patterns: tables, rows, filters, statuses a
 
 ## Legacy CSS policy
 
-Do not bulk-delete the legacy CSS stack.
+Do not bulk-delete route-specific legacy CSS.
 
 For each redesigned route:
 
 1. inspect which legacy rules are actually active;
 2. migrate the required behaviour into canonical route/component styles;
-3. compare desktop and mobile against this baseline;
+3. compare desktop and mobile against the historical baseline;
 4. remove only the superseded selectors/files for that route;
 5. run focused regression tests before moving to the next route.
 
-The dashboard stack is the highest-priority consolidation target because it currently has the most successive visual generations loaded globally.
+The dashboard stack is the highest-priority route consolidation target because it currently has the most successive visual generations loaded globally.
 
 ## Agency-quality review questions
 
