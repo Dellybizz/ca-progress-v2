@@ -60,7 +60,9 @@ test('the retained migration registers one live schedule source without embeddin
   assert.doesNotMatch(phase2,/all six sources|six-source baseline/);
   const engine=readFileSync('workers/icai-sync/sync-engine.ts','utf8');
   assert.match(engine,/right\.sourceType === "exam_schedule_index"/);
-  assert.match(readFileSync('workers/icai-sync/exam-schedule-resolver.ts','utf8'),/if \(Date\.now\(\) > deadline\) break/);
+  const resolver=readFileSync('workers/icai-sync/exam-schedule-resolver.ts','utf8');
+  assert.match(resolver,/if \(Date\.now\(\) > deadline\) break/);
+  assert.match(resolver,/if \(requests >= MAX_FETCHES\) break scan/);
 });
 test('all levels and both groups map each paper to its actual date',()=>{
   const parsed=parseExamSchedule(timetable,evidence,subjects); assert.equal(parsed.events.length,16);

@@ -76,7 +76,7 @@ export async function resolveExamSchedules(
     for (const attempt of payload.attempts.filter(value => value.attemptKey >= floor)) attempts.set(`${attempt.levelCodes[0]}:${attempt.attemptKey}`, attempt);
   };
   const priority = (entry: Entry) => entry.root ? 0 : /important announcement|revised schedule/i.test(entry.title) ? 1 : /\.pdf(?:$|\?)/i.test(entry.url) && !/guidance/i.test(entry.title) ? 2 : 3;
-  while (queue.length) {
+  scan: while (queue.length) {
     queue.sort((a, b) => priority(a) - priority(b));
     const entry = queue.shift()!;
     if (seen.has(entry.url) || skippedUrls.has(entry.url)) continue;
@@ -101,7 +101,10 @@ export async function resolveExamSchedules(
       const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), Math.min(source.timeoutMs, 15_000));
       try {
         for (let redirects = 0; redirects <= 5; redirects++) {
-          if (++requests > MAX_FETCHES) throw new Error("Schedule discovery exceeded its request budget; canonical dates preserved.");
+          // Like the wall-time limit, exhausting the fetch allowance ends a
+          // successful bounded scan. Partial timetables are never merged.
+          if (requests >= MAX_FETCHES) break scan;
+          requests++;
           const url = new URL(finalUrl);
           if (!isApprovedIcaiUrl(finalUrl) || url.protocol !== "https:") throw new Error("Rejected non-HTTPS or non-ICAI schedule URL.");
           const headers = new Headers({ "User-Agent": userAgent, Accept: "text/html,application/pdf" });
