@@ -18,7 +18,7 @@ const queueName = "ca-progress-v2-phase3-background";
 const databaseName = "ca-progress-v2-phase4-shadow";
 const evidenceDir = "deployment-evidence";
 const POLL_MS = 5_000;
-const POLL_ATTEMPTS = 100;
+const POLL_ATTEMPTS = 150;
 const sourceIds = [
   "icai-final-course",
   "icai-foundation-course",
@@ -26,6 +26,7 @@ const sourceIds = [
   "icai-exam-may-2026",
   "icai-exam-sep-nov-2026",
   "icai-bos-important-announcements",
+  "icai-live-exam-schedules",
 ];
 mkdirSync(evidenceDir, { recursive: true });
 
@@ -165,7 +166,7 @@ let baselineRun = phase5Baseline;
 if (!isCompleteRun(baselineRun)) {
   baselineRun = await runSync(queue.queue_id, "baseline-recovery");
   if (!isCompleteRun(baselineRun)) {
-    throw new Error(`Phase 2 could not establish a complete six-source baseline: ${JSON.stringify(baselineRun)}`);
+    throw new Error(`Phase 2 could not establish a complete configured-source baseline: ${JSON.stringify(baselineRun)}`);
   }
 }
 
@@ -178,7 +179,7 @@ if (beforeState.duplicateReviews.length) throw new Error(`Phase 2 baseline conta
 const repeatRun = await runSync(queue.queue_id, "repeat");
 
 if (Number(repeatRun.source_total) !== sourceIds.length || Number(repeatRun.source_succeeded) !== sourceIds.length || Number(repeatRun.source_failed) !== 0) {
-  throw new Error(`Phase 2 repeat sync did not succeed across all six sources: ${JSON.stringify(repeatRun)}`);
+  throw new Error(`Phase 2 repeat sync did not succeed across all configured sources: ${JSON.stringify(repeatRun)}`);
 }
 if (Number(repeatRun.new_items) !== 0 || Number(repeatRun.changed_items) !== 0 || Number(repeatRun.removed_items) !== 0 || Number(repeatRun.pending_reviews) !== 0) {
   throw new Error(`Phase 2 repeat sync was not idempotent: new=${repeatRun.new_items}, changed=${repeatRun.changed_items}, removed=${repeatRun.removed_items}, reviews=${repeatRun.pending_reviews}.`);

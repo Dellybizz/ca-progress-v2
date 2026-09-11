@@ -18,7 +18,10 @@ const queueName = "ca-progress-v2-phase3-background";
 const databaseName = "ca-progress-v2-phase4-shadow";
 const evidenceDir = "deployment-evidence";
 const JOB_POLL_INTERVAL_MS = 5_000;
-const JOB_POLL_ATTEMPTS = 90;
+// Seven official sources now run sequentially through the bounded queue. The
+// previous 450-second window was already nearly consumed by the six-source
+// baseline and could expire while the last source was still making progress.
+const JOB_POLL_ATTEMPTS = 150;
 const runReviewProbe = process.env.ICAI_PHASE5_REVIEW_PROBE === "true";
 mkdirSync(evidenceDir, { recursive: true });
 

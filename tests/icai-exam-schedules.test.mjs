@@ -55,6 +55,9 @@ test('the retained migration registers one live schedule source without embeddin
   assert.match(migration,/exam_schedule_index/);
   assert.doesNotMatch(migration,/2027-01-\d{2}/);
   assert.match(readFileSync('scripts/apply-retained-d1-migrations.mjs','utf8'),/0041_icai_live_exam_schedules/);
+  const phase2=readFileSync('scripts/verify-icai-phase2-live.mjs','utf8');
+  assert.match(phase2,/"icai-live-exam-schedules"/);
+  assert.doesNotMatch(phase2,/all six sources|six-source baseline/);
 });
 test('all levels and both groups map each paper to its actual date',()=>{
   const parsed=parseExamSchedule(timetable,evidence,subjects); assert.equal(parsed.events.length,16);
