@@ -11,7 +11,6 @@ function formatDate(value: string | null) {
   if (Number.isNaN(date.valueOf())) return value;
   return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
 }
-
 function formatVerifiedAt(value: string | null) {
   if (!value) return "Awaiting verification";
   const date = new Date(value);
@@ -154,10 +153,14 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
   const estimated = model.countdown.sourceKind === "admin_estimate";
   const status = pending
     ? "Countdown coming soon"
-    : model.countdown.status === "past"
-      ? "Attempt completed"
-      : `${model.countdown.daysRemaining ?? "—"} days to go`;
+    : model.countdown.status === "exam_period"
+      ? "Exam period"
+      : model.countdown.status === "completed"
+        ? "Exam completed"
+        : `${model.countdown.daysRemaining ?? "—"} days to go`;
   const date = model.countdown.targetDate ? formatDate(model.countdown.targetDate) : null;
+  const endDate = model.countdown.endDate ? formatDate(model.countdown.endDate) : date;
+  const dateRange = date && endDate && date !== endDate ? `${date} – ${endDate}` : date;
 
   return (
     <section className="dashboard-attempt-strip dashboard-attempt-card" aria-label="Current attempt">
@@ -171,8 +174,8 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
         <p>
           {pending
             ? `Your ${model.context.attemptLabel} attempt is selected. The countdown will begin as soon as the official exam date is confirmed.`
-            : date
-              ? `${date} · ${estimated ? "Unofficial planning estimate; ICAI’s verified date will replace it automatically." : "Keep your study plan aligned with your selected attempt."}`
+            : dateRange
+              ? `${dateRange} · ${estimated ? "Unofficial planning estimate; ICAI’s verified date will replace it automatically." : "Keep your study plan aligned with your selected attempt."}`
               : "Keep your study plan aligned with your selected attempt."}
         </p>
         <div className="dashboard-attempt-card__meta">

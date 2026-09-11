@@ -1,13 +1,26 @@
 import type { StudySubjectOption } from "@/lib/study/types";
 
-export type TaskKind = "class" | "study" | "revision" | "test" | "mock" | "personal" | "other";
+export type TaskKind =
+  "class" | "study" | "revision" | "test" | "mock" | "personal" | "other";
 export type TaskStatus = "todo" | "done" | "cancelled";
 export type TaskScheduleMode = "fixed" | "flexible";
 export type GoalStatus = "active" | "completed" | "cancelled";
-export type GoalKind = "daily_study" | "weekly_study" | "completion" | "revision" | "test" | "custom";
+export type GoalKind =
+  | "daily_study"
+  | "weekly_study"
+  | "completion"
+  | "revision"
+  | "test"
+  | "custom";
 export type GoalUnit = "minutes" | "count";
-export type CountdownMilestone = "normal" | "90" | "60" | "30" | "15" | "7" | "today" | "past" | "unavailable";
-export type PlannerNotificationType = "revision_due" | "test_tomorrow" | "goal_near_completion" | "doubt_answered" | "buddy_activity";
+export type CountdownMilestone =
+  "normal" | "90" | "60" | "30" | "15" | "7" | "today" | "past" | "unavailable";
+export type PlannerNotificationType =
+  | "revision_due"
+  | "test_tomorrow"
+  | "goal_near_completion"
+  | "doubt_answered"
+  | "buddy_activity";
 export type NotificationFrequency = "realtime" | "daily_digest" | "off";
 
 export type PlannerTask = {
@@ -46,9 +59,15 @@ export type AttemptCountdown = {
   attemptKey: string | null;
   attemptLabel: string | null;
   anchorDate: string | null;
+  endDate: string | null;
   daysRemaining: number | null;
   milestone: CountdownMilestone;
-  source: "verified_attempt" | "verified_exam_event" | "unavailable";
+  periodStatus: "upcoming" | "exam_period" | "completed" | "unavailable";
+  source:
+    | "verified_attempt"
+    | "verified_exam_event"
+    | "admin_estimate"
+    | "unavailable";
 };
 
 export type NotificationPreferences = {
@@ -107,9 +126,23 @@ export type PlannerReadyModel = {
   notificationPreferences: NotificationPreferences;
 };
 
-export type PlannerPageModel = { mode: "guest" } | { mode: "setup"; viewerName: string } | PlannerReadyModel;
-export type GoalsPageModel = { mode: "guest" } | { mode: "setup"; viewerName: string } | { mode: "ready"; viewerName: string; goals: PlannerGoal[] };
-export type CalendarPageModel = { mode: "guest" } | { mode: "setup"; viewerName: string } | { mode: "ready"; viewerName: string; month: string; timezone: string; countdown: AttemptCountdown; items: CalendarItem[] };
+export type PlannerPageModel =
+  { mode: "guest" } | { mode: "setup"; viewerName: string } | PlannerReadyModel;
+export type GoalsPageModel =
+  | { mode: "guest" }
+  | { mode: "setup"; viewerName: string }
+  | { mode: "ready"; viewerName: string; goals: PlannerGoal[] };
+export type CalendarPageModel =
+  | { mode: "guest" }
+  | { mode: "setup"; viewerName: string }
+  | {
+      mode: "ready";
+      viewerName: string;
+      month: string;
+      timezone: string;
+      countdown: AttemptCountdown;
+      items: CalendarItem[];
+    };
 
 export type ActivityItem = {
   id: string;
@@ -119,4 +152,6 @@ export type ActivityItem = {
   description: string;
   href: string;
 };
-export type ActivityPageModel = { mode: "guest" } | { mode: "ready"; viewerName: string; items: ActivityItem[] };
+export type ActivityPageModel =
+  | { mode: "guest" }
+  | { mode: "ready"; viewerName: string; items: ActivityItem[] };

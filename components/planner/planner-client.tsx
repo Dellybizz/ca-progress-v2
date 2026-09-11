@@ -91,7 +91,7 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
         <Card><CardBody><Icon name="calendar"/><span><strong>{todayTasks.length}</strong><small>Tasks today</small></span></CardBody></Card>
         <Card><CardBody><Icon name="clock"/><span><strong>{todayMinutes}m</strong><small>Planned time</small></span></CardBody></Card>
         <Card><CardBody><Icon name="check"/><span><strong>{completedCount}</strong><small>Completed</small></span></CardBody></Card>
-        <Card><CardBody><Icon name="target"/><span><strong>{model.countdown.daysRemaining ?? "—"}</strong><small>{model.countdown.daysRemaining === null ? "Attempt date unavailable" : `Days to ${model.countdown.attemptLabel ?? "attempt"}`}</small></span></CardBody></Card>
+        <Card><CardBody><Icon name="target"/><span><strong>{model.countdown.periodStatus === "exam_period" ? "Exam period" : model.countdown.periodStatus === "completed" ? "Exam completed" : model.countdown.daysRemaining ?? "—"}</strong><small>{model.countdown.periodStatus === "upcoming" ? `Days to ${model.countdown.attemptLabel ?? "attempt"}` : model.countdown.periodStatus === "unavailable" ? "Attempt date unavailable" : model.countdown.attemptLabel ?? "Selected attempt"}</small></span></CardBody></Card>
       </section>
 
       <Card className="planner-add-card">

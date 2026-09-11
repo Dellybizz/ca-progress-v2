@@ -198,17 +198,23 @@ function countdownMilestone(days: number | null): AttemptCountdown["milestone"] 
 }
 
 export async function getSelectedAttemptCountdown(userId: string, now = new Date(), db = getD1RuntimeDatabase()): Promise<AttemptCountdown> {
-  const row = await db.prepare(`SELECT p.attempt_key,p.timezone,ea.id AS attempt_id,ea.label,ea.start_date,
-    (SELECT MIN(ee.event_date) FROM exam_events ee WHERE ee.attempt_id=ea.id AND ee.verification_status='verified') AS first_event_date
+  const row = await db.prepare(`SELECT p.attempt_key,p.timezone,ea.id AS attempt_id,ea.label,ea.start_date,ea.end_date,
+    (SELECT MIN(ee.event_date) FROM exam_events ee WHERE ee.attempt_id=ea.id AND ee.verification_status='verified') AS first_event_date,
+    (SELECT MAX(ee.event_date) FROM exam_events ee WHERE ee.attempt_id=ea.id AND ee.verification_status='verified') AS last_event_date,
+    ade.estimated_date,ade.estimated_end_date
     FROM profiles p JOIN course_levels l ON l.code=p.ca_level
     LEFT JOIN exam_attempts ea ON ea.level_id=l.id AND ea.attempt_key=p.attempt_key AND ea.verification_status='verified'
-    WHERE p.user_id=?1 AND p.onboarding_completed_at IS NOT NULL LIMIT 1`).bind(userId).first<{ attempt_key: string | null; timezone: string; attempt_id: string | null; label: string | null; start_date: string | null; first_event_date: string | null }>();
-  if (!row?.attempt_key || !row.attempt_id) return { attemptKey: row?.attempt_key ?? null, attemptLabel: row?.label ?? null, anchorDate: null, daysRemaining: null, milestone: "unavailable", source: "unavailable" };
-  const anchorDate = row.start_date ?? row.first_event_date;
-  if (!anchorDate) return { attemptKey: row.attempt_key, attemptLabel: row.label, anchorDate: null, daysRemaining: null, milestone: "unavailable", source: "unavailable" };
+    LEFT JOIN admin_exam_date_estimates ade ON ade.level_code=l.code AND ade.attempt_key=p.attempt_key AND ade.group_choice=p.group_choice
+    WHERE p.user_id=?1 AND p.onboarding_completed_at IS NOT NULL LIMIT 1`).bind(userId).first<{ attempt_key: string | null; timezone: string; attempt_id: string | null; label: string | null; start_date: string | null; end_date: string | null; first_event_date: string | null; last_event_date: string | null; estimated_date: string | null; estimated_end_date: string | null }>();
+  if (!row?.attempt_key) return { attemptKey: row?.attempt_key ?? null, attemptLabel: row?.label ?? null, anchorDate: null, endDate: null, daysRemaining: null, milestone: "unavailable", periodStatus: "unavailable", source: "unavailable" };
+  const anchorDate = row.first_event_date ?? row.start_date ?? row.estimated_date;
+  const endDate = row.last_event_date ?? row.end_date ?? row.estimated_end_date ?? row.estimated_date ?? anchorDate;
+  if (!anchorDate || !endDate) return { attemptKey: row.attempt_key, attemptLabel: row.label, anchorDate: null, endDate: null, daysRemaining: null, milestone: "unavailable", periodStatus: "unavailable", source: "unavailable" };
   const today = dateKeyInTimezone(row.timezone, now);
-  const daysRemaining = localDaysBetween(today, anchorDate);
-  return { attemptKey: row.attempt_key, attemptLabel: row.label, anchorDate, daysRemaining, milestone: countdownMilestone(daysRemaining), source: row.start_date ? "verified_attempt" : "verified_exam_event" };
+  const periodStatus = today > endDate ? "completed" : today >= anchorDate ? "exam_period" : "upcoming";
+  const daysRemaining = periodStatus === "upcoming" ? localDaysBetween(today, anchorDate) : null;
+  const source = row.first_event_date ? "verified_exam_event" : row.start_date ? "verified_attempt" : "admin_estimate";
+  return { attemptKey: row.attempt_key, attemptLabel: row.label, anchorDate, endDate, daysRemaining, milestone: countdownMilestone(daysRemaining), periodStatus, source };
 }
 
 const DEFAULT_PREFERENCES: NotificationPreferences = { revisionDue: true, testTomorrow: true, goalNearCompletion: true, doubtAnswered: true, buddyActivity: false, frequency: "realtime", maxPerDay: 8 };

@@ -14,7 +14,10 @@ const migrations = [
   ["0020", "d1/migrations/0020_product_phase10_study_profiles.sql"],
   ["0021", "d1/migrations/0021_product_phase11_study_buddy.sql"],
   ["0022", "d1/migrations/0022_product_phase12_gamification.sql"],
-  ["0023", "d1/migrations/0023_product_phase13_leaderboards_rewards_referrals.sql"],
+  [
+    "0023",
+    "d1/migrations/0023_product_phase13_leaderboards_rewards_referrals.sql",
+  ],
   ["0024", "d1/migrations/0024_icai_source_bootstrap.sql"],
   ["0025", "d1/migrations/0025_icai_review_audit.sql"],
   ["0026", "d1/migrations/0026_icai_sync_recovery.sql"],
@@ -33,43 +36,63 @@ const migrations = [
   ["0039", "d1/migrations/0039_product_consistency_phase1_academic_model.sql"],
   ["0041", "d1/migrations/0041_icai_live_exam_schedules.sql"],
   ["0042", "d1/migrations/0042_admin_exam_date_estimates.sql"],
+  ["0043", "d1/migrations/0043_exam_date_estimate_windows.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
-  throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
+  throw new Error(
+    "CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.",
+  );
 }
 
 function wrangler(args, { capture = false } = {}) {
-  const result = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["wrangler", ...args], {
-    encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    env: process.env,
-  });
+  const result = spawnSync(
+    process.platform === "win32" ? "npx.cmd" : "npx",
+    ["wrangler", ...args],
+    {
+      encoding: "utf8",
+      stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
+      env: process.env,
+    },
+  );
   if (result.status !== 0) {
     if (capture) {
       if (result.stdout) process.stderr.write(result.stdout);
       if (result.stderr) process.stderr.write(result.stderr);
     }
-    throw new Error(`wrangler ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}.`);
+    throw new Error(
+      `wrangler ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}.`,
+    );
   }
   return result.stdout ?? "";
 }
 
 function query(sql) {
-  const output = wrangler([
-    "d1", "execute", database,
-    "--remote",
-    `--config=${config}`,
-    "--json",
-    "--command", sql,
-  ], { capture: true });
+  const output = wrangler(
+    [
+      "d1",
+      "execute",
+      database,
+      "--remote",
+      `--config=${config}`,
+      "--json",
+      "--command",
+      sql,
+    ],
+    { capture: true },
+  );
   const start = output.indexOf("[");
-  if (start < 0) throw new Error(`Unexpected Wrangler JSON output: ${output.slice(0, 500)}`);
+  if (start < 0)
+    throw new Error(`Unexpected Wrangler JSON output: ${output.slice(0, 500)}`);
   return JSON.parse(output.slice(start));
 }
 
-const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE (version BETWEEN '0012' AND '0039' OR version IN ('0041','0042')) ORDER BY version;");
-const applied = new Set((ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)));
+const ledgerResult = query(
+  "SELECT version FROM _ca_schema_migrations WHERE (version BETWEEN '0012' AND '0039' OR version IN ('0041','0042','0043')) ORDER BY version;",
+);
+const applied = new Set(
+  (ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)),
+);
 
 for (const [version, file] of migrations) {
   if (applied.has(version)) {
@@ -78,7 +101,9 @@ for (const [version, file] of migrations) {
   }
   console.log(`[retained-d1] applying ${version} from ${file}`);
   wrangler([
-    "d1", "execute", database,
+    "d1",
+    "execute",
+    database,
     "--remote",
     `--config=${config}`,
     `--file=${file}`,
@@ -86,11 +111,25 @@ for (const [version, file] of migrations) {
 }
 
 const versions = migrations.map(([version]) => `'${version}'`).join(",");
-const verification = query(`SELECT version FROM _ca_schema_migrations WHERE version IN (${versions}) ORDER BY version; PRAGMA foreign_key_check;`);
-const verified = new Set((verification?.[0]?.results ?? []).map((row) => String(row.version)));
-const missing = migrations.map(([version]) => version).filter((version) => !verified.has(version));
-if (missing.length) throw new Error(`Retained D1 migrations missing after apply: ${missing.join(", ")}`);
+const verification = query(
+  `SELECT version FROM _ca_schema_migrations WHERE version IN (${versions}) ORDER BY version; PRAGMA foreign_key_check;`,
+);
+const verified = new Set(
+  (verification?.[0]?.results ?? []).map((row) => String(row.version)),
+);
+const missing = migrations
+  .map(([version]) => version)
+  .filter((version) => !verified.has(version));
+if (missing.length)
+  throw new Error(
+    `Retained D1 migrations missing after apply: ${missing.join(", ")}`,
+  );
 const fkViolations = verification?.[1]?.results ?? [];
-if (fkViolations.length) throw new Error(`D1 foreign-key verification failed with ${fkViolations.length} violation(s).`);
+if (fkViolations.length)
+  throw new Error(
+    `D1 foreign-key verification failed with ${fkViolations.length} violation(s).`,
+  );
 
-console.log(`[retained-d1] PASS: ${migrations.length} required migrations present; foreign keys clean.`);
+console.log(
+  `[retained-d1] PASS: ${migrations.length} required migrations present; foreign keys clean.`,
+);

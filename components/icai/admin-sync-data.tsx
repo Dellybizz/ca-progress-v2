@@ -473,7 +473,7 @@ export function IcaiAdminSyncData({
             </select>
           </label>
           <label>
-            Provisional first exam date
+            From / first exam date
             <input
               key={`${estimateLevel}:${estimateGroup}:${estimateAttempt}`}
               name="estimatedDate"
@@ -486,6 +486,22 @@ export function IcaiAdminSyncData({
             />
           </label>
           <label>
+            Till / last exam date
+            <input
+              key={`${estimateLevel}:${estimateGroup}:${estimateAttempt}:end`}
+              name="estimatedEndDate"
+              type="date"
+              required
+              disabled={!estimateAttempt}
+              min={
+                selectedEstimate?.estimatedDate ??
+                (estimateAttempt ? `${estimateAttempt}-01` : undefined)
+              }
+              max={estimateAttempt ? `${estimateAttempt}-31` : undefined}
+              defaultValue={selectedEstimate?.estimatedEndDate ?? ""}
+            />
+          </label>
+          <label>
             Admin note
             <input
               name="note"
@@ -494,7 +510,7 @@ export function IcaiAdminSyncData({
             />
           </label>
           <button className="ui-button ui-button--primary" type="submit">
-            Publish provisional date
+            Publish provisional exam period
           </button>
         </form>
         <p className="icai-muted">
@@ -510,7 +526,10 @@ export function IcaiAdminSyncData({
               >
                 <span>
                   <span>
-                    <strong>{time(estimate.estimatedDate)}</strong>
+                    <strong>
+                      {time(estimate.estimatedDate)} –{" "}
+                      {time(estimate.estimatedEndDate)}
+                    </strong>
                     <small>
                       {estimate.levelCode} · {estimate.attemptKey} ·{" "}
                       {estimate.groupChoice.replaceAll("_", " ")}

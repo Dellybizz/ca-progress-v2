@@ -25,10 +25,10 @@ test('matching approved exam reaches the dashboard after more than 24 unrelated 
       const query = dashboardExamQuery('jan',subjects,'2027-01-01');
       return db.prepare(query.sql).all(...query.values).map(row=>row.id);
     };
-    assert.deepEqual(run(['group1']),['selected']);
+    assert.deepEqual(run(['group1']),['past','selected']);
     assert.deepEqual(run([]),[]);
     add('start','jan',null,'exam_start','2027-01-10');
-    assert.deepEqual(run(['group1']),['start','selected']);
+    assert.deepEqual(run(['group1']),['past','start','selected']);
     assert.deepEqual(run([]),['start']);
     assert.deepEqual(run(["group1') OR 1=1 --"]),['start']);
   } finally { db.close(); }
@@ -73,6 +73,7 @@ test('the scoped date reaches the dashboard model across IST midnight and disapp
     assert.equal(before.countdown.sourceUrl, 'https://www.icai.org/exam.pdf');
     const midnight = await loaded.exports.getDashboardPageModel(new Date('2027-01-14T18:30:00Z'));
     assert.equal(midnight.countdown.daysRemaining, 0);
+    assert.equal(midnight.countdown.status, 'exam_period');
     db.exec("UPDATE exam_events SET verification_status='withdrawn'");
     const missing = await loaded.exports.getDashboardPageModel(new Date('2027-01-14T18:30:00Z'));
     assert.equal(missing.countdown.status, 'awaiting_verified_date');
