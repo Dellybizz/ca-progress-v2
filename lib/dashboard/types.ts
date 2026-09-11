@@ -12,7 +12,7 @@ export type DashboardReadyModel = {
   generatedAt: string;
   viewer: { authenticated: true; id: string; displayName: string };
   context: { levelCode: string; levelName: string; groupChoice: string; groupLabel: string; attemptKey: string; attemptLabel: string; subjectCount: number; chapterCount: number };
-  countdown: { status: "scheduled" | "past" | "awaiting_verified_date"; daysRemaining: number | null; targetDate: string | null; title: string; sourceUrl: string | null; lastVerifiedAt: string | null; sourceKind: "exam_event" | "none"; conflictWarning: string | null };
+  countdown: { status: "scheduled" | "past" | "awaiting_verified_date"; daysRemaining: number | null; targetDate: string | null; title: string; sourceUrl: string | null; lastVerifiedAt: string | null; sourceKind: "exam_event" | "admin_estimate" | "none"; conflictWarning: string | null };
   today: { status: "tracked"; tasks: number; revisions: number; tests: number; estimatedMinutes: number };
   progress: { status: "tracked"; overallPercent: number; groups: Array<{ code: string; name: string; subjectCount: number; chapterCount: number; percent: number }>; subjects: Array<DashboardAcademicSubject & { percent: number }> };
   study: { status: "tracked"; dailyTargetMinutes: number; weeklyTargetMinutes: number; studiedThisWeekMinutes: number; studiedTodayMinutes: number; streakDays: number; sessionCountLast7Days: number };

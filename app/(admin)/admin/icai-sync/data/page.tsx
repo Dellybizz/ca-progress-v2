@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IcaiAdminSyncData } from "@/components/icai/admin-sync-data";
 import { requireAdminPageCapability } from "@/lib/authorization/server";
 import { getIcaiAdminDashboard, getIcaiPublicCatalog } from "@/lib/icai/query";
+import { listAdminExamDateEstimates } from "@/lib/icai/exam-date-estimates";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "ICAI Synced Data & Review | CA Progress" };
@@ -25,15 +26,17 @@ export default async function IcaiSyncDataPage({
     subject: param(params.subject),
     type: param(params.type),
   };
-  const [dashboard, catalog] = await Promise.all([
+  const [dashboard, catalog, estimates] = await Promise.all([
     getIcaiAdminDashboard(),
     getIcaiPublicCatalog(filters),
+    listAdminExamDateEstimates(),
   ]);
 
   return (
     <IcaiAdminSyncData
       dashboard={dashboard}
       catalog={catalog}
+      estimates={estimates}
       notice={param(params.notice)}
       error={param(params.error)}
     />

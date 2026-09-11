@@ -10,6 +10,7 @@ import { getStudyAnalytics } from "@/lib/study/service";
 import { getDashboardAcademicReference, getDashboardLiveReference } from "./reference";
 import type { DashboardPageModel, DashboardReadyModel } from "./types";
 import { dateKeyInIst, daysBetweenDateKeys } from "./countdown";
+import { getAdminExamDateEstimate } from "@/lib/icai/exam-date-estimates";
 
 function groupLabel(groupChoice: string, groups: Array<{ code: string; name: string }>) {
   if (groupChoice === "both") return "Both groups";
@@ -49,16 +50,18 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
     subjectIds: academic.subjects.map((subject) => subject.id),
     today,
   }));
+  const estimatePromise = getAdminExamDateEstimate(caLevel, attemptKey, groupChoice);
   const [progressModel, studyAnalytics, planner, storedPlan] = await Promise.all([
     measureServerPerformance("dashboard.progress", () => getProgressDashboardSummary(identity.id, academic.subjects)),
     measureServerPerformance("dashboard.study", () => getStudyAnalytics(identity.id, { now, timezone: context.timezone })),
     measureServerPerformance("dashboard.planner", () => getPlannerDashboardSummary(identity.id, context.timezone, now)),
     measureServerPerformance("dashboard.stored_plan", () => getLatestStoredPlanRecommendation(identity.id)),
   ]);
-  const live = await livePromise;
+  const [live, estimate] = await Promise.all([livePromise, estimatePromise]);
 
   const upcomingExam = live.examEvents[0] ?? null;
-  const targetDate = upcomingExam?.eventDate ?? null;
+  const targetDate = upcomingExam?.eventDate ?? estimate?.estimatedDate ?? null;
+  const usingEstimate = !upcomingExam && Boolean(estimate);
   const startDates = new Set(live.examEvents.filter((event) => event.eventType === "exam_start").map((event) => event.eventDate));
   const conflictWarning = startDates.size > 1 ? "Multiple verified exam-start dates exist for this attempt. Check the official evidence." : null;
   const remaining = targetDate ? daysBetweenDateKeys(today, targetDate) : null;
@@ -78,9 +81,9 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
         daysRemaining: remaining !== null && remaining >= 0 ? remaining : null,
         targetDate,
         title: upcomingExam?.title ?? live.attempt?.label ?? attemptKey,
-        sourceUrl: upcomingExam?.sourceUrl ?? live.attempt?.sourceUrl ?? null,
-        lastVerifiedAt: upcomingExam?.lastVerifiedAt ?? live.attempt?.lastVerifiedAt ?? null,
-        sourceKind: "exam_event",
+        sourceUrl: usingEstimate ? null : upcomingExam?.sourceUrl ?? live.attempt?.sourceUrl ?? null,
+        lastVerifiedAt: usingEstimate ? null : upcomingExam?.lastVerifiedAt ?? live.attempt?.lastVerifiedAt ?? null,
+        sourceKind: usingEstimate ? "admin_estimate" : "exam_event",
         conflictWarning,
       };
 

@@ -4,6 +4,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import { ICAI_RESOURCE_TYPES, type IcaiAdminDashboard, type IcaiPublicCatalog } from "@/lib/icai/types";
 import { decideIcaiReviewAction, manageExamEventAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { manageExamDateEstimateAction } from "@/app/(admin)/admin/icai-sync/estimate-actions";
+import type { AdminExamDateEstimate } from "@/lib/icai/exam-date-estimates";
 
 function time(value: string | null) {
   if (!value) return "—";
@@ -79,11 +81,13 @@ function reviewPreview(
 export function IcaiAdminSyncData({
   dashboard,
   catalog,
+  estimates,
   notice,
   error,
 }: {
   dashboard: IcaiAdminDashboard;
   catalog: IcaiPublicCatalog;
+  estimates: AdminExamDateEstimate[];
   notice?: string | null;
   error?: string | null;
 }) {
@@ -194,6 +198,17 @@ export function IcaiAdminSyncData({
             <h2>Exam dates and countdown sources</h2>
           </div>
         </div>
+        <form action={manageExamDateEstimateAction} className="icai-filters">
+          <input type="hidden" name="intent" value="save" />
+          <label>Level<select name="levelCode" required><option value="">Select level</option>{catalog.levels.map((level) => <option key={level.code} value={level.code}>{level.name}</option>)}</select></label>
+          <label>Attempt<select name="attemptKey" required><option value="">Select attempt</option>{[...new Map(catalog.attempts.map((attempt) => [attempt.key, attempt])).values()].map((attempt) => <option key={attempt.key} value={attempt.key}>{attempt.label}</option>)}</select></label>
+          <label>Group<select name="groupChoice" required><option value="">Select group</option><option value="not_applicable">All papers (Foundation)</option><option value="group_1">Group 1</option><option value="group_2">Group 2</option><option value="both">Both groups</option></select></label>
+          <label>Provisional first exam date<input name="estimatedDate" type="date" required /></label>
+          <label>Admin note<input name="note" maxLength={300} placeholder="Planning estimate source or rationale" /></label>
+          <button className="ui-button ui-button--primary" type="submit">Publish provisional date</button>
+        </form>
+        <p className="icai-muted">Students see this only when no verified ICAI exam event matches their level, attempt and group. Verified sync data replaces it automatically.</p>
+        {estimates.length ? <div className="icai-result-list">{estimates.map((estimate) => <article key={`${estimate.levelCode}:${estimate.attemptKey}:${estimate.groupChoice}`}><span><span><strong>{time(estimate.estimatedDate)}</strong><small>{estimate.levelCode} · {estimate.attemptKey} · {estimate.groupChoice.replaceAll("_", " ")}{estimate.note ? ` · ${estimate.note}` : ""}</small></span></span><span><Badge tone="warning">provisional</Badge><form action={manageExamDateEstimateAction}><input type="hidden" name="intent" value="remove"/><input type="hidden" name="levelCode" value={estimate.levelCode}/><input type="hidden" name="attemptKey" value={estimate.attemptKey}/><input type="hidden" name="groupChoice" value={estimate.groupChoice}/><button className="ui-button ui-button--danger ui-button--sm" type="submit">Remove</button></form></span></article>)}</div> : null}
         {examConflicts.length ? <div className="auth-status auth-status--warning" role="alert">{examConflicts.length} conflicting exam-date mapping{examConflicts.length === 1 ? "" : "s"} detected. Compare the official evidence before replacing or withdrawing a date.</div> : null}
         {catalog.events.length ? (
           <div className="icai-result-list">

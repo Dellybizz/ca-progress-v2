@@ -151,6 +151,7 @@ function OnboardingDashboard({ displayName }: { displayName: string }) {
 
 function AttemptStrip({ model }: { model: DashboardReadyModel }) {
   const pending = model.countdown.status === "awaiting_verified_date";
+  const estimated = model.countdown.sourceKind === "admin_estimate";
   const status = pending
     ? "Countdown coming soon"
     : model.countdown.status === "past"
@@ -162,7 +163,7 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
     <section className="dashboard-attempt-strip dashboard-attempt-card" aria-label="Current attempt">
       <div className="dashboard-attempt-card__main">
         <div className="dashboard-attempt-card__badges">
-          <span className="dashboard-attempt-card__verified"><Icon name="shield" size={13}/> {pending ? "Exam date pending" : "Verified exam date"}</span>
+          <span className="dashboard-attempt-card__verified"><Icon name={estimated ? "clock" : "shield"} size={13}/> {pending ? "Exam date pending" : estimated ? "Estimated exam date" : "Verified exam date"}</span>
           <span>{model.context.levelName} · {model.context.groupLabel}</span>
         </div>
         <span className="dashboard-attempt-card__eyebrow">{model.context.attemptLabel}</span>
@@ -171,11 +172,11 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
           {pending
             ? `Your ${model.context.attemptLabel} attempt is selected. The countdown will begin as soon as the official exam date is confirmed.`
             : date
-              ? `${date} · Keep your study plan aligned with your selected attempt.`
+              ? `${date} · ${estimated ? "Unofficial planning estimate; ICAI’s verified date will replace it automatically." : "Keep your study plan aligned with your selected attempt."}`
               : "Keep your study plan aligned with your selected attempt."}
         </p>
         <div className="dashboard-attempt-card__meta">
-          <span><Icon name="clock" size={13}/>{formatVerifiedAt(model.countdown.lastVerifiedAt)}</span>
+          <span><Icon name="clock" size={13}/>{estimated ? "Set by CA Progress admin" : formatVerifiedAt(model.countdown.lastVerifiedAt)}</span>
           {model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={13}/></a> : null}
           <Link href="/dashboard/exam">View exam details <Icon name="arrow" size={13}/></Link>
         </div>

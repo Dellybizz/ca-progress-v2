@@ -52,6 +52,7 @@ test('the scoped date reaches the dashboard model across IST midnight and disapp
       '@/lib/planner/dashboard': { getLatestStoredPlanRecommendation: async () => null, getPlannerDashboardSummary: async () => ({ taskCount: 0, revisionTaskCount: 0, testTaskCount: 0, estimatedMinutes: 0 }) },
       '@/lib/progress/service': { getProgressDashboardSummary: async () => ({ groups: [], subjects: [], overallPercent: 0, revision1Count: 0, revision2Count: 0, test1Count: 0, test2Count: 0 }) },
       '@/lib/study/service': { getStudyAnalytics: async () => ({ last7DaysSeconds: 0, todaySeconds: 0, streakDays: 0, sessionCountLast7Days: 0 }) },
+      '@/lib/icai/exam-date-estimates': { getAdminExamDateEstimate: async () => null },
       './countdown': countdown,
       './reference': {
         getDashboardAcademicReference: async () => academic,

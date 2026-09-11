@@ -63,7 +63,7 @@ test("attempt strip has a recognizable visual identity without adding dashboard 
   const character = read("app/styles/dashboard-character.css");
   const globals = read("app/globals.css");
   assert.match(dashboard, /dashboard-attempt-strip dashboard-attempt-card/);
-  assert.match(dashboard, /<Icon name="shield"/);
+  assert.match(dashboard, /"shield"/);
   for (const label of ["Subjects", "Chapters", "Selection"]) {
     assert.match(dashboard, new RegExp(`<span>${label}<\\/span>`));
   }
