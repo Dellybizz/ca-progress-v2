@@ -104,6 +104,21 @@ test('failed PDFs and redirects outside ICAI prevent source success',async()=>{
     try{await assert.rejects(resolveExamSchedules(root,source,subjects,db,'test',async()=>{},new Set(),fetcher,now),redirect?/non-HTTPS or non-ICAI/:/503/);}finally{db.sqlite.close();}
   }
 });
+test('an inconsistent guidance fallback is ignored without inventing a corrected date',async()=>{
+  const db=database();
+  const malformed=timetable.replace('6th May 2027','6th May 2026');
+  const fetcher=async(url)=>{
+    if(url.includes('examination_announcement'))return new Response('',{headers:{'content-type':'text/html'}});
+    if(url.endsWith('/new-attempt'))return new Response(`<a href="${evidence}">Guidance Notes for Final Exams May 2027</a>`,{headers:{'content-type':'text/html'}});
+    if(url===evidence)return new Response(makePdf(malformed),{headers:{'content-type':'application/pdf'}});
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+  try{
+    const parsed=await resolveExamSchedules(root,source,subjects,db,'test',async()=>{},new Set(),fetcher,now);
+    assert.equal(parsed.events.length,0);
+    assert.equal(parsed.attempts.length,0);
+  }finally{db.sqlite.close();}
+});
 test('a changed PDF is reparsed instead of reusing stale dates',async()=>{
   const db=database();let version=1;
   const fetcher=async(url)=>url.includes('examination_announcement')?new Response('',{headers:{'content-type':'text/html'}}):url.endsWith('/new-attempt')?new Response(`<a href="${evidence}">Important Announcement</a>`,{headers:{'content-type':'text/html'}}):new Response(makePdf(version===1?timetable:timetable.replace('14th January','16th January')),{headers:{'content-type':'application/pdf',etag:`v${version}`}});

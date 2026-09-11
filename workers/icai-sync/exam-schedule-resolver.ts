@@ -125,7 +125,17 @@ export async function resolveExamSchedules(
     }
     if (/application\/pdf/i.test(contentType) || new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-") {
       const text = await extractSchedulePdf(bytes);
-      const parsed = parseExamSchedule(text, finalUrl, subjects);
+      let parsed: ParsedSourcePayload;
+      try {
+        parsed = parseExamSchedule(text, finalUrl, subjects);
+      } catch (error) {
+        // Guidance notes are only a fallback and occasionally contain an
+        // internally inconsistent printed date. Never infer a correction or
+        // fail the whole discovery source because of that fallback: a later
+        // official timetable/announcement can still provide valid dates.
+        if (/guidance/i.test(entry.title)) continue;
+        throw error;
+      }
       if (parsed.events.length) parsed.resources.push({ title: entry.title, officialUrl: finalUrl, summary: null, resourceType: "schedule", levelCodes: [...new Set(parsed.events.map(event => event.levelCode))], attemptKeys: [...new Set(parsed.events.map(event => event.attemptKey))], subjectIds: parsed.events.map(event => event.subjectId!).filter(Boolean), publishedOn: null });
       merge(parsed);
       await db.prepare("INSERT INTO icai_exam_document_cache(url,etag,last_modified,content_hash,parser_version,payload,checked_at) VALUES(?1,?2,?3,?4,?5,?6,CURRENT_TIMESTAMP) ON CONFLICT(url) DO UPDATE SET etag=excluded.etag,last_modified=excluded.last_modified,content_hash=excluded.content_hash,parser_version=excluded.parser_version,payload=excluded.payload,checked_at=excluded.checked_at")
