@@ -1,3 +1,4 @@
+import { resolveExamSchedules } from "./exam-schedule-resolver";
 import { parseOfficialSource } from "../../lib/icai/adapters";
 import { sha256Hex, stableJson } from "../../lib/icai/hash";
 import { isApprovedIcaiUrl } from "../../lib/icai/html";
@@ -49,6 +50,7 @@ type SubjectRow = {
   id: string;
   title: string;
   level_id: string;
+  paper_label?: string;
   is_active?: boolean;
 };
 type AttemptRow = {
@@ -440,7 +442,9 @@ async function processSource(
   };
 
   await stage("fetching");
-  const fetched = await fetchOfficialPage(source, runtime);
+  const isExamIndex = source.sourceType === "exam_schedule_index";
+  // An unchanged index can still link to a revised PDF; always inspect its children.
+  const fetched = await fetchOfficialPage(isExamIndex ? { ...source, etag: null, lastModified: null } : source, runtime);
   await stage("validating", fetched.response.url || source.officialUrl);
   const snapshotBase = {
     http_status: fetched.response.status,
@@ -471,11 +475,14 @@ async function processSource(
   const subjectLookups = subjects.flatMap((subject) => {
     const levelCode = subjectLevelCode(subject, levelById);
     return levelCode
-      ? [{ id: subject.id, title: subject.title, levelCode }]
+      ? [{ id: subject.id, title: subject.title, levelCode, paperLabel: subject.paper_label }]
       : [];
   });
   await stage("parsing");
-  const discovered = parseOfficialSource(fetched.html, source, subjectLookups);
+  const scheduleSkips = isExamIndex ? (await runtime.db.prepare("SELECT item_url FROM icai_sync_item_skips WHERE source_id=?1 AND is_active=1 AND (scope='permanent' OR skipped_until>CURRENT_TIMESTAMP)").bind(source.id).all<{item_url:string}>()).results ?? [] : [];
+  const discovered = isExamIndex
+    ? await resolveExamSchedules(fetched.html, source, subjectLookups, runtime.db, runtime.userAgent, url => stage("parsing", url), new Set(scheduleSkips.map(row => row.item_url).filter(url => !retryItemUrls.includes(url))))
+    : parseOfficialSource(fetched.html, source, subjectLookups);
   const discoveredItemCount =
     discovered.resources.length + discovered.attempts.length + discovered.events.length;
   const allowEmpty = source.adapterConfig.allow_empty === true;
@@ -490,10 +497,10 @@ async function processSource(
   const listingHash = await sha256Hex(stableJson(discovered.resources.map((item) => item.officialUrl)));
   const cursorCompatible = Boolean(sourceState && (!sourceState.listing_hash || sourceState.listing_hash === listingHash));
   const cursorOffset = cursorCompatible ? Math.min(Number(sourceState?.cursor_offset ?? 0), discovered.resources.length) : 0;
-  const chunkEnd = sourceState ? Math.min(cursorOffset + 4, discovered.resources.length) : discovered.resources.length;
+  const chunkEnd = sourceState && !isExamIndex ? Math.min(cursorOffset + 4, discovered.resources.length) : discovered.resources.length;
   let partialResources: typeof discovered.resources = [];
   let partialEvents = discovered.events;
-  if (cursorCompatible && sourceState?.partial_resources) {
+  if (!isExamIndex && cursorCompatible && sourceState?.partial_resources) {
     try { partialResources = JSON.parse(sourceState.partial_resources) as typeof discovered.resources; } catch { partialResources = []; }
     try { partialEvents = JSON.parse(sourceState.partial_events) as typeof discovered.events; } catch { partialEvents = discovered.events; }
   }
@@ -702,8 +709,12 @@ async function processSource(
       title: event.title,
       subjectId: event.subjectId,
     };
+    const existingPaper = isExamIndex && event.subjectId
+      ? await runtime.db.prepare("SELECT id,verification_status FROM exam_events WHERE attempt_id=?1 AND subject_id=?2 AND event_type='exam_paper' ORDER BY first_seen_at,id LIMIT 1").bind(attemptIdValue, event.subjectId).first<{id:string;verification_status:string}>() : null;
+    if (existingPaper?.verification_status === "withdrawn") continue;
+    const eventIdentity = isExamIndex ? { attemptId: attemptIdValue, eventType: event.eventType, subjectId: event.subjectId } : canonical;
     eventPayloads.push({
-      id: `exam-event-${(await sha256Hex(stableJson(canonical))).slice(0, 32)}`,
+      id: existingPaper?.id ?? `exam-event-${(await sha256Hex(stableJson(eventIdentity))).slice(0, 32)}`,
       attempt_id: attemptIdValue,
       event_type: event.eventType,
       title: event.title,

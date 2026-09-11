@@ -130,6 +130,25 @@ if (Number(realRun.source_succeeded) < 1) {
 if (childJobs.length < Number(realRun.source_total)) throw new Error("Phase 5 did not persist at least one bounded source job per configured source.");
 writeFileSync(`${evidenceDir}/icai-phase5-real-run.json`, JSON.stringify(realRun, null, 2));
 
+// Certify the automatic schedule source on this exact deployed run. A partial
+// success elsewhere must not hide a broken date extraction pipeline.
+const scheduleSource = d1(`SELECT source_id,status,last_error FROM icai_sync_source_states WHERE run_id=${sqlText(realRun.id)} AND source_id='icai-live-exam-schedules';`)[0];
+if (scheduleSource?.status !== "succeeded") throw new Error(`Automatic exam schedule source did not succeed: ${JSON.stringify(scheduleSource ?? {missing:true})}`);
+const scheduleDates = d1("SELECT l.code AS level,a.attempt_key,e.subject_id,e.event_date,e.verification_status,e.source_url FROM exam_events e JOIN exam_attempts a ON a.id=e.attempt_id JOIN course_levels l ON l.id=a.level_id WHERE e.source_id='icai-live-exam-schedules' ORDER BY a.attempt_key,l.code,e.event_date;");
+const expectedScheduleEvents = d1("SELECT payload FROM icai_exam_document_cache;").flatMap(row => JSON.parse(row.payload).events ?? []).filter(event => event.attemptKey >= new Date().toISOString().slice(0,7));
+const deliveredScheduleEvents = d1("SELECT e.id,l.code AS level,a.attempt_key,e.subject_id,e.event_date,e.verification_status FROM exam_events e JOIN exam_attempts a ON a.id=e.attempt_id JOIN course_levels l ON l.id=a.level_id;");
+const pendingScheduleChanges = d1("SELECT entity_id,proposed_patch FROM icai_review_queue WHERE entity_type='exam_event' AND status='pending';");
+for (const expected of expectedScheduleEvents) {
+  const actual = deliveredScheduleEvents.find(event => event.level === expected.levelCode && event.attempt_key === expected.attemptKey && event.subject_id === expected.subjectId);
+  if (actual?.verification_status === "withdrawn") continue;
+  const approved = actual?.verification_status === "verified" && actual.event_date === expected.eventDate;
+  const reviewed = actual && pendingScheduleChanges.some(review => review.entity_id === actual.id && JSON.parse(review.proposed_patch).event_date === expected.eventDate);
+  if (!approved && !reviewed) throw new Error(`Extracted official exam date did not reach its mapped event or review: ${expected.levelCode}/${expected.attemptKey}/${expected.subjectId}`);
+}
+writeFileSync(`${evidenceDir}/icai-live-exam-schedules.json`, JSON.stringify({source:scheduleSource,events:scheduleDates,extractedPaperCount:expectedScheduleEvents.length}, null, 2));
+console.log(`Automatic exam schedule discovery PASS: ${scheduleDates.length} canonical paper events.`);
+
+
 const snapshots = d1(`SELECT ss.id,ss.source_id,ss.fetched_at,ss.http_status,ss.canonical_hash,ss.parsed_item_count,s.official_url FROM icai_source_snapshots ss JOIN icai_sources s ON s.id=ss.source_id WHERE ss.run_id=${sqlText(realRun.id)} ORDER BY ss.source_id;`);
 if (!snapshots.length || !snapshots.some((row) => Number(row.http_status) === 200 || Number(row.http_status) === 304)) {
   throw new Error("Phase 5 real sync produced no successful official-source snapshot.");
