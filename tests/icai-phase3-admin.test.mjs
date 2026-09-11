@@ -79,8 +79,8 @@ test("Phase 3D separates verified student-facing content and review work with co
   assert.match(data, /name="subject"/);
   assert.match(data, /name="type"/);
   assert.match(data, /Approval queue/);
-  assert.match(data, />Approve</);
-  assert.match(data, />Reject</);
+  assert.match(data, />\s*Approve\s*</);
+  assert.match(data, />\s*Reject\s*</);
   assert.match(data, /Open ICAI PDF|Open PDF/);
   assert.match(data, /Exam dates and countdown sources/);
   assert.match(data, /Possible duplicate groups/);

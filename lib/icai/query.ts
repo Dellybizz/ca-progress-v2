@@ -3,6 +3,7 @@ import "server-only";
 import { createD1ServerClient } from "@/lib/data/d1/client";
 import { createD1AdminClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/data/database.types";
+import { visibleAttemptKeys } from "@/lib/profile/validation";
 import type {
   IcaiAdminDashboard,
   IcaiPublicCatalog,
@@ -280,15 +281,17 @@ export async function getIcaiPublicCatalog(
           code: row.code,
           name: row.name,
         })),
-        attempts: attempts.map((row: AttemptRow) => ({
-          id: row.id,
-          key: row.attempt_key,
-          label: row.label,
-          levelCode: levelById.get(row.level_id)?.code ?? "",
-          startDate: row.start_date,
-          endDate: row.end_date,
-          sourceUrl: row.source_url,
-        })),
+        attempts: visibleAttemptKeys(
+          attempts.map((row: AttemptRow) => ({
+            id: row.id,
+            key: row.attempt_key,
+            label: row.label,
+            levelCode: levelById.get(row.level_id)?.code ?? "",
+            startDate: row.start_date,
+            endDate: row.end_date,
+            sourceUrl: row.source_url,
+          })),
+        ),
         subjects: subjects.map((row: SubjectRow) => ({
           id: row.id,
           title: row.title,
@@ -334,7 +337,12 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
       .eq("job_type", "icai-sync")
       .order("created_at", { ascending: false })
       .limit(20),
-    client.from("icai_sync_item_skips").select("id,source_id,item_url,scope,skipped_until").eq("is_active", true).order("updated_at", { ascending: false }).limit(50),
+    client
+      .from("icai_sync_item_skips")
+      .select("id,source_id,item_url,scope,skipped_until")
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(50),
   ]);
 
   const firstError = [
@@ -351,24 +359,43 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
   const sourceById = new Map(sources.map((source) => [source.id, source]));
   const runs = (runResponse.data ?? []) as SyncRunRow[];
   const run = runs[0] ?? null;
-  const [snapshotResponse, runtimeResponse, sourceStateResponse, itemResponse] = run
-    ? await Promise.all([
-        client.from("icai_source_snapshots").select("*").eq("run_id", run.id),
-        client.from("icai_sync_runtime").select("*").eq("run_id", run.id).maybeSingle(),
-        client
-          .from("icai_sync_source_states")
-          .select("source_id,status,attempts,started_at,finished_at,cursor_offset,cursor_total,resolved_count,dropped_count,unavailable_count")
-          .eq("run_id", run.id)
-          .order("source_index"),
-        client.from("icai_sync_items").select("id,run_id,source_id,item_url,item_type,item_title,status,stage,attempts,started_at,completed_at,duration_ms,bytes_fetched,parsed_count,failure_category,failure_message,skip_reason,retry_eligible,updated_at").eq("run_id", run.id).order("updated_at", { ascending: false }).limit(100),
-      ])
-    : [
-        { data: [], error: null },
-        { data: null, error: null },
-        { data: [], error: null },
-        { data: [], error: null },
-      ];
-  const runDetailError = [snapshotResponse.error, runtimeResponse.error, sourceStateResponse.error, itemResponse.error].find(Boolean);
+  const [snapshotResponse, runtimeResponse, sourceStateResponse, itemResponse] =
+    run
+      ? await Promise.all([
+          client.from("icai_source_snapshots").select("*").eq("run_id", run.id),
+          client
+            .from("icai_sync_runtime")
+            .select("*")
+            .eq("run_id", run.id)
+            .maybeSingle(),
+          client
+            .from("icai_sync_source_states")
+            .select(
+              "source_id,status,attempts,started_at,finished_at,cursor_offset,cursor_total,resolved_count,dropped_count,unavailable_count",
+            )
+            .eq("run_id", run.id)
+            .order("source_index"),
+          client
+            .from("icai_sync_items")
+            .select(
+              "id,run_id,source_id,item_url,item_type,item_title,status,stage,attempts,started_at,completed_at,duration_ms,bytes_fetched,parsed_count,failure_category,failure_message,skip_reason,retry_eligible,updated_at",
+            )
+            .eq("run_id", run.id)
+            .order("updated_at", { ascending: false })
+            .limit(100),
+        ])
+      : [
+          { data: [], error: null },
+          { data: null, error: null },
+          { data: [], error: null },
+          { data: [], error: null },
+        ];
+  const runDetailError = [
+    snapshotResponse.error,
+    runtimeResponse.error,
+    sourceStateResponse.error,
+    itemResponse.error,
+  ].find(Boolean);
   if (runDetailError) throw runDetailError;
   const runtime = runtimeResponse.data as Record<string, unknown> | null;
   const snapshots = (snapshotResponse.data ?? []) as Array<
@@ -378,7 +405,9 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
     snapshots.map((snapshot) => [String(snapshot.source_id), snapshot]),
   );
   const jobs = (jobResponse.data ?? []) as Array<Record<string, unknown>>;
-  const sourceStates = (sourceStateResponse.data ?? []) as Array<Record<string, unknown>>;
+  const sourceStates = (sourceStateResponse.data ?? []) as Array<
+    Record<string, unknown>
+  >;
   const sourceMetrics = sourceStates.map((state) => ({
     sourceId: String(state.source_id),
     status: String(state.status),
@@ -390,8 +419,9 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
     startedAt: state.started_at ? String(state.started_at) : null,
     finishedAt: state.finished_at ? String(state.finished_at) : null,
   }));
-  const sumMetric = (key: "pagesChecked" | "pdfsResolved" | "unavailablePages" | "skippedPages") =>
-    sourceMetrics.reduce((total, item) => total + item[key], 0);
+  const sumMetric = (
+    key: "pagesChecked" | "pdfsResolved" | "unavailablePages" | "skippedPages",
+  ) => sourceMetrics.reduce((total, item) => total + item[key], 0);
   const activeJob =
     jobs.find((job) => job.status === "queued" || job.status === "running") ??
     null;
@@ -477,9 +507,16 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
       pdfsResolved: sumMetric("pdfsResolved"),
       unavailablePages: sumMetric("unavailablePages"),
       skippedPages: sumMetric("skippedPages"),
-      affectedRows: run ? Number(run.new_items) + Number(run.changed_items) + Number(run.unchanged_items) + Number(run.removed_items) : 0,
+      affectedRows: run
+        ? Number(run.new_items) +
+          Number(run.changed_items) +
+          Number(run.unchanged_items) +
+          Number(run.removed_items)
+        : 0,
       reviewsCreated: run ? Number(run.pending_reviews) : 0,
-      reviewsSuppressed: ((changeResponse.data ?? []) as ChangeRow[]).filter((change) => change.decision_status === "duplicate_suppressed").length,
+      reviewsSuppressed: ((changeResponse.data ?? []) as ChangeRow[]).filter(
+        (change) => change.decision_status === "duplicate_suppressed",
+      ).length,
     },
     sources: sources.map((source) => ({
       id: source.id,
@@ -495,10 +532,45 @@ export async function getIcaiAdminDashboard(): Promise<IcaiAdminDashboard> {
       trustLevel: source.trust_level,
       authoritativeListing: source.authoritative_listing,
       isActive: source.is_active,
-      excludedUntil: (source as SourceRow & { excluded_until?: string | null }).excluded_until ?? null,
+      excludedUntil:
+        (source as SourceRow & { excluded_until?: string | null })
+          .excluded_until ?? null,
     })),
-    itemDiagnostics: ((itemResponse.data ?? []) as Array<Record<string, unknown>>).map((item) => ({ id: String(item.id), runId: String(item.run_id), sourceId: String(item.source_id), itemUrl: String(item.item_url), itemType: String(item.item_type), itemTitle: item.item_title ? String(item.item_title) : null, status: String(item.status), stage: String(item.stage), attempts: Number(item.attempts ?? 0), startedAt: item.started_at ? String(item.started_at) : null, completedAt: item.completed_at ? String(item.completed_at) : null, durationMs: item.duration_ms == null ? null : Number(item.duration_ms), bytesFetched: Number(item.bytes_fetched ?? 0), parsedCount: Number(item.parsed_count ?? 0), failureCategory: item.failure_category ? String(item.failure_category) : null, failureMessage: item.failure_message ? String(item.failure_message) : null, skipReason: item.skip_reason ? String(item.skip_reason) : null, retryEligible: Boolean(item.retry_eligible) })),
-    skippedItems: ((skipResponse.data ?? []) as Array<Record<string, unknown>>).map((item) => ({ id: String(item.id), sourceId: String(item.source_id), itemUrl: String(item.item_url), scope: String(item.scope), skippedUntil: item.skipped_until ? String(item.skipped_until) : null })),
+    itemDiagnostics: (
+      (itemResponse.data ?? []) as Array<Record<string, unknown>>
+    ).map((item) => ({
+      id: String(item.id),
+      runId: String(item.run_id),
+      sourceId: String(item.source_id),
+      itemUrl: String(item.item_url),
+      itemType: String(item.item_type),
+      itemTitle: item.item_title ? String(item.item_title) : null,
+      status: String(item.status),
+      stage: String(item.stage),
+      attempts: Number(item.attempts ?? 0),
+      startedAt: item.started_at ? String(item.started_at) : null,
+      completedAt: item.completed_at ? String(item.completed_at) : null,
+      durationMs: item.duration_ms == null ? null : Number(item.duration_ms),
+      bytesFetched: Number(item.bytes_fetched ?? 0),
+      parsedCount: Number(item.parsed_count ?? 0),
+      failureCategory: item.failure_category
+        ? String(item.failure_category)
+        : null,
+      failureMessage: item.failure_message
+        ? String(item.failure_message)
+        : null,
+      skipReason: item.skip_reason ? String(item.skip_reason) : null,
+      retryEligible: Boolean(item.retry_eligible),
+    })),
+    skippedItems: (
+      (skipResponse.data ?? []) as Array<Record<string, unknown>>
+    ).map((item) => ({
+      id: String(item.id),
+      sourceId: String(item.source_id),
+      itemUrl: String(item.item_url),
+      scope: String(item.scope),
+      skippedUntil: item.skipped_until ? String(item.skipped_until) : null,
+    })),
     reviews: ((reviewResponse.data ?? []) as ReviewRow[]).map((review) => {
       const source = sourceById.get(review.source_id);
       const rawPatch = review.proposed_patch;

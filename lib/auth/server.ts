@@ -5,9 +5,16 @@ import { cache } from "react";
 import { measureServerPerformance } from "@/lib/cloudflare/runtime-env";
 import { createD1ServerClient } from "@/lib/data/d1/client";
 import type { Database } from "@/lib/data/database.types";
-import type { AttemptOption, CALevel } from "@/lib/profile/validation";
+import {
+  visibleAttemptKeys,
+  type AttemptOption,
+  type CALevel,
+} from "@/lib/profile/validation";
 import type { AppRole } from "@/lib/authorization/roles";
-import { getCloudflareProfileForUser, ensureCloudflareUserBootstrap } from "./cloudflare-profile";
+import {
+  getCloudflareProfileForUser,
+  ensureCloudflareUserBootstrap,
+} from "./cloudflare-profile";
 import { getCloudflareRequestAuth } from "./cloudflare";
 import { loginPathFor, sanitizeReturnPath } from "./navigation";
 
@@ -21,7 +28,12 @@ export type ServerIdentity = {
   role?: AppRole | null;
   entitlements?: string[];
 };
-export type Viewer = { authenticated: boolean; id?: string; label: string; initial: string };
+export type Viewer = {
+  authenticated: boolean;
+  id?: string;
+  label: string;
+  initial: string;
+};
 
 export type RequestAuthContext = {
   identity: ServerIdentity | null;
@@ -34,15 +46,17 @@ async function getRequestAuthContextUncached(): Promise<RequestAuthContext> {
   const auth = await getCloudflareRequestAuth();
   const session = auth.session;
   return {
-    identity: session ? {
-      id: auth.applicationUserId!,
-      email: session.email,
-      phone: session.phone,
-      displayName: session.displayName,
-      avatarUrl: session.avatarUrl,
-      role: auth.role,
-      entitlements: auth.entitlements,
-    } : null,
+    identity: session
+      ? {
+          id: auth.applicationUserId!,
+          email: session.email,
+          phone: session.phone,
+          displayName: session.displayName,
+          avatarUrl: session.avatarUrl,
+          role: auth.role,
+          entitlements: auth.entitlements,
+        }
+      : null,
     role: auth.role,
     entitlements: auth.entitlements,
     authenticated: auth.authenticated,
@@ -64,8 +78,13 @@ export async function requireUser(next = "/dashboard") {
   return user;
 }
 
-async function getProfileForUserUncached(userId: string): Promise<ProfileRow | null> {
-  return await measureServerPerformance("auth.profile", () => getCloudflareProfileForUser(userId) as Promise<ProfileRow | null>);
+async function getProfileForUserUncached(
+  userId: string,
+): Promise<ProfileRow | null> {
+  return await measureServerPerformance(
+    "auth.profile",
+    () => getCloudflareProfileForUser(userId) as Promise<ProfileRow | null>,
+  );
 }
 
 // Profile reads are shared by the shell, page services, and authorization checks.
@@ -93,23 +112,56 @@ export async function ensureUserBootstrap() {
 export async function loadAttemptOptions(): Promise<AttemptOption[]> {
   const client = await createD1ServerClient();
   const [attempts, levels, mappings, groups] = await Promise.all([
-    client.from("exam_attempts").select("attempt_key, label, level_id").eq("verification_status", "verified"),
+    client
+      .from("exam_attempts")
+      .select("attempt_key, label, level_id")
+      .eq("verification_status", "verified"),
     client.from("course_levels").select("id, code").eq("is_active", true),
     client.from("attempt_syllabus_map").select("attempt_key,level_id,group_id"),
     client.from("course_groups").select("id,code"),
   ]);
-  const attemptRows = (attempts.data ?? []) as Array<{ attempt_key: string; label: string; level_id: string }>;
+  const attemptRows = (attempts.data ?? []) as Array<{
+    attempt_key: string;
+    label: string;
+    level_id: string;
+  }>;
   const levelRows = (levels.data ?? []) as Array<{ id: string; code: CALevel }>;
-  const mappingRows = (mappings.data ?? []) as Array<{ attempt_key: string; level_id: string; group_id: string }>;
+  const mappingRows = (mappings.data ?? []) as Array<{
+    attempt_key: string;
+    level_id: string;
+    group_id: string;
+  }>;
   const groupRows = (groups.data ?? []) as Array<{ id: string; code: string }>;
-  if (attempts.error || levels.error || mappings.error || groups.error || !attemptRows.length) return [{ key: "undecided", label: "Not decided yet", kind: "runtime_fallback" }];
-  const levelById = new Map<string, CALevel>(levelRows.map((level) => [level.id, level.code]));
+  if (
+    attempts.error ||
+    levels.error ||
+    mappings.error ||
+    groups.error ||
+    !attemptRows.length
+  )
+    return [
+      { key: "undecided", label: "Not decided yet", kind: "runtime_fallback" },
+    ];
+  const levelById = new Map<string, CALevel>(
+    levelRows.map((level) => [level.id, level.code]),
+  );
   const groupById = new Map(groupRows.map((group) => [group.id, group.code]));
-  const grouped = new Map<string, { label: string; levels: Set<CALevel>; groupsByLevel: Map<CALevel, Set<string>> }>();
+  const grouped = new Map<
+    string,
+    {
+      label: string;
+      levels: Set<CALevel>;
+      groupsByLevel: Map<CALevel, Set<string>>;
+    }
+  >();
   for (const row of attemptRows) {
     const level = levelById.get(row.level_id);
     if (!level) continue;
-    const current = grouped.get(row.attempt_key) ?? { label: row.label, levels: new Set<CALevel>(), groupsByLevel: new Map<CALevel, Set<string>>() };
+    const current = grouped.get(row.attempt_key) ?? {
+      label: row.label,
+      levels: new Set<CALevel>(),
+      groupsByLevel: new Map<CALevel, Set<string>>(),
+    };
     current.levels.add(level);
     if (row.label) current.label = row.label;
     grouped.set(row.attempt_key, current);
@@ -123,9 +175,25 @@ export async function loadAttemptOptions(): Promise<AttemptOption[]> {
     levelGroups.add(group);
     current.groupsByLevel.set(level, levelGroups);
   }
-  return [...grouped.entries()]
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([key, value]) => ({ key, label: value.label, kind: "verified_exam_attempt", levels: [...value.levels], groupsByLevel: Object.fromEntries([...value.groupsByLevel].map(([level, choices]) => [level, [...choices].sort()])) }));
+  return visibleAttemptKeys(
+    [...grouped.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(
+        ([key, value]) =>
+          ({
+            key,
+            label: value.label,
+            kind: "verified_exam_attempt",
+            levels: [...value.levels],
+            groupsByLevel: Object.fromEntries(
+              [...value.groupsByLevel].map(([level, choices]) => [
+                level,
+                [...choices].sort(),
+              ]),
+            ),
+          }) as AttemptOption,
+      ),
+  );
 }
 
 export async function resolvePostAuthDestination(next: string) {
@@ -133,7 +201,8 @@ export async function resolvePostAuthDestination(next: string) {
   const safeNext = sanitizeReturnPath(next);
   if (!user) return loginPathFor(safeNext);
   const profile = await getProfileForUser(user.id);
-  if (!profile?.onboarding_completed_at) return `/onboarding?next=${encodeURIComponent(safeNext)}`;
+  if (!profile?.onboarding_completed_at)
+    return `/onboarding?next=${encodeURIComponent(safeNext)}`;
   return safeNext;
 }
 
@@ -141,6 +210,16 @@ export async function loadViewer(): Promise<Viewer> {
   const user = await optionalUser();
   if (!user) return { authenticated: false, label: "Guest", initial: "G" };
   const profile = await getProfileForUser(user.id);
-  const label = profile?.display_name || user.displayName || user.email || user.phone || "Student";
-  return { authenticated: true, id: user.id, label, initial: label.trim().charAt(0).toUpperCase() || "S" };
+  const label =
+    profile?.display_name ||
+    user.displayName ||
+    user.email ||
+    user.phone ||
+    "Student";
+  return {
+    authenticated: true,
+    id: user.id,
+    label,
+    initial: label.trim().charAt(0).toUpperCase() || "S",
+  };
 }
