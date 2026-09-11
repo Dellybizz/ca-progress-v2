@@ -34,11 +34,11 @@ test("official ICAI source discovery gets a dedicated service-binding wall-time 
 test("live ICAI proof waits beyond the configured 5-minute CPU ceiling without masking dead letters", () => {
   const proof = read("scripts/verify-icai-phase5-live.mjs");
   assert.match(proof, /const JOB_POLL_INTERVAL_MS = 5_000/);
-  assert.match(proof, /const JOB_POLL_ATTEMPTS = 90/);
+  assert.match(proof, /const JOB_POLL_ATTEMPTS = 150/);
   assert.match(proof, /status === "dead_letter"/);
   assert.match(proof, /await sleep\(JOB_POLL_INTERVAL_MS\)/);
-  assert.ok(90 * 5_000 > 300_000, "live proof must allow more wall time than the configured CPU ceiling");
-  assert.ok(90 * 5_000 < 15 * 60_000, "live proof must remain below Cloudflare Queue's 15-minute wall-time ceiling");
+  assert.ok(150 * 5_000 > 300_000, "live proof must allow more wall time than the configured CPU ceiling");
+  assert.ok(150 * 5_000 < 15 * 60_000, "live proof must remain below Cloudflare Queue's 15-minute wall-time ceiling");
 });
 
 test("live ICAI proof binds continuation evidence to its exact deployment correlation and SHA", () => {
