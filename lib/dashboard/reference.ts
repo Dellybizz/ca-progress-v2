@@ -2,7 +2,8 @@ import "server-only";
 
 import { unstable_cache } from "next/cache";
 import { getHotAcademicReference } from "@/lib/data/d1/hot-screens";
-import { createD1AdminClient } from "@/lib/data/d1/client";
+import { getD1RuntimeDatabase, createD1AdminClient } from "@/lib/data/d1/client";
+import { dashboardExamQuery } from "./exam-query";
 import type { Database, Json } from "@/lib/data/database.types";
 import type { DashboardAcademicReference, DashboardAcademicSubject, DashboardIcaiUpdate, DashboardLiveReference } from "./types";
 
@@ -63,7 +64,11 @@ async function loadLiveReference(levelId: string, levelCode: string, attemptKey:
   if (attemptResponse.error) throw attemptResponse.error;
   const attempt = attemptResponse.data;
   const [eventResponse, resourceResponse, sourceResponse, attemptMapResponse, subjectMapResponse] = await Promise.all([
-    attempt ? client.from("exam_events").select("id,attempt_id,subject_id,title,event_type,event_date,source_url,last_seen_at,verification_status").eq("attempt_id", attempt.id).eq("verification_status", "verified").gte("event_date", today).order("event_date").limit(24) : Promise.resolve({ data: [], error: null }),
+    attempt ? (async () => {
+      const query = dashboardExamQuery(attempt.id, subjectIds, today);
+      const result = await getD1RuntimeDatabase().prepare(query.sql).bind(...query.values).all<EventRow>();
+      return { data: result.results ?? [], error: null };
+    })() : Promise.resolve({ data: [], error: null }),
     client.from("icai_resources").select("id,resource_type,title,summary,official_url,source_id,metadata,published_on,last_seen_at,last_changed_at,verification_status,status").eq("verification_status", "verified").eq("status", "active").order("last_changed_at", { ascending: false }).limit(24),
     client.from("icai_sources").select("id,name,official_url,is_active").eq("is_active", true),
     attempt ? client.from("resource_attempt_map").select("resource_id,attempt_id").eq("attempt_id", attempt.id) : Promise.resolve({ data: [], error: null }),
@@ -90,6 +95,6 @@ async function loadLiveReference(levelId: string, levelCode: string, attemptKey:
   return { attempt: attempt ? { id:attempt.id,key:attempt.attempt_key,label:attempt.label,startDate:attempt.start_date,endDate:attempt.end_date,sourceUrl:attempt.source_url,lastVerifiedAt:attempt.last_seen_at } : null, examEvents, updates, verifiedAt:verifiedCandidates.sort().at(-1)??null };
 }
 
-const cachedLiveReference = unstable_cache(loadLiveReference,["phase3-dashboard-live-v2"],{ revalidate: 300, tags: ["dashboard-live"] });
+const cachedLiveReference = unstable_cache(loadLiveReference,["phase5-dashboard-live-v3"],{ revalidate: 300, tags: ["dashboard-live"] });
 export function getDashboardAcademicReference(levelCode:string,groupChoice:string,attemptKey:string){return cachedAcademicReference(levelCode,groupChoice,attemptKey);}
 export function getDashboardLiveReference(input:{levelId:string;levelCode:string;attemptKey:string;subjectIds:string[];today:string}){return cachedLiveReference(input.levelId,input.levelCode,input.attemptKey,input.subjectIds.slice().sort().join(","),input.today);}

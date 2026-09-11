@@ -14,8 +14,8 @@ test("countdown changes date exactly at the IST boundary",()=>{
 
 test("dashboard accepts only verified attempt-mapped and subject-applicable exam events",()=>{
   const reference=read("lib/dashboard/reference.ts");
-  assert.match(reference,/eq\("attempt_id", attempt\.id\)/);
-  assert.match(reference,/eq\("verification_status", "verified"\)/);
+  assert.match(reference,/dashboardExamQuery\(attempt.id, subjectIds, today\)/);
+  assert.match(read("lib/dashboard/exam-query.ts"),/verification_status='verified'/);
   assert.match(reference,/event\.subject_id \? selectedSubjectIds\.has\(event\.subject_id\) : event\.event_type === "exam_start"/);
 });
 

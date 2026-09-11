@@ -39,5 +39,6 @@ test("navigation exposes smart planning on desktop and mobile without removing c
   assert.match(nav, /href: "\/planner"/);
   assert.match(nav, /Revision Settings/);
   assert.match(nav, /Forecast/);
-  assert.match(mobile, /href: "\/planner\/today"/);
+  assert.match(nav, /href: "\/planner\/today"/);
+  assert.match(mobile, /items\.map/);
 });

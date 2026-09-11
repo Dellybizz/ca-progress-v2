@@ -162,7 +162,7 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
     <section className="dashboard-attempt-strip dashboard-attempt-card" aria-label="Current attempt">
       <div className="dashboard-attempt-card__main">
         <div className="dashboard-attempt-card__badges">
-          <span className="dashboard-attempt-card__verified"><Icon name="shield" size={13}/> Verified attempt</span>
+          <span className="dashboard-attempt-card__verified"><Icon name="shield" size={13}/> {pending ? "Exam date pending" : "Verified exam date"}</span>
           <span>{model.context.levelName} · {model.context.groupLabel}</span>
         </div>
         <span className="dashboard-attempt-card__eyebrow">{model.context.attemptLabel}</span>

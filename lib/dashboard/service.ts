@@ -68,8 +68,8 @@ async function getDashboardPageModelUncached(now = new Date()): Promise<Dashboar
         daysRemaining: null,
         targetDate: null,
         title: live.attempt?.label ?? attemptKey,
-        sourceUrl: live.attempt?.sourceUrl ?? null,
-        lastVerifiedAt: live.attempt?.lastVerifiedAt ?? null,
+        sourceUrl: null,
+        lastVerifiedAt: null,
         sourceKind: "none",
         conflictWarning,
       }

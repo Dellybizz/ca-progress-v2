@@ -296,6 +296,7 @@ export async function decideIcaiReviewAction(formData: FormData) {
     await recordAdminAuditEvent({ actorUserId: operator.user.id, actorRole: operator.role, capability: "icai.review", action: `icai.review.${decision}`, targetType: "icai_review", targetId: reviewId, reason: "ICAI high-impact review decision", newValue: { status: result.status }, traceId: traceId(), reversible: false });
     await invalidateSharedPublicCache(["icai"]);
     updateTag("dashboard-live");
+    revalidatePath("/dashboard"); revalidatePath("/dashboard/exam");
     revalidatePath("/admin/icai-sync"); revalidatePath("/admin/icai-sync/data"); revalidatePath("/updates"); revalidatePath("/resources/icai");
     destination = `/admin/icai-sync/data?notice=${encodeURIComponent(`Review ${result.status}. Student-facing data and audit history are now consistent.`)}`;
   } catch (error) { destination = `/admin/icai-sync/data?error=${encodeURIComponent(message(error))}`; }
