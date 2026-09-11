@@ -818,7 +818,13 @@ async function continuationSources(client: AdminClient) {
   const response = await client.from("icai_sources").select("*").eq("is_active", true).order("id");
   if (response.error) throw response.error;
   const now = new Date().toISOString();
-  const sources = ((response.data ?? []) as Array<SourceRow & {excluded_until?:string|null}>).filter((row) => !row.excluded_until || row.excluded_until <= now).map(sourceDto);
+  const sources = ((response.data ?? []) as Array<SourceRow & {excluded_until?:string|null}>)
+    .filter((row) => !row.excluded_until || row.excluded_until <= now)
+    .map(sourceDto)
+    // Countdown dates are time-sensitive and this bounded source is cheap.
+    // Run it before the deeper study-material traversals so a long queue
+    // cannot starve automatic attempt discovery.
+    .sort((left, right) => Number(right.sourceType === "exam_schedule_index") - Number(left.sourceType === "exam_schedule_index"));
   if (!sources.length) throw new Error("No active ICAI sources are configured.");
   return sources;
 }

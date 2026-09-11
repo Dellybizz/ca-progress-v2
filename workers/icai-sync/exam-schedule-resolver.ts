@@ -89,7 +89,10 @@ export async function resolveExamSchedules(
       if (keys.length && keys.every(key => levels.every(level => [...events.values()].filter(event => event.attemptKey === key && event.levelCode === level).length === (level === "foundation" ? 4 : 6)))) continue;
     }
     await checkpoint(entry.url);
-    if (Date.now() > deadline) throw new Error("Schedule discovery reached its time limit; canonical dates preserved.");
+    // Reaching the discovery wall-time bound is a completed bounded scan, not
+    // a retryable source failure. Only fully parsed timetables have been
+    // merged, so returning here cannot publish an inferred or partial date.
+    if (Date.now() > deadline) break;
     let bytes: Uint8Array; let contentType = "text/html"; let finalUrl = entry.url;
     let response: Response | undefined;
     const cached = await db.prepare("SELECT etag,last_modified,payload,parser_version FROM icai_exam_document_cache WHERE url=?1").bind(entry.url).first<CacheRow>();
