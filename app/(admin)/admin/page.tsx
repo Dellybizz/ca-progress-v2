@@ -47,6 +47,16 @@ export default async function AdminPage() {
     </section>
 
     <section style={section}>
+      <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Routine operations</h2>
+      <div style={grid}>
+        <Link href="/admin/health" style={card}><strong>System health</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>See plain-language health and recovery queues.</div></Link>
+        <Link href="/admin/control" style={card}><strong>Control centre</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>Draft, publish and restore operational configuration.</div></Link>
+        <Link href="/admin/plans" style={card}><strong>Plans & entitlements</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>Review student plan availability.</div></Link>
+        <Link href="/admin/notifications" style={card}><strong>Notifications</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>Review templates and delivery health.</div></Link>
+      </div>
+    </section>
+
+    <section style={section}>
       <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Owner workspaces</h2>
       <div style={grid}>
         <Link href="/admin/users" style={card}><strong>Users</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>Search identity, CA profile and plan context.</div></Link>

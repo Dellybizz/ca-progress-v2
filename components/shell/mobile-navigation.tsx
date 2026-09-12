@@ -40,10 +40,14 @@ const studentMoreGroups: MobileMoreGroup[] = [
 
 const adminMoreGroups: MobileMoreGroup[] = [
   { label: "Operations", items: [
+    { label: "System health", description: "See routine operational health", href: "/admin/health", icon: "chart" },
+    { label: "Control centre", description: "Draft, publish or restore configuration", href: "/admin/control", icon: "settings" },
     { label: "Staff & roles", description: "Review privileged accounts and roles", href: "/admin/staff", icon: "shield" },
     { label: "Audit log", description: "Inspect privileged action history", href: "/admin/audit", icon: "notes" },
     { label: "Syllabus preview", description: "Review academic structure", href: "/admin/syllabus", icon: "book" },
     { label: "Jobs", description: "Inspect background job health", href: "/admin/jobs", icon: "timer" },
+    { label: "Plans", description: "Review plans and availability", href: "/admin/plans", icon: "sparkles" },
+    { label: "Notifications", description: "Review templates and delivery health", href: "/admin/notifications", icon: "bell" },
   ] },
   { label: "Moderation", items: [
     { label: "Resource moderation", description: "Review reported student resources", href: "/admin/resources/moderation", icon: "notes" },

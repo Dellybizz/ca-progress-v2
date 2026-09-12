@@ -39,6 +39,7 @@ const migrations = [
   ["0042", "d1/migrations/0042_admin_exam_date_estimates.sql"],
   ["0043", "d1/migrations/0043_exam_date_estimate_windows.sql"],
   ["0044", "d1/migrations/0044_product_consistency_phase7_guest_migration.sql"],
+  ["0045", "d1/migrations/0045_product_consistency_phase8_admin_control.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
@@ -90,7 +91,7 @@ function query(sql) {
 }
 
 const ledgerResult = query(
-  "SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0044' ORDER BY version;",
+  "SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0045' ORDER BY version;",
 );
 const applied = new Set(
   (ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)),
