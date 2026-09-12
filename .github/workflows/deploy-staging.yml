@@ -40,6 +40,12 @@ on:
 permissions:
   contents: read
 
+# GitHub may emit both push and PR synchronization for connector writes. Keep
+# one exact-SHA deployment active so migrations and live proofs never compete.
+concurrency:
+  group: cloudflare-v2-deploy-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     if: github.event_name != 'pull_request' || (github.head_ref == 'phase-12-operations-admin-platform' && github.event.pull_request.head.repo.full_name == github.repository)

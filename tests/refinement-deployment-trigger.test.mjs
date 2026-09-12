@@ -14,3 +14,8 @@ test("PR deployment checks out the exact branch head and never the synthetic mer
   assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
   assert.doesNotMatch(workflow, /refs\/pull\/.*\/merge/);
 });
+
+test("duplicate push and PR events cannot run production deployment concurrently", () => {
+  assert.match(workflow, /group: cloudflare-v2-deploy-\$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(workflow, /cancel-in-progress: true/);
+});
