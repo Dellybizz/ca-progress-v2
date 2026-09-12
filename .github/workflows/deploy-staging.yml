@@ -1,6 +1,7 @@
 name: Cloudflare V2 Deploy
 
 # Canonical web Worker configuration: wrangler.jsonc
+# Phase 12 certification rollout trigger.
 on:
   workflow_dispatch:
   push:
