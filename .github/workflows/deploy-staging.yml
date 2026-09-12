@@ -1,11 +1,28 @@
 name: Cloudflare V2 Deploy
 
 # Canonical web Worker configuration: wrangler.jsonc
-# Phase 12 certification rollout trigger.
 on:
   workflow_dispatch:
   push:
     branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/deploy-staging.yml
+      - app/**
+      - components/**
+      - d1/**
+      - lib/**
+      - server/**
+      - workers/**
+      - scripts/**
+      - tests/**
+      - custom-worker.ts
+      - wrangler.jsonc
+      - package.json
+  # GitHub App writes synchronize the repository's long-lived PR instead of
+  # emitting a usable push run. Keep that exact same-repository branch deployable.
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
     paths:
       - .github/workflows/deploy-staging.yml
       - app/**
@@ -25,6 +42,7 @@ permissions:
 
 jobs:
   deploy:
+    if: github.event_name != 'pull_request' || (github.head_ref == 'phase-12-operations-admin-platform' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: v2-staging
     timeout-minutes: 55
@@ -47,6 +65,9 @@ jobs:
       DEPLOY_BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Never deploy GitHub's synthetic PR merge commit or main.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: 22
