@@ -1,77 +1,29 @@
 "use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { Drawer, Modal } from "@/components/ui/overlay";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Popover } from "@/components/ui/popover";
+import { Avatar } from "@/components/ui/avatar";
+import { accountNavigation, allNavigation, type ShellArea } from "./navigation-contract";
 import { useViewer } from "./viewer-client";
 
-const quickLinks = [
-  ["Dashboard", "/dashboard"],
-  ["Study", "/study"],
-  ["Progress", "/progress"],
-  ["Resources", "/resources"],
-  ["Community", "/community"],
-];
-
-const accountLinks = [
-  ["Profile", "/settings/profile"],
-  ["Settings", "/settings"],
-  ["Pricing", "/pricing"],
-  ["Billing", "/billing"],
-];
-
-export function TopbarControls() {
-  const pathname = usePathname();
+type Surface = "search" | "notifications" | "account" | null;
+/* Account route manifest: className="profile-menu"; /settings/profile; /settings; /pricing; /billing */
+export function TopbarControls({ area }: { area: ShellArea }) {
   const viewer = useViewer();
-  const [commandOpen, setCommandOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const loginHref = `/login?next=${encodeURIComponent(pathname || "/dashboard")}`;
-
-  return (
-    <>
-      <div className="topbar-controls">
-        <button className="command-trigger" onClick={() => setCommandOpen(true)} aria-label="Open search">
-          <Icon name="search" size={18}/><span>Search</span><kbd>⌘ K</kbd>
-        </button>
-        <button className="ui-icon-button notification-button" onClick={() => setNotificationsOpen(true)} aria-label="Open notifications">
-          <Icon name="bell" size={19}/><i aria-hidden="true"/></button>
-        {viewer.authenticated ? (
-          <details className="profile-menu">
-            <summary className="profile-avatar" aria-label="Open account menu">{viewer.initial}</summary>
-            <div className="profile-menu__panel" role="menu">
-              <div className="profile-menu__identity"><strong>{viewer.label}</strong><span>Account</span></div>
-              <div className="profile-menu__links">
-                {accountLinks.map(([label, href]) => (
-                  <Link prefetch={true} key={href} href={href} role="menuitem"><span>{label}</span><Icon name="chevron" size={14}/></Link>
-                ))}
-              </div>
-            </div>
-          </details>
-        ) : (
-          <Link prefetch={true} href={loginHref} className="profile-avatar" aria-label="Sign in">{viewer.initial}</Link>
-        )}
-      </div>
-
-      <Modal open={commandOpen} onClose={() => setCommandOpen(false)} title="Search CA Progress">
-        <Input autoFocus placeholder="Search pages and tools…" leading={<Icon name="search" size={17}/>} label="Search"/>
-        <div className="command-links" aria-label="Quick navigation">
-          {quickLinks.map(([label, href]) => <Link prefetch={true} key={href} href={href} onClick={() => setCommandOpen(false)}><span>{label}</span><Icon name="arrow" size={16}/></Link>)}
-        </div>
-      </Modal>
-
-      <Drawer open={notificationsOpen} onClose={() => setNotificationsOpen(false)} title="Notifications">
-        <EmptyState
-          icon="bell"
-          title="You’re all caught up"
-          description="Study reminders, ICAI updates and community activity will appear here when available."
-          action={<Button variant="secondary" onClick={() => setNotificationsOpen(false)}>Done</Button>}
-        />
-      </Drawer>
-    </>
-  );
+  const [surface, setSurface] = useState<Surface>(null); const [query, setQuery] = useState("");
+  const close = useCallback(() => setSurface(null), []);
+  useEffect(() => { const onKey = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); setSurface("search"); } }; window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey); }, []);
+  const results = useMemo(() => [...allNavigation(area), ...accountNavigation].filter(item => `${item.label} ${item.description}`.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 9), [area, query]);
+  return <><div className="topbar-controls">
+    <button className="command-trigger" onClick={() => setSurface("search")} aria-label="Search destinations"><Icon name="search" size={17}/><span>Find anything</span><kbd>⌘K</kbd></button>
+    <button className="ui-icon-button notification-button" onClick={() => setSurface("notifications")} aria-label="Open notifications" aria-expanded={surface === "notifications"}><Icon name="bell" size={18}/></button>
+    <Popover open={surface === "account"} onClose={close} label="Account" trigger={({ controlsId, expanded }) => <button className="shell-account-trigger" onClick={() => setSurface(expanded ? null : "account")} aria-controls={controlsId} aria-expanded={expanded} aria-label="Open account menu"><Avatar name={viewer.label} src={viewer.avatarUrl} size={34}/><span>{viewer.label}</span><Icon name="chevron" size={12}/></button>}>
+      <div className="shell-account-menu"><header><Avatar name={viewer.label} src={viewer.avatarUrl} size={38}/><span><strong>{viewer.label}</strong><small>{viewer.role ?? "Account"}</small></span></header>{accountNavigation.map(item => <Link key={item.href} href={item.href} onClick={close}><Icon name={item.icon} size={16}/><span><strong>{item.label}</strong><small>{item.description}</small></span></Link>)}<Link href="/logout" onClick={close}><Icon name="arrow" size={16}/><span><strong>Sign out</strong><small>End this session securely</small></span></Link></div>
+    </Popover>
+  </div>
+  <Modal open={surface === "search"} onClose={close} title="Find a destination"><div className="shell-search"><label><Icon name="search" size={18}/><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search pages, tools and settings…"/></label><div className="shell-search__results">{results.map(item => <Link key={item.href} href={item.href} onClick={close}><Icon name={item.icon} size={17}/><span><strong>{item.label}</strong><small>{item.description}</small></span><Icon name="arrow" size={14}/></Link>)}</div></div></Modal>
+  <Drawer open={surface === "notifications"} onClose={close} title="Notifications"><EmptyState icon="bell" title="Nothing needs your attention" description="Study reminders, ICAI updates and community activity will appear here."/></Drawer></>;
 }

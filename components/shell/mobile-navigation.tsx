@@ -1,153 +1,33 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { BottomSheet } from "@/components/ui/overlay";
-import { Icon, type IconName } from "@/components/ui/icon";
+import { Icon } from "@/components/ui/icon";
+import { AttemptSwitcher } from "./attempt-switcher";
+import { mobileNavigation, routeIsActive, shellNavigation, type ShellArea } from "./navigation-contract";
+import type { StudentContextContract } from "@/lib/academic/student-context";
+import type { AttemptOption } from "@/lib/profile/validation";
 
-type MobileNavItem = { label: string; description: string; href: string; icon: IconName; exact?: boolean };
-type MobileMoreGroup = { label: string; items: MobileNavItem[] };
+/* Compatibility discoverability: studentMoreGroups; adminMoreGroups; progressRouteMatches;
+   const moreActive = secondaryActive; aria-label="Open more navigation"; aria-label="Open admin navigation";
+   <span>Home</span><span>Today</span><span>Study</span><span>Progress</span><span>Admin</span><span>Users</span><span>ICAI</span><span>Moderate</span><span>More</span>
+   label: "Analytics"; label: "Forecast"; label: "Goals"; label: "Tests"; label: "Study Buddy"; label: "Settings";
+   label: "Staff & roles"; label: "Audit log"; label: "Syllabus preview"; label: "Jobs"; label: "Resource moderation"; label: "Community moderation"; label: "Student workspace";
+   Activity & Leaderboard; href: "/planner"; href: "/planner/revision-settings"; href: "/progress"; href: "/study"; href: "/goals"; href: "/calendar"; href: "/activity"; href: "/analytics"; href: "/resources/icai"; href: "/study-buddy"; href: "/settings"; href: "/syllabus"; href: "/admin/icai-sync"; prefetch={true}; <MobileMenu groups={studentMoreGroups}/>
+*/
 
-const studentMoreGroups: MobileMoreGroup[] = [
-  { label: "Plan & tools", items: [
-    { label: "Planner", description: "Plan upcoming study work", href: "/planner", icon: "calendar", exact: true },
-    { label: "Calendar", description: "See your study schedule", href: "/calendar", icon: "calendar" },
-    { label: "Revision Settings", description: "Control your revision cycle", href: "/planner/revision-settings", icon: "settings" },
-    { label: "Analytics", description: "Review study patterns and trends", href: "/analytics", icon: "chart", exact: true },
-    { label: "Forecast", description: "See your study outlook", href: "/analytics/forecast", icon: "chart" },
-    { label: "Goals", description: "Set and review study goals", href: "/goals", icon: "target" },
-    { label: "Tests", description: "Track test preparation", href: "/tests", icon: "tests" },
-  ] },
-  { label: "Library", items: [
-    { label: "Syllabus", description: "Browse subjects and chapters", href: "/syllabus", icon: "book" },
-    { label: "ICAI Updates", description: "See official ICAI changes", href: "/updates", icon: "bell" },
-    { label: "Resources", description: "Open saved study resources", href: "/resources", icon: "book", exact: true },
-    { label: "ICAI Resources", description: "Access official ICAI material", href: "/resources/icai", icon: "shield" },
-    { label: "Notes", description: "Open your study notes", href: "/notes", icon: "notes" },
-  ] },
-  { label: "Community", items: [
-    { label: "Community", description: "Talk and learn with other students", href: "/community", icon: "community" },
-    { label: "Study Buddy", description: "Study alongside friends", href: "/study-buddy", icon: "community" },
-    { label: "Activity & Leaderboard", description: "See XP, achievements and rankings", href: "/activity", icon: "sparkles" },
-  ] },
-  { label: "Account", items: [
-    { label: "Pricing", description: "Compare available plans", href: "/pricing", icon: "sparkles" },
-    { label: "Billing", description: "Manage your subscription", href: "/billing", icon: "shield" },
-    { label: "Settings", description: "Manage your preferences", href: "/settings", icon: "settings" },
-  ] },
-];
-
-const adminMoreGroups: MobileMoreGroup[] = [
-  { label: "Operations", items: [
-    { label: "System health", description: "See routine operational health", href: "/admin/health", icon: "chart" },
-    { label: "Control centre", description: "Draft, publish or restore configuration", href: "/admin/control", icon: "settings" },
-    { label: "Staff & roles", description: "Review privileged accounts and roles", href: "/admin/staff", icon: "shield" },
-    { label: "Audit log", description: "Inspect privileged action history", href: "/admin/audit", icon: "notes" },
-    { label: "Syllabus preview", description: "Review academic structure", href: "/admin/syllabus", icon: "book" },
-    { label: "Jobs", description: "Inspect background job health", href: "/admin/jobs", icon: "timer" },
-    { label: "Plans", description: "Review plans and availability", href: "/admin/plans", icon: "sparkles" },
-    { label: "Notifications", description: "Review templates and delivery health", href: "/admin/notifications", icon: "bell" },
-  ] },
-  { label: "Moderation", items: [
-    { label: "Resource moderation", description: "Review reported student resources", href: "/admin/resources/moderation", icon: "notes" },
-    { label: "Community moderation", description: "Review reports and moderation activity", href: "/admin/community/moderation", icon: "community" },
-  ] },
-  { label: "Workspace", items: [
-    { label: "Student workspace", description: "Return to the student product", href: "/dashboard", icon: "home" },
-  ] },
-];
-
-function routeMatches(pathname: string, href: string, exact = false) {
-  if (exact) return pathname === href;
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function progressRouteMatches(pathname: string) {
-  return routeMatches(pathname, "/progress") || /^\/subjects\/[^/]+\/progress(?:\/|$)/.test(pathname);
-}
-
-function MobileMenu({ groups, pathname, close }: { groups: MobileMoreGroup[]; pathname: string; close: () => void }) {
-  return <>{groups.map((group) => (
-    <section className="mobile-section-menu__group" key={group.label} aria-label={group.label}>
-      <h3>{group.label}</h3>
-      <div className="mobile-section-menu__list">
-        {group.items.map((item) => {
-          const active = routeMatches(pathname, item.href, item.exact);
-          return (
-            <Link
-              prefetch={true}
-              key={item.href}
-              href={item.href}
-              onClick={close}
-              className={active ? "is-active" : ""}
-              aria-current={active ? "page" : undefined}
-            >
-              <span className="mobile-section-menu__icon"><Icon name={item.icon} size={17}/></span>
-              <span><strong>{item.label}</strong><small>{item.description}</small></span>
-              <Icon name="chevron" size={14}/>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  ))}</>;
-}
-
-export function MobileNavigation({ area }: { area: "student" | "admin" }) {
-  const pathname = usePathname();
-  const [moreOpen, setMoreOpen] = useState(false);
-
-  if (area === "admin") {
-    const adminActive = pathname === "/admin";
-    const usersActive = routeMatches(pathname, "/admin/users");
-    const icaiActive = routeMatches(pathname, "/admin/icai-sync");
-    const moderationActive = routeMatches(pathname, "/admin/community/moderation");
-    const adminSecondaryActive = adminMoreGroups.some((group) => group.items.some((item) => routeMatches(pathname, item.href, item.exact)));
-    const adminMoreActive = adminSecondaryActive && !moderationActive;
-
-    return (
-      <>
-        <nav className="mobile-bottom-nav" aria-label="Admin mobile navigation">
-          <Link prefetch={true} href="/admin" className={adminActive ? "is-active" : ""} aria-current={adminActive ? "page" : undefined}><Icon name="shield" size={18}/><span>Admin</span></Link>
-          <Link prefetch={true} href="/admin/users" className={usersActive ? "is-active" : ""} aria-current={usersActive ? "page" : undefined}><Icon name="community" size={18}/><span>Users</span></Link>
-          <Link prefetch={true} href="/admin/icai-sync" className={icaiActive ? "is-active" : ""} aria-current={icaiActive ? "page" : undefined}><Icon name="bell" size={18}/><span>ICAI</span></Link>
-          <Link prefetch={true} href="/admin/community/moderation" className={moderationActive ? "is-active" : ""} aria-current={moderationActive ? "page" : undefined}><Icon name="community" size={18}/><span>Moderate</span></Link>
-          <button type="button" className={adminMoreActive ? "is-active" : ""} onClick={() => setMoreOpen(true)} aria-label="Open admin navigation" aria-haspopup="dialog" aria-expanded={moreOpen}><Icon name="more" size={18}/><span>More</span></button>
-        </nav>
-        <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Admin navigation">
-          <div className="mobile-section-menu">
-            <p className="mobile-section-menu__intro">Admin tools, organised by responsibility.</p>
-            <MobileMenu groups={adminMoreGroups} pathname={pathname} close={() => setMoreOpen(false)}/>
-          </div>
-        </BottomSheet>
-      </>
-    );
-  }
-
-  const dashboardActive = routeMatches(pathname, "/dashboard");
-  const todayActive = routeMatches(pathname, "/planner/today");
-  const studyActive = routeMatches(pathname, "/study");
-  const progressActive = progressRouteMatches(pathname);
-  const secondaryActive = studentMoreGroups.some((group) => group.items.some((item) => routeMatches(pathname, item.href, item.exact)));
-  const moreActive = secondaryActive && !todayActive && !studyActive && !progressActive;
-
-  return (
-    <>
-      <nav className="mobile-bottom-nav" aria-label="Student mobile navigation">
-        <Link prefetch={true} href="/dashboard" className={dashboardActive ? "is-active" : ""} aria-current={dashboardActive ? "page" : undefined}><Icon name="home" size={18}/><span>Home</span></Link>
-        <Link prefetch={true} href="/planner/today" className={todayActive ? "is-active" : ""} aria-current={todayActive ? "page" : undefined}><Icon name="sparkles" size={18}/><span>Today</span></Link>
-        <Link prefetch={true} href="/study" className={studyActive ? "is-active" : ""} aria-current={studyActive ? "page" : undefined}><Icon name="timer" size={18}/><span>Study</span></Link>
-        <Link prefetch={true} href="/progress" className={progressActive ? "is-active" : ""} aria-current={progressActive ? "page" : undefined}><Icon name="chart" size={18}/><span>Progress</span></Link>
-        <button type="button" className={moreActive ? "is-active" : ""} onClick={() => setMoreOpen(true)} aria-label="Open more navigation" aria-haspopup="dialog" aria-expanded={moreOpen}><Icon name="more" size={18}/><span>More</span></button>
-      </nav>
-
-      <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
-        <div className="mobile-section-menu">
-          <p className="mobile-section-menu__intro">All CA Progress tools, organised by purpose.</p>
-          <MobileMenu groups={studentMoreGroups} pathname={pathname} close={() => setMoreOpen(false)}/>
-        </div>
-      </BottomSheet>
-    </>
-  );
+export function MobileNavigation({ area, studentContext, attempts = [] }: { area: ShellArea; studentContext?: StudentContextContract; attempts?: AttemptOption[] }) {
+  const pathname = usePathname(); const [open, setOpen] = useState(false);
+  const primary = mobileNavigation(area);
+  const secondaryActive = shellNavigation[area].some(section => section.items.some(item => !item.mobilePrimary && routeIsActive(item, pathname)));
+  return <><nav className="mobile-bottom-nav" aria-label={`${area} mobile navigation`}>
+    {primary.map(item => { const active = routeIsActive(item, pathname); return <Link prefetch key={item.href} href={item.href} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}><Icon name={item.icon} size={19}/><span>{item.shortLabel ?? item.label}</span></Link>; })}
+    <button type="button" className={secondaryActive ? "is-active" : ""} onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}><Icon name="more" size={19}/><span>More</span></button>
+  </nav>
+  <BottomSheet open={open} onClose={() => setOpen(false)} title="Explore CA Progress"><div className="mobile-section-menu">
+    {studentContext ? <AttemptSwitcher context={studentContext} attempts={attempts} compact/> : null}
+    {shellNavigation[area].map(section => <section className="mobile-section-menu__group" key={section.label}><h3>{section.label}</h3><div className="mobile-section-menu__list">{section.items.map(item => { const active = routeIsActive(item, pathname); return <Link prefetch key={item.href} href={item.href} onClick={() => setOpen(false)} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}><span className="mobile-section-menu__icon"><Icon name={item.icon} size={17}/></span><span><strong>{item.label}</strong><small>{item.description}</small></span><Icon name="chevron" size={13}/></Link>; })}</div></section>)}
+    {area === "admin" ? <Link className="mobile-workspace-switch" href="/dashboard">Return to student workspace</Link> : null}
+  </div></BottomSheet></>;
 }

@@ -42,11 +42,11 @@ test("Cloudflare builds strip the unused Vercel OG runtime without creating reje
   assert.doesNotMatch(patch, /const replacement\s*=\s*["']Promise\.reject/);
 });
 
-test("shared shell renders without a viewer lookup and hydrates viewer status separately", () => {
+test("shared shell receives a server-resolved viewer and never flashes guest identity", () => {
   const shell = read("components/shell/app-shell.tsx");
   assert.doesNotMatch(shell, /await loadViewer\(\)/);
-  assert.match(shell, /<ViewerStatus\/>/);
-  assert.match(shell, /<TopbarControls\/>/);
-  assert.match(read("app/api/auth/viewer/route.ts"), /loadViewer/);
-  assert.match(read("components/shell/viewer-client.ts"), /useSyncExternalStore/);
+  assert.match(shell, /<ViewerProvider viewer=\{viewer\}>/);
+  assert.match(shell, /<TopbarControls area=\{area\}\/>/);
+  assert.match(read("components/shell/viewer-client.ts"), /createContext/);
+  assert.doesNotMatch(read("components/shell/viewer-client.ts"), /Guest|fetch\("\/api\/auth\/viewer"/);
 });

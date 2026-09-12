@@ -1,37 +1,9 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { createContext, createElement, useContext } from "react";
 
-export type ViewerSnapshot = { authenticated: boolean; label: string; initial: string };
+export type ViewerSnapshot = { authenticated: boolean; label: string; initial: string; avatarUrl?: string | null; role?: string };
 
-const guestViewer: ViewerSnapshot = { authenticated: false, label: "Guest", initial: "G" };
-let snapshot = guestViewer;
-let started = false;
-const listeners = new Set<() => void>();
-
-function startViewerRequest() {
-  if (started) return;
-  started = true;
-  void fetch("/api/auth/viewer", { cache: "no-store" })
-    .then((response) => response.ok ? response.json() as Promise<ViewerSnapshot> : null)
-    .then((nextViewer) => {
-      if (!nextViewer) return;
-      snapshot = nextViewer;
-      listeners.forEach((listener) => listener());
-    })
-    .catch(() => undefined);
-}
-
-function subscribe(listener: () => void) {
-  startViewerRequest();
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-function getSnapshot() {
-  return snapshot;
-}
-
-export function useViewer() {
-  return useSyncExternalStore(subscribe, getSnapshot, () => guestViewer);
-}
+const ViewerContext = createContext<ViewerSnapshot | null>(null);
+export function ViewerProvider({ viewer, children }: { viewer: ViewerSnapshot; children: React.ReactNode }) { return createElement(ViewerContext.Provider, { value: viewer }, children); }
+export function useViewer() { const viewer = useContext(ViewerContext); if (!viewer) throw new Error("useViewer must be used inside the application shell."); return viewer; }

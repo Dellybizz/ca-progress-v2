@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Icon } from "./icon";
 
 type OverlayProps = { open: boolean; onClose: () => void; title: string; children: ReactNode };
 function Overlay({ open, onClose, title, children, kind }: OverlayProps & { kind: "modal" | "drawer" | "sheet" }) {
   const dialogRef = useRef<HTMLElement>(null);
   const titleId = useId();
+  const pathname = usePathname();
+  const routeRef = useRef(pathname);
+  useEffect(() => { if (routeRef.current !== pathname) { routeRef.current = pathname; if (open) onClose(); } }, [pathname, open, onClose]);
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
