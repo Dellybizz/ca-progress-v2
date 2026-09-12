@@ -3,6 +3,7 @@ import { requireAdminPageCapability } from "@/lib/authorization/server";
 import { getOperatorHealth } from "@/lib/admin/control-centre";
 export const dynamic="force-dynamic";
 export default async function HealthPage(){await requireAdminPageCapability("system.read");const h=await getOperatorHealth();const items=[
+  ["Consistency report","Open","Evidence and repair previews","/admin/consistency"],
   ["Background work",h.activeJobs,h.activeJobs?"Work is processing":"No queued work","/admin/jobs"],
   ["Failed work",h.failedJobs,h.failedJobs?"Needs attention":"Clear","/admin/jobs"],
   ["ICAI reviews",h.pendingReviews,h.pendingReviews?"Awaiting review":"Clear","/admin/icai-sync/data"],

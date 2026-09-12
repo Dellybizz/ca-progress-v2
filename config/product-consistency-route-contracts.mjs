@@ -43,6 +43,7 @@ export const routeContracts = Object.freeze([
   admin("/admin", "", "Admin command centre", "lib/admin/phase1.ts", ["app_users", "admin_audit_events", "background_jobs"]),
   admin("/admin/audit", "audit", "Privileged action history", "lib/admin/phase1.ts", ["admin_audit_events"]),
   admin("/admin/community/moderation", "community/moderation", "Community moderation", "lib/community/service.ts", ["message_reports", "moderation_actions", "chat_blocks"]),
+  admin("/admin/consistency", "consistency", "Cross-system consistency health", "lib/consistency/scanner.ts", ["consistency_scan_runs", "consistency_findings", "consistency_repair_receipts", "admin_audit_events"]),
   admin("/admin/control", "control", "Versioned operational configuration", "lib/admin/control-centre.ts", ["admin_control_versions", "admin_control_publications", "admin_audit_events"]),
   admin("/admin/health", "health", "Plain-language operational health", "lib/admin/control-centre.ts", ["background_jobs", "icai_review_queue", "notification_outbox"]),
   admin("/admin/icai-sync", "icai-sync", "ICAI sync operations", "lib/icai/query.ts", ["icai_sync_runs", "icai_sync_runtime", "background_jobs"]),

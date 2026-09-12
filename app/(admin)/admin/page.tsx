@@ -49,6 +49,7 @@ export default async function AdminPage() {
     <section style={section}>
       <h2 style={{ margin: "0 0 12px", fontSize: 18 }}>Routine operations</h2>
       <div style={grid}>
+        <Link href="/admin/consistency" style={card}><strong>Consistency scanner</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>Review cross-system findings, evidence and safe repairs.</div></Link>
         <Link href="/admin/health" style={card}><strong>System health</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>See plain-language health and recovery queues.</div></Link>
         <Link href="/admin/control" style={card}><strong>Control centre</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>Draft, publish and restore operational configuration.</div></Link>
         <Link href="/admin/plans" style={card}><strong>Plans & entitlements</strong><div style={{ marginTop: 6, color: "var(--muted-foreground, #6f6a78)" }}>Review student plan availability.</div></Link>

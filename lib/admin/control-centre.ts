@@ -3,6 +3,7 @@ import "server-only";
 import type { AppRole } from "@/lib/authorization/roles";
 import type { AdminCapability } from "@/lib/authorization/capabilities.mjs";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
+import { assertNoCriticalConsistencyBlockers } from "@/lib/consistency/scanner";
 
 export const CONTROL_AREAS = [
   { key: "system", label: "System health", href: "/admin/health", capability: "system.configure" },
@@ -89,6 +90,7 @@ export async function saveControlDraft(input:{ area:string; documentKey:string; 
 }
 
 export async function publishControlVersion(input:{ id:string; reason:string; idempotencyKey:string; actor:Actor }) {
+  await assertNoCriticalConsistencyBlockers();
   const db=getD1RuntimeDatabase(); const id=required(input.id,"Version",120); const reason=required(input.reason,"Publish reason",1000); const idem=required(input.idempotencyKey,"Request token",120);
   const version=await db.prepare("SELECT id,area_key,document_key,version,state FROM admin_control_versions WHERE id=?1").bind(id).first<Record<string,unknown>>(); if(!version) throw new Error("Version was not found.");
   const area=controlArea(version.area_key); if(!area) throw new Error("Unknown control area.");

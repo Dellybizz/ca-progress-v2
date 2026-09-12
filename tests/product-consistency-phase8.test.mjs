@@ -37,5 +37,5 @@ test("Phase 8 keeps operator language clear and technical details progressive",(
 test("Phase 8 deploy retains migration 0045",()=>{
   const runner=read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(runner,/0045_product_consistency_phase8_admin_control/);
-  assert.match(runner,/BETWEEN '0012' AND '0046'/);
+  assert.match(runner,/BETWEEN '0012' AND '0047'/);
 });

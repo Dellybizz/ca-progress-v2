@@ -33,7 +33,7 @@ test("retained D1 deployment preserves migration 0032 integrity through Phase 3E
   assert.match(runner, /\["0035", "d1\/migrations\/0035_icai_phase2b_source_cursor\.sql"\]/);
   assert.match(runner, /\["0036", "d1\/migrations\/0036_icai_phase2c_future_state\.sql"\]/);
   assert.match(runner, /\["0037", "d1\/migrations\/0037_icai_phase3b_operator_controls\.sql"\]/);
-  assert.match(runner, /BETWEEN '0012' AND '0046'/);
+  assert.match(runner, /BETWEEN '0012' AND '0047'/);
   assert.match(runner, /PRAGMA foreign_key_check/);
 });
 
