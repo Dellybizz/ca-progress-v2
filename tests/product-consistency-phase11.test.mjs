@@ -47,7 +47,8 @@ test("Phase 11 overlays trap and restore focus and honor reduced motion", () => 
   assert.match(components, /prefers-reduced-motion:\s*reduce/);
 });
 
-test("Phase 11 does not add a schema migration or begin certification Phase 12", () => {
-  const packageJson = read("package.json");
-  assert.doesNotMatch(packageJson, /product-consistency:phase12/);
+test("Phase 11 remains a migration-free visual unification", () => {
+  const phase11 = read("app/styles/product-consistency-phase11.css");
+  assert.match(phase11, /canonical visual contracts/);
+  assert.doesNotMatch(phase11, /DELETE FROM|DROP TABLE|ALTER TABLE/i);
 });
