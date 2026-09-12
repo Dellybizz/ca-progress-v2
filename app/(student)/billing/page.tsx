@@ -131,8 +131,8 @@ export default async function BillingPage({
         <CardHeader title="Payment history" description="Razorpay orders and verified settlement state." />
         <CardBody>
           {model.payments?.length ? (
-            <div className="phase11-table-wrap">
-              <table className="phase11-table">
+            <div className="data-view">
+              <table className="data-table">
                 <thead>
                   <tr><th>Date</th><th>Plan</th><th>Amount</th><th>Status</th><th>Provider reference</th><th>Recovery</th></tr>
                 </thead>
@@ -141,12 +141,12 @@ export default async function BillingPage({
                     const paymentPlan = model.plans?.find((item) => item.id === payment.plan_id);
                     return (
                       <tr key={payment.id}>
-                        <td>{date(payment.created_at)}</td>
-                        <td>{paymentPlan?.name ?? "Plan"} {paymentPlan?.billing_cycle !== "free" ? `· ${paymentPlan?.billing_cycle ?? ""}` : ""}</td>
-                        <td>{money(payment.amount_subunits, payment.currency)}</td>
-                        <td><span className={`phase11-payment-status phase11-payment-status--${payment.status}`}>{payment.status}</span></td>
-                        <td><code>{payment.provider_payment_id ?? payment.provider_order_id}</code></td>
-                        <td>{payment.status === "failed" ? <Link href="/pricing">Retry</Link> : "—"}</td>
+                        <td data-label="Date">{date(payment.created_at)}</td>
+                        <td data-label="Plan">{paymentPlan?.name ?? "Plan"} {paymentPlan?.billing_cycle !== "free" ? `· ${paymentPlan?.billing_cycle ?? ""}` : ""}</td>
+                        <td data-label="Amount">{money(payment.amount_subunits, payment.currency)}</td>
+                        <td data-label="Status"><span className={`phase11-payment-status phase11-payment-status--${payment.status}`}>{payment.status}</span></td>
+                        <td data-label="Provider reference"><code>{payment.provider_payment_id ?? payment.provider_order_id}</code></td>
+                        <td data-label="Recovery">{payment.status === "failed" ? <Link href="/pricing">Retry</Link> : "—"}</td>
                       </tr>
                     );
                   })}

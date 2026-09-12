@@ -4,8 +4,8 @@
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
   /* Neutral product surfaces */
-  --color-bg: #f7f8fb;
-  --color-bg-subtle: #f1f3f7;
+  --color-bg: #f6f7fa;
+  --color-bg-subtle: #eef1f6;
   --color-surface: #ffffff;
   --color-surface-raised: #ffffff;
   --color-surface-muted: #fafbfc;
@@ -13,13 +13,13 @@
   --color-surface-inverse: #171923;
 
   /* Text */
-  --color-text: #191b23;
-  --color-text-soft: #626776;
-  --color-text-faint: #8b91a0;
+  --color-text: #172033;
+  --color-text-soft: #59647a;
+  --color-text-faint: #7d8799;
 
   /* Borders */
-  --color-border: #e5e7ec;
-  --color-border-strong: #d6d9e0;
+  --color-border: #e1e5ec;
+  --color-border-strong: #cfd5df;
 
   /* CA Progress brand: action and selection, not decoration */
   --color-brand: #5b5bd6;

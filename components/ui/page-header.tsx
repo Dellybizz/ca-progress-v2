@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Badge } from "./badge";
 
-export function PageHeader({ eyebrow, title, description, actions, preview = true }: { eyebrow: string; title: string; description?: string; actions?: ReactNode; preview?: boolean }) {
+export function PageHeader({ eyebrow, title, description, actions, preview = false }: { eyebrow: string; title: string; description?: string; actions?: ReactNode; preview?: boolean }) {
   return (
     <header className="page-header">
       <div className="page-header__copy">
