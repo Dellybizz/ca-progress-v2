@@ -54,8 +54,8 @@ test("pricing UX is comparison-first and never exposes internal Basic/Pro naming
   assert.match(client, /PLAN_COMPARISON_COLUMNS/);
   assert.match(client, /PLAN_COMPARISON_ROWS/);
   assert.match(client, /productPlanLabel\(plan\.tier_key\)/);
-  assert.match(client, /monthlyPriceInr\(plan\.tier_key\)/);
-  assert.match(client, /Checkout stays locked if the server billing row differs/);
+  assert.match(client, /plan\.price_subunits/);
+  assert.match(client, /published server policy has a valid price/);
   assert.doesNotMatch(client, />Basic</);
 });
 

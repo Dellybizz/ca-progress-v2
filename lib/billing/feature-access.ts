@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getEntitlementForUser } from "./service";
-import { canUsePlanFeature, planFeatureRequirement, productPlanLabel } from "./plan-policy.mjs";
+import { planFeatureRequirement, productPlanLabel } from "./plan-policy.mjs";
 
 export type PlanFeatureAccess = {
   planId: string;
@@ -16,7 +16,7 @@ export async function getPlanFeatureAccessForUser(userId: string, featureKey: st
   if (!userId) throw new Error("Authenticated user id is required for plan access checks.");
   const entitlement = await getEntitlementForUser(userId, featureKey);
   const requirement = planFeatureRequirement(featureKey);
-  const allowed = Boolean(entitlement.planId) && canUsePlanFeature(entitlement.tier, featureKey);
+  const allowed = Boolean(entitlement.planId) && entitlement.allowed;
   return {
     planId: entitlement.planId,
     tier: entitlement.tier,

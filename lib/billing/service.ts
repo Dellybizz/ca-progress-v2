@@ -7,14 +7,14 @@ import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
 import { hasSubscriptionAccess } from "./lifecycle.mjs";
-import { canUsePlanFeature, storageQuotaBytes, storageQuotaMegabytes, tierRank } from "./plan-policy.mjs";
+import { storageQuotaBytes, tierRank } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
 export type PlanTier = "free" | "basic" | "pro";
 export type SubscriptionPlan = { id: string; tier_key: PlanTier; billing_cycle: BillingCycle; name: string; tagline: string; rank: number; price_subunits: number | null; currency: string; duration_value: number; duration_unit: string; active: boolean; checkout_enabled: boolean; sort_order: number };
 export type PlanEntitlement = { plan_id: string; feature_key: string; enabled: boolean; limit_value: number | null; limit_unit: string; reset_period: string; upgrade_message: string };
-export type Entitlement = { planId: string; tier: PlanTier; planName: string; featureKey: string; allowed: boolean; limitValue: number | null; limitUnit: string; resetPeriod: string; upgradeMessage: string };
+export type Entitlement = { planId: string; tier: PlanTier; planName: string; featureKey: string; allowed: boolean; limitValue: number | null; limitUnit: string; resetPeriod: string; upgradeMessage: string; policyVersionId?: string; timeLimitMinutes?: number | null; storageLimitBytes?: number | null; fileSizeLimitBytes?: number | null; retentionDays?: number | null };
 export type BillingModel = { mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: SubscriptionRow | null; payments?: PaymentRow[]; events?: SubscriptionEventRow[]; plans?: SubscriptionPlan[] };
 
 type CurrentPlanRow = { plan_id: string; status: string; starts_at: string; ends_at: string | null };
@@ -128,9 +128,9 @@ export async function getResourceStorageAccess(userId: string) {
   const result = await db().from("uploaded_resources").select("size_bytes").eq("owner_user_id", userId);
   if (result.error) throw new Error(result.error.message);
   const usedBytes = asRows<StorageRow>(result.data).reduce((sum, item) => sum + Number(item.size_bytes ?? 0), 0);
-  const allowed = Boolean(entitlement.planId) && canUsePlanFeature(entitlement.tier, "resources_storage");
-  const limitValue = storageQuotaMegabytes(entitlement.tier);
-  const limitBytes = storageQuotaBytes(entitlement.tier);
+  const allowed = Boolean(entitlement.planId) && entitlement.allowed;
+  const limitBytes = entitlement.storageLimitBytes ?? storageQuotaBytes(entitlement.tier);
+  const limitValue = limitBytes / (1024 * 1024);
   return {
     ...entitlement,
     allowed,

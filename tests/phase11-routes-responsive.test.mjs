@@ -47,7 +47,7 @@ test("pricing remains configuration-safe and sends only the plan identifier", ()
   assert.match(pricing, /Checkout not configured/);
   assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
   assert.match(pricing, /checkoutMatchesPolicy\(plan, cycle\)/);
-  assert.match(pricing, /Checkout stays locked if the server billing row differs/);
+  assert.match(pricing, /published server policy has a valid price/);
   assert.match(pricing, /\/billing\?payment=success/);
   assert.match(pricing, /\/billing\?payment=pending/);
   assert.match(pricing, /\/billing\?payment=failed/);

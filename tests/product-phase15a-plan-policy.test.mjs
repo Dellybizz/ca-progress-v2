@@ -139,9 +139,8 @@ test("exports and resource storage consume the canonical policy instead of priva
   assert.match(billingSource, /from "\.\/plan-policy\.mjs"/);
   assert.match(billingSource, /tierRank\(rewardTier\)/);
   assert.match(billingSource, /tierRank\(currentTier\)/);
-  assert.match(billingSource, /storageQuotaMegabytes\(entitlement\.tier\)/);
-  assert.match(billingSource, /storageQuotaBytes\(entitlement\.tier\)/);
-  assert.match(billingSource, /canUsePlanFeature\(entitlement\.tier, "resources_storage"\)/);
+  assert.match(billingSource, /entitlement\.storageLimitBytes \?\? storageQuotaBytes\(entitlement\.tier\)/);
+  assert.match(billingSource, /entitlement\.allowed/);
   assert.doesNotMatch(billingSource, /entitlement\.limitValue \* 1024 \* 1024/);
 });
 

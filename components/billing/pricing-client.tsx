@@ -3,9 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
-import type { BillingCycle, PlanEntitlement, SubscriptionPlan } from "@/lib/billing/service";
-import { PLAN_COMPARISON_COLUMNS, PLAN_COMPARISON_ROWS, planComparisonValue } from "@/lib/billing/plan-comparison.mjs";
-import { monthlyPriceInr, productPlanLabel, storageQuotaMegabytes } from "@/lib/billing/plan-policy.mjs";
+import type { BillingCycle, PlanEntitlement, PlanTier, SubscriptionPlan } from "@/lib/billing/service";
+import { PLAN_COMPARISON_COLUMNS, PLAN_COMPARISON_ROWS } from "@/lib/billing/plan-comparison.mjs";
+import { productPlanLabel, storageQuotaMegabytes } from "@/lib/billing/plan-policy.mjs";
 
 type CheckoutResult = {
   razorpay_order_id: string;
@@ -48,9 +48,8 @@ function loadCheckout() {
   });
 }
 
-function canonicalPrice(plan: SubscriptionPlan, cycle: Exclude<BillingCycle, "free">) {
-  const monthly = monthlyPriceInr(plan.tier_key);
-  const rupees = cycle === "annual" ? monthly * 12 : monthly;
+function canonicalPrice(plan: SubscriptionPlan) {
+  const rupees = Number(plan.price_subunits ?? 0) / 100;
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
@@ -60,8 +59,7 @@ function canonicalPrice(plan: SubscriptionPlan, cycle: Exclude<BillingCycle, "fr
 
 function checkoutMatchesPolicy(plan: SubscriptionPlan, cycle: Exclude<BillingCycle, "free">) {
   if (plan.tier_key === "free") return true;
-  const multiplier = cycle === "annual" ? 12 : 1;
-  return Boolean(plan.checkout_enabled) && plan.currency === "INR" && plan.price_subunits === monthlyPriceInr(plan.tier_key) * multiplier * 100;
+  return plan.billing_cycle === cycle && Boolean(plan.checkout_enabled) && plan.currency === "INR" && Number.isInteger(plan.price_subunits) && Number(plan.price_subunits) >= 100;
 }
 
 function storageLabel(plan: SubscriptionPlan) {
@@ -71,6 +69,7 @@ function storageLabel(plan: SubscriptionPlan) {
 
 export function PricingClient({
   plans,
+  entitlements,
   authenticated,
   currentPlanId,
 }: {
@@ -97,6 +96,12 @@ export function PricingClient({
     [plans, cycle],
   );
   const currentTier = plans.find((plan) => plan.id === currentPlanId)?.tier_key ?? null;
+  const comparisonValue = (featureKey: string | undefined, tier: PlanTier) => {
+    if (!featureKey) return "Included";
+    const plan = plans.find((item) => item.tier_key === tier && (tier === "free" || item.billing_cycle === cycle));
+    const rule = entitlements.find((item) => item.plan_id === plan?.id && item.feature_key === featureKey);
+    return rule?.enabled ? "Included" : "—";
+  };
 
   async function purchase(plan: SubscriptionPlan) {
     if (plan.tier_key === "free") {
@@ -110,7 +115,7 @@ export function PricingClient({
     if (!checkoutMatchesPolicy(plan, cycle)) {
       setNotice({
         tone: "info",
-        text: `${productPlanLabel(plan.tier_key)} checkout is disabled until the billing row matches the canonical ₹${monthlyPriceInr(plan.tier_key)}/month Product Phase 15 price.`,
+        text: `${productPlanLabel(plan.tier_key)} checkout is unavailable until an active published policy has a valid price.`,
       });
       return;
     }
@@ -243,7 +248,7 @@ export function PricingClient({
               </div>
               <p>{plan.tier_key === "free" ? "A complete core study system with no payment required." : plan.tier_key === "basic" ? "Advanced planning, exports and collaboration for active students." : "The deepest insight, history and backup layer."}</p>
               <div className="phase11-price">
-                <strong>{canonicalPrice(plan, cycle)}</strong>
+                <strong>{canonicalPrice(plan)}</strong>
                 <span>/{cycle === "monthly" ? "month" : "year"}</span>
               </div>
               <ul>
@@ -269,7 +274,7 @@ export function PricingClient({
               </button>
               {!configured && plan.tier_key !== "free" ? (
                 <small className="phase11-config-note">
-                  Checkout stays locked if the server billing row differs from the canonical Product Phase 15 price.
+                  Checkout stays locked until the published server policy has a valid price.
                 </small>
               ) : null}
             </article>
@@ -292,7 +297,7 @@ export function PricingClient({
                 <th scope="col">Capability</th>
                 {PLAN_COMPARISON_COLUMNS.map((column) => (
                   <th scope="col" key={column.tier}>
-                    {column.label}<br/><small>₹{column.monthlyPriceInr}/month{currentTier === column.tier ? " · Current" : ""}</small>
+                    {column.label}<br/><small>{canonicalPrice(plans.find((item) => item.tier_key === column.tier && (column.tier === "free" || item.billing_cycle === cycle)) ?? visible[0])}/{cycle === "monthly" ? "month" : "year"}{currentTier === column.tier ? " · Current" : ""}</small>
                   </th>
                 ))}
               </tr>
@@ -302,7 +307,7 @@ export function PricingClient({
                 <tr key={row.key}>
                   <th scope="row">{row.label}<small>{row.detail}</small></th>
                   {PLAN_COMPARISON_COLUMNS.map((column) => (
-                    <td key={column.tier}>{planComparisonValue(row, column.tier)}</td>
+                    <td key={column.tier}>{comparisonValue(row.featureKey, column.tier)}</td>
                   ))}
                 </tr>
               ))}
