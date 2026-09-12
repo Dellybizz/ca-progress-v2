@@ -7,6 +7,7 @@ import { TopbarControls } from "./topbar-controls";
 import { ViewerStatus } from "./viewer-status";
 import { NavigationProgress } from "./navigation-progress";
 import { Icon } from "@/components/ui/icon";
+import { AppearanceRuntime } from "@/components/preferences/appearance-runtime";
 
 export function AppShell({ children, area = "student" }: { children: React.ReactNode; area?: "student" | "admin" }) {
   const workspaceLabel = area === "admin" ? "Admin workspace" : "Student workspace";
@@ -14,6 +15,7 @@ export function AppShell({ children, area = "student" }: { children: React.React
 
   return (
     <>
+      <AppearanceRuntime/>
       <NavigationProgress/>
       <MobileOverscrollGuard/>
       <EnvironmentBanner/>
