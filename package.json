@@ -18,6 +18,7 @@
     "audit:product-consistency:phase12": "node scripts/product-consistency/phase12-certify.mjs",
     "audit:product-consistency:phase12:production": "node scripts/product-consistency/phase12-certify.mjs --production --output deployment-evidence/product-consistency-phase12.json",
     "audit:design:phase0": "node --test tests/design-system-phase0-baseline.test.mjs",
+    "audit:refinement:r0": "node scripts/refinement/r0-baseline.mjs",
     "test:icai:phase4": "node --test tests/icai-sync-phase1.test.mjs tests/icai-sync-phase2.test.mjs tests/icai-sync-phase3.test.mjs tests/icai-sync-phase4.test.mjs",
     "test:icai:phase5": "node --test tests/icai-sync-phase1.test.mjs tests/icai-sync-phase2.test.mjs tests/icai-sync-phase3.test.mjs tests/icai-sync-phase4.test.mjs tests/icai-sync-phase5.test.mjs tests/icai-continuation-deploy-order.test.mjs tests/icai-bootstrap-current-window.test.mjs tests/icai-incremental-phase2.test.mjs tests/icai-phase2ab-continuation.test.mjs tests/icai-phase3-admin.test.mjs tests/icai-phase3ef-item-isolation.test.mjs",
     "verify:retirement": "node scripts/verify-supabase-retired.mjs",
