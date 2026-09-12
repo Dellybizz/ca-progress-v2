@@ -221,6 +221,12 @@ kbd { padding: 2px 5px; border: 1px solid var(--color-border); border-radius: va
 .shell-navigation__section { display: grid; gap: 3px; }
 .shell-navigation__section h2 { margin: 0 9px 3px; color: var(--color-text-faint); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 .shell-navigation__section > div { display: grid; gap: 2px; }
+.shell-navigation__trigger { width:100%; min-height:34px; display:grid; grid-template-columns:18px minmax(0,1fr) 14px; align-items:center; gap:8px; padding:0 9px; border:0; border-radius:8px; background:transparent; color:var(--color-text-soft); font-size:11px; font-weight:600; text-align:left; cursor:pointer; }
+.shell-navigation__trigger:hover,.shell-navigation__section.has-active-item .shell-navigation__trigger { background:var(--color-surface-muted); color:var(--color-text); }
+.shell-navigation__chevron { justify-self:end; color:var(--color-text-faint); transition:transform var(--transition-fast); }
+.shell-navigation__section.is-open .shell-navigation__chevron { transform:rotate(90deg); }
+.shell-navigation__section:not(.is-primary) > div { margin:3px 0 0 17px; padding-left:8px; border-left:1px solid var(--color-border); }
+.shell-navigation__section:not(.is-primary) > div a { min-height:30px; font-size:10px; }
 .shell-identity { display: grid; grid-template-columns: 34px minmax(0,1fr); align-items: center; gap: 9px; padding: 9px 7px; border-top: 1px solid var(--color-border); color: var(--color-text); }
 .shell-identity strong,.shell-identity small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .shell-identity strong { font-size: 11px; }.shell-identity small { margin-top:2px; color:var(--color-text-faint); font-size:9px; text-transform:capitalize; }

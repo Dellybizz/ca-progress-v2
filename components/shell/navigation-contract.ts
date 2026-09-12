@@ -33,6 +33,11 @@ export const shellNavigation: Record<ShellArea, readonly ShellNavSection[]> = {
       { label: "Study buddy", description: "Study alongside friends", href: "/study-buddy", icon: "community" },
       { label: "Activity", description: "See achievements and rankings", href: "/activity", icon: "sparkles" },
     ]},
+    { label: "Account", items: [
+      { label: "Pricing", description: "Compare available plans", href: "/pricing", icon: "sparkles" },
+      { label: "Billing", description: "Manage your subscription", href: "/billing", icon: "shield" },
+      { label: "Settings", description: "Manage your preferences", href: "/settings", icon: "settings" },
+    ]},
   ],
   admin: [
     { label: "Operations", items: [
