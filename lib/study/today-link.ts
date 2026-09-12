@@ -1,3 +1,4 @@
+import { offlineTransaction } from "@/lib/offline/transaction-context";
 import "server-only";
 
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
@@ -16,11 +17,14 @@ export async function attachActiveTimerToLatestTodayItem(userId: string, db: Hot
       AND sx.task_id IS NULL
       AND sx.plan_item_id IS NULL
       AND datetime(pe.created_at)>=datetime(st.started_at)
+      AND (?2 IS NULL OR datetime(pe.created_at)<=datetime(?2))
       AND (st.subject_id IS NULL OR dpi.subject_id=st.subject_id)
       AND (st.chapter_id IS NULL OR dpi.chapter_id=st.chapter_id)
     ORDER BY datetime(pe.created_at) DESC
-    LIMIT 1`).bind(userId).first<{ id: string }>();
+    LIMIT 1`).bind(userId, offlineTransaction.getStore()?.occurredAt ?? null).first<{ id: string }>();
   if (!row) return null;
   await db.prepare(`UPDATE study_timer_phase3 SET plan_item_id=?1,updated_at=CURRENT_TIMESTAMP WHERE user_id=?2 AND task_id IS NULL AND plan_item_id IS NULL`).bind(row.id, userId).run();
+  const transaction = offlineTransaction.getStore();
+  if (transaction) transaction.timerPlanItemId = row.id;
   return row.id;
 }

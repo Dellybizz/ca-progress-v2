@@ -34,9 +34,11 @@ const migrations = [
   ["0037", "d1/migrations/0037_icai_phase3b_operator_controls.sql"],
   ["0038", "d1/migrations/0038_icai_phase3ef_item_isolation.sql"],
   ["0039", "d1/migrations/0039_product_consistency_phase1_academic_model.sql"],
+  ["0040", "d1/migrations/0040_product_consistency_phase6_offline.sql"],
   ["0041", "d1/migrations/0041_icai_live_exam_schedules.sql"],
   ["0042", "d1/migrations/0042_admin_exam_date_estimates.sql"],
   ["0043", "d1/migrations/0043_exam_date_estimate_windows.sql"],
+  ["0044", "d1/migrations/0044_product_consistency_phase7_guest_migration.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
@@ -88,7 +90,7 @@ function query(sql) {
 }
 
 const ledgerResult = query(
-  "SELECT version FROM _ca_schema_migrations WHERE (version BETWEEN '0012' AND '0039' OR version IN ('0041','0042','0043')) ORDER BY version;",
+  "SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0044' ORDER BY version;",
 );
 const applied = new Set(
   (ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)),

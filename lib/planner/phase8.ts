@@ -70,10 +70,11 @@ function normalizedTask(input: { title: string; notes: string | null; taskKind: 
   return { ...input, dueAt, targetDate: input.scheduleMode === "flexible" ? input.targetDate : null };
 }
 
-export async function createPhase8Task(userId: string, input: Parameters<typeof normalizedTask>[0], db = getD1RuntimeDatabase()) {
+export async function createPhase8Task(userId: string, input: Parameters<typeof normalizedTask>[0], db = getD1RuntimeDatabase(), createId?:string|null) {
   const value = normalizedTask(input);
   await assertAcademicSelection(userId, value.subjectId, value.chapterId, db);
-  const id = crypto.randomUUID();
+  const id = createId ?? crypto.randomUUID();
+  if(createId){const replay=await db.prepare("SELECT id FROM tasks WHERE id=?1 AND user_id=?2 LIMIT 1").bind(createId,userId).first<{id:string}>();if(replay)return{id,...value,status:"todo",completed_at:null};}
   await db.batch([
     db.prepare("INSERT INTO tasks (id,user_id,title,notes,task_kind,subject_id,chapter_id,due_at,estimated_minutes,status,completed_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,'todo',NULL)").bind(id, userId, value.title, value.notes, value.taskKind, value.subjectId, value.chapterId, value.dueAt, value.estimatedMinutes),
     db.prepare("INSERT INTO planner_task_phase8(task_id,user_id,schedule_mode,target_date) VALUES(?1,?2,?3,?4)").bind(id, userId, value.scheduleMode, value.targetDate),

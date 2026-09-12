@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+const GUEST_ID_COOKIE = "ca_guest_id";
+
 function rejectCrossSiteUnsafeRequest(request: NextRequest) {
   const method = request.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
@@ -26,6 +28,9 @@ export async function updateAuthSession(request: NextRequest) {
   const unsafeResponse = rejectCrossSiteUnsafeRequest(request);
   if (unsafeResponse) return unsafeResponse;
   const response = NextResponse.next({ request });
+  if (!request.cookies.get(GUEST_ID_COOKIE)?.value) {
+    response.cookies.set(GUEST_ID_COOKIE, crypto.randomUUID(), { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 365 * 24 * 60 * 60 });
+  }
   // Temporary staging-only test mode: assign each browser its own isolated server identity.
   if (process.env.CA_GUEST_TEST_MODE?.trim().toLowerCase() === "true" && !request.cookies.get("ca_guest_test_id")?.value) {
     response.cookies.set("ca_guest_test_id", crypto.randomUUID(), { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 30 * 24 * 60 * 60 });

@@ -46,7 +46,7 @@ test("Phase 1 is retained in deployment and has read-only integrity certificatio
   const validator=read("scripts/validate-d1-hot-indexes.mjs");
   const integrity=read("scripts/product-consistency/phase1-integrity.sql");
   assert.match(retained,/0039_product_consistency_phase1_academic_model\.sql/);
-  assert.match(retained,/BETWEEN '0012' AND '0039'/);
+  assert.match(retained,/BETWEEN '0012' AND '0044'/);
   assert.match(validator,/0039_product_consistency_phase1_academic_model\.sql/);
   assert.doesNotMatch(integrity,/\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|REPLACE)\b/i);
 });

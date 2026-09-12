@@ -185,6 +185,7 @@ export async function getStudyPageModel(now = new Date(), preferredReflectionSes
     startedAt: timerRow.started_at,
     runningSince: timerRow.running_since,
     elapsedSeconds: elapsedTimer(timerRow, now),
+    storedElapsedSeconds: Number(timerRow.elapsed_seconds),
     pausedAt: timerRow.paused_at,
     timezone: timerRow.timezone,
     lastInteractionAt: timerRow.last_interaction_at,

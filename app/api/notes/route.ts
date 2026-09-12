@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   const bodyText = richTextToPlainText(bodyHtml);
   const visibility = body.visibility === "shared" ? "shared" : "private";
   const noteId = typeof body.id === "string" && /^[0-9a-f-]{36}$/i.test(body.id) ? body.id : null;
+  const createId = !noteId && typeof body.clientId === "string" && /^[0-9a-f-]{36}$/i.test(body.clientId) ? body.clientId : null;
   const subjectId = nullableId(body.subjectId);
   const chapterId = nullableId(body.chapterId);
   const topicId = nullableId(body.topicId);
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
     const profile = await getProfileForUser(identity.id);
     const result = await savePhase6Note({
       id: noteId,
+      createId,
       userId: identity.id,
       ownerLabel: profile?.display_name?.trim() || "CA Progress student",
       title,

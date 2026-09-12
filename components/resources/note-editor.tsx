@@ -3,6 +3,8 @@
 import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { useStudentContext } from "@/components/academic/student-context-provider";
+import { offlineMutationFetch } from "@/lib/offline/mutation";
 import type { CommunityNoteDraft, NoteSubjectOption } from "@/lib/notes/types";
 import type { NoteCard, UploadCard } from "@/lib/resources/types";
 
@@ -35,6 +37,7 @@ export function NoteEditor({
   initialSubjectId?: string;
   initialChapterId?: string;
 }) {
+  const context = useStudentContext();
   const router = useRouter();
   const editorRef = useRef<HTMLDivElement>(null);
   const sourceSubjectId = communityDraft?.subjectId ?? initialSubjectId;
@@ -132,10 +135,7 @@ export function NoteEditor({
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/notes", {
           id: note?.id ?? null,
           title,
           bodyHtml: editorRef.current?.innerHTML ?? "",
@@ -146,13 +146,12 @@ export function NoteEditor({
           visibility: communityDraft ? "private" : visibility,
           sourceMessageId: communityDraft?.messageId ?? null,
           resourceIds,
-        }),
-      });
+        }, {}, note ? { title: note.title, body_html: note.bodyHtml, subject_id: note.subjectId, chapter_id: note.chapterId, visibility: note.visibility, updated_at: note.updatedAt } : null);
       const payload = await response.json() as { id?: string; error?: string };
       if (!response.ok || !payload.id) throw new Error(payload.error || "Note could not be saved.");
       onSaved?.();
-      router.push(`/notes/${payload.id}`);
-      router.refresh();
+      if(!queued){router.push(`/notes/${payload.id}`);router.refresh();}
+      else setError("Saved on this device. The note will sync when you reconnect.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Note could not be saved.");
     } finally {

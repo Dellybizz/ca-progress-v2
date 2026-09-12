@@ -140,6 +140,7 @@ async function validateOwnedResources(userId: string, resourceIds: string[]) {
 
 export async function savePhase6Note(input: {
   id: string | null;
+  createId?: string | null;
   userId: string;
   ownerLabel: string;
   title: string;
@@ -159,6 +160,7 @@ export async function savePhase6Note(input: {
   const visibility = source && !input.id ? "private" : input.visibility;
   const result = await saveHotNote({
     id: input.id,
+    createId: input.createId,
     userId: input.userId,
     ownerLabel: input.ownerLabel,
     title: input.title,

@@ -30,6 +30,7 @@ export type StudyTimerSnapshot = {
   startedAt: string;
   runningSince: string | null;
   elapsedSeconds: number;
+  storedElapsedSeconds?: number;
   pausedAt: string | null;
   timezone: string;
   lastInteractionAt: string;

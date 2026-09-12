@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { useStudentContext } from "@/components/academic/student-context-provider";
+import { offlineMutationFetch } from "@/lib/offline/mutation";
 import type { ProgressChapter, ProgressMutationResult, ProgressReadyModel, ProgressStage, ProgressState } from "@/lib/progress/types";
 
 const STAGES: Array<{ key: ProgressStage; label: string; short: string }> = [
@@ -85,6 +87,7 @@ export function ProgressTracker({
   subjectLocked?: boolean;
   initialChapterId?: string;
 }) {
+  const context = useStudentContext();
   const router = useRouter();
   const initialChapter = initialChapterId ? model.chapters.find((chapter) => chapter.id === initialChapterId) ?? null : null;
   const [chapters, setChapters] = useState(model.chapters);
@@ -128,16 +131,13 @@ export function ProgressTracker({
     setMessage(null);
     setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
     try {
-      const response = await fetch("/api/progress", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "set_stage", chapterId: chapter.id, stage, enabled }),
-      });
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/progress", { action: "set_stage", chapterId: chapter.id, stage, enabled }, {state:next,saved_at:new Date().toISOString()}, { ...previous });
       const payload = await response.json() as ProgressMutationResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Progress could not be saved.");
       setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
       setUndoEvent(payload.event_id ? { id: payload.event_id, chapterId: chapter.id } : null);
       setSaveState("saved");
+      if(queued)setMessage("Saved on this device. It will sync when you reconnect.");
     } catch (error) {
       setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: previous } : item));
       setSaveState("error");

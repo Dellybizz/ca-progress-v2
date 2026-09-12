@@ -38,3 +38,7 @@
 /* Canonical application chrome loads after route-era CSS until those routes are migrated. */
 @import "./styles/shell.css";
 @import "./styles/navigation-progress.css";
+
+.offline-workspace { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.offline-controls { padding: 16px 0; border-block: 1px solid var(--border, #e5e7eb); margin-bottom: 16px; }
+.offline-controls button { cursor: pointer; }

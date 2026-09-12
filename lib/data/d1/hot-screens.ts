@@ -1,3 +1,4 @@
+import { offlineTransaction } from "@/lib/offline/transaction-context";
 import "server-only";
 
 import { getHotD1Database } from "./runtime";
@@ -357,12 +358,13 @@ async function assertHotAcademicSelection(userId: string, subjectId: string | nu
   }
 }
 
-export async function saveHotNote(input: { id: string|null; userId: string; ownerLabel: string; title: string; bodyHtml: string; bodyText: string; subjectId: string|null; chapterId: string|null; tags: string[]; visibility: "private"|"shared" }, db: HotD1Database = getHotD1Database()) {
+export async function saveHotNote(input: { id: string|null; createId?:string|null; userId: string; ownerLabel: string; title: string; bodyHtml: string; bodyText: string; subjectId: string|null; chapterId: string|null; tags: string[]; visibility: "private"|"shared" }, db: HotD1Database = getHotD1Database()) {
   if (!input.title || input.title.length > 160) throw new Error("A note title is required.");
   if (new TextEncoder().encode(input.bodyHtml).length > 200000 || new TextEncoder().encode(input.bodyText).length > 120000) throw new Error("Note content is too large.");
   if (input.tags.length > 12) throw new Error("A note can have at most 12 tags.");
   await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
-  const id=input.id ?? crypto.randomUUID();
+  const id=input.id ?? input.createId ?? crypto.randomUUID();
+  if(!input.id&&input.createId){const replay=await db.prepare("SELECT id,moderation_status AS status FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(input.createId,input.userId).first<{id:string;status:string}>();if(replay)return replay;}
   const existing=input.id ? await db.prepare("SELECT id FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(input.id,input.userId).first() : null;
   if (input.id && !existing) throw new Error("Note not found.");
   const status=input.visibility==="shared"?"pending":"private";
@@ -473,6 +475,11 @@ async function rebuildHotRevisionSchedule(userId:string,db:HotD1Database) {
   }
 }
 async function rebuildHotRevisionScheduleAfterCommit(userId:string,db:HotD1Database) {
+  const transaction = offlineTransaction.getStore();
+  if (transaction) {
+    transaction.afterCommit.push(() => rebuildHotRevisionScheduleAfterCommit(userId, getHotD1Database()));
+    return;
+  }
   try {
     await rebuildHotRevisionSchedule(userId,db);
   } catch (error) {

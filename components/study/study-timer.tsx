@@ -1,9 +1,12 @@
 "use client";
+import { useOfflineModel } from "@/components/offline/use-offline-model";
 
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
+import { useStudentContext } from "@/components/academic/student-context-provider";
+import { offlineMutationFetch } from "@/lib/offline/mutation";
 import type { StudyReadyModel, StudyTimerMutationResult } from "@/lib/study/types";
 
 function duration(seconds: number) {
@@ -40,7 +43,9 @@ function StudySideRail({ model }: { model: StudyReadyModel }) {
   );
 }
 
-export function StudyTimer({ model, initialSubjectId, initialChapterId, initialTaskId }: { model: StudyReadyModel; initialSubjectId?: string; initialChapterId?: string; initialTaskId?: string }) {
+export function StudyTimer({ model: serverModel, initialSubjectId, initialChapterId, initialTaskId }: { model: StudyReadyModel; initialSubjectId?: string; initialChapterId?: string; initialTaskId?: string }) {
+  const model = useOfflineModel("study", serverModel);
+  const context = useStudentContext();
   const router = useRouter();
   const timer = model.timer;
   const safeInitialTask = !timer && initialTaskId ? model.tasks.find((task) => task.id === initialTaskId) ?? null : null;
@@ -62,14 +67,16 @@ export function StudyTimer({ model, initialSubjectId, initialChapterId, initialT
 
   useEffect(() => {
     if (!timer || timer.status !== "running" || timer.abandoned) return;
-    const id = window.setInterval(() => setElapsed((value) => Math.min(43_200, value + 1)), 1000);
-    return () => window.clearInterval(id);
+    const tick = () => setElapsed(Math.min(43_200, (timer.storedElapsedSeconds ?? timer.elapsedSeconds) + (timer.runningSince ? Math.max(0, Math.floor((Date.now() - Date.parse(timer.runningSince)) / 1000)) : 0)));
+    const initial = window.setTimeout(tick, 0);
+    const id = window.setInterval(tick, 1000);
+    return () => { window.clearTimeout(initial); window.clearInterval(id); };
   }, [timer]);
 
   useEffect(() => {
     if (!timer || timer.status !== "running" || timer.abandoned) return;
     const id = window.setInterval(() => {
-      void fetch("/api/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "touch" }), keepalive: true });
+      if (navigator.onLine) void fetch("/api/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "touch" }), keepalive: true }).catch(() => undefined);
     }, 5 * 60 * 1000);
     return () => window.clearInterval(id);
   }, [timer]);
@@ -80,10 +87,10 @@ export function StudyTimer({ model, initialSubjectId, initialChapterId, initialT
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/study/timer", body, {status:String(body.action||"queued")});
       const payload = await response.json() as StudyTimerMutationResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Timer could not be updated.");
-      router.refresh();
+      if(!queued)router.refresh(); else setError("Timer change saved on this device and queued for sync.");
       return payload;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Timer could not be updated.");

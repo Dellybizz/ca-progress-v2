@@ -20,7 +20,7 @@ type TaskFields = {
 };
 
 type Body =
-  | ({ action: "create" } & TaskFields)
+  | ({ action: "create"; clientId?:string } & TaskFields)
   | ({ action: "update"; id: string } & TaskFields)
   | { action: "toggle"; id: string; done: boolean }
   | { action: "delete"; id: string };
@@ -48,7 +48,8 @@ export async function POST(request: Request) {
         targetDate: body.targetDate || null,
         estimatedMinutes: Math.round(Number(body.estimatedMinutes ?? 30)),
       };
-      const result = body.action === "create" ? await createPhase8Task(user.id, task) : await updatePhase8Task(user.id, body.id, task);
+      const createId=body.action==="create"&&typeof body.clientId==="string"&&/^[0-9a-f-]{36}$/i.test(body.clientId)?body.clientId:null;
+      const result = body.action === "create" ? await createPhase8Task(user.id, task, undefined, createId) : await updatePhase8Task(user.id, body.id, task);
       return NextResponse.json(result, { status: body.action === "create" ? 201 : 200, headers: { "Cache-Control": "private, no-store" } });
     }
     if (body.action === "toggle") return NextResponse.json(await togglePhase8Task(user.id, body.id, body.done), { headers: { "Cache-Control": "private, no-store" } });

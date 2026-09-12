@@ -46,7 +46,7 @@ export default function PrivacyPage() {
       <section>
         <h2>3. Guest mode</h2>
         <p>
-          You may use supported parts of CA Progress as a guest. Guest identity information is created locally in your browser and does not create a CA Progress authentication account. Guest-only information is not synced as private account data unless you later sign in and explicitly use features that save information to your account.
+          You may use supported parts of CA Progress as a guest. A pseudonymous guest identifier is issued to this browser and does not create a CA Progress authentication account. If you later sign in, CA Progress shows a summary and asks before preserving supported guest work in your account. Existing account data is kept when a conflict needs review.
         </p>
       </section>
 

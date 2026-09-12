@@ -1,4 +1,5 @@
 "use client";
+import { useOfflineModel } from "@/components/offline/use-offline-model";
 
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
@@ -6,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { NotificationCenter } from "@/components/planner/notification-center";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
+import { useStudentContext } from "@/components/academic/student-context-provider";
+import { offlineMutationFetch } from "@/lib/offline/mutation";
 import type { PlannerReadyModel, PlannerTask, TaskKind, TaskScheduleMode } from "@/lib/planner/types";
 
 function localInput(date = new Date(Date.now() + 60 * 60 * 1000)) {
@@ -17,8 +20,10 @@ function sameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() 
 function formatTaskSchedule(value: string) { return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).format(new Date(value)); }
 function kindLabel(kind: TaskKind) { return kind === "class" ? "Class" : kind === "mock" ? "Mock" : kind === "personal" ? "Personal" : kind.charAt(0).toUpperCase() + kind.slice(1); }
 
-export function PlannerClient({ model }: { model: PlannerReadyModel }) {
+export function PlannerClient({ model: serverModel }: { model: PlannerReadyModel }) {
+  const model = useOfflineModel("planner", serverModel);
   const router = useRouter();
+  const context = useStudentContext();
   const defaultWhen = useMemo(() => localInput(), []);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -46,10 +51,10 @@ export function PlannerClient({ model }: { model: PlannerReadyModel }) {
   async function request(body: Record<string, unknown>) {
     setBusy(true); setError(null);
     try {
-      const response = await fetch("/api/planner/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/planner/tasks", body);
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Task could not be saved.");
-      router.refresh(); return true;
+      if(!queued)router.refresh(); return true;
     } catch (err) { setError(err instanceof Error ? err.message : "Task could not be saved."); return false; }
     finally { setBusy(false); }
   }

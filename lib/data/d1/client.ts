@@ -1,3 +1,4 @@
+import { offlineTransaction } from "@/lib/offline/transaction-context";
 import "server-only";
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
@@ -87,6 +88,8 @@ function errorResult(error: unknown): QueryResult {
 }
 
 export function getD1RuntimeDatabase(): D1DatabaseLike {
+  const offline = offlineTransaction.getStore();
+  if (offline) return offline.db;
   const { env } = getCloudflareContext();
   const db = (env as unknown as Record<string, unknown>).DB as D1DatabaseLike | undefined;
   if (!db || typeof db.prepare !== "function" || typeof db.batch !== "function") throw new Error("Cloudflare D1 DB binding is required.");

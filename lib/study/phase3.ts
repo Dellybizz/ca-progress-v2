@@ -1,3 +1,4 @@
+import { offlineTransaction } from "@/lib/offline/transaction-context";
 import "server-only";
 
 import { createHotCommunityMessage } from "@/lib/data/d1/hot-screens";
@@ -142,7 +143,9 @@ async function activeTimerPhase3(userId: string, db: HotD1Database) {
 
 export async function performStudyTimerAction(userId: string, body: Record<string, unknown>, db: HotD1Database = getHotD1Database()) {
   const action = safeText(body.action, 24);
-  const now = new Date();
+  const occurredAt = offlineTransaction.getStore() && typeof body.offlineOccurredAt === "string" ? Date.parse(body.offlineOccurredAt) : Date.now();
+  if (!Number.isFinite(occurredAt) || occurredAt > Date.now() + 60_000 || occurredAt < Date.now() - 7 * 86400_000) throw new Error("Offline session time needs review (outside the seven-day window).");
+  const now = new Date(occurredAt);
   const nowIso = now.toISOString();
 
   if (action === "start") {
@@ -192,8 +195,14 @@ export async function performStudyTimerAction(userId: string, body: Record<strin
   }
 
   const timer = await activeTimer(userId, db);
+  const replayId=cleanId(body.clientId);
+  if(!timer&&action==="finish"&&replayId){const replay=await db.prepare("SELECT id,ended_at,duration_seconds FROM study_sessions WHERE id=?1 AND user_id=?2 LIMIT 1").bind(replayId,userId).first<{id:string;ended_at:string;duration_seconds:number}>();if(replay)return{session_id:replay.id,ended_at:replay.ended_at,duration_seconds:replay.duration_seconds};}
   if (!timer) throw new Error("No active study timer was found.");
+  if (now.getTime() < Date.parse(timer.last_interaction_at)) throw new Error("Offline timer actions are out of order.");
   const extension = await activeTimerPhase3(userId, db) ?? { task_id: null, plan_item_id: null, pause_count: 0, paused_seconds: 0 };
+
+  const attachedPlanItem = offlineTransaction.getStore()?.timerPlanItemId;
+  if (attachedPlanItem) extension.plan_item_id = attachedPlanItem;
 
   if (action === "touch") {
     if (timer.status === "running") await db.prepare(`UPDATE study_timer_state SET last_interaction_at=?1,updated_at=CURRENT_TIMESTAMP WHERE user_id=?2`).bind(nowIso, userId).run();
@@ -235,7 +244,7 @@ export async function performStudyTimerAction(userId: string, body: Record<strin
     if (elapsed < 1) throw new Error("Study at least one second before finishing a session.");
     if (elapsed > MAX_SESSION_SECONDS) throw new Error("This timer is longer than the 12-hour safety limit. Discard it instead of saving inactive time.");
     const finalPausedSeconds = extension.paused_seconds + pausedSince(timer, now);
-    const sessionId = crypto.randomUUID();
+    const sessionId = replayId ?? crypto.randomUUID();
     await db.batch([
       db.prepare(`INSERT INTO study_sessions (id,user_id,subject_id,chapter_id,mode,timezone,started_at,ended_at,duration_seconds,focus_target_seconds,break_target_seconds)
         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)`).bind(sessionId, userId, timer.subject_id, timer.chapter_id, timer.mode, timer.timezone, timer.started_at, nowIso, elapsed, timer.focus_target_seconds, timer.break_target_seconds),
