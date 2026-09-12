@@ -32,6 +32,9 @@ The implementation source of truth remains `app/styles/tokens.css`, `app/styles/
 - Mobile complex actions use bottom sheets or full-screen task flows; desktop dialogs are never merely shrunk.
 - Destructive and privileged actions state consequence, require the existing authorization/confirmation contract and return durable evidence where supported.
 - Optimistic presentation is limited to safely reversible or idempotent operations.
+- Common identity uses the shared Avatar; repeated records use DataList or DataTable; menus use Menu/Popover; error, offline and stale feedback uses StatusState.
+- DataTable preserves every labelled field by changing desktop tables into mobile summary records. It never hides data merely to fit a phone.
+- Menu/Popover triggers expose their controlled panel ID and expanded state; consumers retain an explicit 44px trigger and accessible name.
 
 ## Mobile transformation constitution
 
@@ -68,4 +71,3 @@ These are evidence sources, not themes. See `docs/refinement-r1/REFERO_EVIDENCE.
 ## Explicit anti-patterns
 
 Do not ship oversized authenticated-page headings, decorative gradients, glassmorphism, floating card grids, duplicated navigation, hidden table data, tiny touch controls, colour-only status, desktop modal compression, arbitrary route-level tokens, or a literal clone of any reference product.
-

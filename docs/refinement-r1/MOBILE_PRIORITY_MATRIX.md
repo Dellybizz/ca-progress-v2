@@ -28,3 +28,6 @@ Outcome parity is mandatory; component parity is not. `Remove on mobile` means r
 - List → detail transitions preserve filters, scroll position and unfinished input.
 - Slow, offline/reconnect, loading, empty, stale, permission and error states retain the next safe action.
 
+## Route-level approval
+
+The executable config/refinement-r1-route-decisions.mjs expands this matrix over every route in the certified R0 contract. Each of the 46 routes has a page purpose, reference owner, primary mobile action, ordered information hierarchy, explicit transformations and outcome-parity requirement. The closure test fails when a contracted route is added without an R1 decision.

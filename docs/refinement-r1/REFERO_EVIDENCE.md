@@ -13,16 +13,27 @@ Sources reviewed on 12 September 2026:
 - [Refero design-context guidance](https://styles.refero.design/ai-agents/design-context)
 - [Refero design-prompt guidance](https://styles.refero.design/ai-agents/design-prompts)
 
+Traceability note: Refero's public library exposes stable taxonomy searches but individual screen records require an authenticated research session. This programme records only URLs verified in the public library and never invents screen IDs. Product-specific conclusions are bounded observations, while the public Refero taxonomies remain the reproducible evidence entry points.
+
+| Evidence ID | Verified Refero entry point | Decision supported |
+| --- | --- | --- |
+| REF-DASHBOARD | https://refero.design/search?page_types[id][]=28&order=trending | Summary hierarchy, dashboard density and restrained metric grouping |
+| REF-ONBOARDING | https://refero.design/search/flows?flow_types[id][]=1&order=trending | Short, sequential authentication/onboarding flows |
+| REF-DIALOG | https://refero.design/search?page_elements[id][]=81&order=trending | Dialog hierarchy, dismissal and action placement |
+| REF-WEB | https://refero.design/search | Web application screens, navigation, tables, filters and account surfaces |
+| REF-IOS | https://refero.design/apps/search | Mobile-native priority, full-screen tasks and compact navigation |
+| REF-STYLES | https://styles.refero.design/design-styles/productivity-apps | Productivity density and restrained workspace language |
+
 ## Accepted evidence
 
-| Reference | Problem it solves | Adopted hierarchy and behaviour | Mobile transformation | Accessibility risk to control | CA Progress ownership |
-| --- | --- | --- | --- | --- | --- |
-| Quizlet | Makes learning state and next study action recognizable | Strong subject identity, plain study-state language, one dominant learning action | Keep current activity; defer related modes and history into drill-down | Colour-only mastery state and gamification distraction | Study, Progress, Tests, Chapter Hub |
-| Amie | Keeps a busy personal workspace calm | Flat surfaces, restrained accent, compact paired actions, schedule-led hierarchy | Convert secondary panes to sheets; keep next event/action visible | Low-contrast secondary text and gesture-only actions | Dashboard shell, Calendar, account surfaces |
-| Todoist | Supports rapid daily planning and completion | Today-first list, fast capture, quiet rows, clear done state | Sticky add/complete action; details open in sheet/full-screen flow | Destructive swipe actions and small row controls | Today Plan, Planner, Goals |
-| Goodnotes | Protects concentration in a content workspace | Canvas dominance, disciplined toolbar, content-first editing | Full-screen editor with contextual tools; list and editor become separate steps | Icon-only tools and keyboard/stylus conflicts | Notes, note detail, resource annotation entry |
-| Dub | Makes analytics scannable without card soup | Compact filters, summary-first metrics, restrained charts, progressive detail | Condense metric set; filters move to sheet; chart details remain reachable | Dense labels and chart meaning without text equivalent | Analytics, Forecast, admin summaries |
-| Linear | Handles operational density and repeated actions | Hairline grouping, table/list precision, command search, keyboard rigor | Tables become labelled summary rows with detail sheets | Tiny targets, weak contrast and desktop shortcut assumptions | Admin, moderation, audit, jobs, ICAI operations |
+| Reference | Evidence | Problem it solves | Hierarchy, density, navigation and component behaviour | Mobile transformation | Accessibility risk to control | CA Progress ownership |
+| --- | --- | --- | --- | --- | --- | --- |
+| Quizlet | REF-IOS, REF-WEB | Makes learning state and next study action recognizable | Strong subject identity; moderate educational density; stable subject navigation; explicit state/action components | Keep current activity; defer related modes and history into drill-down | Colour-only mastery state and gamification distraction | Study, Progress, Tests, Chapter Hub |
+| Amie | REF-DASHBOARD, REF-IOS | Keeps a busy personal workspace calm | Schedule-led hierarchy; low visual density; stable time navigation; flat paired-action rows | Convert secondary panes to sheets; keep next event/action visible | Low-contrast secondary text and gesture-only actions | Dashboard shell, Calendar, account surfaces |
+| Todoist | REF-IOS, REF-WEB | Supports rapid daily planning and completion | Today-first hierarchy; compact list density; stable Today/Upcoming navigation; fast capture and clear completion controls | Sticky add/complete action; details open in sheet/full-screen flow | Destructive swipe actions and small row controls | Today Plan, Planner, Goals |
+| Goodnotes | REF-IOS | Protects concentration in a content workspace | Canvas-first hierarchy; tools appear contextually; document navigation stays secondary; disciplined editor controls | Full-screen editor with contextual tools; list and editor become separate steps | Icon-only tools and keyboard/stylus conflicts | Notes, note detail, resource annotation entry |
+| Dub | REF-DASHBOARD, REF-WEB | Makes analytics scannable without card soup | Summary-first hierarchy; compact analytical density; filters stay near scope; charts retain progressive detail | Condense metric set; filters move to sheet; chart details remain reachable | Dense labels and chart meaning without text equivalent | Analytics, Forecast, admin summaries |
+| Linear | REF-WEB, REF-DIALOG | Handles operational density and repeated actions | Attention-first hierarchy; dense hairline lists; stable workspace navigation; precise table, command and dialog controls | Tables become labelled summary rows with detail sheets | Tiny targets, weak contrast and desktop shortcut assumptions | Admin, moderation, audit, jobs, ICAI operations |
 
 ## Rejected patterns
 
@@ -38,4 +49,3 @@ Sources reviewed on 12 September 2026:
 ## Normalized synthesis
 
 CA Progress uses Quizlet’s educational clarity inside Amie’s restrained workspace, Todoist’s daily action model, Goodnotes’ focused canvas, and Dub/Linear precision for data-heavy surfaces. No route may blend motifs from multiple references unless the route map names one owner for each distinct interaction problem.
-
