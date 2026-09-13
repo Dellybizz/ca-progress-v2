@@ -88,6 +88,7 @@ test("legacy dashboard styling cannot override the canonical application shell",
 test("desktop navigation scrolls independently without colliding with account identity", () => {
   const shell = read("app/styles/shell.css");
   assert.match(shell, /\.shell-navigation\s*\{[^}]*flex:\s*1 1 auto[^}]*overflow-y:\s*auto/s);
+  assert.match(shell, /\.shell-navigation\s*\{[^}]*align-content:\s*start[^}]*grid-auto-rows:\s*max-content/s);
   assert.match(shell, /\.app-shell--r3 \.desktop-sidebar\s*\{[^}]*overflow:\s*hidden/s);
   assert.match(shell, /\.shell-identity\s*\{[^}]*flex:\s*0 0 auto[^}]*min-height:\s*54px/s);
 });

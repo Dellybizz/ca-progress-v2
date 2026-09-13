@@ -217,7 +217,7 @@ kbd { padding: 2px 5px; border: 1px solid var(--color-border); border-radius: va
 /* R3 — one calm, identity-stable workspace shell */
 .app-shell--r3 .topbar { background: var(--color-surface); }
 .topbar-context__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 4px var(--color-success-soft); }
-.shell-navigation { flex: 1 1 auto; gap: 14px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.shell-navigation { flex: 1 1 auto; align-content: start; grid-auto-rows: max-content; gap: 8px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
 .shell-navigation__section { display: grid; gap: 3px; }
 .shell-navigation__section h2 { margin: 0 9px 3px; color: var(--color-text-faint); font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 .shell-navigation__section > div { display: grid; gap: 2px; }
