@@ -24,7 +24,7 @@ export function DesktopNavigation({ area }: { area: ShellArea }) {
   const activeSection = useMemo(() => sections.findIndex((section, index) => index > 0 && section.items.some(item => routeIsActive(item, pathname))), [pathname, sections]);
   const [manualSection, setManualSection] = useState<{ pathname: string; index: number | null } | null>(null);
   const openSection = manualSection?.pathname === pathname ? manualSection.index : activeSection >= 0 ? activeSection : null;
-  return <nav className="sidebar-nav shell-navigation" aria-label={`${area} navigation`}>
+  return <nav className="sidebar-nav shell-navigation" data-route-root-navigation aria-label={`${area} navigation`}>
     {sections.map((section, index) => {
       const primary = index === 0;
       const expanded = primary || openSection === index;

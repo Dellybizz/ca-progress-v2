@@ -62,10 +62,10 @@ function GuestDashboard() {
           </div>
         </Link>
 
-        <Link href="/study" className="dashboard-overview-card" aria-label="Open study mode">
+        <Link href="/study" className="dashboard-overview-card" aria-label="Open Focus">
           <header className="dashboard-overview-card__header">
             <span className="dashboard-overview-card__icon"><Icon name="timer" size={17}/></span>
-            <div><strong>Study</strong><small>Try focus mode</small></div>
+            <div><strong>Focus</strong><small>Start a timed session</small></div>
             <Icon name="chevron" size={14}/>
           </header>
           <div className="dashboard-overview-card__primary">
@@ -194,10 +194,10 @@ export function TodayOverview({ model }: { model: DashboardReadyModel }) {
 
 export function StudyOverview({ model }: { model: DashboardReadyModel }) {
   return (
-    <Link href="/study" className="dashboard-overview-card" aria-label="Open study mode">
+    <Link href="/study" className="dashboard-overview-card" aria-label="Open Focus">
       <header className="dashboard-overview-card__header">
         <span className="dashboard-overview-card__icon"><Icon name="timer" size={17}/></span>
-        <div><strong>Study</strong><small>Time & consistency</small></div>
+        <div><strong>Focus</strong><small>Time & consistency</small></div>
         <Icon name="chevron" size={14}/>
       </header>
       <div className="dashboard-overview-card__primary">

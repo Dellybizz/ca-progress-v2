@@ -9,8 +9,8 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 test("Study page uses one clear hierarchy instead of repeated questions", () => {
   const page = read("components/study/study-page.tsx");
   const timer = read("components/study/study-timer.tsx");
-  assert.match(page, /model\.timer \? "Focus session" : "Study"/);
-  assert.match(page, /formatAttempt\(model\.attemptKey\)/);
+  assert.match(page, /StudyFocusWorkspace/);
+  assert.doesNotMatch(page, /study-page__intro/);
   assert.match(timer, /title=\{isActive \? "Session details" : "Start a focus session"\}/);
   assert.match(timer, /<strong>Subject & chapter<\/strong>/);
   assert.match(timer, /<strong>Timer<\/strong>/);
@@ -48,7 +48,7 @@ test("A1.2 unifies Study actions and the structural Syllabus index", () => {
   const syllabus = read("components/academic/syllabus-explorer.tsx");
   const css = read("app/styles/academic-index-a12.css");
   assert.doesNotMatch(page, /study-course-index/);
-  assert.match(page, /Browse course structure/);
+  assert.match(page, /StudyFocusWorkspace/);
   assert.match(syllabus, /Level → Group → Subject → Chapter → Unit/);
   assert.match(syllabus, /academic-subject-list/);
   assert.doesNotMatch(syllabus, /academic-hero/);
@@ -73,6 +73,7 @@ test("Study timer uses the requested focused dial and control-panel composition"
 test("timer mutations and reflection dismissal respond optimistically", () => {
   const timer = read("components/study/study-timer.tsx");
   const reflection = read("components/study/study-reflection.tsx");
+  const workspace = read("components/study/study-focus-workspace.tsx");
   assert.match(timer, /setOptimisticStartedAt\(Date\.now\(\)\)/);
   assert.match(timer, /setOptimisticEnded\(true\)/);
   assert.match(timer, /const timerStatus = optimisticStatus/);
@@ -81,6 +82,9 @@ test("timer mutations and reflection dismissal respond optimistically", () => {
   assert.match(reflection, /setLater\(true\)/);
   assert.match(reflection, />Later<\/button>/);
   assert.match(reflection, /Number\(value\) <= 100/);
+  assert.match(reflection, /role="dialog"/);
+  assert.match(workspace, /onReviewChange/);
+  assert.match(timer, /ready: false/);
 });
 
 test("academic breadcrumbs preserve the route a student used", () => {
@@ -89,9 +93,10 @@ test("academic breadcrumbs preserve the route a student used", () => {
   const study = read("components/study/study-page.tsx");
   assert.match(trail, /usePathname/);
   assert.match(trail, /sessionStorage/);
-  assert.match(trail, /existing >= 0 \? previous\.slice/);
+  assert.match(trail, /data-route-root-navigation/);
+  assert.match(trail, /isTopLevel/);
   assert.match(shell, /<RouteTrail homeHref=\{homeHref\}/);
-  assert.match(study, /href="\/syllabus"/);
+  assert.doesNotMatch(study, /study-page__intro/);
 });
 
 test("focus sessions work without a subject or chapter", () => {

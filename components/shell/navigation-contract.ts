@@ -9,7 +9,7 @@ export const shellNavigation: Record<ShellArea, readonly ShellNavSection[]> = {
     { label: "Workspace", items: [
       { label: "Dashboard", shortLabel: "Home", description: "Your study overview", href: "/dashboard", icon: "home", mobilePrimary: true },
       { label: "Today", description: "What needs your attention now", href: "/planner/today", icon: "sparkles", mobilePrimary: true },
-      { label: "Study", description: "Start and manage study sessions", href: "/study", icon: "timer", mobilePrimary: true },
+      { label: "Focus", description: "Start and manage focus sessions", href: "/study", icon: "timer", mobilePrimary: true },
       { label: "Progress", description: "Track syllabus completion", href: "/progress", icon: "chart", mobilePrimary: true },
       { label: "Planner", description: "Plan upcoming study work", href: "/planner", icon: "calendar", exact: true },
     ]},

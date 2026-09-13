@@ -4,7 +4,7 @@ import { getStudyPageModel } from "@/lib/study/service";
 import { OfflineSnapshot } from "@/components/offline/offline-snapshot";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Study | CA Progress" };
+export const metadata: Metadata = { title: "Focus | CA Progress" };
 
 function cleanId(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value[0] : value;

@@ -24,8 +24,8 @@ test("Today ignores malformed historical dates and optional enhancement failures
   assert.match(phase8, /getTaskPlanningExtensions[\s\S]*\.catch\(\(\) => new Map\(\)\)/);
   assert.match(page, /getPhase8TodayModel\(\)\.catch/);
   assert.match(page, /return getTodayPlanPageModel\(\)/);
-  assert.match(page, /getPendingStudyReflectionPrompt\(\)\.catch/);
-  assert.match(page, /\[today\] reflection prompt unavailable/);
+  assert.doesNotMatch(page, /getPendingStudyReflectionPrompt/);
+  assert.doesNotMatch(page, /Reflect on your finished session/);
   assert.match(page, /getCurrentPhase8Snapshot\(\)\.catch/);
   assert.match(page, /\[today\] planning snapshot unavailable/);
   assert.match(page, /Today is running in core mode/);

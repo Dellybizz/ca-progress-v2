@@ -98,15 +98,15 @@ test("Product Phase 3 Chapter Hub reports reflection as self-reported rather tha
   assert.doesNotMatch(hub, /mastery:|Mastery score/);
 });
 
-test("Product Phase 3 asks for pending reflection from Study and Today without blocking a new timer", () => {
+test("Product Phase 3 opens pending reflection in Focus without blocking a new timer", () => {
   const studyPage = read("components/study/study-page.tsx");
-  const today = read("app/(student)/planner/today/page.tsx");
+  const workspace = read("components/study/study-focus-workspace.tsx");
 
-  assert.match(studyPage, /model\.pendingReflection \? <StudyReflection/);
-  assert.match(studyPage, /<StudyTimer/);
-  assert.match(today, /getPendingStudyReflectionPrompt/);
-  assert.match(today, /Reflect on your finished session/);
-  assert.match(today, /\/study\?reflect=/);
+  assert.match(studyPage, /StudyFocusWorkspace/);
+  assert.match(workspace, /model\.pendingReflection/);
+  assert.match(read("components/study/study-reflection.tsx"), /role="dialog"/);
+  assert.match(workspace, /<StudyTimer/);
+  assert.match(workspace, /<StudyReflection/);
 });
 
 test("Product Phase 3 production deployment applies the additive idempotent session-reflection migration", () => {

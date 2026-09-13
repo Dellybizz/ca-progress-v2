@@ -47,7 +47,7 @@ async function ActivityContent({ initialReferralCode }: { initialReferralCode: s
   const nextPath = initialReferralCode ? `/activity?ref=${encodeURIComponent(initialReferralCode)}` : "/activity";
 
   if (model.mode === "guest" || !user) return <div className="phase6-page">
-    <PageHeader preview={false} eyebrow="Activity" title="Your study and progress history." description="Browse the activity page as a guest. Your personal timeline appears after sign-in." actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link></div>}/>
+    <PageHeader preview={false} eyebrow="Activity" title="Your study and progress history." description="Browse the activity page as a guest. Your personal timeline appears after sign-in." actions={<div className="phase6-header-links"><Link href="/study">Focus</Link><Link href="/progress">Progress</Link></div>}/>
     <Card><CardBody><div className="phase6-empty"><Icon name="sparkles"/><strong>Activity preview</strong><p>There is no guest activity history. Sign in to record study and progress events.</p></div></CardBody></Card>
     <LoginRequired next={nextPath} title="Sign in to view your private activity"/>
   </div>;
@@ -55,7 +55,7 @@ async function ActivityContent({ initialReferralCode }: { initialReferralCode: s
   const items = Array.isArray(model.items) ? model.items : [];
 
   return <div className="phase6-page">
-    <PageHeader preview={false} eyebrow="Activity" title="Preparation momentum and activity." description="XP, levels and achievements reward meaningful preparation only. They never change syllabus progress, revision readiness or test readiness." actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link></div>}/>
+    <PageHeader preview={false} eyebrow="Activity" title="Preparation momentum and activity." description="XP, levels and achievements reward meaningful preparation only. They never change syllabus progress, revision readiness or test readiness." actions={<div className="phase6-header-links"><Link href="/study">Focus</Link><Link href="/progress">Progress</Link></div>}/>
 
     <ActivityGamificationClient initialReferralCode={initialReferralCode}/>
 

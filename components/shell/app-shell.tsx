@@ -15,7 +15,7 @@ import { RouteTrail } from "./route-trail";
 
 export function AppShell({ children, area = "student", viewer, studentContext, attempts = [] }: { children: React.ReactNode; area?: "student" | "admin"; viewer: ViewerSnapshot; studentContext?: StudentContextContract; attempts?: AttemptOption[] }) {
   /* Stable labels retained for operational search: Student workspace; Admin workspace */
-  const workspaceLabel = area === "admin" ? "Operations" : "Study workspace";
+  const workspaceLabel = area === "admin" ? "Operations" : "Student workspace";
   const homeHref = area === "admin" ? "/admin" : "/dashboard";
   return <ViewerProvider viewer={viewer}>
     <AppearanceRuntime/><NavigationProgress/><MobileOverscrollGuard/><EnvironmentBanner/>

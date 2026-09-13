@@ -70,7 +70,7 @@ test("Product Phase 2 Today shows attempt countdown, planned/completed duration 
   assert.match(page, /Days remaining/);
   assert.match(page, /Planned study/);
   assert.match(page, /Completed today/);
-  for (const action of ["Start Study", "Rearrange", "Add Task", "View Full Planner"]) assert.match(page, new RegExp(action));
+  for (const action of ["Start Focus", "Rearrange", "Add Task", "View Full Planner"]) assert.match(page, new RegExp(action));
   assert.match(client, /itemKind/);
   assert.match(client, /revision/);
   assert.match(client, /test/);

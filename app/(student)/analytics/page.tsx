@@ -40,7 +40,7 @@ export default async function AnalyticsPage() {
   ]);
 
   if (model.mode === "guest") return <div className="progress-page">
-    <PageHeader preview={false} eyebrow="Analytics" title="Study and progress analytics." description="Browse the analytics layout as a guest. Personal insights are available only after sign-in and only when your own recorded evidence supports them." actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link></div>}/>
+    <PageHeader preview={false} eyebrow="Analytics" title="Study and progress analytics." description="Browse the analytics layout as a guest. Personal insights are available only after sign-in and only when your own recorded evidence supports them." actions={<div className="phase6-header-links"><Link href="/study">Focus</Link><Link href="/progress">Progress</Link></div>}/>
     <Card><CardBody><div className="phase6-empty"><Icon name="chart"/><strong>Analytics preview</strong><p>Guest mode does not create personal analytics or forecasts.</p></div></CardBody></Card>
     <LoginRequired next="/analytics" title="Sign in to view private analytics"/>
   </div>;
@@ -59,7 +59,7 @@ export default async function AnalyticsPage() {
       eyebrow="Analytics"
       title="Actionable analytics from your recorded study data."
       description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Core analytics remain available on Free. Pro adds the deeper weakness, revision, consistency and test-insight analysis. No manually maintained totals are used, and XP is never treated as readiness.`}
-      actions={<div className="phase6-header-links"><Link href="/study">Study</Link><Link href="/progress">Progress</Link><Link href="/analytics/forecast">Forecast</Link></div>}
+      actions={<div className="phase6-header-links"><Link href="/study">Focus</Link><Link href="/progress">Progress</Link><Link href="/analytics/forecast">Forecast</Link></div>}
     />
 
     {phase9.mode === "ready" ? advancedAnalytics?.allowed ? <Phase9ActionableAnalytics model={phase9}/> : <Card>

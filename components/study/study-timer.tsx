@@ -7,7 +7,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { useStudentContext } from "@/components/academic/student-context-provider";
 import { offlineMutationFetch } from "@/lib/offline/mutation";
-import type { StudyReadyModel, StudyTimerMutationResult } from "@/lib/study/types";
+import type { StudyPendingReflection, StudyReadyModel, StudyTimerMutationResult } from "@/lib/study/types";
 
 function duration(seconds: number) {
   const safe = Math.max(0, Math.floor(seconds));
@@ -41,7 +41,7 @@ function StudySideRail({ model }: { model: StudyReadyModel }) {
   );
 }
 
-export function StudyTimer({ model: serverModel, initialSubjectId, initialChapterId, initialTaskId }: { model: StudyReadyModel; initialSubjectId?: string; initialChapterId?: string; initialTaskId?: string }) {
+export function StudyTimer({ model: serverModel, initialSubjectId, initialChapterId, initialTaskId, onReviewChange }: { model: StudyReadyModel; initialSubjectId?: string; initialChapterId?: string; initialTaskId?: string; onReviewChange?: (review: { session: StudyPendingReflection; ready: boolean } | null) => void }) {
   const model = useOfflineModel("study", serverModel);
   const context = useStudentContext();
   const router = useRouter();
@@ -123,16 +123,36 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
     event.preventDefault();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     setElapsed(0);
+    setOptimisticEnded(false);
     setOptimisticStartedAt(Date.now());
     const result = await mutate({ action: "start", subjectId: subjectId || null, chapterId: chapterId || null, taskId: taskId || null, mode, focusMinutes: mode === "pomodoro" ? focusMinutes : null, breakMinutes: mode === "pomodoro" ? breakMinutes : null, timezone });
     if (!result) setOptimisticStartedAt(null);
   }
 
   async function end(action: "finish" | "discard") {
+    const clientId = crypto.randomUUID();
+    const endedAt = new Date().toISOString();
+    const provisional: StudyPendingReflection = {
+      sessionId: clientId,
+      subjectId: timer?.subjectId ?? null,
+      chapterId: timer?.chapterId ?? null,
+      subjectTitle: timer?.subjectTitle ?? selectedSubject?.title ?? null,
+      chapterTitle: timer?.chapterTitle ?? selectedSubject?.chapters.find((chapter) => chapter.id === chapterId)?.title ?? null,
+      intendedTaskTitle: timer?.intendedTaskTitle ?? model.tasks.find((task) => task.id === taskId)?.title ?? null,
+      durationSeconds: Math.max(1, Math.floor(elapsed)),
+      endedAt,
+    };
     setOptimisticEnded(true);
     setOptimisticStartedAt(null);
-    const result = await mutate({ action });
-    if (!result) setOptimisticEnded(false);
+    if (action === "finish" && provisional.durationSeconds >= 60) onReviewChange?.({ session: provisional, ready: false });
+    const result = await mutate({ action, ...(action === "finish" ? { clientId } : {}) });
+    if (!result) {
+      setOptimisticEnded(false);
+      onReviewChange?.(null);
+      return;
+    }
+    if (action === "finish" && result.reflection_required) onReviewChange?.({ session: { ...provisional, sessionId: result.session_id ?? clientId, durationSeconds: result.duration_seconds ?? provisional.durationSeconds, endedAt: result.ended_at ?? endedAt }, ready: true });
+    else onReviewChange?.(null);
   }
 
   async function changeStatus(action: "pause" | "resume", next: "paused" | "running") {

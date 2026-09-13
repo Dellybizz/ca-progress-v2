@@ -21,11 +21,11 @@ export function MobileNavigation({ area, studentContext, attempts = [] }: { area
   const pathname = usePathname(); const [open, setOpen] = useState(false);
   const primary = mobileNavigation(area);
   const secondaryActive = shellNavigation[area].some(section => section.items.some(item => !item.mobilePrimary && routeIsActive(item, pathname)));
-  return <><nav className="mobile-bottom-nav" aria-label={`${area} mobile navigation`}>
+  return <><nav className="mobile-bottom-nav" data-route-root-navigation aria-label={`${area} mobile navigation`}>
     {primary.map(item => { const active = routeIsActive(item, pathname); return <Link prefetch key={item.href} href={item.href} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}><Icon name={item.icon} size={19}/><span>{item.shortLabel ?? item.label}</span></Link>; })}
     <button type="button" className={secondaryActive ? "is-active" : ""} onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}><Icon name="more" size={19}/><span>More</span></button>
   </nav>
-  <BottomSheet open={open} onClose={() => setOpen(false)} title="Explore CA Progress"><div className="mobile-section-menu">
+  <BottomSheet open={open} onClose={() => setOpen(false)} title="Explore CA Progress"><div className="mobile-section-menu" data-route-root-navigation>
     {studentContext ? <AttemptSwitcher context={studentContext} attempts={attempts} compact/> : null}
     {shellNavigation[area].map(section => <section className="mobile-section-menu__group" key={section.label}><h3>{section.label}</h3><div className="mobile-section-menu__list">{section.items.map(item => { const active = routeIsActive(item, pathname); return <Link prefetch key={item.href} href={item.href} onClick={() => setOpen(false)} className={active ? "is-active" : ""} aria-current={active ? "page" : undefined}><span className="mobile-section-menu__icon"><Icon name={item.icon} size={17}/></span><span><strong>{item.label}</strong><small>{item.description}</small></span><Icon name="chevron" size={13}/></Link>; })}</div></section>)}
     {area === "admin" ? <Link className="mobile-workspace-switch" href="/dashboard">Return to student workspace</Link> : null}
