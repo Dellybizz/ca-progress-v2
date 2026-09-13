@@ -14,18 +14,18 @@ test("A1.3 joins subject structure to canonical progress without duplicating sta
   assert.match(subject, /\/chapters\/\$\{chapter\.id\}/);
 });
 
-test("A1.3 separates portfolio comparison from subject action", () => {
+test("A1.3 uses direct group and subject selectors before chapter action", () => {
   const tracker = read("components/progress/progress-tracker.tsx");
-  assert.match(tracker, /progress-portfolio/);
-  assert.match(tracker, /progress-subject-status/);
-  assert.match(tracker, /subjectLocked \?/);
-  assert.match(tracker, /Filter chapters/);
+  assert.match(tracker, /progress-group-tabs/);
+  assert.match(tracker, /progress-subject-tabs/);
+  assert.match(tracker, /All groups/);
+  assert.match(tracker, /All subjects/);
+  assert.doesNotMatch(tracker, /Your portfolio at a glance/);
 });
 
-test("A1.3 mobile keeps chapter actions and defers comparison detail", () => {
+test("A1.3 mobile keeps compact selectors and chapter actions", () => {
   const css = read("app/styles/progress.css") + read("app/styles/academic.css");
-  assert.match(css, /\.progress-mobile-filters\{display:block/);
-  assert.match(css, /\.progress-toolbar\{display:none\}/);
-  assert.match(css, /\.progress-history\{display:none\}/);
+  assert.match(css, /\.progress-group-tabs/);
+  assert.match(css, /\.progress-subject-tabs/);
   assert.match(css, /academic-chapter-row--workspace/);
 });

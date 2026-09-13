@@ -74,11 +74,12 @@ test("Product Phase 4 keeps safe recovery and prevents clearing a marks-backed m
   assert.match(service, /action,previous_state,new_state,reverts_event_id/);
 });
 
-test("Product Phase 4 shows completion and last-revision dates while percentages stay state-derived and XP-independent", () => {
+test("Product Phase 4 keeps milestone dates in state while the compact tracker stays XP-independent", () => {
   const tracker = read("components/progress/progress-tracker.tsx");
   const progress = read("lib/progress/service.ts");
-  assert.match(tracker, /First completion:/);
-  assert.match(tracker, /Last revision:/);
+  assert.match(tracker, /completed_at/);
+  assert.match(tracker, /revision_1_at/);
+  assert.doesNotMatch(tracker, /First completion:/);
   assert.match(progress, /Number\(Boolean\(row\.completed_at\)\)/);
   assert.match(progress, /Number\(Boolean\(row\.revision_1_at\)\)/);
   assert.match(progress, /Number\(Boolean\(row\.test_2_at\)\)/);

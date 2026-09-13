@@ -21,16 +21,8 @@ export function ProgressPage({ model, subjectLocked = false, next = "/progress",
     </div>
   );
 
-  const subjectTitle = subjectLocked ? model.chapters[0]?.subjectTitle : null;
   return (
     <div className="progress-page">
-      <PageHeader
-        preview={false}
-        eyebrow={subjectTitle ? "Subject workspace" : "Portfolio progress"}
-        title={subjectTitle ? subjectTitle : "See where every subject stands."}
-        description={subjectTitle ? `${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Update the next useful milestone for each chapter.` : `${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. Compare subjects here, then open one to take action.`}
-        actions={<div className="phase6-header-links"><Link href="/tests">Record test marks</Link><Link href="/analytics">View analytics</Link></div>}
-      />
       {model.chapters.length ? <ProgressTracker model={model} subjectLocked={subjectLocked} initialChapterId={initialChapterId}/> : <Card><CardBody><div className="progress-empty"><Icon name="book"/><h2>No applicable chapters</h2><p>No chapter structure is currently mapped to this academic selection.</p><Link href="/settings/profile" className="ui-text-link">Review academic profile</Link></div></CardBody></Card>}
     </div>
   );
