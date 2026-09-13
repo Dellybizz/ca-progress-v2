@@ -46,7 +46,8 @@ export function RouteTrail({ homeHref }: { homeHref: string }) {
     const next = pathname === homeHref ? [home] : isTopLevel || resetHref === pathname ? [home, current] : existing >= 0 ? previous.slice(0, existing + 1) : [...(previous.length ? previous : [home]), current].slice(-5);
     sessionStorage.removeItem(resetKey);
     sessionStorage.setItem(storageKey, JSON.stringify(next));
-    setItems(next);
+    const update = window.setTimeout(() => setItems(next), 0);
+    return () => window.clearTimeout(update);
   }, [current, homeHref, pathname, resetKey, storageKey]);
 
   useEffect(() => {
