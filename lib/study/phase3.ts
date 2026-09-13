@@ -8,7 +8,7 @@ export type StudyFocusRating = "poor" | "okay" | "focused";
 
 const MAX_SESSION_SECONDS = 12 * 60 * 60;
 const STALE_INTERACTION_MS = 16 * 60 * 60 * 1000;
-export const MEANINGFUL_REFLECTION_SECONDS = 1;
+export const MEANINGFUL_REFLECTION_SECONDS = 120;
 
 type TimerRow = {
   user_id: string;

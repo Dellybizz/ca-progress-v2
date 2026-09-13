@@ -88,7 +88,7 @@ test("timer mutations and reflection dismissal respond optimistically", () => {
   assert.match(workspace, /useState<PendingReview \| null>\(null\)/);
   assert.match(read("app\/(student)\/settings\/page.tsx"), /FocusPreferences/);
   assert.match(timer, /ready: false/);
-  assert.match(timer, /action === "finish"\) onReviewChange/);
+  assert.match(timer, /provisional\.durationSeconds >= 120/);
 });
 
 test("academic breadcrumbs preserve the route a student used", () => {
