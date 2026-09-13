@@ -28,13 +28,10 @@ export const designBaselineRoutes = Object.freeze([
     [
       "app/styles/dashboard.css",
       "app/styles/student-dashboard.css",
-      "app/styles/dashboard-clean.css",
-      "app/styles/dashboard-clarity.css",
-      "app/styles/dashboard-balanced.css",
-      "app/styles/dashboard-character.css",
+      "app/styles/dashboard-a1.css",
     ],
     ["primary next action", "study/syllabus progress", "exam countdown", "leaderboard", "ICAI updates"],
-    ["Multiple generations of dashboard CSS remain globally stacked and must be consolidated only after route-by-route visual migration."],
+    ["A1.1 has one authoritative authenticated-dashboard composition; legacy dashboard CSS remains only for guest, onboarding and compatibility surfaces."],
   ),
   route(
     "study",

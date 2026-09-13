@@ -60,7 +60,7 @@ The baseline route set is intentionally small and representative:
 
 | Route | Responsibility | Current visual ownership | Main redesign risk |
 | --- | --- | --- | --- |
-| `/dashboard` | Daily student command centre | `dashboard.css`, `student-dashboard.css`, `dashboard-clean.css`, `dashboard-clarity.css`, `dashboard-balanced.css`, `dashboard-character.css` | Six dashboard generations are still stacked globally. Consolidate only after the new dashboard composition is proven. |
+| `/dashboard` | Daily student command centre | `dashboard-a1.css` for the authenticated composition; `dashboard.css` and `student-dashboard.css` for guest/onboarding compatibility | A1.1 removes four stacked override generations and gives the signed-in dashboard one authoritative, mobile-composed stylesheet. |
 | `/study` | Focused study-session workspace | `phase6.css`, `surfaces.css`, `study-clarity.css`, `study-layout-refine.css` | Later refinements override older phase-level treatments. |
 | `/planner` | Tasks and schedule | `phase6.css`, `surfaces.css`, `planner-clarity.css`, `planner-mobile-final.css`, `planner-desktop-layout-fix.css` | Mobile and desktop patch files sit on top of the main planner layer. |
 | `/progress` | Academic progress tracking | `progress.css`, `academic.css`, `surfaces.css` | Academic hierarchy and generic surfaces must remain visually coherent. |

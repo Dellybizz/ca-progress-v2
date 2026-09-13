@@ -78,8 +78,8 @@ test("Design Phase 0 explicitly records current route-level legacy risks", () =>
   const dashboard = designBaselineRoutes.find((item) => item.id === "dashboard");
   const admin = designBaselineRoutes.find((item) => item.id === "admin");
   const settings = designBaselineRoutes.find((item) => item.id === "settings");
-  assert.ok(dashboard.cssOwners.length >= 6);
-  assert.match(dashboard.risks.join(" "), /Multiple generations of dashboard CSS/);
+  assert.deepEqual(dashboard.cssOwners, ["app/styles/dashboard.css", "app/styles/student-dashboard.css", "app/styles/dashboard-a1.css"]);
+  assert.match(dashboard.risks.join(" "), /one authoritative authenticated-dashboard composition/);
   assert.match(admin.risks.join(" "), /inline React styles/);
   assert.match(settings.risks.join(" "), /ProductPreviewPage/);
 });

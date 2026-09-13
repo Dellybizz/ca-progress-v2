@@ -18,7 +18,7 @@ test("student sidebar keeps the core study flow visible and secondary areas grou
   assert.match(navigation, /sidebar-nav-group__trigger/);
   assert.match(navigation, /aria-expanded=\{expanded\}/);
   for (const route of ["/analytics", "/study-buddy", "/pricing", "/billing", "/settings"]) {
-    assert.match(navigation, new RegExp(route.replaceAll("/", "\/")));
+    assert.match(navigation, new RegExp(route.replaceAll("/", "\\/")));
   }
 });
 
@@ -32,7 +32,7 @@ test("mobile navigation exposes the core flow directly and keeps secondary desti
   assert.match(mobile, /studentMoreGroups/);
   assert.match(mobile, /aria-label="Open more navigation"/);
   for (const route of ["/planner", "/planner/revision-settings", "/analytics", "/resources/icai", "/study-buddy", "/activity", "/settings"]) {
-    assert.match(mobile, new RegExp(route.replaceAll("/", "\/")));
+    assert.match(mobile, new RegExp(route.replaceAll("/", "\\/")));
   }
 });
 
@@ -40,13 +40,15 @@ test("account destinations also remain available from the header profile dropdow
   const controls = read("components/shell/topbar-controls.tsx");
   assert.match(controls, /className="profile-menu"/);
   for (const route of ["/settings/profile", "/settings", "/pricing", "/billing"]) {
-    assert.match(controls, new RegExp(route.replaceAll("/", "\/")));
+    assert.match(controls, new RegExp(route.replaceAll("/", "\\/")));
   }
 });
 
 test("dashboard overview uses instantly recognizable Today Study and Progress widgets", () => {
   const dashboard = read("components/dashboard/student-dashboard.tsx");
-  assert.match(dashboard, /dashboard-overview-grid/);
+  assert.match(dashboard, /dashboard-a1-focus/);
+  assert.match(dashboard, /dashboard-a1-pulse/);
+  assert.match(dashboard, /dashboard-a1-continue/);
   assert.match(dashboard, /function TodayOverview/);
   assert.match(dashboard, /function StudyOverview/);
   assert.match(dashboard, /function ProgressOverview/);
@@ -60,30 +62,29 @@ test("dashboard overview uses instantly recognizable Today Study and Progress wi
 
 test("attempt strip has a recognizable visual identity without adding dashboard clutter", () => {
   const dashboard = read("components/dashboard/student-dashboard.tsx");
-  const character = read("app/styles/dashboard-character.css");
+  const character = read("app/styles/dashboard-a1.css");
   const globals = read("app/globals.css");
-  assert.match(dashboard, /dashboard-attempt-strip dashboard-attempt-card/);
+  assert.match(dashboard, /dashboard-a1-exam/);
   assert.match(dashboard, /"shield"/);
-  for (const label of ["Subjects", "Chapters", "Selection"]) {
-    assert.match(dashboard, new RegExp(`<span>${label}<\/span>`));
+  for (const label of ["Syllabus completed", "Studied this week", "Current streak"]) {
+    assert.match(dashboard, new RegExp(label));
   }
-  assert.match(character, /linear-gradient/);
-  assert.match(character, /dashboard-attempt-card__summary strong/);
-  assert.match(globals, /dashboard-character\.css/);
-  assert.ok(globals.indexOf("dashboard-character.css") > globals.indexOf("dashboard-balanced.css"));
+  assert.match(character, /dashboard-a1-exam__status strong/);
+  assert.match(character, /grid-template-areas:"focus" "exam" "continue" "pulse" "update" "actions" "leaderboard"/);
+  assert.match(globals, /dashboard-a1\.css/);
+  assert.doesNotMatch(globals, /dashboard-(clean|clarity|balanced|character)\.css/);
 });
 
 test("legacy dashboard styling cannot override the canonical application shell", () => {
   const globals = read("app/globals.css");
   const shell = read("app/styles/shell.css");
-  assert.match(globals, /dashboard-balanced\.css/);
+  assert.match(globals, /dashboard-a1\.css/);
   assert.match(globals, /shell\.css/);
-  assert.ok(globals.indexOf("shell.css") > globals.indexOf("dashboard-balanced.css"));
+  assert.ok(globals.indexOf("shell.css") > globals.indexOf("dashboard-a1.css"));
   assert.match(shell, /\.mobile-bottom-nav\s*\{/);
   assert.match(shell, /border-top:\s*1px solid var\(--color-border\)/);
   assert.match(shell, /box-shadow:\s*none/);
 });
-
 
 test("desktop navigation scrolls independently without colliding with account identity", () => {
   const shell = read("app/styles/shell.css");

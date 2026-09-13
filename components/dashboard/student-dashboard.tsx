@@ -163,34 +163,12 @@ function AttemptStrip({ model }: { model: DashboardReadyModel }) {
   const dateRange = date && endDate && date !== endDate ? `${date} – ${endDate}` : date;
 
   return (
-    <section className="dashboard-attempt-strip dashboard-attempt-card" aria-label="Current attempt">
-      <div className="dashboard-attempt-card__main">
-        <div className="dashboard-attempt-card__badges">
-          <span className="dashboard-attempt-card__verified"><Icon name={estimated ? "clock" : "shield"} size={13}/> {pending ? "Exam date pending" : estimated ? "Estimated exam date" : "Verified exam date"}</span>
-          <span>{model.context.levelName} · {model.context.groupLabel}</span>
-        </div>
-        <span className="dashboard-attempt-card__eyebrow">{model.context.attemptLabel}</span>
-        <h2>{status}</h2>
-        <p>
-          {pending
-            ? `Your ${model.context.attemptLabel} attempt is selected. The countdown will begin as soon as the official exam date is confirmed.`
-            : dateRange
-              ? `${dateRange} · ${estimated ? "Unofficial planning estimate; ICAI’s verified date will replace it automatically." : "Keep your study plan aligned with your selected attempt."}`
-              : "Keep your study plan aligned with your selected attempt."}
-        </p>
-        <div className="dashboard-attempt-card__meta">
-          <span><Icon name="clock" size={13}/>{estimated ? "Set by CA Progress admin" : formatVerifiedAt(model.countdown.lastVerifiedAt)}</span>
-          {model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source <Icon name="arrow" size={13}/></a> : null}
-          <Link href="/dashboard/exam">View exam details <Icon name="arrow" size={13}/></Link>
-        </div>
-        {model.countdown.conflictWarning ? <p className="dashboard-attempt-card__warning" role="alert">{model.countdown.conflictWarning}</p> : null}
-      </div>
-
-      <div className="dashboard-attempt-card__summary" aria-label="Academic selection">
-        <div><strong>{model.context.subjectCount}</strong><span>Subjects</span></div>
-        <div><strong>{model.context.chapterCount}</strong><span>Chapters</span></div>
-        <div><strong>{model.context.groupLabel}</strong><span>Selection</span></div>
-      </div>
+    <section className="dashboard-a1-exam" aria-label="Current attempt" data-state={model.countdown.status}>
+      <header><span><Icon name={estimated ? "clock" : "shield"} size={14}/>{pending ? "Date pending" : estimated ? "Planning estimate" : "ICAI verified"}</span><small>{model.context.attemptLabel}</small></header>
+      <div className="dashboard-a1-exam__status"><strong>{status}</strong>{dateRange ? <time>{dateRange}</time> : null}</div>
+      <p>{pending ? "We’ll start the countdown when ICAI confirms the exam period." : estimated ? "Set by CA Progress admin · replaced automatically when ICAI publishes a verified date." : formatVerifiedAt(model.countdown.lastVerifiedAt)}</p>
+      {model.countdown.conflictWarning ? <p className="dashboard-a1-exam__warning" role="alert">{model.countdown.conflictWarning}</p> : null}
+      <footer>{model.countdown.sourceUrl ? <a href={model.countdown.sourceUrl} target="_blank" rel="noreferrer">Official source</a> : <span>{model.context.levelName} · {model.context.groupLabel}</span>}<Link href="/dashboard/exam">View exam details <Icon name="arrow" size={13}/></Link></footer>
     </section>
   );
 }
@@ -269,41 +247,37 @@ function ReadyDashboard({ model }: { model: DashboardReadyModel }) {
         : { ...action, label: "Add task", description: "Plan your study" });
 
   return (
-    <div className="student-dashboard student-dashboard--home">
+    <div className="student-dashboard dashboard-a1">
       <DashboardViewTracker/>
-      <header className="dashboard-welcome" aria-label="Welcome back dashboard">
-        <div><time dateTime={model.generatedAt}>{dashboardDate(model.generatedAt)}</time><h1>{dashboardGreeting(model.generatedAt)}, {model.viewer.displayName}</h1><p>{model.context.levelName} · {model.context.groupLabel} · {model.context.attemptLabel}</p></div>
+      <header className="dashboard-a1-header" aria-label="Welcome back dashboard">
+        <div><time dateTime={model.generatedAt}>{dashboardDate(model.generatedAt)}</time><h1>{dashboardGreeting(model.generatedAt)}, {model.viewer.displayName}</h1></div>
+        <p>{model.context.levelName}<span aria-hidden="true">/</span>{model.context.groupLabel}<span aria-hidden="true">/</span>{model.context.attemptLabel}</p>
       </header>
 
-      <div className="dashboard-command-layout">
-        <main className="dashboard-command-main">
-          <section className="dashboard-focus-card" aria-labelledby="dashboard-focus-title">
-            <div className="dashboard-focus-card__content"><span className="dashboard-focus-card__eyebrow"><Icon name="target" size={15}/> Today&apos;s focus</span><h2 id="dashboard-focus-title">{model.recommendation.title}</h2><p>{model.today.estimatedMinutes ? `${formatMinutes(model.today.estimatedMinutes)} planned · ${model.today.tasks} task${model.today.tasks === 1 ? "" : "s"} remaining` : model.recommendation.description}</p><div className="dashboard-focus-card__actions"><Link className="dashboard-focus-card__primary" href="/study">Start studying <Icon name="arrow" size={14}/></Link><Link className="dashboard-focus-card__secondary" href="/planner/today">View today&apos;s plan</Link></div></div>
-            <div className="dashboard-focus-scene" aria-hidden="true"><span className="dashboard-focus-book dashboard-focus-book--top">CA Study</span><span className="dashboard-focus-book dashboard-focus-book--bottom"/><span className="dashboard-focus-cup">Small<br/>Steps</span></div>
-          </section>
+      <div className="dashboard-a1-grid">
+        <section className="dashboard-a1-focus" aria-labelledby="dashboard-focus-title">
+          <div className="dashboard-a1-focus__index" aria-hidden="true"><span>01</span><strong>CA</strong></div>
+          <div className="dashboard-a1-focus__content"><span className="dashboard-a1-kicker"><Icon name="target" size={14}/>Today&apos;s focus</span><h2 id="dashboard-focus-title">{model.recommendation.title}</h2><p>{model.recommendation.description}</p><div className="dashboard-a1-focus__meta"><span>{model.today.tasks} task{model.today.tasks === 1 ? "" : "s"} remaining</span><span>{formatMinutes(model.today.estimatedMinutes)} planned</span></div><div className="dashboard-a1-focus__actions"><Link className="dashboard-a1-primary" href={model.recommendation.href}>Continue <Icon name="arrow" size={14}/></Link><Link href="/planner/today">Open today&apos;s plan</Link></div></div>
+        </section>
 
-          <section className="dashboard-metric-strip dashboard-metric-strip--intended" aria-label="Study overview">
-            <Link href="/study" className="dashboard-metric-card"><span><Icon name="timer" size={21}/></span><div><strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><small>This week</small></div></Link>
-            <Link href="/activity" className="dashboard-metric-card"><span><Icon name="sparkles" size={21}/></span><div><strong>{model.study.streakDays} day{model.study.streakDays === 1 ? "" : "s"}</strong><small>streak</small></div></Link>
-            <Link href="/progress" className="dashboard-metric-card"><span><Icon name="book" size={21}/></span><div><strong>{model.progress.overallPercent}%</strong><small>Syllabus completed</small></div></Link>
-          </section>
+        <AttemptStrip model={model}/>
 
-          <Card className="dashboard-continue-card"><CardHeader title="Continue where you left off"/><CardBody>{continueSubject ? <div className="dashboard-continue-row" aria-label="Next up"><span><Icon name="notes" size={18}/></span><div><strong>{continueSubject.title}</strong><small>{continueSubject.groupName}</small></div><i><b style={{ width: `${continueSubject.percent}%` }}/></i><em>{continueSubject.percent}%</em><Link href={`/subjects/${continueSubject.slug}/progress`}>Continue</Link></div> : <div className="dashboard-panel-empty">Choose a subject to continue studying.</div>}</CardBody></Card>
+        <nav className="dashboard-a1-pulse" aria-label="Study overview">
+          <Link href="/study"><small>Studied this week</small><strong>{formatMinutes(model.study.studiedThisWeekMinutes)}</strong><span>{formatMinutes(model.study.dailyTargetMinutes)} daily target</span></Link>
+          <Link href="/progress"><small>Syllabus completed</small><strong>{model.progress.overallPercent}%</strong><span>{model.context.chapterCount} chapters tracked</span></Link>
+          <Link href="/activity"><small>Current streak</small><strong>{model.study.streakDays} day{model.study.streakDays === 1 ? "" : "s"}</strong><span>{model.study.sessionCountLast7Days} sessions this week</span></Link>
+        </nav>
 
-          <Card className="dashboard-actions-card dashboard-actions-card--horizontal"><CardHeader title="Quick actions"/><CardBody><DashboardQuickActions actions={intendedActions}/></CardBody></Card>
-        </main>
+        <section className="dashboard-a1-continue" aria-labelledby="dashboard-continue-title">
+          <header><div><span className="dashboard-a1-kicker">Continue learning</span><h2 id="dashboard-continue-title">Your active subject</h2></div><Link href="/syllabus">All subjects <Icon name="arrow" size={13}/></Link></header>
+          {continueSubject ? <div className="dashboard-a1-continue__row" aria-label="Next up"><span className="dashboard-a1-subject-mark"><Icon name="book" size={18}/></span><div><strong>{continueSubject.title}</strong><small>{continueSubject.groupName} · {continueSubject.chapterCount} chapters</small></div><div className="dashboard-a1-progress"><i><b style={{ width: `${continueSubject.percent}%` }}/></i><span>{continueSubject.percent}%</span></div><Link href={`/subjects/${continueSubject.slug}/progress`}>Continue</Link></div> : <div className="dashboard-a1-empty">Choose a subject to start building your academic workspace.</div>}
+        </section>
 
-        <aside className="dashboard-command-rail" aria-label="Attempt and community overview">
-          <AttemptStrip model={model}/>
-          <Card className="dashboard-leaderboard-card">
-            <CardHeader title="Monthly leaderboard" action={<Link className="ui-text-link" href="/activity#leaderboard">Leaderboard <Icon name="arrow" size={13}/></Link>}/>
-            <CardBody><DashboardLeaderboard/></CardBody>
-          </Card>
-          <Card className="dashboard-icai-compact">
-            <CardHeader title="Latest ICAI update" action={<Link className="ui-text-link" href="/updates">View all <Icon name="arrow" size={13}/></Link>}/>
-            <CardBody>{latestUpdate ? <article className="dashboard-latest-update"><span className="dashboard-latest-update__icon"><Icon name="bell" size={17}/></span><div><strong>{latestUpdate.title}</strong><p>{latestUpdate.summary || "Official update for your selected course and attempt."}</p></div><a href={latestUpdate.officialUrl} target="_blank" rel="noreferrer" aria-label={`Open ${latestUpdate.title} on ICAI`}><Icon name="arrow" size={12}/></a></article> : <div className="dashboard-no-update"><span><Icon name="check" size={16}/></span><div><strong>No new updates</strong><p>There are no current ICAI changes matching your selection.</p></div></div>}</CardBody>
-          </Card>
-        </aside>
+        <section className="dashboard-a1-leaderboard" aria-labelledby="dashboard-leaderboard-title"><header><div><span className="dashboard-a1-kicker">Community pulse</span><h2 id="dashboard-leaderboard-title">Monthly leaders</h2></div><Link href="/activity#leaderboard">Leaderboard</Link></header><DashboardLeaderboard/></section>
+
+        <section className="dashboard-a1-update" aria-labelledby="dashboard-update-title"><header><div><span className="dashboard-a1-kicker">Official source</span><h2 id="dashboard-update-title">Latest ICAI update</h2></div><Link href="/updates">View all</Link></header>{latestUpdate ? <article><span><Icon name="bell" size={16}/></span><div><strong>{latestUpdate.title}</strong><p>{latestUpdate.summary || "Official update for your selected course and attempt."}</p></div><a href={latestUpdate.officialUrl} target="_blank" rel="noreferrer" aria-label={`Open ${latestUpdate.title} on ICAI`}><Icon name="arrow" size={13}/></a></article> : <div className="dashboard-a1-empty"><Icon name="check" size={16}/>No new updates match your current selection.</div>}</section>
+
+        <section className="dashboard-a1-actions" aria-labelledby="dashboard-actions-title"><header><span className="dashboard-a1-kicker">Shortcuts</span><h2 id="dashboard-actions-title">Quick actions</h2></header><DashboardQuickActions actions={intendedActions}/></section>
       </div>
     </div>
   );
