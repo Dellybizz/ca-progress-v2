@@ -32,11 +32,9 @@ function compactStudyTime(seconds: number) {
 function StudySideRail({ model }: { model: StudyReadyModel }) {
   return (
     <aside className="study-side-rail" aria-label="Study summary and recent activity">
-      <Card className="study-side-stat study-side-stat--today"><CardBody><span className="study-side-stat__icon"><Icon name="clock" size={18}/></span><div><strong>{compactStudyTime(model.analytics.todaySeconds)}</strong><small>Today</small></div></CardBody></Card>
-      <Card className="study-side-stat study-side-stat--week"><CardBody><span className="study-side-stat__icon"><Icon name="chart" size={18}/></span><div><strong>{compactStudyTime(model.analytics.last7DaysSeconds)}</strong><small>Last 7 days</small></div></CardBody></Card>
-      <Card className="study-side-stat study-side-stat--streak"><CardBody><span className="study-side-stat__icon"><Icon name="sparkles" size={18}/></span><div><strong>{model.analytics.streakDays}</strong><small>Day streak</small></div></CardBody></Card>
+      <nav className="study-side-pulse" aria-label="Study activity"><span><small>Today</small><strong>{compactStudyTime(model.analytics.todaySeconds)}</strong></span><span><small>7 days</small><strong>{compactStudyTime(model.analytics.last7DaysSeconds)}</strong></span><span><small>Streak</small><strong>{model.analytics.streakDays}d</strong></span></nav>
       <Card className="study-recent-card">
-        <CardHeader title="Recent study" description="Your latest completed sessions."/>
+        <CardHeader title="Recent study"/>
         <CardBody>{model.analytics.recentSessions.length ? <div className="phase6-session-list">{model.analytics.recentSessions.slice(0, 5).map((session) => <div key={session.id}><span><strong>{session.intendedTaskTitle ?? session.chapterTitle ?? session.subjectTitle ?? "General study"}</strong><small>{new Date(session.endedAt).toLocaleString()}{session.understandingScore !== null ? ` · self-reported ${session.understandingScore}%` : ""}{session.focusRating ? ` · ${session.focusRating}` : ""}</small></span><b>{minutesLabel(session.durationSeconds)}</b></div>)}</div> : <div className="phase6-empty study-empty"><span className="study-empty__icon"><Icon name="timer" size={22}/></span><strong>Your study history starts here</strong><p>Complete your first focus session and it’ll appear here automatically.</p></div>}</CardBody>
       </Card>
     </aside>

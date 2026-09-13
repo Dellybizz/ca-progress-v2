@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardBody } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
 import type {
@@ -90,27 +89,23 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
   }
 
   return (
-    <div className="academic-page">
+    <div className="academic-page academic-index-page">
       <AcademicBreadcrumbs
         items={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Syllabus" },
         ]}
       />
-      <section className="academic-hero">
+      <header className="academic-index-header">
         <div>
-          <Badge tone="brand">Verified academic catalog</Badge>
-          <h1>CA Syllabus Explorer</h1>
-          <p>
-            Explore the ICAI New Scheme by level, group, subject, chapter and
-            unit. Structure is versioned so historical syllabi can remain
-            intact.
-          </p>
+          <span className="eyebrow">Course structure</span>
+          <h1>Syllabus</h1>
+          <p>Level → Group → Subject → Chapter → Unit</p>
         </div>
         <div className="academic-source-chip">
           <Icon name="shield" size={18} />
           <span>
-            <strong>ICAI source metadata</strong>
+            <strong>ICAI verified structure</strong>
             <small>
               {catalog.sourceVerifiedAt
                 ? `Verified ${new Date(catalog.sourceVerifiedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
@@ -118,7 +113,7 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
             </small>
           </span>
         </div>
-      </section>
+      </header>
 
       <AcademicContextBar
         level={catalog.selectedLevel.name}
@@ -270,10 +265,11 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
           </Badge>
         </div>
         {catalog.subjects.length ? (
-          <div className="academic-subject-grid">
-            {catalog.subjects.map((subject) => (
-              <Card key={subject.id} className="academic-subject-card">
-                <CardBody>
+          <div className="academic-subject-list">
+            {catalog.subjects.map((subject, subjectIndex) => (
+              <article key={subject.id} className="academic-subject-row">
+                <div className="academic-subject-row__index">{String(subjectIndex + 1).padStart(2, "0")}</div>
+                <div className="academic-subject-row__body">
                   <div className="academic-subject-card__top">
                     <span className="academic-paper-mark">
                       {subject.paperLabel}
@@ -353,8 +349,8 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
                       Open subject <Icon name="arrow" size={14} />
                     </Link>
                   </div>
-                </CardBody>
-              </Card>
+                </div>
+              </article>
             ))}
           </div>
         ) : (

@@ -27,19 +27,31 @@ test("Pomodoro presets show focus and break together", () => {
   assert.match(timer, /Start focus session/);
 });
 
-test("desktop Study uses a right rail with metrics stacked above recent study", () => {
+test("A1.2 Study uses a compact activity pulse above recent study", () => {
   const page = read("components/study/study-page.tsx");
   const timer = read("components/study/study-timer.tsx");
   const globals = read("app/globals.css");
-  const css = read("app/styles/study-layout-refine.css");
+  const css = read("app/styles/academic-index-a12.css");
   assert.doesNotMatch(page, /study-page__summary/);
   assert.match(timer, /function StudySideRail/);
-  assert.match(timer, /study-side-stat--today/);
-  assert.match(timer, /study-side-stat--week/);
-  assert.match(timer, /study-side-stat--streak/);
+  assert.match(timer, /study-side-pulse/);
+  assert.match(timer, /Today/);
+  assert.match(timer, /7 days/);
+  assert.match(timer, /Streak/);
   assert.match(timer, /study-recent-card/);
-  assert.match(globals, /study-layout-refine\.css/);
-  assert.match(css, /study-session-grid--idle/);
-  assert.match(css, /grid-template-columns: minmax\(0, 1\.55fr\) minmax\(280px, \.62fr\)/);
-  assert.match(css, /study-side-rail/);
+  assert.match(globals, /academic-index-a12\.css/);
+  assert.match(css, /study-side-pulse/);
+});
+
+test("A1.2 unifies Study actions and the structural Syllabus index", () => {
+  const page = read("components/study/study-page.tsx");
+  const syllabus = read("components/academic/syllabus-explorer.tsx");
+  const css = read("app/styles/academic-index-a12.css");
+  assert.match(page, /study-course-index/);
+  assert.match(page, /Browse course structure/);
+  assert.match(page, /recentSessions\.find/);
+  assert.match(syllabus, /Level → Group → Subject → Chapter → Unit/);
+  assert.match(syllabus, /academic-subject-list/);
+  assert.doesNotMatch(syllabus, /academic-hero/);
+  assert.match(css, /@media\(max-width:620px\)/);
 });

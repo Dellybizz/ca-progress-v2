@@ -1,0 +1,35 @@
+/* A1.2 — Study is action-led; Syllabus is the structural course index. */
+.academic-index-study,.academic-index-page{width:100%;max-width:1180px;margin-inline:auto}
+.academic-index-link{min-height:38px;display:inline-flex;align-items:center;gap:7px;padding:0 13px;border:1px solid var(--color-border-strong);border-radius:8px;color:var(--color-text-soft);font-size:10px;font-weight:800}
+.study-course-index{display:grid;gap:0;border-top:1px solid var(--color-border-strong)}
+.study-course-index>header{display:flex;align-items:end;justify-content:space-between;gap:16px;padding:14px 2px 10px}
+.study-course-index h2{margin:4px 0 0;font-size:17px;letter-spacing:-.025em}
+.study-course-index>header>small{color:var(--color-text-faint);font-size:10px}
+.study-course-index__subjects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-block:1px solid var(--color-border)}
+.study-course-index__row{min-height:64px;display:grid;grid-template-columns:28px minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 14px;border-right:1px solid var(--color-border);border-bottom:1px solid var(--color-border)}
+.study-course-index__row:nth-child(2n){border-right:0}.study-course-index__row:nth-last-child(-n+2){border-bottom:0}
+.study-course-index__row>span:first-child{color:var(--color-text-faint);font:700 9px var(--font-mono)}
+.study-course-index__row strong,.study-course-index__row small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.study-course-index__row strong{font-size:11px}.study-course-index__row small{margin-top:3px;color:var(--color-text-faint);font-size:9px}
+.study-course-index__action{display:inline-flex;align-items:center;gap:5px;color:var(--color-brand-strong);font-size:9px;font-weight:800}
+.study-course-index__all{width:max-content;margin-top:9px;color:var(--color-text-soft);font-size:10px;font-weight:750}
+.study-side-pulse{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-block:1px solid var(--color-border)}
+.study-side-pulse span{display:grid;gap:4px;padding:11px;border-right:1px solid var(--color-border)}.study-side-pulse span:last-child{border-right:0}
+.study-side-pulse small{color:var(--color-text-faint);font-size:9px}.study-side-pulse strong{font-size:17px;letter-spacing:-.03em}
+
+.academic-index-page{gap:16px}.academic-index-header{display:flex;align-items:end;justify-content:space-between;gap:24px;padding:2px 2px 13px;border-bottom:1px solid var(--color-border-strong)}
+.academic-index-header h1{margin:5px 0 0;font-size:clamp(27px,2.8vw,38px);line-height:1;letter-spacing:-.045em}.academic-index-header p{margin:8px 0 0;color:var(--color-text-faint);font-size:10px}
+.academic-index-page .academic-source-chip{min-width:0;padding:0;border:0;border-radius:0;background:transparent}.academic-index-page .academic-context-bar{padding:9px 12px;border-radius:9px;background:var(--color-bg-subtle)}
+.academic-index-page .academic-level-tabs{padding:0;border:0;border-bottom:1px solid var(--color-border);border-radius:0;background:transparent}
+.academic-index-page .academic-level-tabs a{border-radius:7px 7px 0 0}.academic-index-page .academic-level-tabs a.is-active{box-shadow:none}
+.academic-index-page .academic-filter-group a{min-height:34px;border-radius:8px}.academic-index-page .academic-search{min-height:46px;border-radius:9px;box-shadow:none}
+.academic-subject-list{display:grid;border-top:1px solid var(--color-border-strong)}
+.academic-subject-row{display:grid;grid-template-columns:48px minmax(0,1fr);border-bottom:1px solid var(--color-border-strong)}
+.academic-subject-row__index{padding:19px 10px;color:var(--color-text-faint);font:700 10px var(--font-mono)}
+.academic-subject-row__body{min-width:0;display:grid;grid-template-columns:minmax(180px,.55fr) minmax(280px,1fr);grid-template-areas:"meta tree" "title tree" "footer tree";gap:7px 24px;padding:16px 2px 16px 4px;border-left:1px solid var(--color-border)}
+.academic-subject-row .academic-subject-card__top{grid-area:meta}.academic-subject-row .academic-subject-card__title{grid-area:title}.academic-subject-row .academic-chapter-tree{grid-area:tree;border-top:0}.academic-subject-row .academic-subject-card__footer{grid-area:footer;align-self:end}
+.academic-subject-row .academic-subject-card__title h3{font-size:17px}.academic-subject-row .academic-subject-card__title p{font-size:10px}
+.academic-subject-row .academic-chapter-tree summary{min-height:43px}.academic-subject-row .academic-subject-card__footer{justify-content:flex-start;flex-wrap:wrap;gap:11px}
+
+@media(max-width:899px){.study-course-index__subjects{grid-template-columns:1fr}.study-course-index__row,.study-course-index__row:nth-child(2n){border-right:0;border-bottom:1px solid var(--color-border)}.study-course-index__row:last-child{border-bottom:0}.academic-subject-row__body{grid-template-columns:1fr;grid-template-areas:"meta" "title" "tree" "footer"}.academic-index-page .academic-filter-row{padding:12px;border:1px solid var(--color-border);border-radius:10px}}
+@media(max-width:620px){.academic-index-study{gap:12px}.study-page__intro{display:flex;align-items:flex-start;flex-direction:column;gap:11px}.academic-index-link{width:100%;justify-content:space-between}.study-course-index>header{align-items:flex-start}.study-course-index>header>small{display:none}.study-course-index__row{padding-inline:5px;grid-template-columns:24px minmax(0,1fr) auto}.study-side-pulse{order:-1}.academic-index-page{gap:12px}.academic-index-page .academic-breadcrumbs{display:none}.academic-index-header{align-items:flex-start;flex-direction:column;gap:10px}.academic-index-header p{font-size:9px}.academic-index-page .academic-source-chip small{display:none}.academic-index-page .academic-context-bar>svg{display:none}.academic-index-page .academic-context-bar>div{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.academic-index-page .academic-level-tabs{position:static;overflow-x:auto;grid-template-columns:repeat(3,minmax(105px,1fr))}.academic-index-page .academic-filter-row{gap:12px}.academic-index-page .academic-filter-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.academic-index-page .academic-filter-group>span{grid-column:1/-1}.academic-index-page .academic-filter-group a{justify-content:center;padding-inline:8px}.academic-subject-row{grid-template-columns:34px minmax(0,1fr)}.academic-subject-row__index{padding:17px 7px}.academic-subject-row__body{padding:14px 0 14px 10px;gap:9px}.academic-subject-row .academic-subject-card__top .ui-badge{display:none}.academic-subject-row .academic-chapter-tree details:not([open]) .academic-topic-list{display:none}.academic-subject-row .academic-subject-card__footer a:first-child{display:none}.academic-subject-row .academic-subject-card__footer a:last-child{width:100%;min-height:38px;justify-content:space-between;border-top:1px solid var(--color-border);padding-top:8px}}
