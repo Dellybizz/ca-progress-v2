@@ -41,7 +41,7 @@ export function OfflineRuntime() {
       clearGuestIdentity();
     })();
     ready.catch(() => { if (!cancelled) setError("Offline storage is unavailable. Changes cannot be saved on this device."); });
-    navigator.serviceWorker?.register("/sw.js").catch(() => { if (!cancelled) setError("Offline page loading could not be enabled. Keep this tab open while offline."); });
+    navigator.serviceWorker?.register("/sw.js", { updateViaCache: "none" }).then(registration => registration.update()).catch(() => { if (!cancelled) setError("Offline page loading could not be enabled. Keep this tab open while offline."); });
     const sync = async () => { await ready; if (!cancelled && context.userId && navigator.onLine) await flushPendingMutations(context.userId); };
     const update = () => void sync().catch(() => undefined);
     const click = (event: MouseEvent) => {
