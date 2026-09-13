@@ -66,6 +66,7 @@ test("Study timer uses the requested focused dial and control-panel composition"
   assert.match(timer, /study-timer-ring__progress/);
   assert.match(timer, /setInterval\(tick, 100\)/);
   assert.match(css, /stroke-dashoffset \.12s linear/);
+  assert.match(css, /study-timer-dial>\.study-timer-ring\{position:absolute/);
   assert.match(css, /is-stopwatch \.study-timer-ring/);
 });
 
@@ -74,6 +75,9 @@ test("timer mutations and reflection dismissal respond optimistically", () => {
   const reflection = read("components/study/study-reflection.tsx");
   assert.match(timer, /setOptimisticStartedAt\(Date\.now\(\)\)/);
   assert.match(timer, /setOptimisticEnded\(true\)/);
+  assert.match(timer, /const timerStatus = optimisticStatus/);
+  assert.match(timer, /activeStartedAt/);
+  assert.doesNotMatch(timer, /Starting your focus session|study-starting-state/);
   assert.match(reflection, /setLater\(true\)/);
   assert.match(reflection, />Later<\/button>/);
   assert.match(reflection, /Number\(value\) <= 100/);

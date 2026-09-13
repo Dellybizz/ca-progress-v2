@@ -29,6 +29,7 @@ export function StudyReflection({ session }: { session: StudyPendingReflection }
       setError("Enter a whole number from 0 to 100.");
       return;
     }
+    setLater(true);
     setBusy(true);
     setError(null);
     try {
@@ -48,6 +49,7 @@ export function StudyReflection({ session }: { session: StudyPendingReflection }
       router.replace("/study");
       router.refresh();
     } catch (err) {
+      setLater(false);
       setError(err instanceof Error ? err.message : "Reflection could not be saved.");
     } finally {
       setBusy(false);
