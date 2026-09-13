@@ -18,7 +18,7 @@ test("student sidebar keeps the core study flow visible and secondary areas grou
   assert.match(navigation, /sidebar-nav-group__trigger/);
   assert.match(navigation, /aria-expanded=\{expanded\}/);
   for (const route of ["/analytics", "/study-buddy", "/pricing", "/billing", "/settings"]) {
-    assert.match(navigation, new RegExp(route.replaceAll("/", "\\/")));
+    assert.match(navigation, new RegExp(route.replaceAll("/", "\/")));
   }
 });
 
@@ -32,7 +32,7 @@ test("mobile navigation exposes the core flow directly and keeps secondary desti
   assert.match(mobile, /studentMoreGroups/);
   assert.match(mobile, /aria-label="Open more navigation"/);
   for (const route of ["/planner", "/planner/revision-settings", "/analytics", "/resources/icai", "/study-buddy", "/activity", "/settings"]) {
-    assert.match(mobile, new RegExp(route.replaceAll("/", "\\/")));
+    assert.match(mobile, new RegExp(route.replaceAll("/", "\/")));
   }
 });
 
@@ -40,7 +40,7 @@ test("account destinations also remain available from the header profile dropdow
   const controls = read("components/shell/topbar-controls.tsx");
   assert.match(controls, /className="profile-menu"/);
   for (const route of ["/settings/profile", "/settings", "/pricing", "/billing"]) {
-    assert.match(controls, new RegExp(route.replaceAll("/", "\\/")));
+    assert.match(controls, new RegExp(route.replaceAll("/", "\/")));
   }
 });
 
@@ -65,7 +65,7 @@ test("attempt strip has a recognizable visual identity without adding dashboard 
   assert.match(dashboard, /dashboard-attempt-strip dashboard-attempt-card/);
   assert.match(dashboard, /"shield"/);
   for (const label of ["Subjects", "Chapters", "Selection"]) {
-    assert.match(dashboard, new RegExp(`<span>${label}<\\/span>`));
+    assert.match(dashboard, new RegExp(`<span>${label}<\/span>`));
   }
   assert.match(character, /linear-gradient/);
   assert.match(character, /dashboard-attempt-card__summary strong/);
@@ -87,7 +87,7 @@ test("legacy dashboard styling cannot override the canonical application shell",
 
 test("desktop navigation scrolls independently without colliding with account identity", () => {
   const shell = read("app/styles/shell.css");
-  assert.match(shell, /\\.shell-navigation\\s*\\{[^}]*flex:\\s*1 1 auto[^}]*overflow-y:\\s*auto/s);
-  assert.match(shell, /\\.app-shell--r3 \\.desktop-sidebar\\s*\\{[^}]*overflow:\\s*hidden/s);
-  assert.match(shell, /\\.shell-identity\\s*\\{[^}]*flex:\\s*0 0 auto[^}]*min-height:\\s*54px/s);
+  assert.match(shell, /\.shell-navigation\s*\{[^}]*flex:\s*1 1 auto[^}]*overflow-y:\s*auto/s);
+  assert.match(shell, /\.app-shell--r3 \.desktop-sidebar\s*\{[^}]*overflow:\s*hidden/s);
+  assert.match(shell, /\.shell-identity\s*\{[^}]*flex:\s*0 0 auto[^}]*min-height:\s*54px/s);
 });
