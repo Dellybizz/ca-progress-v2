@@ -169,7 +169,6 @@ export async function performStudyTimerAction(userId: string, body: Record<strin
       subjectId = subjectId ?? work.subject_id;
       chapterId = chapterId ?? work.chapter_id;
     }
-    if (!chapterId && !work) throw new Error("Choose a chapter before starting a standalone study session.");
     await assertAcademicSelection(userId, subjectId, chapterId, db);
 
     const focusMinutes = asInteger(body.focusMinutes);

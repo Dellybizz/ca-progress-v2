@@ -8,7 +8,7 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 
 test("F1 keeps the shared shell above student route content", () => {
   assert.match(read("app/(student)/layout.tsx"), /AppShell/);
-  assert.match(read("components/shell/app-shell.tsx"), /<main className="content-wrap">\{children\}<\/main>/);
+  assert.match(read("components/shell/app-shell.tsx"), /<main className="content-wrap"><RouteTrail homeHref=\{homeHref\}\/>{children}<\/main>/);
   assert.match(read("components/shell/app-shell.tsx"), /NavigationProgress/);
   assert.doesNotMatch(read("components/shell/app-shell.tsx"), /await loadViewer/);
 });

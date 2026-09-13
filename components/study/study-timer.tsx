@@ -1,7 +1,7 @@
 "use client";
 import { useOfflineModel } from "@/components/offline/use-offline-model";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -80,6 +80,14 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
   }, [timer]);
 
   const remaining = timer?.mode === "pomodoro" && timer.focusTargetSeconds ? Math.max(0, timer.focusTargetSeconds - elapsed) : null;
+  const activeMode = timer?.mode ?? mode;
+  const displaySeconds = timer ? (activeMode === "pomodoro" && remaining !== null ? remaining : elapsed) : activeMode === "pomodoro" ? focusMinutes * 60 : 0;
+  const progress = timer
+    ? activeMode === "pomodoro" && timer.focusTargetSeconds
+      ? Math.min(100, (elapsed / timer.focusTargetSeconds) * 100)
+      : (elapsed % 3600) / 36
+    : 0;
+  const focusLabel = timer?.intendedTaskTitle ?? timer?.chapterTitle ?? timer?.subjectTitle ?? selectedSubject?.chapters.find((chapter) => chapter.id === chapterId)?.title ?? selectedSubject?.title ?? "General focus";
 
   async function mutate(body: Record<string, unknown>) {
     setBusy(true);
@@ -104,48 +112,36 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
     await mutate({ action: "start", subjectId: subjectId || null, chapterId: chapterId || null, taskId: taskId || null, mode, focusMinutes: mode === "pomodoro" ? focusMinutes : null, breakMinutes: mode === "pomodoro" ? breakMinutes : null, timezone });
   }
 
-  if (timer) return (
-    <div className="phase6-study-grid study-session-grid study-session-grid--live">
-      <Card className="phase6-focus-card study-live-card"><CardBody>
-        <div className="phase6-focus-top"><span className="phase6-kicker"><Icon name="timer" size={16}/> Focus session</span><span className={`phase6-status phase6-status--${timer.status}`}>{timer.abandoned ? "Needs review" : timer.status}</span></div>
-        <div className="phase6-clock" aria-live="polite">{duration(timer.mode === "pomodoro" && remaining !== null ? remaining : elapsed)}</div>
-        <p className="phase6-clock-label">{timer.mode === "pomodoro" ? remaining === 0 ? "Focus target reached — finish now or keep studying." : `${minutesLabel(timer.focusTargetSeconds ?? 0)} focus target` : "Focused time elapsed"}</p>
-        <div className="phase6-focus-context"><strong>{timer.intendedTaskTitle ?? timer.chapterTitle ?? timer.subjectTitle ?? "General study"}</strong><span>{timer.mode === "pomodoro" ? `Pomodoro · ${Math.round((timer.focusTargetSeconds ?? 0) / 60)}/${Math.round((timer.breakTargetSeconds ?? 0) / 60)}` : "Stopwatch"}</span></div>
-        {timer.abandoned ? <div className="phase6-warning"><Icon name="clock"/><div><strong>This timer looks inactive or too long.</strong><p>Discard it and start a fresh session so inactive time is never saved as study.</p></div></div> : null}
-        {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
-        <div className="phase6-timer-actions">
-          {!timer.abandoned && timer.status === "running" ? <button className="ui-button ui-button--secondary" disabled={busy} onClick={() => void mutate({ action: "pause" })}>Pause</button> : null}
-          {!timer.abandoned && timer.status === "paused" ? <button className="ui-button ui-button--secondary" disabled={busy} onClick={() => void mutate({ action: "resume" })}>Resume</button> : null}
-          {!timer.abandoned ? <button className="ui-button ui-button--primary" disabled={busy} onClick={() => void mutate({ action: "finish" })}>Finish session</button> : null}
-          <button className="ui-button ui-button--ghost" disabled={busy} onClick={() => { if (window.confirm("Discard this timer without adding study time?")) void mutate({ action: "discard" }); }}>Discard</button>
-        </div>
-      </CardBody></Card>
-      <Card className="study-session-details"><CardHeader title="Session details" description="Academic context, intended task and pauses are retained with this session."/><CardBody><div className="phase6-detail-list">
-        <div><span>Started</span><strong>{new Date(timer.startedAt).toLocaleString()}</strong></div><div><span>Chapter</span><strong>{timer.chapterTitle ?? "Task-linked general work"}</strong></div><div><span>Intended task</span><strong>{timer.intendedTaskTitle ?? "Chapter study"}</strong></div><div><span>Pauses</span><strong>{timer.pauseCount}</strong></div><div><span>Timezone</span><strong>{timer.timezone}</strong></div><div><span>Saved focused time</span><strong>{duration(timer.elapsedSeconds)}</strong></div>
-      </div></CardBody></Card>
-    </div>
-  );
-
   return (
-    <div className="phase6-study-grid study-session-grid study-session-grid--idle study-timer-workspace">
-      <section className="study-timer-preview" aria-label="Timer preview">
-        <span className="study-timer-preview__mode"><Icon name={mode === "pomodoro" ? "timer" : "clock"} size={15}/>{mode === "pomodoro" ? "Pomodoro" : "Stopwatch"}</span>
-        <div className="study-timer-dial" style={{ "--timer-progress": mode === "pomodoro" ? `${Math.min(100, Math.max(8, focusMinutes / 0.6))}%` : "18%" } as React.CSSProperties}>
+    <div className={`phase6-study-grid study-session-grid study-timer-workspace ${timer ? "study-session-grid--live" : "study-session-grid--idle"}`}>
+      <section className={`study-timer-preview ${timer ? `is-${timer.status}` : "is-idle"}`} aria-label={timer ? "Active focus timer" : "Focus timer"}>
+        <span className="study-timer-preview__mode"><Icon name={activeMode === "pomodoro" ? "timer" : "clock"} size={15}/>{activeMode === "pomodoro" ? "Pomodoro" : "Stopwatch"}{timer ? ` · ${timer.abandoned ? "Needs review" : timer.status}` : ""}</span>
+        <div className="study-timer-dial" style={{ "--timer-progress": `${progress}%` } as CSSProperties}>
           <span><Icon name="book" size={22}/></span>
-          <strong>{mode === "pomodoro" ? `${String(focusMinutes).padStart(2, "0")}:00` : "00:00"}</strong>
-          <small>{selectedSubject?.chapters.find((chapter) => chapter.id === chapterId)?.title ?? selectedSubject?.title ?? "Choose your study focus"}</small>
+          <strong aria-live="polite">{duration(displaySeconds)}</strong>
+          <small>{focusLabel}</small>
         </div>
-        <p>{mode === "pomodoro" ? `${focusMinutes} min focus · ${breakMinutes} min break` : "Open-ended focused study"}</p>
+        <p>{timer ? activeMode === "pomodoro" && remaining === 0 ? "Focus target reached — finish now or keep studying." : timer.status === "paused" ? "Paused — your progress is preserved." : "Your focus ring is moving with the session." : activeMode === "pomodoro" ? `${focusMinutes} min focus · ${breakMinutes} min break` : "Open-ended focused study"}</p>
+        {timer ? <div className="study-dial-actions">
+          {!timer.abandoned && timer.status === "running" ? <button className="study-dial-button study-dial-button--secondary" disabled={busy} onClick={() => void mutate({ action: "pause" })}><Icon name="clock" size={22}/><span>Pause</span></button> : null}
+          {!timer.abandoned && timer.status === "paused" ? <button className="study-dial-button study-dial-button--primary" disabled={busy} onClick={() => void mutate({ action: "resume" })}><Icon name="arrow" size={22}/><span>Resume</span></button> : null}
+          {!timer.abandoned ? <button className="study-dial-button study-dial-button--primary" disabled={busy} onClick={() => void mutate({ action: "finish" })}><Icon name="check" size={22}/><span>Finish</span></button> : null}
+          <button className="study-dial-button study-dial-button--secondary" disabled={busy} onClick={() => { if (window.confirm("Discard this timer without adding study time?")) void mutate({ action: "discard" }); }}><Icon name="close" size={20}/><span>Discard</span></button>
+        </div> : null}
       </section>
       <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card study-control-panel">
-        <CardHeader title="Start a focus session"/>
-        <CardBody><form className="phase6-form study-builder" onSubmit={start}>
+        <CardHeader title={timer ? "Session details" : "Start a focus session"}/>
+        <CardBody>{timer ? <div className="phase6-detail-list study-live-details">
+          <div><span>Focus</span><strong>{focusLabel}</strong></div><div><span>Started</span><strong>{new Date(timer.startedAt).toLocaleString()}</strong></div><div><span>Mode</span><strong>{timer.mode === "pomodoro" ? `Pomodoro · ${Math.round((timer.focusTargetSeconds ?? 0) / 60)}/${Math.round((timer.breakTargetSeconds ?? 0) / 60)}` : "Stopwatch"}</strong></div><div><span>Pauses</span><strong>{timer.pauseCount}</strong></div>
+          {timer.abandoned ? <div className="phase6-warning"><Icon name="clock"/><div><strong>This timer needs review.</strong><p>Discard it and start fresh so inactive time is not saved.</p></div></div> : null}
+          {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
+        </div> : <form className="phase6-form study-builder" onSubmit={start}>
           <section className="study-builder-section">
             <div className="study-builder-section__title"><span>1</span><div><strong>Subject & chapter</strong></div></div>
             <div className="study-builder-fields">
-              <label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); setTaskId(""); }}><option value="">Choose subject</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
-              <label><span>Chapter</span><select value={chapterId} onChange={(event) => { setChapterId(event.target.value); setTaskId(""); }} disabled={!selectedSubject}><option value="">Choose chapter</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
-              <label><span>Task <small>optional</small></span><select value={taskId} onChange={(event) => setTaskId(event.target.value)}><option value="">Chapter study — no planner task</option>{taskOptions.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
+              <label><span>Subject <small>optional</small></span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); setTaskId(""); }}><option value="">General focus</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label>
+              <label><span>Chapter <small>optional</small></span><select value={chapterId} onChange={(event) => { setChapterId(event.target.value); setTaskId(""); }} disabled={!selectedSubject}><option value="">No chapter selected</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label>
+              <label><span>Task <small>optional</small></span><select value={taskId} onChange={(event) => setTaskId(event.target.value)}><option value="">No planner task</option>{taskOptions.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
             </div>
           </section>
 
@@ -162,8 +158,8 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
             </div> : <div className="phase6-note"><Icon name="clock"/><span>Stopwatch records the exact focused time when you finish the session.</span></div>}
           </section>
           {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
-          <button className="ui-button ui-button--primary phase6-start-button study-start-button" disabled={busy || (!chapterId && !taskId)} type="submit"><Icon name="timer" size={17}/>{busy ? "Starting…" : "Start focus session"}</button>
-        </form></CardBody>
+          <button className="ui-button ui-button--primary phase6-start-button study-start-button" disabled={busy} type="submit"><Icon name="timer" size={17}/>{busy ? "Starting…" : subjectId || taskId ? "Start focus session" : "Start general focus"}</button>
+        </form>}</CardBody>
       </Card>
       <StudySideRail model={model}/>
     </div>

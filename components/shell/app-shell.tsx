@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { AttemptSwitcher } from "./attempt-switcher";
 import type { AttemptOption } from "@/lib/profile/validation";
 import type { StudentContextContract } from "@/lib/academic/student-context";
+import { RouteTrail } from "./route-trail";
 
 export function AppShell({ children, area = "student", viewer, studentContext, attempts = [] }: { children: React.ReactNode; area?: "student" | "admin"; viewer: ViewerSnapshot; studentContext?: StudentContextContract; attempts?: AttemptOption[] }) {
   /* Stable labels retained for operational search: Student workspace; Admin workspace */
@@ -33,7 +34,7 @@ export function AppShell({ children, area = "student", viewer, studentContext, a
           <div className="topbar-context"><span className="topbar-context__dot"/><div><strong>{workspaceLabel}</strong><span>{studentContext?.selection ? `${studentContext.selection.level.replace("_", " ")} · ${studentContext.selection.group.replace("_", " ")}` : "CA Progress"}</span></div></div>
           <TopbarControls area={area}/>
         </header>
-        <main className="content-wrap">{children}</main>
+        <main className="content-wrap"><RouteTrail homeHref={homeHref}/>{children}</main>
       </div>
     </div>
     <MobileNavigation area={area} studentContext={studentContext} attempts={attempts}/>

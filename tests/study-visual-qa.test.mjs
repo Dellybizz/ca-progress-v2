@@ -11,7 +11,7 @@ test("Study page uses one clear hierarchy instead of repeated questions", () => 
   const timer = read("components/study/study-timer.tsx");
   assert.match(page, /model\.timer \? "Focus session" : "Study"/);
   assert.match(page, /formatAttempt\(model\.attemptKey\)/);
-  assert.match(timer, /title="Start a focus session"/);
+  assert.match(timer, /title=\{timer \? "Session details" : "Start a focus session"\}/);
   assert.match(timer, /<strong>Subject & chapter<\/strong>/);
   assert.match(timer, /<strong>Timer<\/strong>/);
   assert.doesNotMatch(timer, /What are you studying\?/);
@@ -47,9 +47,8 @@ test("A1.2 unifies Study actions and the structural Syllabus index", () => {
   const page = read("components/study/study-page.tsx");
   const syllabus = read("components/academic/syllabus-explorer.tsx");
   const css = read("app/styles/academic-index-a12.css");
-  assert.match(page, /study-course-index/);
+  assert.doesNotMatch(page, /study-course-index/);
   assert.match(page, /Browse course structure/);
-  assert.match(page, /recentSessions\.find/);
   assert.match(syllabus, /Level → Group → Subject → Chapter → Unit/);
   assert.match(syllabus, /academic-subject-list/);
   assert.doesNotMatch(syllabus, /academic-hero/);
@@ -68,12 +67,21 @@ test("Study timer uses the requested focused dial and control-panel composition"
 });
 
 test("academic breadcrumbs preserve the route a student used", () => {
-  const navigation = read("components/academic/academic-navigation.tsx");
+  const trail = read("components/shell/route-trail.tsx");
+  const shell = read("components/shell/app-shell.tsx");
   const study = read("components/study/study-page.tsx");
-  const subject = read("components/academic/subject-detail.tsx");
-  assert.match(navigation, /useSearchParams/);
-  assert.match(navigation, /via === "study"/);
-  assert.match(navigation, /via === "subject"/);
-  assert.match(study, /syllabus\?via=study/);
-  assert.match(subject, /chapters\/\$\{chapter\.id\}\?via=subject/);
+  assert.match(trail, /usePathname/);
+  assert.match(trail, /sessionStorage/);
+  assert.match(trail, /existing >= 0 \? previous\.slice/);
+  assert.match(shell, /<RouteTrail homeHref=\{homeHref\}/);
+  assert.match(study, /href="\/syllabus"/);
+});
+
+test("focus sessions work without a subject or chapter", () => {
+  const timer = read("components/study/study-timer.tsx");
+  const service = read("lib/study/phase3.ts");
+  assert.match(timer, /Start general focus/);
+  assert.match(timer, /<option value="">General focus<\/option>/);
+  assert.match(timer, /disabled=\{busy\}/);
+  assert.doesNotMatch(service, /Choose a chapter before starting a standalone study session/);
 });

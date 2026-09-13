@@ -49,25 +49,8 @@ export function StudyPage({ model, initialSubjectId = null, initialChapterId = n
           <h1>{model.timer ? "Focus session" : "Study"}</h1>
           <p>{model.levelName} · {model.groupLabel} · {formatAttempt(model.attemptKey)}</p>
         </div>
-        <Link href="/syllabus?via=study" className="academic-index-link">Browse course structure <Icon name="arrow" size={14}/></Link>
+        <Link href="/syllabus" className="academic-index-link">Browse course structure <Icon name="arrow" size={14}/></Link>
       </header>
-
-      {!model.timer ? <section className="study-course-index" aria-label="Your academic index">
-        <header><div><span className="study-page__eyebrow">Continue quickly</span><h2>Choose where to focus</h2></div><small>{model.subjects.length} subjects in your group</small></header>
-        <div className="study-course-index__subjects">
-          {model.subjects.slice(0, 4).map((subject, index) => {
-            const recent = model.analytics.recentSessions.find((session) => session.subjectId === subject.id);
-            const chapter = recent?.chapterId ? subject.chapters.find((item) => item.id === recent.chapterId) : subject.chapters[0];
-            const href = chapter ? `/study?subjectId=${encodeURIComponent(subject.id)}&chapterId=${encodeURIComponent(chapter.id)}#study-timer` : `/subjects/${subject.slug}`;
-            return <Link key={subject.id} href={href} className="study-course-index__row">
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <div><strong>{subject.title}</strong><small>{recent ? `Resume ${recent.chapterTitle ?? "recent work"}` : chapter ? `${subject.chapters.length} chapters · Start with ${chapter.title}` : "Open subject workspace"}</small></div>
-              <span className="study-course-index__action">{recent ? "Resume" : "Start"}<Icon name="arrow" size={13}/></span>
-            </Link>;
-          })}
-        </div>
-        {model.subjects.length > 4 ? <Link href="/syllabus?via=study" className="study-course-index__all">View all {model.subjects.length} subjects</Link> : null}
-      </section> : null}
 
       {model.pendingReflection ? <StudyReflection session={model.pendingReflection}/> : null}
       <div id="study-timer"><StudyTimer key={timerKey} model={model} initialSubjectId={initialSubjectId ?? undefined} initialChapterId={initialChapterId ?? undefined} initialTaskId={initialTaskId ?? undefined}/></div>
