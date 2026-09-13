@@ -1,7 +1,7 @@
 "use client";
 import { useOfflineModel } from "@/components/offline/use-offline-model";
 
-import { type CSSProperties, type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -45,7 +45,9 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
   const model = useOfflineModel("study", serverModel);
   const context = useStudentContext();
   const router = useRouter();
-  const timer = model.timer;
+  const [optimisticStartedAt, setOptimisticStartedAt] = useState<number | null>(null);
+  const [optimisticEnded, setOptimisticEnded] = useState(false);
+  const timer = optimisticEnded ? null : model.timer;
   const safeInitialTask = !timer && initialTaskId ? model.tasks.find((task) => task.id === initialTaskId) ?? null : null;
   const requestedSubjectId = safeInitialTask?.subjectId ?? initialSubjectId ?? null;
   const initialSubject = !timer && requestedSubjectId ? model.subjects.find((subject) => subject.id === requestedSubjectId) ?? null : null;
@@ -64,12 +66,17 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
   const taskOptions = useMemo(() => model.tasks.filter((task) => (!subjectId || !task.subjectId || task.subjectId === subjectId) && (!chapterId || !task.chapterId || task.chapterId === chapterId)), [model.tasks, subjectId, chapterId]);
 
   useEffect(() => {
-    if (!timer || timer.status !== "running" || timer.abandoned) return;
-    const tick = () => setElapsed(Math.min(43_200, (timer.storedElapsedSeconds ?? timer.elapsedSeconds) + (timer.runningSince ? Math.max(0, Math.floor((Date.now() - Date.parse(timer.runningSince)) / 1000)) : 0)));
-    const initial = window.setTimeout(tick, 0);
-    const id = window.setInterval(tick, 1000);
-    return () => { window.clearTimeout(initial); window.clearInterval(id); };
-  }, [timer]);
+    if ((!timer || timer.status !== "running" || timer.abandoned) && optimisticStartedAt === null) return;
+    const tick = () => {
+      const value = timer
+        ? (timer.storedElapsedSeconds ?? timer.elapsedSeconds) + (timer.runningSince ? Math.max(0, (Date.now() - Date.parse(timer.runningSince)) / 1000) : 0)
+        : Math.max(0, (Date.now() - Number(optimisticStartedAt)) / 1000);
+      setElapsed(Math.min(43_200, value));
+    };
+    tick();
+    const interval = window.setInterval(tick, 100);
+    return () => window.clearInterval(interval);
+  }, [optimisticStartedAt, timer]);
 
   useEffect(() => {
     if (!timer || timer.status !== "running" || timer.abandoned) return;
@@ -80,13 +87,16 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
   }, [timer]);
 
   const remaining = timer?.mode === "pomodoro" && timer.focusTargetSeconds ? Math.max(0, timer.focusTargetSeconds - elapsed) : null;
+  const isOptimisticallyStarting = !timer && optimisticStartedAt !== null;
+  const isActive = Boolean(timer || isOptimisticallyStarting);
   const activeMode = timer?.mode ?? mode;
-  const displaySeconds = timer ? (activeMode === "pomodoro" && remaining !== null ? remaining : elapsed) : activeMode === "pomodoro" ? focusMinutes * 60 : 0;
+  const optimisticRemaining = activeMode === "pomodoro" ? Math.max(0, focusMinutes * 60 - elapsed) : null;
+  const displaySeconds = timer ? (activeMode === "pomodoro" && remaining !== null ? remaining : elapsed) : isOptimisticallyStarting ? (optimisticRemaining ?? elapsed) : activeMode === "pomodoro" ? focusMinutes * 60 : 0;
   const progress = timer
     ? activeMode === "pomodoro" && timer.focusTargetSeconds
       ? Math.min(100, (elapsed / timer.focusTargetSeconds) * 100)
-      : (elapsed % 3600) / 36
-    : 0;
+      : 0
+    : isOptimisticallyStarting && activeMode === "pomodoro" ? Math.min(100, (elapsed / (focusMinutes * 60)) * 100) : 0;
   const focusLabel = timer?.intendedTaskTitle ?? timer?.chapterTitle ?? timer?.subjectTitle ?? selectedSubject?.chapters.find((chapter) => chapter.id === chapterId)?.title ?? selectedSubject?.title ?? "General focus";
 
   async function mutate(body: Record<string, unknown>) {
@@ -109,14 +119,25 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
   async function start(event: FormEvent) {
     event.preventDefault();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    await mutate({ action: "start", subjectId: subjectId || null, chapterId: chapterId || null, taskId: taskId || null, mode, focusMinutes: mode === "pomodoro" ? focusMinutes : null, breakMinutes: mode === "pomodoro" ? breakMinutes : null, timezone });
+    setElapsed(0);
+    setOptimisticStartedAt(Date.now());
+    const result = await mutate({ action: "start", subjectId: subjectId || null, chapterId: chapterId || null, taskId: taskId || null, mode, focusMinutes: mode === "pomodoro" ? focusMinutes : null, breakMinutes: mode === "pomodoro" ? breakMinutes : null, timezone });
+    if (!result) setOptimisticStartedAt(null);
+  }
+
+  async function end(action: "finish" | "discard") {
+    setOptimisticEnded(true);
+    setOptimisticStartedAt(null);
+    const result = await mutate({ action });
+    if (!result) setOptimisticEnded(false);
   }
 
   return (
-    <div className={`phase6-study-grid study-session-grid study-timer-workspace ${timer ? "study-session-grid--live" : "study-session-grid--idle"}`}>
-      <section className={`study-timer-preview ${timer ? `is-${timer.status}` : "is-idle"}`} aria-label={timer ? "Active focus timer" : "Focus timer"}>
-        <span className="study-timer-preview__mode"><Icon name={activeMode === "pomodoro" ? "timer" : "clock"} size={15}/>{activeMode === "pomodoro" ? "Pomodoro" : "Stopwatch"}{timer ? ` · ${timer.abandoned ? "Needs review" : timer.status}` : ""}</span>
-        <div className="study-timer-dial" style={{ "--timer-progress": `${progress}%` } as CSSProperties}>
+    <div className={`phase6-study-grid study-session-grid study-timer-workspace ${isActive ? "study-session-grid--live" : "study-session-grid--idle"}`}>
+      <section className={`study-timer-preview ${timer ? `is-${timer.status}` : isOptimisticallyStarting ? "is-running" : "is-idle"} ${activeMode === "stopwatch" ? "is-stopwatch" : ""}`} aria-label={isActive ? "Active focus timer" : "Focus timer"}>
+        <span className="study-timer-preview__mode"><Icon name={activeMode === "pomodoro" ? "timer" : "clock"} size={15}/>{activeMode === "pomodoro" ? "Pomodoro" : "Stopwatch"}{timer ? ` · ${timer.abandoned ? "Needs review" : timer.status}` : isOptimisticallyStarting ? " · running" : ""}</span>
+        <div className="study-timer-dial">
+          <svg className="study-timer-ring" viewBox="0 0 100 100" aria-hidden="true"><circle className="study-timer-ring__track" cx="50" cy="50" r="47" pathLength="100"/><circle className="study-timer-ring__progress" cx="50" cy="50" r="47" pathLength="100" strokeDasharray="100" strokeDashoffset={100 - progress}/></svg>
           <span><Icon name="book" size={22}/></span>
           <strong aria-live="polite">{duration(displaySeconds)}</strong>
           <small>{focusLabel}</small>
@@ -125,17 +146,17 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
         {timer ? <div className="study-dial-actions">
           {!timer.abandoned && timer.status === "running" ? <button className="study-dial-button study-dial-button--secondary" disabled={busy} onClick={() => void mutate({ action: "pause" })}><Icon name="clock" size={22}/><span>Pause</span></button> : null}
           {!timer.abandoned && timer.status === "paused" ? <button className="study-dial-button study-dial-button--primary" disabled={busy} onClick={() => void mutate({ action: "resume" })}><Icon name="arrow" size={22}/><span>Resume</span></button> : null}
-          {!timer.abandoned ? <button className="study-dial-button study-dial-button--primary" disabled={busy} onClick={() => void mutate({ action: "finish" })}><Icon name="check" size={22}/><span>Finish</span></button> : null}
-          <button className="study-dial-button study-dial-button--secondary" disabled={busy} onClick={() => { if (window.confirm("Discard this timer without adding study time?")) void mutate({ action: "discard" }); }}><Icon name="close" size={20}/><span>Discard</span></button>
-        </div> : null}
+          {!timer.abandoned ? <button className="study-dial-button study-dial-button--primary" disabled={busy} onClick={() => void end("finish")}><Icon name="check" size={22}/><span>Finish</span></button> : null}
+          <button className="study-dial-button study-dial-button--secondary" disabled={busy} onClick={() => { if (window.confirm("Discard this timer without adding study time?")) void end("discard"); }}><Icon name="close" size={20}/><span>Discard</span></button>
+        </div> : isOptimisticallyStarting ? <div className="study-dial-pending" role="status">Starting session…</div> : null}
       </section>
       <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card study-control-panel">
-        <CardHeader title={timer ? "Session details" : "Start a focus session"}/>
+        <CardHeader title={isActive ? "Session details" : "Start a focus session"}/>
         <CardBody>{timer ? <div className="phase6-detail-list study-live-details">
           <div><span>Focus</span><strong>{focusLabel}</strong></div><div><span>Started</span><strong>{new Date(timer.startedAt).toLocaleString()}</strong></div><div><span>Mode</span><strong>{timer.mode === "pomodoro" ? `Pomodoro · ${Math.round((timer.focusTargetSeconds ?? 0) / 60)}/${Math.round((timer.breakTargetSeconds ?? 0) / 60)}` : "Stopwatch"}</strong></div><div><span>Pauses</span><strong>{timer.pauseCount}</strong></div>
           {timer.abandoned ? <div className="phase6-warning"><Icon name="clock"/><div><strong>This timer needs review.</strong><p>Discard it and start fresh so inactive time is not saved.</p></div></div> : null}
           {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
-        </div> : <form className="phase6-form study-builder" onSubmit={start}>
+        </div> : isOptimisticallyStarting ? <div className="study-starting-state"><Icon name="timer" size={22}/><strong>Starting your focus session</strong><span>The timer is already counting while your session is saved.</span></div> : <form className="phase6-form study-builder" onSubmit={start}>
           <section className="study-builder-section">
             <div className="study-builder-section__title"><span>1</span><div><strong>Subject & chapter</strong></div></div>
             <div className="study-builder-fields">

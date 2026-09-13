@@ -19,9 +19,16 @@ export function StudyReflection({ session }: { session: StudyPendingReflection }
   const [visibility, setVisibility] = useState<"private" | "community">("private");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [later, setLater] = useState(false);
+  const [showDoubt, setShowDoubt] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const score = Number(understanding);
+    if (!Number.isInteger(score) || score < 0 || score > 100) {
+      setError("Enter a whole number from 0 to 100.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -30,7 +37,7 @@ export function StudyReflection({ session }: { session: StudyPendingReflection }
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId: session.sessionId,
-          understandingScore: understanding === "" ? null : Number(understanding),
+          understandingScore: score,
           focusRating: focus,
           doubtBody: doubt.trim() || null,
           doubtVisibility: doubt.trim() ? visibility : null,
@@ -47,20 +54,22 @@ export function StudyReflection({ session }: { session: StudyPendingReflection }
     }
   }
 
+  if (later) return null;
+
   return <Card className="study-reflection-card" data-study-session-reflection={session.sessionId}>
-    <CardHeader title="Quick session reflection" description={`${session.intendedTaskTitle ?? session.chapterTitle ?? session.subjectTitle ?? "Study session"} · ${minutesLabel(session.durationSeconds)}`}/>
+    <CardHeader title="Quick reflection" description={`${session.intendedTaskTitle ?? session.chapterTitle ?? session.subjectTitle ?? "Study session"} · ${minutesLabel(session.durationSeconds)}`}/>
     <CardBody>
       <form className="phase6-form study-reflection-form" onSubmit={submit}>
-        <div className="phase6-note"><Icon name="chart"/><span>Understanding here is <strong>self-reported understanding</strong>, not a mastery score or an assessment by CA Progress.</span></div>
-        <label><span>Self-reported understanding (0–100)</span><input type="number" min="0" max="100" step="1" required value={understanding} onChange={(event) => setUnderstanding(event.target.value)}/></label>
+        <label className="study-reflection-score"><span>Self-reported understanding <small>0–100 · self-reported understanding, not a mastery score</small></span><input type="number" inputMode="numeric" min="0" max="100" step="1" required value={understanding} onChange={(event) => { const value = event.target.value; if (value === "" || (/^\d{1,3}$/.test(value) && Number(value) <= 100)) setUnderstanding(value); }}/></label>
         <fieldset className="phase6-mode"><legend>How focused were you?</legend>
           {(["poor", "okay", "focused"] as const).map((value) => <button type="button" key={value} className={focus === value ? "is-active" : ""} onClick={() => setFocus(value)}>{value === "poor" ? "Poor" : value === "okay" ? "Okay" : "Focused"}</button>)}
         </fieldset>
-        <label><span>Any doubt? <small>Optional</small></span><textarea rows={3} maxLength={1200} value={doubt} onChange={(event) => setDoubt(event.target.value)} placeholder="Write the doubt from this session…"/></label>
+        <button type="button" className="study-reflection-doubt-toggle" aria-expanded={showDoubt} onClick={() => setShowDoubt((value) => !value)}><Icon name="plus" size={15}/>{showDoubt ? "Hide doubt" : "Add an optional doubt"}</button>
+        {showDoubt ? <><label><span>Any doubt? <small>Optional</small></span><textarea rows={2} maxLength={1200} value={doubt} onChange={(event) => setDoubt(event.target.value)} placeholder="Write the doubt from this session…"/></label>
         {doubt.trim() ? <fieldset className="phase6-mode"><legend>Where should this doubt go?</legend><button type="button" className={visibility === "private" ? "is-active" : ""} onClick={() => setVisibility("private")}>Keep private</button><button type="button" className={visibility === "community" ? "is-active" : ""} onClick={() => setVisibility("community")}>Ask Community</button></fieldset> : null}
-        {doubt.trim() && visibility === "community" ? <div className="phase6-note"><Icon name="community"/><span>CA Progress will use this session’s subject and chapter to choose the Community doubts room automatically. You do not need to reselect a category.</span></div> : null}
+        {doubt.trim() && visibility === "community" ? <div className="phase6-note"><Icon name="community"/><span>CA Progress will use this session’s subject and chapter to choose the Community doubts room automatically. You do not need to reselect a category.</span></div> : null}</> : null}
         {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
-        <div className="button-row"><button type="submit" className="ui-button ui-button--primary" disabled={busy || understanding === "" || !focus}>{busy ? "Saving…" : "Save reflection"}</button><a href="#study-timer" className="ui-button ui-button--ghost">Study again first</a></div>
+        <div className="button-row"><button type="submit" className="ui-button ui-button--primary" disabled={busy || understanding === "" || !focus}>{busy ? "Saving…" : "Save reflection"}</button><button type="button" className="ui-button ui-button--ghost" onClick={() => setLater(true)}>Later</button></div>
       </form>
     </CardBody>
   </Card>;

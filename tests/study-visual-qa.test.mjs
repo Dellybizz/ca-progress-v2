@@ -11,7 +11,7 @@ test("Study page uses one clear hierarchy instead of repeated questions", () => 
   const timer = read("components/study/study-timer.tsx");
   assert.match(page, /model\.timer \? "Focus session" : "Study"/);
   assert.match(page, /formatAttempt\(model\.attemptKey\)/);
-  assert.match(timer, /title=\{timer \? "Session details" : "Start a focus session"\}/);
+  assert.match(timer, /title=\{isActive \? "Session details" : "Start a focus session"\}/);
   assert.match(timer, /<strong>Subject & chapter<\/strong>/);
   assert.match(timer, /<strong>Timer<\/strong>/);
   assert.doesNotMatch(timer, /What are you studying\?/);
@@ -63,7 +63,20 @@ test("Study timer uses the requested focused dial and control-panel composition"
   assert.match(timer, /study-timer-dial/);
   assert.match(timer, /study-control-panel/);
   assert.match(css, /grid-template-areas:"preview controls" "preview rail"/);
-  assert.match(css, /conic-gradient/);
+  assert.match(timer, /study-timer-ring__progress/);
+  assert.match(timer, /setInterval\(tick, 100\)/);
+  assert.match(css, /stroke-dashoffset \.12s linear/);
+  assert.match(css, /is-stopwatch \.study-timer-ring/);
+});
+
+test("timer mutations and reflection dismissal respond optimistically", () => {
+  const timer = read("components/study/study-timer.tsx");
+  const reflection = read("components/study/study-reflection.tsx");
+  assert.match(timer, /setOptimisticStartedAt\(Date\.now\(\)\)/);
+  assert.match(timer, /setOptimisticEnded\(true\)/);
+  assert.match(reflection, /setLater\(true\)/);
+  assert.match(reflection, />Later<\/button>/);
+  assert.match(reflection, /Number\(value\) <= 100/);
 });
 
 test("academic breadcrumbs preserve the route a student used", () => {
