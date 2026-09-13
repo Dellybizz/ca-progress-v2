@@ -18,8 +18,10 @@ test("A1.3 uses direct group and subject selectors before chapter action", () =>
   const tracker = read("components/progress/progress-tracker.tsx");
   assert.match(tracker, /progress-group-tabs/);
   assert.match(tracker, /progress-subject-tabs/);
-  assert.match(tracker, /All groups/);
+  assert.match(tracker, /Both groups/);
   assert.match(tracker, /All subjects/);
+  assert.match(tracker, /Go to Chapter Hub/);
+  assert.match(tracker, /flushSync/);
   assert.doesNotMatch(tracker, /Your portfolio at a glance/);
 });
 

@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 import { Icon } from "@/components/ui/icon";
 import { useStudentContext } from "@/components/academic/student-context-provider";
 import { offlineMutationFetch } from "@/lib/offline/mutation";
@@ -55,6 +57,16 @@ function isTestStage(stage: ProgressStage): stage is "test_1" | "test_2" {
   return stage === "test_1" || stage === "test_2";
 }
 
+function shortSubjectTitle(title: string) {
+  const labels: Record<string, string> = {
+    "Financial Management and Strategic Management": "FM SM",
+    "Cost and Management Accounting": "Costing",
+    "Auditing and Ethics": "Audit",
+    "Corporate and Other Laws": "Law",
+  };
+  return labels[title] ?? title;
+}
+
 export function ProgressTracker({
   model,
   subjectLocked = false,
@@ -91,6 +103,7 @@ export function ProgressTracker({
     const q = query.trim().toLocaleLowerCase();
     return !q || `${chapter.number} ${chapter.title} ${chapter.subjectTitle}`.toLocaleLowerCase().includes(q);
   }), [chapters, group, query, subject]);
+  const grouped = useMemo(() => [...new Map(filtered.map((chapter) => [chapter.subjectId, { title: chapter.subjectTitle, chapters: filtered.filter((item) => item.subjectId === chapter.subjectId) }])).values()], [filtered]);
 
   async function mutate(chapter: ProgressChapter, stage: ProgressStage) {
     if (isTestStage(stage)) {
@@ -102,10 +115,12 @@ export function ProgressTracker({
     const previous = chapter.state;
     const next = optimisticState(previous, stage, enabled);
     const key = `${chapter.id}:${stage}`;
-    setPendingKey(key);
-    setSaveState("saved");
-    setMessage(null);
-    setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
+    flushSync(() => {
+      setPendingKey(key);
+      setSaveState("saved");
+      setMessage(null);
+      setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
+    });
     try {
       const {response,queued} = await offlineMutationFetch(context.userId!, "/api/progress", { action: "set_stage", chapterId: chapter.id, stage, enabled }, {state:next,saved_at:new Date().toISOString()}, { ...previous });
       const payload = await response.json() as ProgressMutationResult & { error?: string };
@@ -145,16 +160,17 @@ export function ProgressTracker({
 
   return (
     <div className="progress-workspace">
-      {!subjectLocked && groups.length > 1 ? <nav className="progress-group-tabs" aria-label="Group"><button type="button" className={group === "all" ? "is-active" : ""} onClick={() => setGroup("all")}>All groups</button>{groups.map((item) => <button type="button" key={item.code} className={group === item.code ? "is-active" : ""} onClick={() => { setGroup(item.code); setSubject("all"); }}>{item.name}</button>)}</nav> : null}
-      {!subjectLocked ? <nav className="progress-subject-tabs" aria-label="Subject"><span>Subject</span><button type="button" className={subject === "all" ? "is-active" : ""} onClick={() => setSubject("all")}>All subjects</button>{subjects.filter((item) => group === "all" || chapters.some((chapter) => chapter.subjectId === item.id && chapter.groupCode === group)).map((item) => <button type="button" key={item.id} className={subject === item.id ? "is-active" : ""} onClick={() => setSubject(item.id)}>{item.title}</button>)}</nav> : null}
+      {!subjectLocked && groups.length > 1 ? <nav className="progress-group-tabs" aria-label="Group"><button type="button" className={group === "all" ? "is-active" : ""} onClick={() => setGroup("all")}>Both groups</button>{groups.map((item) => <button type="button" key={item.code} className={group === item.code ? "is-active" : ""} onClick={() => { setGroup(item.code); setSubject("all"); }}>{item.name}</button>)}</nav> : null}
+      {!subjectLocked ? <nav className="progress-subject-tabs" aria-label="Subject"><span>Subjects</span><button type="button" className={subject === "all" ? "is-active" : ""} onClick={() => setSubject("all")}>All subjects</button>{subjects.filter((item) => group === "all" || chapters.some((chapter) => chapter.subjectId === item.id && chapter.groupCode === group)).map((item) => <button type="button" key={item.id} className={subject === item.id ? "is-active" : ""} onClick={() => setSubject(item.id)}>{shortSubjectTitle(item.title)}</button>)}</nav> : null}
       <label className="progress-search progress-search--standalone"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chapters" /></label>
 
       {saveState === "error" ? <div className="progress-save-error" role="alert"><span><Icon name="bell" size={15}/>{message}</span>{undoEvent ? <button onClick={undo}>Undo</button> : null}</div> : null}
 
-      {filtered.length ? <div className="progress-chapter-list">{filtered.map((chapter) => (
+      {filtered.length ? <div className="progress-subject-sections">{grouped.map((section) => <section className="progress-subject-section" key={section.title}><h2>{shortSubjectTitle(section.title)}</h2><div className="progress-chapter-list">{section.chapters.map((chapter) => (
         <article className="progress-chapter-card" key={chapter.id} data-canonical-chapter-id={chapter.id}>
           <div className="progress-chapter-heading">
             <h3><b>{chapter.number}</b>{chapter.title}</h3>
+            <Link href={`/chapters/${chapter.id}`}>Go to Chapter Hub <Icon name="arrow" size={12}/></Link>
           </div>
           <div className="progress-stage-controls" role="group" aria-label={`${chapter.title} stages`}>
             {STAGES.map((stage) => {
@@ -182,12 +198,12 @@ export function ProgressTracker({
                 <span>{stage.short}</span>
                 <small>{stage.label}</small>
                 {active && date ? <small>{formatDate(date)}</small> : null}
-                {locked ? <Icon name="lock" size={12}/> : pending ? <Icon name="clock" size={12}/> : active ? <Icon name="check" size={12}/> : testStage ? <Icon name="arrow" size={12}/> : null}
+                {locked ? <Icon name="lock" size={12}/> : active ? <Icon name="check" size={12}/> : pending ? <Icon name="clock" size={12}/> : testStage ? <Icon name="arrow" size={12}/> : null}
               </button>;
             })}
           </div>
         </article>
-      ))}</div> : <div className="progress-empty"><Icon name="search"/><h3>No chapters match these filters</h3><p>Clear the search or broaden the subject/group selection.</p></div>}
+      ))}</div></section>)}</div> : <div className="progress-empty"><Icon name="search"/><h3>No chapters match these filters</h3><p>Clear the search or broaden the subject/group selection.</p></div>}
 
     </div>
   );
