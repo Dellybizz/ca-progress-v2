@@ -98,12 +98,13 @@ test("Product Phase 3 Chapter Hub reports reflection as self-reported rather tha
   assert.doesNotMatch(hub, /mastery:|Mastery score/);
 });
 
-test("Product Phase 3 opens pending reflection in Focus without blocking a new timer", () => {
+test("Product Phase 3 opens reflection only from a completed Focus event", () => {
   const studyPage = read("components/study/study-page.tsx");
   const workspace = read("components/study/study-focus-workspace.tsx");
 
   assert.match(studyPage, /StudyFocusWorkspace/);
-  assert.match(workspace, /model\.pendingReflection/);
+  assert.match(workspace, /useState<PendingReview \| null>\(null\)/);
+  assert.match(workspace, /focusReflectionPromptEnabled/);
   assert.match(read("components/study/study-reflection.tsx"), /role="dialog"/);
   assert.match(workspace, /<StudyTimer/);
   assert.match(workspace, /<StudyReflection/);

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import type { StudyFocusRating, StudyPendingReflection } from "@/lib/study/types";
+import { saveFocusReflectionPrompt } from "@/components/preferences/focus-preferences";
 
 function minutesLabel(seconds: number) {
   const minutes = Math.max(1, Math.round(seconds / 60));
@@ -21,6 +22,13 @@ export function StudyReflection({ session, ready = true, onClose }: { session: S
   const [error, setError] = useState<string | null>(null);
   const [later, setLater] = useState(false);
   const [showDoubt, setShowDoubt] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+
+  function close() {
+    if (dontShowAgain) saveFocusReflectionPrompt(false);
+    setLater(true);
+    onClose?.();
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -46,6 +54,7 @@ export function StudyReflection({ session, ready = true, onClose }: { session: S
       });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Reflection could not be saved.");
+      if (dontShowAgain) saveFocusReflectionPrompt(false);
       onClose?.();
       router.replace("/study");
       router.refresh();
@@ -60,7 +69,7 @@ export function StudyReflection({ session, ready = true, onClose }: { session: S
   if (later) return null;
 
   return <div className="study-reflection-modal" role="dialog" aria-modal="true" aria-labelledby="study-reflection-title" data-study-session-reflection={session.sessionId}>
-    <button type="button" className="study-reflection-modal__backdrop" aria-label="Complete reflection later" onClick={() => { setLater(true); onClose?.(); }}/>
+    <button type="button" className="study-reflection-modal__backdrop" aria-label="Complete reflection later" onClick={close}/>
     <Card className="study-reflection-card">
     <div id="study-reflection-title"><CardHeader title="Quick reflection" description={`${session.intendedTaskTitle ?? session.chapterTitle ?? session.subjectTitle ?? "Focus session"} · ${minutesLabel(session.durationSeconds)}`}/></div>
     <CardBody>
@@ -75,7 +84,8 @@ export function StudyReflection({ session, ready = true, onClose }: { session: S
         {doubt.trim() && visibility === "community" ? <div className="phase6-note"><Icon name="community"/><span>CA Progress will use this session’s subject and chapter to choose the Community doubts room automatically. You do not need to reselect a category.</span></div> : null}</> : null}
         {error ? <div className="phase6-inline-error" role="alert">{error}</div> : null}
         {!ready ? <p className="study-reflection-saving" role="status">Finishing session… you can reflect while it saves.</p> : null}
-        <div className="button-row"><button type="submit" className="ui-button ui-button--primary" disabled={!ready || busy || understanding === "" || !focus}>{busy ? "Saving…" : "Save reflection"}</button><button type="button" className="ui-button ui-button--ghost" onClick={() => { setLater(true); onClose?.(); }}>Later</button></div>
+        <label className="study-reflection-opt-out"><input type="checkbox" checked={dontShowAgain} onChange={(event) => setDontShowAgain(event.target.checked)}/><span>Don’t show this again</span></label>
+        <div className="button-row"><button type="submit" className="ui-button ui-button--primary" disabled={!ready || busy || understanding === "" || !focus}>{busy ? "Saving…" : "Save reflection"}</button><button type="button" className="ui-button ui-button--ghost" onClick={close}>Later</button></div>
       </form>
     </CardBody>
   </Card></div>;

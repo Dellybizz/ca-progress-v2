@@ -83,7 +83,10 @@ test("timer mutations and reflection dismissal respond optimistically", () => {
   assert.match(reflection, />Later<\/button>/);
   assert.match(reflection, /Number\(value\) <= 100/);
   assert.match(reflection, /role="dialog"/);
+  assert.match(reflection, /Don’t show this again/);
   assert.match(workspace, /onReviewChange/);
+  assert.match(workspace, /useState<PendingReview \| null>\(null\)/);
+  assert.match(read("app\/(student)\/settings\/page.tsx"), /FocusPreferences/);
   assert.match(timer, /ready: false/);
 });
 
