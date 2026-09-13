@@ -1,11 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Badge } from "@/components/ui/badge";
 
 export type AcademicCrumb = { label: string; href?: string };
 
 export function AcademicBreadcrumbs({ items }: { items: AcademicCrumb[] }) {
-  return <nav className="academic-breadcrumbs" aria-label="Breadcrumb"><ol>{items.map((item, index) => <li key={`${item.label}-${index}`}>
+  const params = useSearchParams();
+  const via = params.get("via");
+  let trail = items;
+  if (via === "study" && !items.some((item) => item.label === "Study")) trail = [{ label: "Dashboard", href: "/dashboard" }, { label: "Study", href: "/study" }, ...items.filter((item) => item.label !== "Dashboard")];
+  if (via === "subject" && items[1]) trail = [{ label: "Dashboard", href: "/dashboard" }, { label: "Syllabus", href: "/syllabus" }, ...items.slice(1)];
+  return <nav className="academic-breadcrumbs" aria-label="Breadcrumb"><ol>{trail.map((item, index) => <li key={`${item.label}-${index}`}>
     {index ? <Icon name="chevron" size={12}/> : null}
     {item.href ? <Link href={item.href}>{item.label}</Link> : <span aria-current="page">{item.label}</span>}
   </li>)}</ol></nav>;

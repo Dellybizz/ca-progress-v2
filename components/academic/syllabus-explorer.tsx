@@ -270,6 +270,7 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
               <article key={subject.id} className="academic-subject-row">
                 <div className="academic-subject-row__index">{String(subjectIndex + 1).padStart(2, "0")}</div>
                 <div className="academic-subject-row__body">
+                  <div className="academic-subject-row__summary">
                   <div className="academic-subject-card__top">
                     <span className="academic-paper-mark">
                       {subject.paperLabel}
@@ -299,6 +300,11 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
                         : "chapters"}{" "}
                       · {subject.version.title}
                     </p>
+                  </div>
+                  <div className="academic-subject-card__footer">
+                    <a href={subject.version.sourceUrl} target="_blank" rel="noreferrer">Official ICAI source <Icon name="arrow" size={14} /></a>
+                    <Link href={`/subjects/${subject.slug}?${new URLSearchParams({ ...(catalog.selectedAttempt ? { attempt: catalog.selectedAttempt } : {}), via: "syllabus" }).toString()}`}>Open subject <Icon name="arrow" size={14} /></Link>
+                  </div>
                   </div>
                   <div className="academic-chapter-tree">
                     {subject.chapters.map((chapter) => (
@@ -334,20 +340,6 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
                         )}
                       </details>
                     ))}
-                  </div>
-                  <div className="academic-subject-card__footer">
-                    <a
-                      href={subject.version.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Official ICAI source <Icon name="arrow" size={14} />
-                    </a>
-                    <Link
-                      href={`/subjects/${subject.slug}${catalog.selectedAttempt ? `?attempt=${encodeURIComponent(catalog.selectedAttempt)}` : ""}`}
-                    >
-                      Open subject <Icon name="arrow" size={14} />
-                    </Link>
                   </div>
                 </div>
               </article>

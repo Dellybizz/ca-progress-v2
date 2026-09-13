@@ -31,7 +31,7 @@ export function SubjectDetail({ subject, context }: { subject: AcademicSubject; 
         <div className="academic-chapter-row__number"><span>{chapter.number}</span></div>
         <div className="academic-chapter-row__content"><div className="academic-chapter-row__heading"><div><h3>{chapter.title}</h3>{chapter.sectionKey ? <small>{sectionLabel(chapter.sectionKey)}</small> : null}</div><Badge tone={chapter.kind === "special_unit" ? "warning" : "neutral"}>{chapter.kind === "special_unit" ? "Special unit" : "Chapter"}</Badge></div>
         {chapter.topics.length ? <div className="academic-topic-chips">{chapter.topics.map((topic) => <span key={topic.id} data-academic-topic-id={topic.id}><b>{topic.unitNumber ?? "Unit"}</b>{topic.title}{topic.kind === "accounting_standard" ? <i>AS</i> : null}</span>)}</div> : <p className="academic-chapter-row__empty">No separately indexed units for this chapter.</p>}</div>
-        <div className="academic-chapter-row__future"><span>Workspace</span><Link href={`/chapters/${chapter.id}`}>Open Chapter Hub <Icon name="arrow" size={13}/></Link><small>Canonical ID</small></div>
+        <div className="academic-chapter-row__future"><span>Workspace</span><Link href={`/chapters/${chapter.id}?via=subject`}>Open Chapter Hub <Icon name="arrow" size={13}/></Link><small>Canonical ID</small></div>
       </article>)}</div> : <EmptyState icon="book" title="No chapter structure is published" description="The subject exists, but this version does not yet contain verified chapter metadata."/>}
     </section>
   </div>;

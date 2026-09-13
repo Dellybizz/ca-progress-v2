@@ -49,7 +49,7 @@ export function StudyPage({ model, initialSubjectId = null, initialChapterId = n
           <h1>{model.timer ? "Focus session" : "Study"}</h1>
           <p>{model.levelName} · {model.groupLabel} · {formatAttempt(model.attemptKey)}</p>
         </div>
-        <Link href="/syllabus" className="academic-index-link">Browse course structure <Icon name="arrow" size={14}/></Link>
+        <Link href="/syllabus?via=study" className="academic-index-link">Browse course structure <Icon name="arrow" size={14}/></Link>
       </header>
 
       {!model.timer ? <section className="study-course-index" aria-label="Your academic index">
@@ -66,7 +66,7 @@ export function StudyPage({ model, initialSubjectId = null, initialChapterId = n
             </Link>;
           })}
         </div>
-        {model.subjects.length > 4 ? <Link href="/syllabus" className="study-course-index__all">View all {model.subjects.length} subjects</Link> : null}
+        {model.subjects.length > 4 ? <Link href="/syllabus?via=study" className="study-course-index__all">View all {model.subjects.length} subjects</Link> : null}
       </section> : null}
 
       {model.pendingReflection ? <StudyReflection session={model.pendingReflection}/> : null}

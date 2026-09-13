@@ -127,8 +127,17 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
   );
 
   return (
-    <div className="phase6-study-grid study-session-grid study-session-grid--idle">
-      <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card">
+    <div className="phase6-study-grid study-session-grid study-session-grid--idle study-timer-workspace">
+      <section className="study-timer-preview" aria-label="Timer preview">
+        <span className="study-timer-preview__mode"><Icon name={mode === "pomodoro" ? "timer" : "clock"} size={15}/>{mode === "pomodoro" ? "Pomodoro" : "Stopwatch"}</span>
+        <div className="study-timer-dial" style={{ "--timer-progress": mode === "pomodoro" ? `${Math.min(100, Math.max(8, focusMinutes / 0.6))}%` : "18%" } as React.CSSProperties}>
+          <span><Icon name="book" size={22}/></span>
+          <strong>{mode === "pomodoro" ? `${String(focusMinutes).padStart(2, "0")}:00` : "00:00"}</strong>
+          <small>{selectedSubject?.chapters.find((chapter) => chapter.id === chapterId)?.title ?? selectedSubject?.title ?? "Choose your study focus"}</small>
+        </div>
+        <p>{mode === "pomodoro" ? `${focusMinutes} min focus · ${breakMinutes} min break` : "Open-ended focused study"}</p>
+      </section>
+      <Card className="phase6-focus-card phase6-focus-card--setup study-builder-card study-control-panel">
         <CardHeader title="Start a focus session"/>
         <CardBody><form className="phase6-form study-builder" onSubmit={start}>
           <section className="study-builder-section">

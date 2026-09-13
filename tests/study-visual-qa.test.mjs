@@ -55,3 +55,25 @@ test("A1.2 unifies Study actions and the structural Syllabus index", () => {
   assert.doesNotMatch(syllabus, /academic-hero/);
   assert.match(css, /@media\(max-width:620px\)/);
 });
+
+test("Study timer uses the requested focused dial and control-panel composition", () => {
+  const timer = read("components/study/study-timer.tsx");
+  const css = read("app/styles/academic-index-a12.css");
+  assert.match(timer, /study-timer-workspace/);
+  assert.match(timer, /study-timer-preview/);
+  assert.match(timer, /study-timer-dial/);
+  assert.match(timer, /study-control-panel/);
+  assert.match(css, /grid-template-areas:"preview controls" "preview rail"/);
+  assert.match(css, /conic-gradient/);
+});
+
+test("academic breadcrumbs preserve the route a student used", () => {
+  const navigation = read("components/academic/academic-navigation.tsx");
+  const study = read("components/study/study-page.tsx");
+  const subject = read("components/academic/subject-detail.tsx");
+  assert.match(navigation, /useSearchParams/);
+  assert.match(navigation, /via === "study"/);
+  assert.match(navigation, /via === "subject"/);
+  assert.match(study, /syllabus\?via=study/);
+  assert.match(subject, /chapters\/\$\{chapter\.id\}\?via=subject/);
+});
