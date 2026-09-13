@@ -115,6 +115,7 @@ export function ProgressTracker({
     return !q || `${chapter.number} ${chapter.title} ${chapter.subjectTitle}`.toLocaleLowerCase().includes(q);
   }), [chapters, group, query, subject]);
   const totals = useMemo(() => summary(chapters), [chapters]);
+  const lockedSummary = subjectLocked ? model.analytics.subjects[0] : null;
 
   async function mutate(chapter: ProgressChapter, stage: ProgressStage) {
     if (isTestStage(stage)) {
@@ -170,13 +171,9 @@ export function ProgressTracker({
 
   return (
     <div className="progress-workspace">
-      <section className="progress-summary-grid" aria-label="Progress analytics summary">
-        <div><span>Overall</span><strong>{totals.overall}%</strong><small>from recorded milestones</small></div>
-        <div><span>Completed</span><strong>{totals.completion}%</strong><small>{totals.completed}/{chapters.length} chapters</small></div>
-        <div><span>Revisions</span><strong>{totals.revisions}%</strong><small>1R + 2R</small></div>
-        <div><span>Tests</span><strong>{totals.tests}%</strong><small>saved T1 + T2 milestones</small></div>
-      </section>
+      {subjectLocked ? <section className="progress-subject-status" aria-label="Subject progress summary"><div><span>Coverage</span><strong>{totals.completed}/{chapters.length}</strong><small>chapters completed</small></div><div><span>Revision</span><strong>{lockedSummary?.revisionPercent ?? totals.revisions}%</strong><small>checkpoints recorded</small></div><div><span>Tests</span><strong>{lockedSummary?.testPercent ?? totals.tests}%</strong><small>checkpoints recorded</small></div></section> : <section className="progress-portfolio" aria-label="Subject comparison"><div className="progress-portfolio__heading"><div><span className="eyebrow">Subject comparison</span><h2>Your portfolio at a glance</h2></div><small>{model.analytics.subjects.length} applicable subjects</small></div><div className="progress-portfolio__list">{model.analytics.subjects.map((item) => <Link key={item.id} href={`/subjects/${item.slug}/progress`}><span><strong>{item.title}</strong><small>{item.groupName} · {item.completedCount}/{item.chapterCount} chapters complete</small></span><div className="progress-portfolio__meter"><i style={{width:`${item.overallPercent}%`}}/></div><b>{item.overallPercent}%</b><Icon name="chevron" size={15}/></Link>)}</div></section>}
 
+      <details className="progress-mobile-filters"><summary><Icon name="settings" size={16}/> Filter chapters <Badge>{filtered.length}</Badge></summary><div><label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Chapter or subject" /></label>{!subjectLocked ? <label><span>Subject</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="all">All subjects</option>{subjects.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}{groups.length > 1 ? <label><span>Group</span><select value={group} onChange={(event) => setGroup(event.target.value)}><option value="all">All groups</option>{groups.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label> : null}</div></details>
       <section className="progress-toolbar" aria-label="Progress filters">
         <label className="progress-search"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chapters or subjects" /></label>
         {!subjectLocked ? <label><span>Subject</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="all">All subjects</option>{subjects.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
