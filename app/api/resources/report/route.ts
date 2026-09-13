@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { reportHotResource } from "@/lib/data/d1/hot-screens";
 import { cleanText } from "@/lib/resources/validation";
 
 const reasons = new Set(["spam", "misleading", "copyright", "unsafe", "other"]);
@@ -18,8 +18,11 @@ export async function POST(request: Request) {
   const reason = typeof body.reason === "string" && reasons.has(body.reason) ? body.reason : null;
   const details = cleanText(body.details, 4000) || null;
   if (!entityType || !/^[0-9a-f-]{36}$/i.test(entityId) || !reason) return NextResponse.json({ error: "Invalid report request." }, { status: 400 });
-  const supabase = await createServerSupabaseClient();
-  const response = await supabase.rpc("phase7_report_resource", { p_entity_type: entityType, p_entity_id: entityId, p_reason: reason, p_details: details });
-  if (response.error) return NextResponse.json({ error: response.error.message }, { status: 400 });
-  return NextResponse.json({ id: response.data, status: "reported" }, { status: 201 });
+  try {
+    const result = await reportHotResource({ entityType, entityId, userId: identity.id, reason, details });
+    return NextResponse.json(result, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Resource could not be reported." }, { status: 400 });
+  }
+
 }

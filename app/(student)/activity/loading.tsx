@@ -1,1 +1,11 @@
-export default function Loading() { return <div className="phase6-loading" aria-label="Loading activity"><div className="phase6-loading__hero"/><div className="phase6-loading__row"/><div className="phase6-loading__card"/></div>; }
+import { Card, CardBody } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+
+export default function Loading() {
+  return <div className="phase6-page" aria-busy="true">
+    <PageHeader preview={false} eyebrow="Activity" title="Your study and progress history." description="Your timeline is loading." />
+    <Card><CardBody><div className="phase6-activity-list phase6-activity-list--loading">
+      <div className="phase6-activity-skeleton" /><div className="phase6-activity-skeleton" /><div className="phase6-activity-skeleton" /><div className="phase6-activity-skeleton" />
+    </div></CardBody></Card>
+  </div>;
+}

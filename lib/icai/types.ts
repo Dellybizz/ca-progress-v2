@@ -130,13 +130,34 @@ export type IcaiPublicCatalog = {
   resources: IcaiResourceCard[];
   events: IcaiExamEventCard[];
   levels: { code: string; name: string }[];
-  attempts: { id: string; key: string; label: string; levelCode: string }[];
+  attempts: { id: string; key: string; label: string; levelCode: string; startDate: string | null; endDate: string | null; sourceUrl: string }[];
   subjects: { id: string; title: string; levelCode: string }[];
   filters: IcaiNormalizedFilters;
   verifiedAt: string | null;
 };
 
 export type IcaiAdminDashboard = {
+  runtime: {
+    runId: string;
+    stage: string;
+    currentSourceId: string | null;
+    currentItemUrl: string | null;
+    stageStartedAt: string;
+    heartbeatAt: string;
+    cancelRequested: boolean;
+    skipSourceRequested: boolean;
+    stale: boolean;
+  } | null;
+  activeJob: {
+    id: string;
+    status: string;
+    attempts: number;
+    maxAttempts: number;
+    createdAt: string;
+    startedAt: string | null;
+    finishedAt: string | null;
+    lastError: string | null;
+  } | null;
   latestRun: {
     id: string;
     status: string;
@@ -144,6 +165,7 @@ export type IcaiAdminDashboard = {
     startedAt: string;
     completedAt: string | null;
     sourceTotal: number;
+    sourceProcessed: number;
     sourceSucceeded: number;
     sourceFailed: number;
     newItems: number;
@@ -153,6 +175,53 @@ export type IcaiAdminDashboard = {
     pendingReviews: number;
     errorSummary: string | null;
   } | null;
+  recentRuns: {
+    id: string;
+    status: string;
+    triggerType: string;
+    startedAt: string;
+    completedAt: string | null;
+    sourceTotal: number;
+    sourceProcessed: number;
+    sourceSucceeded: number;
+    sourceFailed: number;
+    newItems: number;
+    changedItems: number;
+    unchangedItems: number;
+    removedItems: number;
+    pendingReviews: number;
+    errorSummary: string | null;
+  }[];
+  sourceResults: {
+    sourceId: string;
+    sourceName: string;
+    state: "fetched" | "failed" | "pending" | "not_run";
+    httpStatus: number | null;
+    parsedItemCount: number | null;
+    changed: boolean | null;
+    fetchedAt: string | null;
+    error: string | null;
+  }[];
+  sourceMetrics: {
+    sourceId: string;
+    status: string;
+    pagesChecked: number;
+    pdfsResolved: number;
+    unavailablePages: number;
+    skippedPages: number;
+    attempts: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+  }[];
+  operationalMetrics: {
+    pagesChecked: number;
+    pdfsResolved: number;
+    unavailablePages: number;
+    skippedPages: number;
+    affectedRows: number;
+    reviewsCreated: number;
+    reviewsSuppressed: number;
+  };
   sources: {
     id: string;
     name: string;
@@ -167,7 +236,10 @@ export type IcaiAdminDashboard = {
     trustLevel: string;
     authoritativeListing: boolean;
     isActive: boolean;
+    excludedUntil: string | null;
   }[];
+  itemDiagnostics: { id: string; runId: string; sourceId: string; itemUrl: string; itemType: string; itemTitle: string | null; status: string; stage: string; attempts: number; startedAt: string | null; completedAt: string | null; durationMs: number | null; bytesFetched: number; parsedCount: number; failureCategory: string | null; failureMessage: string | null; skipReason: string | null; retryEligible: boolean }[];
+  skippedItems: { id: string; sourceId: string; itemUrl: string; scope: string; skippedUntil: string | null }[];
   reviews: {
     id: string;
     title: string;
@@ -177,6 +249,7 @@ export type IcaiAdminDashboard = {
     confidence: number;
     sourceName: string;
     sourceUrl: string;
+    proposedPatch: Record<string, unknown>;
     createdAt: string;
   }[];
   recentChanges: {

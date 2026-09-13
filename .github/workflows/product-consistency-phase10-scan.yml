@@ -1,0 +1,23 @@
+name: Phase 10 Consistency Scan
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: product-consistency-phase10-scan
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    steps:
+      - name: Run bounded production consistency scan
+        env:
+          CONSISTENCY_CRON_SECRET: ${{ secrets.ICAI_CRON_SECRET }}
+        run: |
+          test -n "$CONSISTENCY_CRON_SECRET"
+          curl --fail-with-body --max-time 120 -X POST \
+            -H "Authorization: Bearer $CONSISTENCY_CRON_SECRET" \
+            https://ca-progress-v2.habeebaasif622.workers.dev/api/cron/consistency-scan

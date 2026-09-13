@@ -1,26 +1,23 @@
 import "server-only";
 
-import { getPublicRuntimeConfig, getSupabasePublicConfig } from "@/lib/env";
+import { getPublicRuntimeConfig } from "@/lib/env";
+import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { logEvent } from "@/lib/logging/logger";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getServerRuntimeValue } from "@/lib/cloudflare/runtime-env";
 
 export type DatabaseHealth = "ok" | "degraded" | "not_configured";
 
 export async function getHealthSnapshot(correlationId: string) {
   const runtime = getPublicRuntimeConfig();
-  const supabaseConfig = getSupabasePublicConfig();
+  const startedAt = performance.now();
   let database: DatabaseHealth = "not_configured";
 
-  if (supabaseConfig.configured) {
-    try {
-      const supabase = await createServerSupabaseClient();
-      const { error } = await supabase.from("app_settings").select("key").limit(1);
-      database = error ? "degraded" : "ok";
-      if (error) logEvent("warn", "health.database.degraded", { correlationId, code: error.code });
-    } catch (error) {
-      database = "degraded";
-      logEvent("error", "health.database.exception", { correlationId, error: error instanceof Error ? error.message : "unknown" });
-    }
+  try {
+    await getD1RuntimeDatabase().prepare("SELECT key FROM app_settings LIMIT 1").first();
+    database = "ok";
+  } catch (error) {
+    database = "degraded";
+    logEvent("error", "health.database.exception", { correlationId, error: error instanceof Error ? error.message : "unknown" });
   }
 
   const status = database === "degraded" ? "degraded" : "ok";
@@ -31,7 +28,8 @@ export async function getHealthSnapshot(correlationId: string) {
     version: runtime.appVersion,
     timestamp: new Date().toISOString(),
     correlationId,
-    checks: { database },
+    checks: { database, billingBinding: getServerRuntimeValue("BILLING_SERVICE") ? "configured" : "optional", icaiBinding: getServerRuntimeValue("ICAI_SYNC_SERVICE") ? "configured" : "optional" },
+    latencyMs: Math.round((performance.now() - startedAt) * 100) / 100,
   } as const;
 
   logEvent(status === "ok" ? "info" : "warn", "health.request", snapshot);

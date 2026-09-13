@@ -1,0 +1,391 @@
+/* Today Plan: make the study order obvious before the planning engine details. */
+.today-plan-page {
+  max-width: 1220px;
+  gap: 14px;
+  padding-top: 18px;
+}
+
+.today-plan-page .ui-page-header {
+  gap: 7px;
+}
+
+.today-plan-page .ui-page-header h1 {
+  font-size: clamp(30px, 2.4vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+
+.today-plan-page .ui-page-header p {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.today-plan-layout {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+}
+
+.today-plan-layout .phase9-today-main,
+.today-plan-side {
+  gap: 10px;
+}
+
+.today-plan-metrics {
+  gap: 8px;
+}
+
+.today-plan-metrics .ui-card {
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.today-plan-metrics .ui-card__body {
+  min-height: 72px;
+  gap: 10px;
+  padding: 11px 13px;
+}
+
+.today-plan-metrics svg {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 8px;
+  border-radius: 9px;
+  background: var(--color-brand-soft);
+}
+
+.today-plan-metrics .ui-card__body > div {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  justify-content: start;
+  gap: 1px 6px;
+}
+
+.today-plan-metrics span {
+  grid-column: 1 / -1;
+  color: var(--color-text-soft);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.today-plan-metrics strong {
+  font-size: 21px;
+  line-height: 1;
+}
+
+.today-plan-metrics small {
+  color: var(--color-text-faint);
+  font-size: 8px;
+}
+
+.today-plan-list-card,
+.today-plan-side .ui-card {
+  border-radius: 13px;
+  box-shadow: none;
+}
+
+.today-plan-list-card > .ui-card__header,
+.today-plan-side .ui-card__header {
+  padding: 13px 14px 6px;
+}
+
+.today-plan-list-card > .ui-card__header h2,
+.today-plan-side .ui-card__header h2 {
+  font-size: 14px;
+}
+
+.today-plan-list-card > .ui-card__body {
+  padding: 4px 14px 12px;
+}
+
+.today-plan-refresh {
+  min-height: 32px;
+  padding-inline: 10px;
+  border-radius: 9px;
+  font-size: 10px;
+}
+
+.today-plan-timeline .phase9-plan-item {
+  grid-template-columns: 32px minmax(0, 1fr);
+  padding-bottom: 9px;
+}
+
+.today-plan-timeline .phase9-plan-item:not(:last-child)::before {
+  left: 15px;
+  top: 30px;
+  bottom: -1px;
+  width: 1px;
+}
+
+.today-plan-timeline .phase9-timeline-marker {
+  padding-top: 2px;
+}
+
+.today-plan-timeline .phase9-timeline-marker span {
+  width: 30px;
+  height: 30px;
+  font-size: 10px;
+}
+
+.today-plan-item {
+  margin-left: 7px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  background: var(--color-surface);
+}
+
+.today-plan-item .phase9-plan-heading {
+  gap: 10px;
+}
+
+.today-plan-item .phase9-kind {
+  font-size: 8px;
+  letter-spacing: .06em;
+}
+
+.today-plan-item .phase9-plan-heading h3 {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.today-plan-item .phase9-plan-heading > strong {
+  padding: 5px 7px;
+  font-size: 10px;
+}
+
+.today-plan-item-meta {
+  gap: 4px;
+  margin-top: 5px;
+  font-size: 9px;
+}
+
+.today-plan-chip-row {
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.today-plan-chip-row .phase9-priority,
+.today-plan-chip-row .phase9-reason-chip,
+.today-plan-chip-row .phase9-manual-chip {
+  padding: 4px 7px;
+  font-size: 8.5px;
+}
+
+.today-plan-item .phase9-manual-note {
+  margin-top: 7px;
+  padding: 6px 8px;
+  font-size: 9px;
+}
+
+.today-plan-actions {
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.today-plan-actions > button,
+.today-plan-actions .phase9-date-action button {
+  min-height: 30px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 9.5px;
+}
+
+.today-plan-actions .phase9-date-action input {
+  width: 118px;
+  min-height: 30px;
+  padding: 4px 6px;
+  font-size: 9.5px;
+}
+
+.today-plan-side {
+  position: sticky;
+  top: calc(var(--topbar-height) + 12px);
+}
+
+.today-plan-side .ui-card__body {
+  padding: 8px 14px 14px;
+}
+
+.today-plan-side .ui-card__header p {
+  margin-top: 3px;
+  font-size: 9px;
+}
+
+.today-plan-forecast-card .phase9-forecast-status strong {
+  font-size: 15px;
+}
+
+.today-plan-forecast-card .phase9-forecast-status span {
+  font-size: 9px;
+}
+
+.today-plan-forecast-card .phase9-progress-track {
+  height: 6px;
+  margin: 9px 0 10px;
+}
+
+.today-plan-forecast-card .phase9-forecast-grid {
+  gap: 6px;
+  margin: 9px 0;
+}
+
+.today-plan-forecast-card .phase9-forecast-grid div {
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+
+.today-plan-forecast-card .phase9-forecast-grid dt {
+  font-size: 8px;
+}
+
+.today-plan-forecast-card .phase9-forecast-grid dd {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.today-plan-forecast-card .phase9-estimate-note {
+  margin: 8px 0 10px;
+  font-size: 9px;
+}
+
+.today-plan-forecast-card .ui-text-link {
+  font-size: 10px;
+}
+
+.today-plan-weak-list {
+  gap: 6px;
+}
+
+.today-plan-weak-list > div {
+  padding: 8px 9px;
+  border-radius: 9px;
+  background: var(--color-surface-muted);
+}
+
+.today-plan-weak-list strong {
+  font-size: 10px;
+}
+
+.today-plan-weak-list span {
+  font-size: 9px;
+}
+
+.today-plan-side-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.today-plan-side-links a {
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  font-size: 9px;
+}
+
+@media (max-width: 1050px) {
+  .today-plan-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .today-plan-side {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .today-plan-side-links {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .today-plan-page {
+    gap: 12px;
+    padding-top: 14px;
+  }
+
+  .today-plan-page .ui-page-header h1 {
+    font-size: 28px;
+  }
+
+  .today-plan-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px;
+  }
+
+  .today-plan-metrics > *:last-child {
+    grid-column: auto !important;
+  }
+
+  .today-plan-metrics .ui-card__body {
+    min-height: 76px;
+    display: grid;
+    justify-items: start;
+    gap: 5px;
+    padding: 9px;
+  }
+
+  .today-plan-metrics svg {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    padding: 7px;
+  }
+
+  .today-plan-metrics .ui-card__body > div {
+    display: block;
+  }
+
+  .today-plan-metrics span,
+  .today-plan-metrics strong,
+  .today-plan-metrics small {
+    display: block;
+  }
+
+  .today-plan-metrics strong {
+    margin-top: 3px;
+    font-size: 18px;
+  }
+
+  .today-plan-metrics small {
+    margin-top: 2px;
+  }
+
+  .today-plan-side {
+    grid-template-columns: 1fr;
+  }
+
+  .today-plan-side-links {
+    grid-column: auto;
+  }
+
+  .today-plan-item {
+    padding: 10px;
+  }
+
+  .today-plan-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .today-plan-actions > button,
+  .today-plan-actions .phase9-date-action {
+    width: 100%;
+  }
+
+  .today-plan-actions .phase9-date-action {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .today-plan-actions .phase9-date-action input {
+    width: 100%;
+    min-width: 0;
+  }
+}

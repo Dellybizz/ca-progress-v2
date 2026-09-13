@@ -1,73 +1,220 @@
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon } from "@/components/ui/icon";
+import { SyncLiveRefresh } from "./sync-live-refresh";
 import type { AppRole } from "@/lib/authorization/roles";
 import type { IcaiAdminDashboard } from "@/lib/icai/types";
-import { decideIcaiReviewAction, runIcaiSyncAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { excludeIcaiDiagnosticItemAction, excludeIcaiSourceAction, restoreIcaiItemAction, restoreIcaiSourceAction, retryIcaiItemsAction, runIcaiSyncAction, runTargetedIcaiSyncAction } from "@/app/(admin)/admin/icai-sync/actions";
+import { CopyFailureButton } from "./copy-failure-button";
 
 function time(value: string | null) {
-  if (!value) return "Never";
+  if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Unknown";
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" }).format(date);
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  }).format(date);
 }
 
-function shortHash(value: string | null) {
-  return value ? `${value.slice(0, 10)}…` : "No snapshot yet";
+function duration(start: string, end: string | null) {
+  const ms = (end ? new Date(end) : new Date()).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const seconds = Math.round(ms / 1000);
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-export function IcaiAdminSyncMonitor({ dashboard, role, notice, error }: { dashboard: IcaiAdminDashboard; role: AppRole; notice?: string | null; error?: string | null }) {
+function averageLatency(start: string | null, end: string | null, pages: number) {
+  if (!start || !end || pages < 1) return "—";
+  const milliseconds = new Date(end).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
+  const average = milliseconds / pages;
+  return average < 1_000 ? `${Math.round(average)}ms` : `${(average / 1_000).toFixed(1)}s`;
+}
+
+function tone(status: string): "success" | "warning" | "danger" | "info" | "neutral" {
+  if (["success", "completed", "succeeded", "fetched"].includes(status)) return "success";
+  if (["failed", "dead_letter"].includes(status)) return "danger";
+  if (["running", "queued", "pending"].includes(status)) return "info";
+  return status === "partial" ? "warning" : "neutral";
+}
+
+const liveLabels = {
+  live: "Live worker state",
+  skip: "Skip current source",
+  cancel: "Cancel run",
+  recover: "Recover stalled run",
+};
+
+export function IcaiAdminSyncMonitor({
+  dashboard,
+  role,
+  notice,
+  error,
+}: {
+  dashboard: IcaiAdminDashboard;
+  role: AppRole;
+  notice?: string | null;
+  error?: string | null;
+}) {
   const run = dashboard.latestRun;
+  const active = Boolean(dashboard.activeJob || run?.status === "running");
+  const metrics = dashboard.operationalMetrics;
+  const sourceMetrics = new Map(dashboard.sourceMetrics.map((item) => [item.sourceId, item]));
+  const lastSuccessfulRun = dashboard.recentRuns.find((item) => item.status === "success" || item.status === "completed") ?? null;
+
   return (
     <div className="icai-page icai-admin-page">
       <section className="icai-hero">
-        <div><Badge tone="warning">Admin · Phase 8</Badge><h1>ICAI Sync Monitor</h1><p>Monitor official-source health, review high-impact exam-date changes and run the verification engine manually when needed.</p></div>
-        <form action={runIcaiSyncAction}><button type="submit" className="ui-button ui-button--primary ui-button--lg"><span>Run Sync now</span></button></form>
+        <div>
+          <Badge tone="warning">Admin · ICAI Sync</Badge>
+          <h1>ICAI sync operations</h1>
+          <p>Monitor official-source synchronization, recover failed sources, and keep content review separate from runtime operations.</p>
+          <div className="icai-source-flags">
+            <Badge tone="neutral">{role.replaceAll("_", " ")}</Badge>
+            <Badge tone="info">1. Sync & progress</Badge>
+            <Link className="ui-button ui-button--secondary ui-button--sm" href="/admin/icai-sync/data">2. Synced data & review</Link>
+          </div>
+        </div>
+        <form action={runIcaiSyncAction}>
+          <button type="submit" disabled={active} className="ui-button ui-button--primary ui-button--lg">
+            {active ? "Sync in progress" : "Run Sync now"}
+          </button>
+        </form>
       </section>
 
       {notice ? <div className="auth-status auth-status--success" role="status">{notice}</div> : null}
       {error ? <div className="auth-status auth-status--danger" role="alert">{error}</div> : null}
 
       <section className="icai-admin-summary">
-        <div><span>Operator role</span><strong>{role.replaceAll("_", " ")}</strong></div>
-        <div><span>Schedule</span><strong>Daily · 06:00 IST</strong></div>
-        <div><span>Last run</span><strong>{run ? time(run.startedAt) : "No run yet"}</strong></div>
-        <div><span>Run status</span><strong>{run?.status ?? "Awaiting first run"}</strong></div>
+        <div><span>Status</span><strong>{active ? "sync active" : run?.status ?? "ready"}</strong></div>
+        <div><span>Last success</span><strong>{lastSuccessfulRun?.completedAt ? time(lastSuccessfulRun.completedAt) : "—"}</strong></div>
+        <div><span>Sources</span><strong>{dashboard.sources.filter((source) => source.isActive).length} active</strong></div>
+        <div><span>Review queue</span><strong>{dashboard.reviews.length} pending</strong></div>
       </section>
 
-      {run ? (
+      <SyncLiveRefresh
+        active={active}
+        runId={run?.status === "running" && !dashboard.activeJob ? run.id : null}
+        labels={liveLabels}
+      />
+
+      {!active && run ? (
         <section className="icai-section">
-          <div className="icai-section-heading"><div><span className="eyebrow">Latest run</span><h2>Verification results</h2></div><Badge tone={run.status === "success" ? "success" : run.status === "partial" ? "warning" : "danger"}>{run.status}</Badge></div>
-          <div className="icai-run-stats"><div><span>Sources</span><strong>{run.sourceSucceeded}/{run.sourceTotal}</strong></div><div><span>New</span><strong>{run.newItems}</strong></div><div><span>Changed</span><strong>{run.changedItems}</strong></div><div><span>Unchanged</span><strong>{run.unchangedItems}</strong></div><div><span>Removed links</span><strong>{run.removedItems}</strong></div><div><span>Review queue</span><strong>{run.pendingReviews}</strong></div></div>
-          {run.errorSummary ? <div className="icai-run-error"><Icon name="shield"/><span><strong>Run errors</strong><small>{run.errorSummary}</small></span></div> : null}
+          <div className="icai-section-heading">
+            <div>
+              <span className="eyebrow">Latest completed run</span>
+              <h2>Sync result</h2>
+              <p className="icai-muted">Started {time(run.startedAt)} · {run.completedAt ? `finished ${time(run.completedAt)} in ${duration(run.startedAt, run.completedAt)}` : `last observed after ${duration(run.startedAt, null)}`}</p>
+            </div>
+            <Badge tone={tone(run.status)}>{run.status}</Badge>
+          </div>
+
+          <div className="icai-run-stats icai-run-stats--compact">
+            <div><span>Sources</span><strong>{run.sourceProcessed}/{run.sourceTotal}</strong></div>
+            <div><span>Pages checked</span><strong>{metrics.pagesChecked}</strong></div>
+            <div><span>PDFs resolved</span><strong>{metrics.pdfsResolved}</strong></div>
+            <div><span>New</span><strong>{run.newItems}</strong></div>
+            <div><span>Changed</span><strong>{run.changedItems}</strong></div>
+            <div><span>Unchanged</span><strong>{run.unchangedItems}</strong></div>
+          </div>
+
+          <details className="icai-disclosure">
+            <summary>Performance and write details</summary>
+            <div className="icai-run-stats">
+              <div><span>Unavailable pages</span><strong>{metrics.unavailablePages}</strong></div>
+              <div><span>Skipped pages</span><strong>{metrics.skippedPages}</strong></div>
+              <div><span>Affected rows</span><strong>{metrics.affectedRows}</strong></div>
+              <div><span>Reviews created</span><strong>{metrics.reviewsCreated}</strong></div>
+              <div><span>Reviews suppressed</span><strong>{metrics.reviewsSuppressed}</strong></div>
+              <div><span>Total duration</span><strong>{duration(run.startedAt, run.completedAt)}</strong></div>
+            </div>
+            <p className="icai-muted">D1 request counts are not shown because they are not currently persisted; affected rows is the reliable stored database metric.</p>
+          </details>
+
+          <div className="icai-result-list">
+            {dashboard.sourceResults.map((result) => {
+              const sourceMetric = sourceMetrics.get(result.sourceId);
+              return <article key={result.sourceId}>
+                <span>
+                  <i className={`is-${result.state}`} />
+                  <span>
+                    <strong>{result.sourceName}</strong>
+                    <small>{result.error ?? (result.fetchedAt ? `Fetched ${time(result.fetchedAt)}` : "Not fetched in this run")}</small>
+                    {sourceMetric ? <small>{sourceMetric.pagesChecked} checked · {sourceMetric.pdfsResolved} PDFs · {sourceMetric.unavailablePages + sourceMetric.skippedPages} unavailable/skipped</small> : null}
+                  </span>
+                </span>
+                <span>
+                  <Badge tone={tone(result.state)}>{result.state.replaceAll("_", " ")}</Badge>
+                  <small>{sourceMetric?.startedAt ? `${duration(sourceMetric.startedAt, sourceMetric.finishedAt)} · avg ${averageLatency(sourceMetric.startedAt, sourceMetric.finishedAt, sourceMetric.pagesChecked)}/page` : result.parsedItemCount === null ? "—" : `${result.parsedItemCount} eligible items`}</small>
+                </span>
+              </article>;
+            })}
+          </div>
+
+          {run.errorSummary ? (
+            <div className="icai-run-error">
+              <Icon name="shield" />
+              <span><strong>Run issue</strong><small>{run.errorSummary}</small></span>
+            </div>
+          ) : null}
+
+          <div className="icai-section-heading">
+            <div>
+              <h3>Next step</h3>
+              <p className="icai-muted">Open Synced data & review to see direct ICAI PDFs, exam dates and anything requiring approval.</p>
+            </div>
+            <Link className="ui-button ui-button--primary ui-button--sm" href="/admin/icai-sync/data">Review synced data</Link>
+          </div>
         </section>
-      ) : <EmptyState icon="clock" title="No synchronization run has been recorded" description="The daily Cloudflare Cron Trigger or the manual Run Sync action will create the first run."/>}
+      ) : !active ? (
+        <EmptyState icon="clock" title="No synchronization run yet" description="Run it now or wait for the configured Cloudflare schedule." />
+      ) : null}
 
-      <section className="icai-section">
-        <div className="icai-section-heading"><div><span className="eyebrow">Source registry</span><h2>Official source health</h2></div><Badge tone="neutral">{dashboard.sources.length} sources</Badge></div>
-        <div className="icai-source-table">{dashboard.sources.map((source) => (
-          <article key={source.id} className={source.failures ? "has-error" : ""}>
-            <div><span className="icai-source-health"><i/>{source.name}</span><a href={source.officialUrl} target="_blank" rel="noreferrer">{source.officialUrl}</a><div className="icai-source-flags"><Badge tone={source.trustLevel === "high_impact" ? "warning" : "neutral"}>{source.trustLevel.replaceAll("_", " ")}</Badge>{source.authoritativeListing ? <Badge tone="info">authoritative listing</Badge> : null}</div></div>
-            <dl><div><dt>Last attempt</dt><dd>{time(source.lastAttemptAt)}</dd></div><div><dt>Last success</dt><dd>{time(source.lastSuccessAt)}</dd></div><div><dt>Failures</dt><dd>{source.failures}</dd></div><div><dt>Parser</dt><dd>{source.parserVersion}</dd></div><div><dt>Content hash</dt><dd title={source.lastContentHash ?? undefined}>{shortHash(source.lastContentHash)}</dd></div></dl>
-            {source.lastError ? <p>{source.lastError}</p> : null}
-          </article>
-        ))}</div>
-      </section>
+      <details className="icai-section icai-disclosure">
+        <summary>Source & file recovery</summary>
+        <div className="icai-section-heading"><div><span className="eyebrow">Recovery controls</span><h2>Sources and files</h2><p className="icai-muted">Targeted runs preserve canonical data and are disabled while another sync owns the lock.</p></div>
+          <form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="failed_only"/><button disabled={active} className="ui-button ui-button--sm">Run failed sources</button></form>
+        </div>
+        <div className="icai-result-list">
+          {dashboard.sources.filter(source=>source.isActive).map(source=><article key={source.id}><span><span><strong>{source.name}</strong><small>{source.excludedUntil ? `Excluded until ${time(source.excludedUntil)}` : source.lastError ?? "Ready"}</small></span></span><span className="icai-runtime-actions">
+            <a className="ui-button ui-button--sm" href={source.officialUrl} target="_blank" rel="noreferrer">Open ICAI page</a>
+            {source.lastError ? <CopyFailureButton detail={source.lastError}/> : null}
+            <form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="one"/><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Run source</button></form>
+            <form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="force"/><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Force recheck</button></form>
+            {source.lastError ? <><form action={runTargetedIcaiSyncAction}><input type="hidden" name="mode" value="retry_source"/><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Retry failed source</button></form></> : null}
+            {source.excludedUntil ? <form action={restoreIcaiSourceAction}><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Restore source</button></form> : <form action={excludeIcaiSourceAction}><input type="hidden" name="sourceId" value={source.id}/><button disabled={active} className="ui-button ui-button--sm">Exclude 24h</button></form>}
+          </span></article>)}
+        </div>
+        {dashboard.latestRun && dashboard.itemDiagnostics.length ? <div className="icai-item-diagnostics">
+          <div className="icai-section-heading"><div><span className="eyebrow">Item diagnostics</span><h3>Nested-page execution</h3><p className="icai-muted">A failed page is isolated from the rest of its source. Retry rescans only affected source(s) so canonical comparison remains complete.</p></div><Badge tone="neutral">{dashboard.itemDiagnostics.length} items</Badge></div>
+          <div className="icai-runtime-actions">
+            <form action={retryIcaiItemsAction}><input type="hidden" name="runId" value={dashboard.latestRun.id}/><input type="hidden" name="mode" value="failed"/><button className="ui-button ui-button--sm">Retry failed items</button></form>
+            <form action={retryIcaiItemsAction}><input type="hidden" name="runId" value={dashboard.latestRun.id}/><input type="hidden" name="mode" value="timed_out"/><button className="ui-button ui-button--sm">Retry timed-out items</button></form>
+          </div>
+          <div className="icai-result-list">{dashboard.itemDiagnostics.map((item)=><article key={item.id}><span><i className={`is-${item.status}`}/><span><strong>{item.itemTitle ?? item.itemUrl}</strong><small>{item.status.replaceAll("_"," ")} · {item.attempts} attempt(s){item.durationMs == null ? "" : ` · ${item.durationMs}ms`}{item.failureMessage ? ` · ${item.failureMessage}` : ""}</small><a href={item.itemUrl} target="_blank" rel="noreferrer">Open ICAI page</a></span></span><div className="icai-runtime-actions">{item.retryEligible ? <form action={retryIcaiItemsAction}><input type="hidden" name="mode" value="one"/><input type="hidden" name="itemId" value={item.id}/><button className="ui-button ui-button--sm">Retry item</button></form> : null}<form action={excludeIcaiDiagnosticItemAction}><input type="hidden" name="sourceId" value={item.sourceId}/><input type="hidden" name="itemUrl" value={item.itemUrl}/><input type="hidden" name="scope" value="temporary"/><button className="ui-button ui-button--sm">Exclude 24h</button></form><form action={excludeIcaiDiagnosticItemAction}><input type="hidden" name="sourceId" value={item.sourceId}/><input type="hidden" name="itemUrl" value={item.itemUrl}/><input type="hidden" name="scope" value="permanent"/><button className="ui-button ui-button--sm">Exclude until restored</button></form></div></article>)}</div>
+        </div> : null}
+        {dashboard.skippedItems.length ? <div className="icai-result-list">{dashboard.skippedItems.map(item=><article key={item.id}><span><span><strong>{item.itemUrl}</strong><small>{item.scope}{item.skippedUntil ? ` · until ${time(item.skippedUntil)}` : ""}</small></span></span><form action={restoreIcaiItemAction}><input type="hidden" name="skipId" value={item.id}/><button className="ui-button ui-button--sm">Restore file</button></form></article>)}</div> : null}
+      </details>
 
-      <section className="icai-section">
-        <div className="icai-section-heading"><div><span className="eyebrow">High-impact verification</span><h2>Review queue</h2></div><Badge tone={dashboard.reviews.length ? "warning" : "success"}>{dashboard.reviews.length} pending</Badge></div>
-        {dashboard.reviews.length ? <div className="icai-review-list">{dashboard.reviews.map((review) => (
-          <article key={review.id}>
-            <div><Badge tone="warning">{Math.round(review.confidence * 100)}% parser confidence</Badge><h3>{review.title}</h3><p>{review.reason}</p><small>{review.sourceName} · detected {time(review.createdAt)}</small><a href={review.sourceUrl} target="_blank" rel="noreferrer">Inspect official source <Icon name="arrow" size={14}/></a></div>
-            <div className="icai-review-actions"><form action={decideIcaiReviewAction}><input type="hidden" name="reviewId" value={review.id}/><input type="hidden" name="decision" value="approved"/><button className="ui-button ui-button--primary ui-button--sm" type="submit"><span>Approve</span></button></form><form action={decideIcaiReviewAction}><input type="hidden" name="reviewId" value={review.id}/><input type="hidden" name="decision" value="rejected"/><button className="ui-button ui-button--secondary ui-button--sm" type="submit"><span>Reject</span></button></form></div>
-          </article>
-        ))}</div> : <EmptyState compact icon="check" title="No date changes need review" description="High-impact exam dates and times stay unchanged until an admin explicitly approves a detected change."/>}
-      </section>
-
-      <section className="icai-section">
-        <div className="icai-section-heading"><div><span className="eyebrow">Audit trail</span><h2>Recent detected changes</h2></div></div>
-        {dashboard.recentChanges.length ? <div className="icai-change-list">{dashboard.recentChanges.map((change) => <div key={change.id}><span><Badge tone={change.riskLevel === "high" ? "warning" : "neutral"}>{change.changeType}</Badge><strong>{change.entityType}</strong><small>{change.entityId}</small></span><span>{change.decisionStatus}<small>{time(change.detectedAt)}</small></span></div>)}</div> : <EmptyState compact icon="shield" title="No changes recorded yet" description="The audit trail begins when the first source sync detects a new, changed or removed item."/>}
-      </section>
+      <details className="icai-section icai-disclosure">
+        <summary>Recent run history</summary>
+        <div className="icai-section-heading">
+          <div><span className="eyebrow">Recent runs</span><h2>Execution history</h2></div>
+        </div>
+        <div className="icai-history">
+          {dashboard.recentRuns.map((item) => (
+            <div key={item.id}>
+              <span><Badge tone={tone(item.status)}>{item.status}</Badge><strong>{item.triggerType} sync</strong><small>{time(item.startedAt)}</small></span>
+              <span><small>{item.sourceSucceeded} succeeded · {item.sourceFailed} failed</small><strong>{duration(item.startedAt, item.completedAt)}</strong></span>
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

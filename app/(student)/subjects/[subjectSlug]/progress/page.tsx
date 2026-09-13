@@ -10,9 +10,10 @@ export async function generateMetadata({ params }: { params: Promise<{ subjectSl
   return { title: `${subjectSlug.replaceAll("-", " ")} progress | CA Progress` };
 }
 
-export default async function SubjectProgressPage({ params }: { params: Promise<{ subjectSlug: string }> }) {
+export default async function SubjectProgressPage({ params, searchParams }: { params: Promise<{ subjectSlug: string }>; searchParams: Promise<{ chapterId?: string }> }) {
   const { subjectSlug } = await params;
+  const { chapterId } = await searchParams;
   const model = await getProgressPageModel(subjectSlug);
   if (model.mode === "ready" && !model.chapters.length) notFound();
-  return <ProgressPage model={model} subjectLocked next={`/subjects/${subjectSlug}/progress`}/>;
+  return <ProgressPage model={model} subjectLocked next={`/subjects/${subjectSlug}/progress`} initialChapterId={chapterId}/>;
 }

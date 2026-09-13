@@ -1,0 +1,49 @@
+/* Final interaction polish for Today Plan controls and task timing. */
+.today-plan-header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.today-plan-completed-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: var(--color-success, #0f8a5f);
+  background: color-mix(in srgb, #16a36f 9%, var(--color-surface));
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.today-plan-completed-time svg {
+  flex: none;
+}
+
+.today-plan-actions .today-plan-start-action {
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .today-plan-header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .today-plan-header-actions .today-plan-refresh {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .today-plan-completed-time {
+    width: 100%;
+    line-height: 1.35;
+  }
+
+  .today-plan-actions .today-plan-start-action {
+    grid-column: 1 / -1;
+  }
+}

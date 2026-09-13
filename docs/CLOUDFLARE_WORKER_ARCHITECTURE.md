@@ -68,3 +68,18 @@ For local Cloudflare multi-worker testing use `npm run cf:preview:multi`.
 ## Future-phase rule
 
 Do not create a Worker for every small feature. Extract only natural heavy or security-sensitive domains. Payment/webhook processing is a likely future candidate when its assigned phase is implemented; this document does not implement or start that later-phase functionality.
+
+
+## Phase 5 direct-service cutover runbook
+
+Cloudflare hot reads use typed, bounded D1 services in `lib/data/d1/hot-screens.ts`. The current migration covers profile, Dashboard academic reference, Study analytics/timer, Community channel discovery/unread previews, Resources library/detail, Planner calendar exam events, Activity, Progress summaries, and Planner tasks/goals.
+
+The `CA_DATA_RUNTIME=cloudflare` flag selects the Cloudflare path. Removing or disabling that flag returns the application to the Supabase-shaped compatibility path for rollback. Billing verification remains behind the Billing Worker binding; OAuth identity mapping, stable application user IDs, and historical event IDs are unchanged.
+
+Operational checks before promotion:
+- run `npm run typecheck`, `npm run lint`, `npm test`, and the Cloudflare migration validation scripts;
+- run `npm run cf:smoke` against the deployed URL, with `SMOKE_AUTH_COOKIE` when authenticated synthetic coverage is available;
+- verify `/api/health`, request IDs, D1 foreign-key checks, OAuth redirects, billing boundary responses, Community pagination/reconnect, R2 authorization, Queue idempotency, and rollback evidence;
+- if smoke fails, use the existing Phase 5 deployment workflow rollback before changing bindings or deleting compatibility code.
+
+Compatibility modules must remain until a repository-wide caller scan shows zero production callers and the final smoke/rollback gate passes.

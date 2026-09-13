@@ -1,0 +1,67 @@
+/* Mobile document and fixed-navigation contract. */
+@media (max-width: 899px) {
+  html,
+  body {
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0;
+    overscroll-behavior-x: none;
+  }
+
+  html {
+    overflow-x: clip;
+    overflow-y: auto;
+  }
+
+  body {
+    position: static !important;
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .app-shell,
+  .app-main,
+  .content-wrap {
+    width: 100%;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    box-sizing: border-box;
+  }
+
+  .app-shell,
+  .app-main {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .app-main,
+  .content-wrap {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .content-wrap {
+    margin: 0 auto;
+    padding-bottom: calc(var(--bottom-nav-height) + 20px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .content-wrap > [class*="-page"],
+  .content-wrap > .student-dashboard--home,
+  .content-wrap > .student-dashboard--simple-state {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+}

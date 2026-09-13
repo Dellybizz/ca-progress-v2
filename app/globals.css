@@ -1,6 +1,6 @@
 @import "./styles/tokens.css";
-@import "./styles/shell.css";
 @import "./styles/components.css";
+
 @import "./styles/dashboard.css";
 @import "./styles/student-dashboard.css";
 @import "./styles/surfaces.css";
@@ -13,5 +13,31 @@
 @import "./styles/phase7.css";
 @import "./styles/phase9.css";
 @import "./styles/phase10.css";
+@import "./styles/product-phase7-community.css";
+@import "./styles/product-phase11-study-buddy.css";
 @import "./styles/phase11.css";
+@import "./styles/product-phase15-pricing.css";
+@import "./styles/product-phase5-tests.css";
 @import "./styles/phase11-lock.css";
+@import "./styles/dashboard-a1.css";
+@import "./styles/study-clarity.css";
+@import "./styles/study-layout-refine.css";
+@import "./styles/academic-index-a12.css";
+@import "./styles/planner-clarity.css";
+@import "./styles/planner-mobile-final.css";
+@import "./styles/mobile-scroll-fix.css";
+@import "./styles/planner-desktop-layout-fix.css";
+@import "./styles/today-plan-clarity.css";
+@import "./styles/today-plan-schedule.css";
+@import "./styles/today-plan-interactions.css";
+@import "./styles/today-plan-interaction-refine.css";
+@import "./styles/chapter-hub.css";
+
+/* Canonical application chrome loads after route-era CSS until those routes are migrated. */
+@import "./styles/shell.css";
+@import "./styles/navigation-progress.css";
+@import "./styles/product-consistency-phase11.css";
+
+.offline-workspace { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.offline-controls { padding: 16px 0; border-block: 1px solid var(--border, #e5e7eb); margin-bottom: 16px; }
+.offline-controls button { cursor: pointer; }

@@ -1,0 +1,45 @@
+/* Desktop Planner columns must size independently.
+   The Add task card must not determine the vertical position of Today's tasks. */
+
+@media (min-width: 1051px) {
+  .planner-layout {
+    --planner-desktop-side-width: clamp(330px, 28%, 380px);
+    position: relative;
+    display: block !important;
+    width: 100%;
+    min-height: 550px;
+  }
+
+  /* Left column flows normally: analytics -> Today's tasks. */
+  .planner-summary,
+  .planner-tasks-card {
+    width: calc(100% - var(--planner-desktop-side-width) - 16px) !important;
+    max-width: calc(100% - var(--planner-desktop-side-width) - 16px) !important;
+    margin-right: calc(var(--planner-desktop-side-width) + 16px);
+    box-sizing: border-box;
+  }
+
+  .planner-summary {
+    margin-bottom: 12px;
+  }
+
+  .planner-tasks-card {
+    margin-top: 0 !important;
+  }
+
+  /* Right column is positioned independently so its height cannot stretch
+     either left-column row. */
+  .planner-add-card {
+    position: absolute !important;
+    top: 0;
+    right: 0;
+    width: var(--planner-desktop-side-width) !important;
+    max-width: var(--planner-desktop-side-width) !important;
+    margin: 0 !important;
+    align-self: auto !important;
+  }
+
+  .planner-mobile-links {
+    display: none !important;
+  }
+}

@@ -1,27 +1,23 @@
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
-import { getProfileForUser, optionalUser } from "@/lib/auth/server";
-import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
+import { getStudentContext, selectionForAcademicQuery, type StudentContextContract } from "@/lib/academic/student-context";
+import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
+import { getHotActivityRows, getHotPlannerRows } from "@/lib/data/d1/hot-screens";
+import type { Database } from "@/lib/data/database.types";
 import type { StudySubjectOption } from "@/lib/study/types";
-import type { ActivityItem, ActivityPageModel, CalendarItem, CalendarPageModel, GoalsPageModel, PlannerGoal, PlannerPageModel, PlannerTask } from "./types";
+import { getPhase8GoalSummaries, getPhase8NotificationCenter, getSelectedAttemptCountdown, getTaskPlanningExtensions } from "./phase8";
+import type { ActivityItem, ActivityPageModel, GoalsPageModel, PlannerPageModel, PlannerTask } from "./types";
+
+export { getCalendarPageModel } from "./calendar";
 
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
-type GoalRow = Database["public"]["Tables"]["goals"]["Row"];
-type EventRow = Database["public"]["Tables"]["user_calendar_events"]["Row"];
 type SessionRow = Database["public"]["Tables"]["study_sessions"]["Row"];
 type ProgressEventRow = Database["public"]["Tables"]["progress_events"]["Row"];
 
-function viewerLabel(name: string | null, email: string | null, phone: string | null) { return name?.trim() || email || phone || "Student"; }
-function validProfile(profile: Awaited<ReturnType<typeof getProfileForUser>>) {
-  return Boolean(profile?.onboarding_completed_at && isCALevel(profile.ca_level) && isGroupChoice(profile.group_choice) && profile.attempt_key && profile.attempt_key !== "undecided");
-}
-
-async function academicOptions(profile: NonNullable<Awaited<ReturnType<typeof getProfileForUser>>>) {
-  if (!isCALevel(profile.ca_level) || !isGroupChoice(profile.group_choice) || !profile.attempt_key) return [] as StudySubjectOption[];
-  const catalog = await getAcademicCatalog({ level: profile.ca_level, group: profile.group_choice, attempt: profile.attempt_key });
+async function academicOptions(context: StudentContextContract) {
+  if (context.mode !== "ready") return [] as StudySubjectOption[];
+  const catalog = await getAcademicCatalog(selectionForAcademicQuery(context));
   return catalog.subjects.map((subject) => ({ id: subject.id, slug: subject.slug, title: subject.title, chapters: subject.chapters.map((chapter) => ({ id: chapter.id, number: chapter.number, title: chapter.title })) }));
 }
 
@@ -32,27 +28,52 @@ function maps(subjects: StudySubjectOption[]) {
   };
 }
 
-function taskDto(row: TaskRow, subjectNames: Map<string, string>, chapterNames: Map<string, string>): PlannerTask {
-  return { id: row.id, title: row.title, notes: row.notes, taskKind: row.task_kind as PlannerTask["taskKind"], subjectId: row.subject_id, chapterId: row.chapter_id, subjectTitle: row.subject_id ? subjectNames.get(row.subject_id) ?? null : null, chapterTitle: row.chapter_id ? chapterNames.get(row.chapter_id) ?? null : null, dueAt: row.due_at, estimatedMinutes: row.estimated_minutes, status: row.status as PlannerTask["status"], completedAt: row.completed_at };
+function taskDto(row: TaskRow, subjectNames: Map<string, string>, chapterNames: Map<string, string>, extension: { schedule_mode: "fixed" | "flexible"; target_date: string | null } | undefined): PlannerTask {
+  return {
+    id: row.id,
+    title: row.title,
+    notes: row.notes,
+    taskKind: row.task_kind as PlannerTask["taskKind"],
+    subjectId: row.subject_id,
+    chapterId: row.chapter_id,
+    subjectTitle: row.subject_id ? subjectNames.get(row.subject_id) ?? null : null,
+    chapterTitle: row.chapter_id ? chapterNames.get(row.chapter_id) ?? null : null,
+    dueAt: row.due_at,
+    scheduleMode: extension?.schedule_mode ?? "fixed",
+    targetDate: extension?.target_date ?? null,
+    estimatedMinutes: row.estimated_minutes,
+    status: row.status as PlannerTask["status"],
+    completedAt: row.completed_at,
+  };
 }
-function goalDto(row: GoalRow): PlannerGoal { return { id: row.id, title: row.title, description: row.description, dueDate: row.due_date, status: row.status as PlannerGoal["status"], completedAt: row.completed_at }; }
 
 export async function getPlannerPageModel(): Promise<PlannerPageModel> {
-  const identity = await optionalUser();
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (!validProfile(profile)) return { mode: "setup", viewerName: name };
-  const subjects = await academicOptions(profile!);
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest" };
+  const name = context.displayName;
+  if (context.mode !== "ready" || !context.userId) return { mode: "setup", viewerName: name };
+  const identity = { id: context.userId };
+  const timezone = context.timezone;
+  const subjects = await academicOptions(context);
   const names = maps(subjects);
-  const supabase = await createServerSupabaseClient();
-  const [tasks, goals] = await Promise.all([
-    supabase.from("tasks").select("*").eq("user_id", identity.id).neq("status", "cancelled").order("due_at").limit(250),
-    supabase.from("goals").select("*").eq("user_id", identity.id).neq("status", "cancelled").order("due_date").limit(100),
+  const hot = await getHotPlannerRows(identity.id);
+  const [extensions, goals, countdown] = await Promise.all([
+    getTaskPlanningExtensions(identity.id, hot.tasks.map((row) => row.id)),
+    getPhase8GoalSummaries(identity.id, timezone),
+    getSelectedAttemptCountdown(identity.id),
   ]);
-  const error = tasks.error || goals.error;
-  if (error) throw new Error(`Planner could not be loaded: ${error.message}`);
-  return { mode: "ready", viewerName: name, subjects, tasks: ((tasks.data ?? []) as TaskRow[]).map((row) => taskDto(row, names.subjects, names.chapters)), goals: ((goals.data ?? []) as GoalRow[]).map(goalDto) };
+  const center = await getPhase8NotificationCenter(identity.id, timezone, goals);
+  return {
+    mode: "ready",
+    viewerName: name,
+    timezone,
+    subjects,
+    tasks: hot.tasks.map((row) => taskDto(row as TaskRow, names.subjects, names.chapters, extensions.get(row.id))),
+    goals,
+    countdown,
+    notifications: center.notifications,
+    notificationPreferences: center.preferences,
+  };
 }
 
 export async function getGoalsPageModel(): Promise<GoalsPageModel> {
@@ -61,63 +82,54 @@ export async function getGoalsPageModel(): Promise<GoalsPageModel> {
   return { mode: "ready", viewerName: model.viewerName, goals: model.goals };
 }
 
-function monthBounds(month?: string | null) {
-  const now = new Date();
-  const parsed = month && /^\d{4}-\d{2}$/.test(month) ? `${month}-01T00:00:00.000Z` : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-  const start = new Date(parsed);
-  const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
-  return { month: start.toISOString().slice(0, 7), start, end };
+async function loadActivityRows(userId: string) {
+  const hot = await getHotActivityRows(userId, 40);
+  return { sessions: hot.sessions, progress: hot.progress, error: null };
 }
 
-export async function getCalendarPageModel(month?: string | null): Promise<CalendarPageModel> {
-  const identity = await optionalUser();
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  if (!validProfile(profile)) return { mode: "setup", viewerName: name };
-  const bounds = monthBounds(month);
-  const supabase = await createServerSupabaseClient();
-  const [tasks, goals, userEvents, attempt] = await Promise.all([
-    supabase.from("tasks").select("*").eq("user_id", identity.id).gte("due_at", bounds.start.toISOString()).lt("due_at", bounds.end.toISOString()).neq("status", "cancelled").order("due_at"),
-    supabase.from("goals").select("*").eq("user_id", identity.id).gte("due_date", bounds.start.toISOString().slice(0, 10)).lt("due_date", bounds.end.toISOString().slice(0, 10)).neq("status", "cancelled").order("due_date"),
-    supabase.from("user_calendar_events").select("*").eq("user_id", identity.id).gte("starts_at", bounds.start.toISOString()).lt("starts_at", bounds.end.toISOString()).order("starts_at"),
-    supabase.from("exam_attempts").select("id").eq("attempt_key", profile!.attempt_key!).eq("verification_status", "verified").limit(1).maybeSingle(),
+async function loadActivityNames(sessions: SessionRow[], progress: ProgressEventRow[]) {
+  const subjectIds = [...new Set(sessions.map((row) => row.subject_id).filter((id): id is string => Boolean(id)))];
+  const chapterIds = [...new Set([
+    ...sessions.map((row) => row.chapter_id),
+    ...progress.map((row) => row.chapter_id),
+  ].filter((id): id is string => Boolean(id)))];
+  if (!subjectIds.length && !chapterIds.length) return { subjects: new Map<string, string>(), chapters: new Map<string, string>() };
+  const db = getD1RuntimeDatabase();
+  const subjectPlaceholders = subjectIds.map((_, index) => `?${index + 1}`).join(",");
+  const chapterPlaceholders = chapterIds.map((_, index) => `?${index + 1}`).join(",");
+  const [subjects, chapters] = await Promise.all([
+    subjectIds.length ? db.prepare(`SELECT id,title FROM subjects WHERE id IN (${subjectPlaceholders})`).bind(...subjectIds).all<{ id: string; title: string }>() : Promise.resolve({ results: [] }),
+    chapterIds.length ? db.prepare(`SELECT id,title FROM chapters WHERE id IN (${chapterPlaceholders})`).bind(...chapterIds).all<{ id: string; title: string }>() : Promise.resolve({ results: [] }),
   ]);
-  const error = tasks.error || goals.error || userEvents.error || attempt.error;
-  if (error) throw new Error(`Calendar could not be loaded: ${error.message}`);
-  const examEvents = attempt.data?.id ? await supabase.from("exam_events").select("*").eq("attempt_id", attempt.data.id).eq("verification_status", "verified").gte("event_date", bounds.start.toISOString().slice(0, 10)).lt("event_date", bounds.end.toISOString().slice(0, 10)).order("event_date") : { data: [], error: null };
-  if (examEvents.error) throw new Error(`Official exam calendar could not be loaded: ${examEvents.error.message}`);
-  const items: CalendarItem[] = [];
-  for (const row of (tasks.data ?? []) as TaskRow[]) items.push({ id: `task:${row.id}`, source: "task", kind: row.task_kind as CalendarItem["kind"], title: row.title, startsAt: row.due_at, endsAt: null, allDay: false, readOnly: false, status: row.status, estimatedMinutes: row.estimated_minutes });
-  for (const row of (goals.data ?? []) as GoalRow[]) items.push({ id: `goal:${row.id}`, source: "goal", kind: "goal", title: row.title, startsAt: `${row.due_date}T12:00:00.000Z`, endsAt: null, allDay: true, readOnly: false, status: row.status });
-  for (const row of (userEvents.data ?? []) as EventRow[]) items.push({ id: `user:${row.id}`, source: "user", kind: "personal", title: row.title, startsAt: row.starts_at, endsAt: row.ends_at, allDay: row.all_day, readOnly: false });
-  for (const row of examEvents.data ?? []) items.push({ id: `icai:${row.id}`, source: "icai", kind: "exam", title: row.title, startsAt: `${row.event_date}T00:00:00.000Z`, endsAt: null, allDay: true, readOnly: true, status: "verified", sourceUrl: row.source_url });
-  items.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  return { mode: "ready", viewerName: name, month: bounds.month, items };
+  return {
+    subjects: new Map((subjects.results ?? []).map((row) => [row.id, row.title])),
+    chapters: new Map((chapters.results ?? []).map((row) => [row.id, row.title])),
+  };
 }
 
 export async function getActivityPageModel(): Promise<ActivityPageModel> {
-  const identity = await optionalUser();
-  if (!identity) return { mode: "guest" };
-  const profile = await getProfileForUser(identity.id);
-  const name = viewerLabel(profile?.display_name ?? null, identity.email, identity.phone);
-  const subjects = validProfile(profile) ? await academicOptions(profile!) : [];
-  const names = maps(subjects);
-  const supabase = await createServerSupabaseClient();
-  const [sessions, progress] = await Promise.all([
-    supabase.from("study_sessions").select("*").eq("user_id", identity.id).order("ended_at", { ascending: false }).limit(40),
-    supabase.from("progress_events").select("*").eq("user_id", identity.id).order("created_at", { ascending: false }).limit(40),
-  ]);
-  const error = sessions.error || progress.error;
-  if (error) throw new Error(`Activity could not be loaded: ${error.message}`);
+  const context = await getStudentContext();
+  if (context.mode === "guest") return { mode: "guest" };
+  if (!context.userId) return { mode: "guest" };
+  const identity = { id: context.userId };
+  const name = context.displayName;
+  const { sessions, progress } = await loadActivityRows(identity.id);
+  const allowedSubjects = new Set(context.subjectIds);
+  const allowedVersions = new Set(context.syllabusVersionIds);
+  const db = getD1RuntimeDatabase();
+  const allowedChapterRows = context.mode === "ready" && allowedVersions.size ? (await db.prepare(`SELECT id FROM chapters WHERE syllabus_version_id IN (${[...allowedVersions].map((_,i)=>`?${i+1}`).join(",")})`).bind(...allowedVersions).all<{id:string}>()).results ?? [] : [];
+  const allowedChapters = new Set(allowedChapterRows.map((row)=>row.id));
+  const sessionRows = ((sessions ?? []) as SessionRow[]).filter((row)=>!row.subject_id || allowedSubjects.has(row.subject_id)).filter((row)=>!row.chapter_id || allowedChapters.has(row.chapter_id));
+  const progressRows = ((progress ?? []) as ProgressEventRow[]).filter((row)=>allowedChapters.has(row.chapter_id));
+  const names = await loadActivityNames(sessionRows, progressRows);
   const items: ActivityItem[] = [];
-  for (const row of (sessions.data ?? []) as SessionRow[]) {
+  for (const row of sessionRows) {
     const subject = row.subject_id ? names.subjects.get(row.subject_id) : null;
     const chapter = row.chapter_id ? names.chapters.get(row.chapter_id) : null;
     items.push({ id: `study:${row.id}`, source: "study", occurredAt: row.ended_at, title: `Studied ${Math.max(1, Math.round(row.duration_seconds / 60))} min`, description: chapter ?? subject ?? "General study session", href: "/study" });
   }
   const stageLabel: Record<string, string> = { completed: "Completed", revision_1: "Revision 1", revision_2: "Revision 2", test_1: "Test 1", test_2: "Test 2" };
-  for (const row of (progress.data ?? []) as ProgressEventRow[]) items.push({ id: `progress:${row.id}`, source: "progress", occurredAt: row.created_at, title: `${row.action === "clear" ? "Cleared" : row.action === "undo" ? "Undid" : "Saved"} ${stageLabel[row.stage] ?? row.stage}`, description: names.chapters.get(row.chapter_id) ?? "Chapter progress", href: "/progress" });
+  for (const row of progressRows) items.push({ id: `progress:${row.id}`, source: "progress", occurredAt: row.created_at, title: `${row.action === "clear" ? "Cleared" : row.action === "undo" ? "Undid" : "Saved"} ${stageLabel[row.stage] ?? row.stage}`, description: names.chapters.get(row.chapter_id) ?? "Chapter progress", href: "/progress" });
   items.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
   return { mode: "ready", viewerName: name, items: items.slice(0, 60) };
 }

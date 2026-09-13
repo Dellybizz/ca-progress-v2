@@ -18,9 +18,11 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
   const googleHref = useMemo(() => `/auth/google?next=${encodeURIComponent(next)}&remember=${remember ? "true" : "false"}`, [next, remember]);
   const linkedinHref = useMemo(() => `/auth/linkedin?next=${encodeURIComponent(next)}&remember=${remember ? "true" : "false"}`, [next, remember]);
 
-  function continueAsGuest() {
+  async function continueAsGuest() {
     setLoading("guest");
-    getOrCreateGuestIdentity();
+    const response = await fetch("/api/offline/context", { cache: "no-store", credentials: "same-origin" });
+    const context = response.ok ? await response.json() as { guestId?: string } : null;
+    getOrCreateGuestIdentity(context?.guestId ?? null);
     router.push(next);
     router.refresh();
   }
@@ -62,7 +64,7 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
           </label>
 
           <div className="auth-divider"><span>or continue without an account</span></div>
-          <Button size="lg" variant="ghost" isLoading={loading === "guest"} onClick={continueAsGuest}>Continue as Guest <Icon name="arrow" size={16} /></Button>
+          <Button size="lg" variant="ghost" isLoading={loading === "guest"} onClick={() => void continueAsGuest()}>Continue as Guest <Icon name="arrow" size={16} /></Button>
           <p className="auth-terms">Guest mode stays on this browser and does not create synced private records. You can sign in later when you want cross-device access.</p>
         </CardBody>
       </Card>

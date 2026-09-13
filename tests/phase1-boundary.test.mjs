@@ -6,13 +6,9 @@ import { join } from "node:path";
 const root = new URL("../", import.meta.url).pathname;
 const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("later work preserves the Phase 1 boundary against academic and progress logic", () => {
-  const phase1Source = [
-    "supabase/migrations/20260830010100_phase1_user_preferences.sql",
-    "lib/preferences/contract.ts",
-    "lib/analytics/events.ts",
-  ].map(read).join("\n");
-  for (const forbidden of ["course_levels", "syllabus_versions", "chapter_progress"]) assert.equal(phase1Source.includes(forbidden), false, forbidden);
+test("preferences and analytics stay provider-neutral", () => {
+  const source = ["lib/preferences/contract.ts", "lib/analytics/events.ts"].map(read).join("\n");
+  assert.doesNotMatch(source, /@supabase\/|SUPABASE_|lib\/supabase/);
 });
 
 test("analytics remains a provider-neutral interface placeholder", () => {

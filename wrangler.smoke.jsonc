@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ca-progress-v2-smoke",
+  "main": "./custom-worker.ts",
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "ca-progress-v2-smoke-local",
+    "database_id": "6f002cbe-fe40-4d1b-9cf4-df6faaf52350",
+    "migrations_dir": "d1/migrations",
+    "migrations_table": "d1_migrations"
+  }],
+  "r2_buckets": [
+    { "binding": "USER_RESOURCES_R2", "bucket_name": "ca-progress-v2-staging-user-resources" }
+  ],
+  "vars": {
+    "NEXT_PUBLIC_APP_NAME": "CA Progress",
+    "NEXT_PUBLIC_APP_ENV": "staging",
+    "NEXT_PUBLIC_APP_VERSION": "cloudflare-migration-phase-5-smoke",
+    "CA_AUTH_RUNTIME": "cloudflare",
+    "CA_DATA_RUNTIME": "cloudflare",
+    "CA_PHASE4_SHADOW_READ": "0",
+    "CA_GUEST_TEST_MODE": "true"
+  }
+}

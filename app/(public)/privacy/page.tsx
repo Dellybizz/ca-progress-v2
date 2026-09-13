@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "Privacy policy for CA Progress, including Google and LinkedIn sign-in, guest mode, profile data, and service providers.",
 };
 
-const effectiveDate = "30 August 2026";
+const effectiveDate = "6 September 2026";
 
 export default function PrivacyPage() {
   return (
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
       <section>
         <h2>3. Guest mode</h2>
         <p>
-          You may use supported parts of CA Progress as a guest. Guest identity information is created locally in your browser and does not create a CA Progress authentication account. Guest-only information is not synced as private account data unless you later sign in and explicitly use features that save information to your account.
+          You may use supported parts of CA Progress as a guest. A pseudonymous guest identifier is issued to this browser and does not create a CA Progress authentication account. If you later sign in, CA Progress shows a summary and asks before preserving supported guest work in your account. Existing account data is kept when a conflict needs review.
         </p>
       </section>
 
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
       <section>
         <h2>5. Service providers</h2>
         <p>
-          CA Progress relies on third-party infrastructure providers to operate the service. These currently include <strong>Supabase</strong> for authentication, database, and storage services and <strong>Cloudflare</strong> for application hosting, delivery, and security. Google and LinkedIn are used when you choose their respective sign-in options.
+          CA Progress uses <strong>Cloudflare</strong> infrastructure for application hosting and delivery, authentication/session processing, application data storage through D1, private file storage through R2, and related security and background services. Google and LinkedIn are used when you choose their respective sign-in options.
         </p>
         <p>These providers may process information on our behalf according to their own contractual and privacy obligations.</p>
       </section>

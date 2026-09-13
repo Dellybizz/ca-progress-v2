@@ -4,7 +4,7 @@ export type IconName =
   | "home" | "calendar" | "chart" | "timer" | "tests" | "notes" | "book"
   | "community" | "settings" | "shield" | "search" | "bell" | "more" | "close"
   | "chevron" | "arrow" | "check" | "sparkles" | "clock" | "target" | "layers"
-  | "plus" | "sun" | "moon" | "command" | "lock";
+  | "plus" | "sun" | "moon" | "command" | "lock" | "alert" | "cloud-off";
 
 const paths: Record<IconName, ReactNode> = {
   home: <><path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.8V21h13V9.8"/><path d="M9.5 21v-6h5v6"/></>,
@@ -33,6 +33,8 @@ const paths: Record<IconName, ReactNode> = {
   moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>,
   command: <><path d="M9 6a3 3 0 1 0-3 3h3V6ZM15 6a3 3 0 1 1 3 3h-3V6ZM9 15H6a3 3 0 1 0 3 3v-3ZM15 15h3a3 3 0 1 1-3 3v-3Z"/><path d="M9 9h6v6H9z"/></>,
   lock: <><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+  alert: <><path d="M10.3 3.7 2.4 18a2 2 0 0 0 1.8 3h15.6a2 2 0 0 0 1.8-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></>,
+  "cloud-off": <><path d="m3 3 18 18"/><path d="M16.7 16.7H6.5A4.5 4.5 0 0 1 5.8 7.8M8.7 4.6A6 6 0 0 1 18 9.5a3.5 3.5 0 0 1 2.3 5.9"/></>,
 };
 
 export function Icon({ name, size = 20, ...props }: { name: IconName; size?: number } & Omit<SVGProps<SVGSVGElement>, "name">) {

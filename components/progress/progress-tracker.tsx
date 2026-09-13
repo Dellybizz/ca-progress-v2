@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { useStudentContext } from "@/components/academic/student-context-provider";
+import { offlineMutationFetch } from "@/lib/offline/mutation";
 import type { ProgressChapter, ProgressMutationResult, ProgressReadyModel, ProgressStage, ProgressState } from "@/lib/progress/types";
 
 const STAGES: Array<{ key: ProgressStage; label: string; short: string }> = [
-  { key: "completed", label: "Completed", short: "Done" },
+  { key: "completed", label: "First Completion", short: "Done" },
   { key: "revision_1", label: "Revision 1", short: "1R" },
   { key: "revision_2", label: "Revision 2", short: "2R" },
   { key: "test_1", label: "Test 1", short: "T1" },
@@ -36,7 +39,6 @@ function stageLocked(state: ProgressState, stage: ProgressStage) {
 function clearLocked(state: ProgressState, stage: ProgressStage) {
   if (stage === "completed") return Boolean(state.revision_1_at || state.test_1_at);
   if (stage === "revision_1") return Boolean(state.revision_2_at);
-  if (stage === "test_1") return Boolean(state.test_2_at);
   return false;
 }
 
@@ -59,9 +61,37 @@ function summary(chapters: ProgressChapter[]) {
   };
 }
 
-export function ProgressTracker({ model, subjectLocked = false }: { model: ProgressReadyModel; subjectLocked?: boolean }) {
+function formatDate(value: string | null) {
+  if (!value) return "Not yet";
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(parsed);
+}
+
+function lastRevision(state: ProgressState) {
+  const candidates = [state.revision_1_at, state.revision_2_at].filter((value): value is string => Boolean(value));
+  if (!candidates.length) return null;
+  return candidates.sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+}
+
+function isTestStage(stage: ProgressStage): stage is "test_1" | "test_2" {
+  return stage === "test_1" || stage === "test_2";
+}
+
+export function ProgressTracker({
+  model,
+  subjectLocked = false,
+  initialChapterId,
+}: {
+  model: ProgressReadyModel;
+  subjectLocked?: boolean;
+  initialChapterId?: string;
+}) {
+  const context = useStudentContext();
+  const router = useRouter();
+  const initialChapter = initialChapterId ? model.chapters.find((chapter) => chapter.id === initialChapterId) ?? null : null;
   const [chapters, setChapters] = useState(model.chapters);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialChapter ? `${initialChapter.number} ${initialChapter.title}` : "");
   const [subject, setSubject] = useState(subjectLocked && model.chapters[0] ? model.chapters[0].subjectId : "all");
   const [group, setGroup] = useState("all");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
@@ -74,7 +104,10 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
     chapters.forEach((chapter) => map.set(chapter.subjectId, { id: chapter.subjectId, title: chapter.subjectTitle }));
     return [...map.values()];
   }, [chapters]);
-  const groups = useMemo(() => [...new Map(chapters.map((chapter) => [chapter.groupCode, { code: chapter.groupCode, name: chapter.groupName }])).values()], [chapters]);
+  const groups = useMemo(
+    () => [...new Map(chapters.map((chapter) => [chapter.groupCode, { code: chapter.groupCode, name: chapter.groupName }])).values()],
+    [chapters],
+  );
   const filtered = useMemo(() => chapters.filter((chapter) => {
     if (subject !== "all" && chapter.subjectId !== subject) return false;
     if (group !== "all" && chapter.groupCode !== group) return false;
@@ -84,6 +117,10 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
   const totals = useMemo(() => summary(chapters), [chapters]);
 
   async function mutate(chapter: ProgressChapter, stage: ProgressStage) {
+    if (isTestStage(stage)) {
+      router.push(`/tests?chapterId=${encodeURIComponent(chapter.id)}&stage=${stage}`);
+      return;
+    }
     const enabled = !stageEnabled(chapter.state, stage);
     if ((enabled && stageLocked(chapter.state, stage)) || (!enabled && clearLocked(chapter.state, stage))) return;
     const previous = chapter.state;
@@ -94,16 +131,13 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
     setMessage(null);
     setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
     try {
-      const response = await fetch("/api/progress", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "set_stage", chapterId: chapter.id, stage, enabled }),
-      });
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/progress", { action: "set_stage", chapterId: chapter.id, stage, enabled }, {state:next,saved_at:new Date().toISOString()}, { ...previous });
       const payload = await response.json() as ProgressMutationResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Progress could not be saved.");
       setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
       setUndoEvent(payload.event_id ? { id: payload.event_id, chapterId: chapter.id } : null);
       setSaveState("saved");
+      if(queued)setMessage("Saved on this device. It will sync when you reconnect.");
     } catch (error) {
       setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: previous } : item));
       setSaveState("error");
@@ -137,16 +171,17 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
   return (
     <div className="progress-workspace">
       <section className="progress-summary-grid" aria-label="Progress analytics summary">
-        <div><span>Overall</span><strong>{totals.overall}%</strong><small>all 5 stages</small></div>
+        <div><span>Overall</span><strong>{totals.overall}%</strong><small>from recorded milestones</small></div>
         <div><span>Completed</span><strong>{totals.completion}%</strong><small>{totals.completed}/{chapters.length} chapters</small></div>
         <div><span>Revisions</span><strong>{totals.revisions}%</strong><small>1R + 2R</small></div>
-        <div><span>Tests</span><strong>{totals.tests}%</strong><small>T1 + T2</small></div>
+        <div><span>Tests</span><strong>{totals.tests}%</strong><small>saved T1 + T2 milestones</small></div>
       </section>
 
       <section className="progress-toolbar" aria-label="Progress filters">
         <label className="progress-search"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chapters or subjects" /></label>
         {!subjectLocked ? <label><span>Subject</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="all">All subjects</option>{subjects.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
         {groups.length > 1 ? <label><span>Group</span><select value={group} onChange={(event) => setGroup(event.target.value)}><option value="all">All groups</option>{groups.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label> : null}
+        <Link className="progress-analytics-link" href="/tests">Record test marks <Icon name="arrow" size={14}/></Link>
         <Link className="progress-analytics-link" href="/analytics">Analytics <Icon name="arrow" size={14}/></Link>
       </section>
 
@@ -156,22 +191,50 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
       </div>
 
       {filtered.length ? <div className="progress-chapter-list">{filtered.map((chapter) => (
-        <article className="progress-chapter-card" key={chapter.id}>
-          <div className="progress-chapter-heading"><span>{chapter.subjectTitle}</span><h3><b>{chapter.number}</b>{chapter.title}</h3><small>{chapter.groupName}</small></div>
+        <article className="progress-chapter-card" key={chapter.id} data-canonical-chapter-id={chapter.id}>
+          <div className="progress-chapter-heading">
+            <span>{chapter.subjectTitle}</span>
+            <h3><b>{chapter.number}</b>{chapter.title}</h3>
+            <small>{chapter.groupName}</small>
+            <small>First completion: {formatDate(chapter.state.completed_at)} · Last revision: {formatDate(lastRevision(chapter.state))}</small>
+            <Link className="progress-chapter-heading__hub" href={`/chapters/${chapter.id}`}>Open Chapter Hub <Icon name="arrow" size={11}/></Link>
+          </div>
           <div className="progress-stage-controls" role="group" aria-label={`${chapter.title} stages`}>
             {STAGES.map((stage) => {
               const active = stageEnabled(chapter.state, stage.key);
-              const locked = active ? clearLocked(chapter.state, stage.key) : stageLocked(chapter.state, stage.key);
+              const testStage = isTestStage(stage.key);
+              const locked = !active && stageLocked(chapter.state, stage.key)
+                ? true
+                : !testStage && active ? clearLocked(chapter.state, stage.key) : false;
               const pending = pendingKey === `${chapter.id}:${stage.key}`;
-              return <button key={stage.key} type="button" className={active ? "is-active" : ""} disabled={locked || Boolean(pendingKey)} onClick={() => mutate(chapter, stage.key)} title={locked ? "Complete the required earlier stage first." : stage.label} aria-pressed={active}><span>{stage.short}</span><small>{stage.label}</small>{locked && !active ? <Icon name="lock" size={12}/> : pending ? <Icon name="clock" size={12}/> : active ? <Icon name="check" size={12}/> : null}</button>;
+              const date = chapter.state[fieldForStage[stage.key]];
+              const title = locked
+                ? "Complete the required earlier stage first."
+                : testStage
+                  ? active ? `Open saved ${stage.label} marks (${formatDate(date)})` : `Record ${stage.label} marks`
+                  : stage.label;
+              return <button
+                key={stage.key}
+                type="button"
+                className={active ? "is-active" : ""}
+                disabled={locked || Boolean(pendingKey)}
+                onClick={() => void mutate(chapter, stage.key)}
+                title={title}
+                aria-pressed={active}
+              >
+                <span>{stage.short}</span>
+                <small>{stage.label}</small>
+                {active && date ? <small>{formatDate(date)}</small> : null}
+                {locked ? <Icon name="lock" size={12}/> : pending ? <Icon name="clock" size={12}/> : active ? <Icon name="check" size={12}/> : testStage ? <Icon name="arrow" size={12}/> : null}
+              </button>;
             })}
           </div>
         </article>
       ))}</div> : <div className="progress-empty"><Icon name="search"/><h3>No chapters match these filters</h3><p>Clear the search or broaden the subject/group selection.</p></div>}
 
       <section className="progress-history">
-        <div><span className="eyebrow">Recent history</span><h2>Latest saved changes</h2><p>Every accepted stage change creates an audit event. Undo only applies when no newer change would be overwritten.</p></div>
-        <div className="progress-history-list">{model.history.length ? model.history.slice(0, 8).map((item) => <div key={item.id}><span><strong>{item.chapterTitle}</strong><small>{item.stage.replaceAll("_", " ")} · {item.action}</small></span><Badge tone={item.action === "undo" ? "neutral" : "info"}>{new Date(item.createdAt).toLocaleDateString("en-IN")}</Badge></div>) : <p>No progress changes yet. Your first auto-saved stage update will appear here.</p>}</div>
+        <div><span className="eyebrow">Recent history</span><h2>Latest saved changes</h2><p>Completion, revision and marks-driven test milestones share one audit stream. Undo only applies when no newer change would be overwritten.</p></div>
+        <div className="progress-history-list">{model.history.length ? model.history.slice(0, 8).map((item) => <div key={item.id}><span><strong>{item.chapterTitle}</strong><small>{item.stage.replaceAll("_", " ")} · {item.action}</small></span><Badge tone={item.action === "undo" ? "neutral" : "info"}>{new Date(item.createdAt).toLocaleDateString("en-IN")}</Badge></div>) : <p>No progress changes yet. Your first auto-saved milestone will appear here.</p>}</div>
       </section>
     </div>
   );

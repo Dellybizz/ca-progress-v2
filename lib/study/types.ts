@@ -1,8 +1,17 @@
 export type StudyMode = "stopwatch" | "pomodoro";
 export type StudyTimerStatus = "running" | "paused";
+export type StudyFocusRating = "poor" | "okay" | "focused";
 
 export type StudyChapterOption = { id: string; number: string; title: string };
 export type StudySubjectOption = { id: string; slug: string; title: string; chapters: StudyChapterOption[] };
+export type StudyTaskOption = {
+  id: string;
+  title: string;
+  taskKind: string;
+  subjectId: string | null;
+  chapterId: string | null;
+  dueAt: string;
+};
 
 export type StudyTimerSnapshot = {
   status: StudyTimerStatus;
@@ -11,11 +20,17 @@ export type StudyTimerSnapshot = {
   chapterId: string | null;
   subjectTitle: string | null;
   chapterTitle: string | null;
+  taskId: string | null;
+  planItemId: string | null;
+  intendedTaskTitle: string | null;
+  pauseCount: number;
+  pausedSeconds: number;
   focusTargetSeconds: number | null;
   breakTargetSeconds: number | null;
   startedAt: string;
   runningSince: string | null;
   elapsedSeconds: number;
+  storedElapsedSeconds?: number;
   pausedAt: string | null;
   timezone: string;
   lastInteractionAt: string;
@@ -28,11 +43,31 @@ export type StudySessionItem = {
   chapterId: string | null;
   subjectTitle: string | null;
   chapterTitle: string | null;
+  taskId: string | null;
+  planItemId: string | null;
+  intendedTaskTitle: string | null;
+  pauseCount: number;
+  pausedSeconds: number;
+  completionState: "completed" | "recovered";
+  understandingScore: number | null;
+  focusRating: StudyFocusRating | null;
+  reflectionSavedAt: string | null;
   startedAt: string;
   endedAt: string;
   durationSeconds: number;
   mode: StudyMode;
   timezone: string;
+};
+
+export type StudyPendingReflection = {
+  sessionId: string;
+  subjectId: string | null;
+  chapterId: string | null;
+  subjectTitle: string | null;
+  chapterTitle: string | null;
+  intendedTaskTitle: string | null;
+  durationSeconds: number;
+  endedAt: string;
 };
 
 export type StudyAnalytics = {
@@ -51,7 +86,9 @@ export type StudyReadyModel = {
   groupLabel: string;
   attemptKey: string;
   subjects: StudySubjectOption[];
+  tasks: StudyTaskOption[];
   timer: StudyTimerSnapshot | null;
+  pendingReflection: StudyPendingReflection | null;
   analytics: StudyAnalytics;
 };
 
@@ -69,4 +106,6 @@ export type StudyTimerMutationResult = {
   session_id?: string;
   duration_seconds?: number;
   ended_at?: string;
+  reflection_required?: boolean;
+  discarded?: boolean;
 };

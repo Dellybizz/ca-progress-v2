@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { sanitizeReturnPath } from "@/lib/auth/navigation";
+import { startOAuthSignIn } from "@/lib/auth/provider";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +12,8 @@ export async function GET(request: NextRequest) {
   callback.searchParams.set("remember", remember ? "true" : "false");
 
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback.toString() } });
-    if (error || !data.url) throw error ?? new Error("Google OAuth URL was not returned.");
-    return NextResponse.redirect(data.url);
+    const url = await startOAuthSignIn("google", callback.toString());
+    return NextResponse.redirect(url);
   } catch {
     const login = new URL("/login", request.nextUrl.origin);
     login.searchParams.set("next", next);

@@ -14,6 +14,6 @@ test("Phase 4 dashboard progress slot is promoted to Phase 5 data", () => {
   assert.match(service, /status: "tracked"/);
   assert.doesNotMatch(types, /awaiting_phase5/);
   assert.match(ui, /model\.progress\.overallPercent/);
-  assert.match(ui, /subject\.percent/);
+  assert.match(ui, /group\.percent/);
   assert.doesNotMatch(ui, /Progress pending/);
 });

@@ -1,0 +1,40 @@
+/* Schedule-aware Today Plan labels. */
+.today-plan-schedule-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-soft);
+  font-size: 8.5px;
+  font-weight: 800;
+}
+
+.today-plan-schedule-chip--fixed {
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+}
+
+.today-plan-schedule-chip--urgent {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
+.today-plan-item.is-time-overdue,
+.phase9-plan-item.is-time-overdue .today-plan-item {
+  border-color: color-mix(in srgb, var(--color-danger) 26%, var(--color-border));
+}
+
+.phase9-plan-item.is-time-overdue .phase9-timeline-marker span {
+  background: var(--color-danger-soft);
+  border-color: color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  color: var(--color-danger);
+}
+
+@media (max-width: 720px) {
+  .today-plan-schedule-chip {
+    max-width: 100%;
+    white-space: normal;
+  }
+}
