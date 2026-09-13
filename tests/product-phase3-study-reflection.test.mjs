@@ -48,7 +48,7 @@ test("Product Phase 3 retains one explicit self-reported understanding and focus
   assert.match(migration, /understanding_score INTEGER CHECK\(understanding_score BETWEEN 0 AND 100\)/);
   assert.match(migration, /focus_rating TEXT CHECK\(focus_rating IN \('poor','okay','focused'\)\)/);
   assert.match(migration, /reflection_saved_at TEXT/);
-  assert.match(service, /MEANINGFUL_REFLECTION_SECONDS = 60/);
+  assert.match(service, /MEANINGFUL_REFLECTION_SECONDS = 1/);
   assert.match(service, /reflection has already been saved/);
   assert.match(reflection, /self-reported understanding/);
   assert.match(reflection, /not a mastery score/);

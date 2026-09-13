@@ -144,7 +144,7 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
     };
     setOptimisticEnded(true);
     setOptimisticStartedAt(null);
-    if (action === "finish" && provisional.durationSeconds >= 60) onReviewChange?.({ session: provisional, ready: false });
+    if (action === "finish") onReviewChange?.({ session: provisional, ready: false });
     const result = await mutate({ action, ...(action === "finish" ? { clientId } : {}) });
     if (!result) {
       setOptimisticEnded(false);
