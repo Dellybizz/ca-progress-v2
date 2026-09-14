@@ -14,6 +14,15 @@ const STAGES: Array<{ key: ProgressStage; label: string; short: string }> = [
   { key: "test_2", label: "Test 2", short: "Test 2" },
 ];
 
+const PROGRESS_SYNC_EVENT = "ca-progress:chapter-sync";
+function readSyncedProgress(chapterId:string):ProgressState|null{
+  if(typeof window==="undefined")return null;
+  try{const value=sessionStorage.getItem(`ca-progress:chapter:${chapterId}`);return value?JSON.parse(value) as ProgressState:null;}catch{return null;}
+}
+function writeSyncedProgress(chapterId:string,state:ProgressState){
+  try{sessionStorage.setItem(`ca-progress:chapter:${chapterId}`,JSON.stringify(state));window.dispatchEvent(new CustomEvent(PROGRESS_SYNC_EVENT,{detail:{chapterId,state}}));}catch{}
+}
+
 const fieldForStage: Record<ProgressStage, keyof ProgressState> = {
   completed: "completed_at",
   revision_1: "revision_1_at",
@@ -90,6 +99,11 @@ export function ProgressTracker({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
+  useEffect(()=>{
+    const apply=()=>{setChapters((items)=>items.map((item)=>{const state=readSyncedProgress(item.id);return state?{...item,state}:item;}));setSavedChapters((items)=>items.map((item)=>{const state=readSyncedProgress(item.id);return state?{...item,state}:item;}));};
+    apply();window.addEventListener(PROGRESS_SYNC_EVENT,apply);return()=>window.removeEventListener(PROGRESS_SYNC_EVENT,apply);
+  },[]);
+
   const dirty = useMemo(() => chapters.some((chapter) => {
     const saved=savedChapters.find((item)=>item.id===chapter.id);
     return !saved || JSON.stringify(saved.state)!==JSON.stringify(chapter.state);
@@ -149,7 +163,7 @@ export function ProgressTracker({
       if(!response.ok)throw new Error(payload.error||"Progress could not be saved.");
       const states=new Map((payload.states??[]).map((row)=>[row.chapter_id,row]));
       const committed=chapters.map((chapter)=>{const row=states.get(chapter.id);return row?{...chapter,state:row.state,updatedAt:row.saved_at}:chapter;});
-      setChapters(committed);setSavedChapters(committed);setSaveState("saved");setMessage("All changes saved.");router.refresh();
+      for(const chapter of committed)if(states.has(chapter.id))writeSyncedProgress(chapter.id,chapter.state);setChapters(committed);setSavedChapters(committed);setSaveState("saved");setMessage("All changes saved.");router.refresh();
     }catch(error){setSaveState("error");setMessage(error instanceof Error?error.message:"Progress could not be saved.");}
   }
   function discardChanges(){setChapters(savedChapters);setSaveState("idle");setMessage(null);}
@@ -160,20 +174,13 @@ export function ProgressTracker({
   function downloadExcel(){
     const rows=exportRows();
     const stageKeys=["Done","Rev. 1","Rev. 2","Test 1","Test 2"] as const;
-    const subjects=[...new Set(rows.map((row)=>row.Subject))];
-    const subjectRows=subjects.map((name)=>{const subjectRows=rows.filter((row)=>row.Subject===name);const completed=subjectRows.filter((row)=>Boolean(row.Done)).length;return {name,completed,total:subjectRows.length,percent:subjectRows.length?Math.round(completed/subjectRows.length*100):0};});
-    const stageRows=stageKeys.map((stage)=>{const completed=rows.filter((row)=>Boolean(row[stage])).length;return {stage,completed,total:rows.length,percent:rows.length?Math.round(completed/rows.length*100):0};});
-    const bar=(percent:number,color:string)=>`<table class="bar" cellspacing="0"><tr><td style="width:${percent}%;background:${color}"></td><td style="width:${100-percent}%;background:#e9eaf2"></td></tr></table>`;
     const report=`<!doctype html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"><style>
-      body{font-family:Arial,sans-serif;color:#111827}.title{font-size:22px;font-weight:700;color:#3325a8}.meta{color:#667085;font-size:11px}
-      table{border-collapse:collapse;table-layout:fixed}th{background:#5b50d8;color:#fff;font-weight:700;text-align:left}th,td{border:1px solid #d8dbe8;padding:7px 9px;vertical-align:middle}.section{margin-top:18px;font-size:15px;font-weight:700;color:#181a2a}
-      .summary th{background:#f0efff;color:#3325a8}.number{text-align:center}.bar{width:260px;height:13px}.bar td{border:0;padding:0;height:13px}
-      .progress{width:100%}.progress col.subject{width:150px}.progress col.chapter{width:340px}.progress col.date{width:92px}.progress tr:nth-child(even) td{background:#f8f9fc}
+      body{font-family:Arial,sans-serif;color:#111827}.title{font-size:22px;font-weight:700;color:#3325a8}.meta{color:#667085;font-size:11px;margin-bottom:16px}
+      table{border-collapse:collapse;table-layout:fixed;width:100%}th{background:#5b50d8;color:#fff;font-weight:700;text-align:left}th,td{border:1px solid #d8dbe8;padding:7px 9px;vertical-align:middle}
+      col.subject{width:150px}col.chapter{width:340px}col.date{width:92px}tbody tr:nth-child(even) td{background:#f8f9fc}
     </style></head><body>
     <div class="title">CA Progress Report</div><div class="meta">Generated ${excelEscape(new Date().toLocaleString("en-IN"))} · ${rows.length} chapters</div>
-    <div class="section">Completion by stage</div><table class="summary"><tr><th style="width:110px">Stage</th><th style="width:80px">Completed</th><th style="width:70px">Percent</th><th style="width:280px">Chart</th></tr>${stageRows.map((row)=>`<tr><td>${row.stage}</td><td class="number">${row.completed} / ${row.total}</td><td class="number">${row.percent}%</td><td>${bar(row.percent,"#5b50d8")}</td></tr>`).join("")}</table>
-    <div class="section">Subject completion</div><table class="summary"><tr><th style="width:220px">Subject</th><th style="width:80px">Completed</th><th style="width:70px">Percent</th><th style="width:280px">Chart</th></tr>${subjectRows.map((row)=>`<tr><td>${excelEscape(row.name)}</td><td class="number">${row.completed} / ${row.total}</td><td class="number">${row.percent}%</td><td>${bar(row.percent,"#23a36d")}</td></tr>`).join("")}</table>
-    <div class="section">Chapter detail</div><table class="progress"><colgroup><col class="subject"><col class="chapter">${stageKeys.map(()=>'<col class="date">').join("")}</colgroup><thead><tr><th>Subject</th><th>Chapter</th>${stageKeys.map((stage)=>`<th>${stage}</th>`).join("")}</tr></thead><tbody>${rows.map((row)=>`<tr><td>${excelEscape(row.Subject)}</td><td>${excelEscape(row.Chapter)}</td>${stageKeys.map((stage)=>`<td>${excelEscape(row[stage])}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    <table><colgroup><col class="subject"><col class="chapter">${stageKeys.map(()=>'<col class="date">').join("")}</colgroup><thead><tr><th>Subject</th><th>Chapter</th>${stageKeys.map((stage)=>`<th>${stage}</th>`).join("")}</tr></thead><tbody>${rows.map((row)=>`<tr><td>${excelEscape(row.Subject)}</td><td>${excelEscape(row.Chapter)}</td>${stageKeys.map((stage)=>`<td>${excelEscape(row[stage])}</td>`).join("")}</tr>`).join("")}</tbody></table>
     </body></html>`;
     const url=URL.createObjectURL(new Blob(["\ufeff",report],{type:"application/vnd.ms-excel;charset=utf-8"}));const link=document.createElement("a");link.href=url;link.download="ca-progress-report.xls";document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),0);
   }

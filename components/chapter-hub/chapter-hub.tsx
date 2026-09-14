@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
 import type { ChapterHubItem, ChapterHubLink, ChapterHubReadyModel } from "@/lib/chapter-hub/types";
 import type { ProgressState } from "@/lib/progress/types";
 import { AcademicEntityMark } from "@/components/academic/academic-navigation";
+
+const PROGRESS_SYNC_EVENT = "ca-progress:chapter-sync";
+function readSyncedProgress(chapterId:string):ProgressState|null{
+  if(typeof window==="undefined")return null;
+  try{const value=sessionStorage.getItem(`ca-progress:chapter:${chapterId}`);return value?JSON.parse(value) as ProgressState:null;}catch{return null;}
+}
+function writeSyncedProgress(chapterId:string,state:ProgressState){
+  try{sessionStorage.setItem(`ca-progress:chapter:${chapterId}`,JSON.stringify(state));window.dispatchEvent(new CustomEvent(PROGRESS_SYNC_EVENT,{detail:{chapterId,state}}));}catch{}
+}
 
 const STAGES: Array<{ field: keyof ProgressState; label: string; short: string }> = [
   { field: "completed_at", label: "Completed", short: "Done" }, { field: "revision_1_at", label: "Revision 1", short: "Rev. 1" },
@@ -39,6 +48,10 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
   const [resourceQuery, setResourceQuery] = useState("");
   const [message, setMessage] = useState("");
   const { academic } = model;
+  useEffect(()=>{
+    const apply=()=>{const state=readSyncedProgress(academic.chapterId);if(!state)return;setProgress(state);setDateDrafts(Object.fromEntries(STAGES.map((stage)=>[stage.field,state[stage.field]?.slice(0,10)??""])) as Record<keyof ProgressState,string>);};
+    apply();window.addEventListener(PROGRESS_SYNC_EVENT,apply);return()=>window.removeEventListener(PROGRESS_SYNC_EVENT,apply);
+  },[academic.chapterId]);
   const progressCount = STAGES.filter((stage) => Boolean(progress[stage.field])).length;
   const controlsDirty = understandingLevel !== savedUnderstandingLevel || STAGES.some((stage) => Boolean(progress[stage.field]) && dateDrafts[stage.field] !== progress[stage.field]?.slice(0,10));
   const chapterQuery = `chapterId=${encodeURIComponent(academic.chapterId)}&subjectId=${encodeURIComponent(academic.subjectId)}`;
@@ -79,7 +92,8 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
       }
       if(understandingLevel!==savedUnderstandingLevel)updates.push(mutate({action:"set_understanding",level:understandingLevel}));
       await Promise.all(updates);
-      setProgress((current)=>Object.fromEntries(STAGES.map((stage)=>[stage.field,current[stage.field]? `${dateDrafts[stage.field]}T12:00:00.000Z`:null])) as ProgressState);
+      const nextProgress=Object.fromEntries(STAGES.map((stage)=>[stage.field,progress[stage.field]? `${dateDrafts[stage.field]}T12:00:00.000Z`:null])) as ProgressState;
+      writeSyncedProgress(academic.chapterId,nextProgress);setProgress(nextProgress);
       setSavedUnderstandingLevel(understandingLevel);
       setMessage("Saved");
       router.refresh();

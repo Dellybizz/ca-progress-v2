@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
@@ -30,7 +31,7 @@ async function assertAttachable(db:ReturnType<typeof getD1RuntimeDatabase>,userI
   if(sourceKind==="community_resource")row=await db.prepare("SELECT 1 FROM uploaded_resources WHERE id=?1 AND owner_user_id<>?2 AND visibility='shared' AND moderation_status='approved' AND subject_id=?3 LIMIT 1").bind(sourceId,userId,chapter.subject_id).first();
   if(sourceKind==="icai_resource")row=await db.prepare(`SELECT 1 FROM autofetch_resource_records a JOIN icai_resources r ON r.id=a.resource_row_id
     WHERE a.canonical_resource_id=?1 AND a.is_current=1 AND r.status='active' AND r.verification_status='verified'
-    AND EXISTS(SELECT 1 FROM resource_subject_map rsm WHERE rsm.resource_id=r.id AND rsm.subject_id=?2) LIMIT 1`).bind(sourceId,chapter.subject_id).first();
+    LIMIT 1`).bind(sourceId).first();
   if(!row)throw new Error("This item is no longer available to attach.");
 }
 
@@ -45,14 +46,14 @@ export async function POST(request:Request,{params}:{params:Promise<{chapterId:s
       const stage=text(body.stage,20);
       const date=body.date===null||body.date===""?null:text(body.date,10);
       if(!PROGRESS_STAGES.includes(stage as typeof PROGRESS_STAGES[number]))throw new Error("Choose a valid progress stage.");
-      return NextResponse.json(await setHotProgressStageDate(identity.id,chapterId,stage,date,db));
+      const result=await setHotProgressStageDate(identity.id,chapterId,stage,date,db);revalidatePath("/progress");revalidatePath(`/chapters/${chapterId}`);return NextResponse.json(result);
     }
     if(body.action==="set_understanding"){
       const level=Number(body.level);
       if(!Number.isInteger(level)||level<0||level>100)throw new Error("Understanding must be a whole number from 0 to 100.");
       await db.prepare(`INSERT INTO chapter_workspace_preferences(user_id,chapter_id,understanding_level,updated_at) VALUES(?1,?2,?3,CURRENT_TIMESTAMP)
         ON CONFLICT(user_id,chapter_id) DO UPDATE SET understanding_level=excluded.understanding_level,updated_at=CURRENT_TIMESTAMP`).bind(identity.id,chapterId,level).run();
-      return NextResponse.json({ok:true,level});
+      revalidatePath(`/chapters/${chapterId}`);return NextResponse.json({ok:true,level});
     }
     if(body.action==="add_link"){
       const kind=text(body.kind,20),title=text(body.title,160),url=text(body.url,2048);
@@ -74,7 +75,7 @@ export async function POST(request:Request,{params}:{params:Promise<{chapterId:s
       const id=crypto.randomUUID();
       await db.prepare("INSERT OR IGNORE INTO chapter_workspace_items(id,user_id,chapter_id,source_kind,source_id) VALUES(?1,?2,?3,?4,?5)").bind(id,identity.id,chapterId,sourceKind,sourceId).run();
       const saved=await db.prepare("SELECT id FROM chapter_workspace_items WHERE user_id=?1 AND chapter_id=?2 AND source_kind=?3 AND source_id=?4 LIMIT 1").bind(identity.id,chapterId,sourceKind,sourceId).first<{id:string}>();
-      return NextResponse.json({ok:true,id:saved?.id??id},{status:201});
+      revalidatePath(`/chapters/${chapterId}`);return NextResponse.json({ok:true,id:saved?.id??id},{status:201});
     }
     if(body.action==="remove_item"){
       await db.prepare("DELETE FROM chapter_workspace_items WHERE id=?1 AND user_id=?2 AND chapter_id=?3").bind(text(body.id,80),identity.id,chapterId).run();

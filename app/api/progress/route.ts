@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { setHotProgressStage, undoHotProgressEvent } from "@/lib/data/d1/hot-screens";
@@ -61,6 +62,8 @@ export async function POST(request: Request) {
         }));
         for(const [chapterId,result] of results)if(result)latest.set(chapterId,result);
       }
+      revalidatePath("/progress");
+      for(const chapterId of latest.keys())revalidatePath(`/chapters/${chapterId}`);
       return NextResponse.json({states:[...latest.values()]});
     }
     if (body.action === "undo") {
