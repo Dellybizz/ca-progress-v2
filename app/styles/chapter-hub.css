@@ -59,6 +59,7 @@
 .chapter-hub-date-grid label.is-complete { background: var(--color-success-soft); }
 .chapter-hub-date-grid span { font-size: 10px; font-weight: 700; }
 .chapter-hub-date-grid input { width: 100%; min-width: 0; min-height: 34px; padding: 0 6px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); font-size: 9px; }
+.chapter-hub-date-grid label > button { width: fit-content; padding: 0; background: transparent; color: var(--color-brand-strong); font-size: 9px; font-weight: 700; cursor: pointer; }
 .chapter-hub-understanding { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px 12px; padding-top: 2px; }
 .chapter-hub-understanding > span { display: grid; gap: 2px; }
 .chapter-hub-understanding strong { font-size: 11px; }
@@ -101,6 +102,20 @@
 .chapter-hub-content-list strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .chapter-hub-content-list small { overflow: hidden; color: var(--color-text-faint); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 
+.chapter-hub-resource-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-muted); }
+.chapter-hub-resource-tabs button { min-height: 38px; display: flex; align-items: center; justify-content: center; gap: 7px; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-soft); font-size: 11px; font-weight: 700; cursor: pointer; }
+.chapter-hub-resource-tabs button[aria-selected="true"] { background: var(--color-surface); color: var(--color-text); box-shadow: var(--shadow-xs); }
+.chapter-hub-resource-tabs small { min-width: 20px; padding: 2px 5px; border-radius: var(--radius-full); background: var(--color-surface-strong); color: var(--color-text-faint); font-size: 9px; }
+.chapter-hub-resource-search { width: 100%; min-height: var(--touch-target); padding: 0 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); font-size: 11px; }
+.chapter-hub-resource-results { max-height: 300px; overflow-y: auto; display: grid; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.chapter-hub-resource-results > div { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 9px 10px; border-bottom: 1px solid var(--color-border); }
+.chapter-hub-resource-results > div:last-child { border-bottom: 0; }
+.chapter-hub-resource-results > div > span { min-width: 0; display: grid; gap: 2px; }
+.chapter-hub-resource-results strong, .chapter-hub-resource-results small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-hub-resource-results strong { font-size: 10px; }
+.chapter-hub-resource-results small, .chapter-hub-resource-results p { color: var(--color-text-faint); font-size: 9px; }
+.chapter-hub-resource-results p { margin: 0; padding: 18px 10px; text-align: center; }
+.chapter-hub-resource-results .ui-button { min-height: 34px; padding-inline: 11px; font-size: 10px; }
 .chapter-hub-attach { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
 .chapter-hub-attach select, .chapter-hub-link-form select, .chapter-hub-link-form input { width: 100%; min-width: 0; min-height: var(--touch-target); padding: 0 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); font-size: 11px; }
 .chapter-hub-pinned-list, .chapter-hub-link-list { display: grid; border-top: 1px solid var(--color-border); }
@@ -179,5 +194,8 @@
   .chapter-hub-date-grid label:last-child { border-bottom: 0; }
   .chapter-hub-date-grid input { min-height: 40px; font-size: 11px; }
   .chapter-hub-attach, .chapter-hub-link-form { grid-template-columns: 1fr; }
+  .chapter-hub-resource-tabs button { min-height: 42px; gap: 4px; font-size: 10px; }
+  .chapter-hub-resource-results { max-height: 360px; }
+  .chapter-hub-resource-results > div { padding-inline: 8px; }
   .chapter-hub-attach button, .chapter-hub-link-form button { width: 100%; }
 }
