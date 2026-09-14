@@ -6,7 +6,7 @@ import { isCALevel, isGroupChoice } from "@/lib/profile/validation";
 import type { ProgressStage, ProgressState } from "@/lib/progress/types";
 import type {
   ChapterHubAcademic, ChapterHubDoubtChannel, ChapterHubFile, ChapterHubModel, ChapterHubNote,
-  ChapterHubProgressEvent, ChapterHubStudySession, ChapterHubTopic, ChapterHubItem, ChapterHubItemKind, ChapterHubLink,
+  ChapterHubOfficialResource, ChapterHubProgressEvent, ChapterHubStudySession, ChapterHubTopic,
 } from "./types";
 
 const EMPTY_PROGRESS: ProgressState = { completed_at: null, revision_1_at: null, revision_2_at: null, test_1_at: null, test_2_at: null };
@@ -24,9 +24,7 @@ type NoteRow = { id: string; title: string; body_text: string; updated_at: strin
 type FileRow = { id: string; title: string; original_filename: string; extension: string; size_bytes: number; updated_at: string };
 type ChannelRow = { id: string; channel_key: string; title: string; description: string };
 type TopicRow = { id: string; unit_number: string | null; title: string; topic_kind: string };
-type WorkspaceLinkRow = { id: string; link_kind: "useful" | "youtube" | "revision"; title: string; url: string };
-type WorkspaceItemRow = { id: string; source_kind: ChapterHubItemKind; source_id: string };
-type CandidateRow = { source_kind: ChapterHubItemKind; source_id: string; title: string; meta: string };
+type OfficialRow = { canonical_resource_id: string; title: string; resource_type: string; source_name: string; published_on: string | null; last_seen_at: string };
 
 function viewerLabel(name: string | null, email: string | null, phone: string | null) { return name?.trim() || email || phone || "Student"; }
 function excerpt(value: string) { const clean = value.replace(/\s+/g, " ").trim(); return clean.length > 180 ? `${clean.slice(0, 177)}…` : clean; }
@@ -62,7 +60,7 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
   const groupAllowed = profile.ca_level === "foundation" || profile.group_choice === "both" || profile.group_choice === "not_applicable" || profile.group_choice === academicRow.group_code;
   if (!applicable || profile.ca_level !== academicRow.level_code || !groupAllowed) return { mode: "scope_mismatch" };
 
-  const [progressRow, progressEventsResult, studyResult, studyAggregate, notesResult, filesResult, channelsResult, topicsResult, preferenceRow, linksResult, pinnedResult, pinnedCandidateResult, candidateResult] = await Promise.all([
+  const [progressRow, progressEventsResult, studyResult, studyAggregate, notesResult, filesResult, channelsResult, topicsResult, officialResult] = await Promise.all([
     db.prepare(`SELECT completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at FROM chapter_progress WHERE user_id=?1 AND chapter_id=?2 LIMIT 1`).bind(identity.id, cleanChapterId).first<ProgressRow>(),
     db.prepare(`SELECT id,stage,action,created_at FROM progress_events WHERE user_id=?1 AND chapter_id=?2 ORDER BY created_at DESC LIMIT 10`).bind(identity.id, cleanChapterId).all<ProgressEventRow>(),
     db.prepare(`SELECT s.id,s.started_at,s.ended_at,s.duration_seconds,s.mode,x.understanding_score,x.focus_rating,COALESCE(t.title,dpi.title) AS intended_task_title
@@ -77,25 +75,12 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
     db.prepare(`SELECT id,title,original_filename,extension,size_bytes,updated_at FROM uploaded_resources WHERE owner_user_id=?1 AND chapter_id=?2 ORDER BY updated_at DESC LIMIT 6`).bind(identity.id, cleanChapterId).all<FileRow>(),
     db.prepare(`SELECT id,channel_key,title,description FROM community_channels WHERE subject_id=?1 AND is_active=1 ORDER BY sort_order LIMIT 6`).bind(academicRow.subject_id).all<ChannelRow>(),
     db.prepare(`SELECT id,unit_number,title,topic_kind FROM topics WHERE chapter_id=?1 ORDER BY sort_order LIMIT 120`).bind(cleanChapterId).all<TopicRow>(),
-    db.prepare("SELECT understanding_level FROM chapter_workspace_preferences WHERE user_id=?1 AND chapter_id=?2 LIMIT 1").bind(identity.id,cleanChapterId).first<{understanding_level:number|null}>(),
-    db.prepare("SELECT id,link_kind,title,url FROM chapter_workspace_links WHERE user_id=?1 AND chapter_id=?2 ORDER BY created_at DESC LIMIT 40").bind(identity.id,cleanChapterId).all<WorkspaceLinkRow>(),
-    db.prepare("SELECT id,source_kind,source_id FROM chapter_workspace_items WHERE user_id=?1 AND chapter_id=?2 ORDER BY created_at DESC LIMIT 80").bind(identity.id,cleanChapterId).all<WorkspaceItemRow>(),
-    db.prepare(`
-      SELECT wi.source_kind,wi.source_id,n.title,'Personal note' AS meta FROM chapter_workspace_items wi JOIN notes n ON n.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='personal_note'
-      UNION ALL SELECT wi.source_kind,wi.source_id,u.title,'Personal file' FROM chapter_workspace_items wi JOIN uploaded_resources u ON u.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='personal_file'
-      UNION ALL SELECT wi.source_kind,wi.source_id,n.title,'Community note' FROM chapter_workspace_items wi JOIN notes n ON n.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='community_note'
-      UNION ALL SELECT wi.source_kind,wi.source_id,u.title,'Community resource' FROM chapter_workspace_items wi JOIN uploaded_resources u ON u.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='community_resource'
-      UNION ALL SELECT wi.source_kind,wi.source_id,r.title,'Official ICAI resource' FROM chapter_workspace_items wi JOIN autofetch_resource_records a ON a.canonical_resource_id=wi.source_id JOIN icai_resources r ON r.id=a.resource_row_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='icai_resource' AND a.is_current=1
-    `).bind(identity.id,cleanChapterId).all<CandidateRow>(),
-    db.prepare(`
-      SELECT 'personal_note' AS source_kind,id AS source_id,title,'Personal note' AS meta FROM notes WHERE user_id=?1
-      UNION ALL SELECT 'personal_file',id,title,'Personal file' FROM uploaded_resources WHERE owner_user_id=?1
-      UNION ALL SELECT 'community_note',id,title,'Community note' FROM notes WHERE user_id<>?1 AND visibility='shared' AND moderation_status='approved' AND subject_id=?2
-      UNION ALL SELECT 'community_resource',id,title,'Community resource' FROM uploaded_resources WHERE owner_user_id<>?1 AND visibility='shared' AND moderation_status='approved' AND subject_id=?2
-      UNION ALL SELECT 'icai_resource',a.canonical_resource_id,r.title,'Official ICAI resource' FROM autofetch_resource_records a
-        JOIN icai_resources r ON r.id=a.resource_row_id JOIN resource_subject_map rsm ON rsm.resource_id=r.id
-        WHERE a.is_current=1 AND r.status='active' AND r.verification_status='verified' AND rsm.subject_id=?2
-      LIMIT 600`).bind(identity.id,academicRow.subject_id).all<CandidateRow>(),
+    db.prepare(`SELECT a.canonical_resource_id,r.title,r.resource_type,s.name AS source_name,r.published_on,r.last_seen_at
+      FROM autofetch_resource_records a JOIN icai_resources r ON r.id=a.resource_row_id JOIN icai_sources s ON s.id=r.source_id JOIN resource_subject_map rsm ON rsm.resource_id=r.id
+      WHERE a.is_current=1 AND a.health_status NOT IN ('broken','review_required') AND r.status='active' AND r.verification_status='verified' AND rsm.subject_id=?1
+      AND (NOT EXISTS (SELECT 1 FROM resource_attempt_map ram0 WHERE ram0.resource_id=r.id) OR EXISTS (
+        SELECT 1 FROM resource_attempt_map ram JOIN exam_attempts ea ON ea.id=ram.attempt_id WHERE ram.resource_id=r.id AND ea.attempt_key=?2 AND ea.verification_status='verified'))
+      ORDER BY COALESCE(r.published_on,r.last_seen_at) DESC LIMIT 12`).bind(academicRow.subject_id, profile.attempt_key).all<OfficialRow>(),
   ]);
 
   const progress: ProgressState = progressRow ? { completed_at: progressRow.completed_at, revision_1_at: progressRow.revision_1_at, revision_2_at: progressRow.revision_2_at, test_1_at: progressRow.test_1_at, test_2_at: progressRow.test_2_at } : EMPTY_PROGRESS;
@@ -105,18 +90,7 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
   const files: ChapterHubFile[] = (filesResult.results ?? []).map((row) => ({ id: row.id, title: row.title, filename: row.original_filename, extension: row.extension, sizeBytes: Number(row.size_bytes), updatedAt: row.updated_at }));
   const doubtChannels: ChapterHubDoubtChannel[] = (channelsResult.results ?? []).map((row) => ({ id: row.id, channelKey: row.channel_key, title: row.title, description: row.description }));
   const topics: ChapterHubTopic[] = (topicsResult.results ?? []).map((row) => ({ id: row.id, unitNumber: row.unit_number, title: row.title, kind: row.topic_kind }));
-  const candidateMap = new Map<string, ChapterHubItem>();
-  for (const row of [...(pinnedCandidateResult.results ?? []), ...(candidateResult.results ?? [])]) {
-    const href = row.source_kind === "icai_resource" ? `/resources/${encodeURIComponent(row.source_id)}/open` : row.source_kind.endsWith("note") ? `/notes/${row.source_id}` : `/resources/${row.source_id}`;
-    candidateMap.set(`${row.source_kind}:${row.source_id}`, { id: `${row.source_kind}:${row.source_id}`, sourceKind: row.source_kind, sourceId: row.source_id, title: row.title, meta: row.meta, href });
-  }
-  const pinnedItems: ChapterHubItem[] = (pinnedResult.results ?? []).flatMap((row) => {
-    const candidate = candidateMap.get(`${row.source_kind}:${row.source_id}`);
-    return candidate ? [{ ...candidate, id: row.id }] : [];
-  });
-  const pinnedKeys = new Set(pinnedItems.map((item) => `${item.sourceKind}:${item.sourceId}`));
-  const availableItems = [...candidateMap.values()].filter((item) => !pinnedKeys.has(`${item.sourceKind}:${item.sourceId}`));
-  const links: ChapterHubLink[] = (linksResult.results ?? []).map((row) => ({ id: row.id, kind: row.link_kind, title: row.title, url: row.url }));
+  const officialResources: ChapterHubOfficialResource[] = (officialResult.results ?? []).map((row) => ({ canonicalResourceId: row.canonical_resource_id, title: row.title, resourceType: row.resource_type, sourceName: row.source_name, publishedOn: row.published_on, lastVerifiedAt: row.last_seen_at }));
 
   return {
     mode: "ready", viewerName: name, attemptKey: profile.attempt_key, academic: academicDto(academicRow), topics, progress,
@@ -126,6 +100,6 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
       averageSelfReportedUnderstanding: studyAggregate?.average_understanding === null || studyAggregate?.average_understanding === undefined ? null : Number(studyAggregate.average_understanding),
       reflectedSessionCount: Number(studyAggregate?.reflected_session_count ?? 0), recentSessions,
     },
-    notes, files, doubtChannels, understandingLevel: preferenceRow?.understanding_level ?? null, links, pinnedItems, availableItems,
+    notes, files, doubtChannels, officialResources,
   };
 }

@@ -14,10 +14,8 @@ export type ChapterHubProgressEvent = { id: string; stage: ProgressStage; action
 export type ChapterHubNote = { id: string; title: string; excerpt: string; updatedAt: string };
 export type ChapterHubFile = { id: string; title: string; filename: string; extension: string; sizeBytes: number; updatedAt: string };
 export type ChapterHubDoubtChannel = { id: string; channelKey: string; title: string; description: string };
+export type ChapterHubOfficialResource = { canonicalResourceId: string; title: string; resourceType: string; sourceName: string; publishedOn: string | null; lastVerifiedAt: string };
 export type ChapterHubTopic = { id: string; unitNumber: string | null; title: string; kind: string };
-export type ChapterHubLink = { id: string; kind: "useful" | "youtube" | "revision"; title: string; url: string };
-export type ChapterHubItemKind = "personal_note" | "personal_file" | "icai_resource" | "community_note" | "community_resource";
-export type ChapterHubItem = { id: string; sourceKind: ChapterHubItemKind; sourceId: string; title: string; meta: string; href: string };
 
 export type ChapterHubReadyModel = {
   mode: "ready";
@@ -38,10 +36,7 @@ export type ChapterHubReadyModel = {
   notes: ChapterHubNote[];
   files: ChapterHubFile[];
   doubtChannels: ChapterHubDoubtChannel[];
-  understandingLevel: number | null;
-  links: ChapterHubLink[];
-  pinnedItems: ChapterHubItem[];
-  availableItems: ChapterHubItem[];
+  officialResources: ChapterHubOfficialResource[];
 };
 
 export type ChapterHubModel =
