@@ -184,7 +184,7 @@ export function ProgressTracker({
         <article className="progress-chapter-card" key={chapter.id} data-canonical-chapter-id={chapter.id}>
           <div className="progress-chapter-heading">
             <h3><b>{chapter.number}</b>{chapter.title}</h3>
-            <Link href={`/chapters/${chapter.id}`}>Go to Chapter Hub <Icon name="arrow" size={12}/></Link>
+            <Link href={`/chapters/${chapter.id}`}><span className="progress-hub-label--desktop">Go to Chapter Hub</span><span className="progress-hub-label--mobile">Chapter Hub</span><Icon name="arrow" size={12}/></Link>
           </div>
           <div className="progress-stage-controls" role="group" aria-label={`${chapter.title} stages`}>
             {STAGES.map((stage) => {
