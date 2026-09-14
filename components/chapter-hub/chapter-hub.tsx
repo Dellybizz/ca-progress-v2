@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -16,16 +19,18 @@ function fileSize(bytes: number) { if (bytes < 1024 * 1024) return `${Math.max(1
 function SectionTitle({ icon, eyebrow, title, action }: { icon: IconName; eyebrow: string; title: string; action?: React.ReactNode }) { return <header className="chapter-hub-section__header"><div className="chapter-hub-section__title"><span><Icon name={icon} size={18}/></span><div><small>{eyebrow}</small><h2>{title}</h2></div></div>{action}</header>; }
 
 export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
+  const [mobileView, setMobileView] = useState<"overview" | "study" | "resources">("overview");
   const { academic } = model;
   const progressCount = STAGES.filter((stage) => Boolean(model.progress[stage.field])).length;
   const chapterQuery = `chapterId=${encodeURIComponent(academic.chapterId)}&subjectId=${encodeURIComponent(academic.subjectId)}`;
   const lastStudyAt = model.study.recentSessions[0]?.endedAt ?? null;
   const understanding = model.study.averageSelfReportedUnderstanding;
 
-  return <div className="chapter-hub-page" data-canonical-chapter-id={academic.chapterId}>
+  return <div className={`chapter-hub-page chapter-hub-page--${mobileView}`} data-canonical-chapter-id={academic.chapterId}>
     <AcademicBreadcrumbs items={[{ label: "Progress", href: "/progress" }, { label: academic.subjectTitle, href: `/subjects/${academic.subjectSlug}` }, { label: `Chapter ${academic.chapterNumber}` }]}/>
-    <section className="chapter-hub-hero"><div className="chapter-hub-hero__copy"><div className="chapter-hub-hero__badges"><AcademicEntityMark kind="chapter" label={`Chapter ${academic.chapterNumber}`}/><Badge>{academic.paperLabel}</Badge></div><span className="eyebrow">Chapter Hub · canonical workspace</span><h1><b>{academic.chapterNumber}</b>{academic.chapterTitle}</h1><p>Progress, study time, tests, notes, doubts, files and verified ICAI material stay connected to this chapter through its canonical academic ID.</p><div className="chapter-hub-identity"><Icon name="lock" size={14}/><code>{academic.chapterId}</code><span>Stable chapter identity</span></div></div><div className="chapter-hub-hero__stats"><div><span>Progress</span><strong>{progressCount}/5</strong><small>stages complete</small></div><div><span>Study time</span><strong>{durationLabel(model.study.totalSeconds)}</strong><small>{model.study.sessionCount} sessions</small></div><div><span>Workspace</span><strong>{model.notes.length + model.files.length}</strong><small>notes + files</small></div></div></section>
+    <section className="chapter-hub-hero"><div className="chapter-hub-hero__copy"><div className="chapter-hub-hero__badges"><AcademicEntityMark kind="chapter" label={`Chapter ${academic.chapterNumber}`}/><Badge>{academic.paperLabel}</Badge></div><h1><b>{academic.chapterNumber}</b>{academic.chapterTitle}</h1><p>{academic.subjectTitle} · {academic.groupName}</p><div className="chapter-hub-actions"><Link href={`/study?${chapterQuery}`} className="ui-button ui-button--primary"><Icon name="timer" size={16}/> Start Focus</Link><Link href={`/subjects/${academic.subjectSlug}/progress?chapterId=${encodeURIComponent(academic.chapterId)}`} className="ui-button">Update progress</Link></div></div><div className="chapter-hub-hero__stats"><div><span>Progress</span><strong>{progressCount}/5</strong><small>stages complete</small></div><div><span>Focused</span><strong>{durationLabel(model.study.totalSeconds)}</strong><small>{model.study.sessionCount} sessions</small></div><div><span>Saved</span><strong>{model.notes.length + model.files.length}</strong><small>notes and files</small></div></div></section>
     <AcademicContextBar level={academic.levelName} group={academic.groupName} attempt={model.attemptKey} syllabus={academic.syllabusVersionKey}/>
+    <nav className="chapter-hub-mobile-tabs" aria-label="Chapter workspace view">{(["overview", "study", "resources"] as const).map((view) => <button type="button" key={view} className={mobileView === view ? "is-active" : ""} onClick={() => setMobileView(view)}>{view.charAt(0).toUpperCase() + view.slice(1)}</button>)}</nav>
 
     <div className="chapter-hub-grid chapter-hub-grid--primary">
       <Card className="chapter-hub-section chapter-hub-progress"><CardBody><SectionTitle icon="target" eyebrow="Progress" title="Chapter stages" action={<Link href={`/subjects/${academic.subjectSlug}/progress?chapterId=${encodeURIComponent(academic.chapterId)}`} className="chapter-hub-text-link">Open tracker <Icon name="arrow" size={13}/></Link>}/><div className="chapter-hub-stage-grid">{STAGES.map((stage) => { const completedAt = model.progress[stage.field]; return <div key={stage.field} className={completedAt ? "is-complete" : ""}><span>{completedAt ? <Icon name="check" size={14}/> : stage.short}</span><strong>{stage.label}</strong><small>{dateLabel(completedAt)}</small></div>; })}</div>{model.progressEvents.length ? <div className="chapter-hub-mini-history"><span>Recent changes</span>{model.progressEvents.slice(0, 3).map((event) => <div key={event.id}><strong>{event.stage.replaceAll("_", " ")}</strong><small>{event.action} · {dateLabel(event.createdAt)}</small></div>)}</div> : <p className="chapter-hub-empty-line">No progress events yet. The existing progress tracker remains the single mutation path.</p>}</CardBody></Card>

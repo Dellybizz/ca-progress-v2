@@ -83,7 +83,7 @@ test("Product Phase 1 existing records stay linked by canonical academic IDs acr
   assert.match(service, /chapter_id=\?2/);
   assert.match(service, /FROM topics WHERE chapter_id=\?1/);
   assert.match(hub, /data-canonical-chapter-id=\{academic\.chapterId\}/);
-  assert.match(hub, /Stable chapter identity/);
+  assert.match(hub, /Start Focus/);
   const privateLinkage = service.match(/FROM (?:chapter_progress|progress_events|study_sessions|notes|uploaded_resources)[\s\S]{0,280}/g)?.join("\n") ?? "";
   assert.doesNotMatch(privateLinkage, /chapter_name\s*=|chapter_title\s*=/);
 });
