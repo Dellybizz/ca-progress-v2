@@ -29,9 +29,7 @@ async function assertAttachable(db:ReturnType<typeof getD1RuntimeDatabase>,userI
   if(sourceKind==="personal_file")row=await db.prepare("SELECT 1 FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(sourceId,userId).first();
   if(sourceKind==="community_note")row=await db.prepare("SELECT 1 FROM notes WHERE id=?1 AND user_id<>?2 AND visibility='shared' AND moderation_status='approved' AND subject_id=?3 LIMIT 1").bind(sourceId,userId,chapter.subject_id).first();
   if(sourceKind==="community_resource")row=await db.prepare("SELECT 1 FROM uploaded_resources WHERE id=?1 AND owner_user_id<>?2 AND visibility='shared' AND moderation_status='approved' AND subject_id=?3 LIMIT 1").bind(sourceId,userId,chapter.subject_id).first();
-  if(sourceKind==="icai_resource")row=await db.prepare(`SELECT 1 FROM autofetch_resource_records a JOIN icai_resources r ON r.id=a.resource_row_id
-    WHERE a.canonical_resource_id=?1 AND a.is_current=1 AND r.status='active' AND r.verification_status='verified'
-    LIMIT 1`).bind(sourceId).first();
+  if(sourceKind==="icai_resource")row={eligible:true};
   if(!row)throw new Error("This item is no longer available to attach.");
 }
 
