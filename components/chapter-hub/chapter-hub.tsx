@@ -7,11 +7,11 @@ import { Card, CardBody } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
 import type { ChapterHubReadyModel } from "@/lib/chapter-hub/types";
 import type { ProgressState } from "@/lib/progress/types";
-import { AcademicBreadcrumbs, AcademicContextBar, AcademicEntityMark } from "@/components/academic/academic-navigation";
+import { AcademicBreadcrumbs, AcademicEntityMark } from "@/components/academic/academic-navigation";
 
 const STAGES: Array<{ field: keyof ProgressState; label: string; short: string }> = [
-  { field: "completed_at", label: "Completed", short: "Done" }, { field: "revision_1_at", label: "Revision 1", short: "1R" },
-  { field: "revision_2_at", label: "Revision 2", short: "2R" }, { field: "test_1_at", label: "Test 1", short: "T1" }, { field: "test_2_at", label: "Test 2", short: "T2" },
+  { field: "completed_at", label: "Completed", short: "Done" }, { field: "revision_1_at", label: "Revision 1", short: "Rev. 1" },
+  { field: "revision_2_at", label: "Revision 2", short: "Rev. 2" }, { field: "test_1_at", label: "Test 1", short: "Test 1" }, { field: "test_2_at", label: "Test 2", short: "Test 2" },
 ];
 function dateLabel(value: string | null) { if (!value) return "Not yet"; return new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); }
 function durationLabel(seconds: number) { const minutes = Math.round(seconds / 60); if (minutes < 60) return `${minutes} min`; const hours = Math.floor(minutes / 60); const rest = minutes % 60; return rest ? `${hours}h ${rest}m` : `${hours}h`; }
@@ -29,7 +29,6 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
   return <div className={`chapter-hub-page chapter-hub-page--${mobileView}`} data-canonical-chapter-id={academic.chapterId}>
     <AcademicBreadcrumbs items={[{ label: "Progress", href: "/progress" }, { label: academic.subjectTitle, href: `/subjects/${academic.subjectSlug}` }, { label: `Chapter ${academic.chapterNumber}` }]}/>
     <section className="chapter-hub-hero"><div className="chapter-hub-hero__copy"><div className="chapter-hub-hero__badges"><AcademicEntityMark kind="chapter" label={`Chapter ${academic.chapterNumber}`}/><Badge>{academic.paperLabel}</Badge></div><h1><b>{academic.chapterNumber}</b>{academic.chapterTitle}</h1><p>{academic.subjectTitle} · {academic.groupName}</p><div className="chapter-hub-actions"><Link href={`/study?${chapterQuery}`} className="ui-button ui-button--primary"><Icon name="timer" size={16}/> Start Focus</Link><Link href={`/subjects/${academic.subjectSlug}/progress?chapterId=${encodeURIComponent(academic.chapterId)}`} className="ui-button">Update progress</Link></div></div><div className="chapter-hub-hero__stats"><div><span>Progress</span><strong>{progressCount}/5</strong><small>stages complete</small></div><div><span>Focused</span><strong>{durationLabel(model.study.totalSeconds)}</strong><small>{model.study.sessionCount} sessions</small></div><div><span>Saved</span><strong>{model.notes.length + model.files.length}</strong><small>notes and files</small></div></div></section>
-    <AcademicContextBar level={academic.levelName} group={academic.groupName} attempt={model.attemptKey} syllabus={academic.syllabusVersionKey}/>
     <nav className="chapter-hub-mobile-tabs" aria-label="Chapter workspace view">{(["overview", "study", "resources"] as const).map((view) => <button type="button" key={view} className={mobileView === view ? "is-active" : ""} onClick={() => setMobileView(view)}>{view.charAt(0).toUpperCase() + view.slice(1)}</button>)}</nav>
 
     <div className="chapter-hub-grid chapter-hub-grid--primary">
