@@ -29,6 +29,7 @@ test("Phase 4 browsing states and responsive rollout are implemented",()=>{
   for(const state of ["Current","Historical","New","Changed","Unavailable"]) assert.match(browser,new RegExp(`"${state}"`));
   assert.match(browser,/view === "folders"/);
   assert.match(browser,/view === "list"/);
-  assert.match(read("components/chapter-hub/chapter-hub.tsx"),/AcademicBreadcrumbs/);
+  assert.match(read("components/chapter-hub/chapter-hub.tsx"),/AcademicContextBar/);
+  assert.match(read("components/shell/app-shell.tsx"),/RouteTrail/);
   assert.match(read("app\/styles\/academic.css"),/@media \(max-width: 620px\)/);
 });

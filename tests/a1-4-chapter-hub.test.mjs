@@ -18,7 +18,21 @@ test("A1.4 gives mobile shallow chapter views instead of one long stack", () => 
   const css = read("app/styles/chapter-hub.css");
   assert.match(hub, /overview.*study.*resources/);
   assert.match(hub, /chapter-hub-mobile-tabs/);
+  assert.match(hub, /data-mobile-view="overview"/);
+  assert.match(hub, /data-mobile-view="study"/);
+  assert.match(hub, /data-mobile-view="resources"/);
   assert.match(css, /chapter-hub-page--overview/);
   assert.match(css, /chapter-hub-page--study/);
   assert.match(css, /chapter-hub-page--resources/);
+});
+
+test("A1.4 uses one desktop workspace and the global route trail", () => {
+  const hub = read("components/chapter-hub/chapter-hub.tsx");
+  const css = read("app/styles/chapter-hub.css");
+  assert.match(hub, /chapter-hub-workspace/);
+  assert.match(hub, /chapter-hub-main/);
+  assert.match(hub, /chapter-hub-rail/);
+  assert.match(hub, /Chapter activity/);
+  assert.doesNotMatch(hub, /AcademicBreadcrumbs/);
+  assert.match(css, /grid-template-columns:\s*minmax\(0, 1\.62fr\)/);
 });
