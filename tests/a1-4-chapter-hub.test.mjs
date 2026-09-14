@@ -56,6 +56,8 @@ test("A1.4 provides private advanced chapter controls", () => {
   assert.match(api, /set_stage_date/);
   assert.match(api, /set_understanding/);
   assert.match(api, /assertAttachable/);
+  assert.match(api, /sourceId,2048/);
+  assert.match(api, /if\(!saved\?\.id\)throw/);
   assert.match(migration, /understanding_level INTEGER CHECK\(understanding_level BETWEEN 0 AND 100\)/);
   assert.match(migration, /UNIQUE\(user_id,chapter_id,source_kind,source_id\)/);
   assert.doesNotMatch(hub, /Official ICAI resources/);

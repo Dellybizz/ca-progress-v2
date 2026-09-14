@@ -163,7 +163,7 @@ export function ProgressTracker({
       if(!response.ok)throw new Error(payload.error||"Progress could not be saved.");
       const states=new Map((payload.states??[]).map((row)=>[row.chapter_id,row]));
       const committed=chapters.map((chapter)=>{const row=states.get(chapter.id);return row?{...chapter,state:row.state,updatedAt:row.saved_at}:chapter;});
-      for(const chapter of committed)if(states.has(chapter.id))writeSyncedProgress(chapter.id,chapter.state);setChapters(committed);setSavedChapters(committed);setSaveState("saved");setMessage("All changes saved.");router.refresh();
+      for(const chapter of committed)if(states.has(chapter.id))writeSyncedProgress(chapter.id,chapter.state);setChapters(committed);setSavedChapters(committed);setSaveState("saved");setMessage("All changes saved.");
     }catch(error){setSaveState("error");setMessage(error instanceof Error?error.message:"Progress could not be saved.");}
   }
   function discardChanges(){setChapters(savedChapters);setSaveState("idle");setMessage(null);}
