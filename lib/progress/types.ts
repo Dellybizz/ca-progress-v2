@@ -18,6 +18,7 @@ export type ProgressChapter = {
   subjectSlug: string;
   groupCode: string;
   groupName: string;
+  sectionKey: string | null;
   state: ProgressState;
   updatedAt: string | null;
 };

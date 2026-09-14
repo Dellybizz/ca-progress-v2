@@ -46,13 +46,6 @@ function optimisticState(state: ProgressState, stage: ProgressStage, enabled: bo
   return { ...state, [fieldForStage[stage]]: enabled ? new Date().toISOString() : null };
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "Not yet";
-  const parsed = new Date(value);
-  if (!Number.isFinite(parsed.getTime())) return value;
-  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(parsed);
-}
-
 function isTestStage(stage: ProgressStage): stage is "test_1" | "test_2" {
   return stage === "test_1" || stage === "test_2";
 }
@@ -65,6 +58,20 @@ function shortSubjectTitle(title: string) {
     "Corporate and Other Laws": "Law",
   };
   return labels[title] ?? title;
+}
+
+function sectionTitle(subjectTitle: string, sectionKey: string | null) {
+  if (!sectionKey) return null;
+  const key = sectionKey.toLocaleLowerCase().replaceAll("_", "-");
+  if (subjectTitle === "Taxation") {
+    if (/gst|goods|indirect/.test(key)) return "Goods and Service Tax (IDT)";
+    if (/income|direct/.test(key)) return "Income Tax (DT)";
+  }
+  if (subjectTitle === "Financial Management and Strategic Management") {
+    if (/strategic|strategy/.test(key)) return "Strategic Management";
+    if (/financial|finance/.test(key)) return "Financial Management";
+  }
+  return null;
 }
 
 export function ProgressTracker({
@@ -103,7 +110,7 @@ export function ProgressTracker({
     const q = query.trim().toLocaleLowerCase();
     return !q || `${chapter.number} ${chapter.title} ${chapter.subjectTitle}`.toLocaleLowerCase().includes(q);
   }), [chapters, group, query, subject]);
-  const grouped = useMemo(() => [...new Map(filtered.map((chapter) => [chapter.subjectId, { title: chapter.subjectTitle, chapters: filtered.filter((item) => item.subjectId === chapter.subjectId) }])).values()], [filtered]);
+  const grouped = useMemo(() => [...new Map(filtered.map((chapter) => [chapter.subjectId, { title: chapter.subjectTitle, chapters: filtered.filter((item) => item.subjectId === chapter.subjectId) }])).values()].map((item) => ({ ...item, sections: [...new Map(item.chapters.map((chapter) => [sectionTitle(item.title, chapter.sectionKey) ?? "", { title: sectionTitle(item.title, chapter.sectionKey), chapters: item.chapters.filter((candidate) => (sectionTitle(item.title, candidate.sectionKey) ?? "") === (sectionTitle(item.title, chapter.sectionKey) ?? "")) }])).values()] })), [filtered]);
 
   async function mutate(chapter: ProgressChapter, stage: ProgressStage) {
     if (isTestStage(stage)) {
@@ -166,7 +173,7 @@ export function ProgressTracker({
 
       {saveState === "error" ? <div className="progress-save-error" role="alert"><span><Icon name="bell" size={15}/>{message}</span>{undoEvent ? <button onClick={undo}>Undo</button> : null}</div> : null}
 
-      {filtered.length ? <div className="progress-subject-sections">{grouped.map((section) => <section className="progress-subject-section" key={section.title}><h2>{shortSubjectTitle(section.title)}</h2><div className="progress-chapter-list">{section.chapters.map((chapter) => (
+      {filtered.length ? <div className="progress-subject-sections">{grouped.map((subjectSection) => <section className="progress-subject-section" key={subjectSection.title}><h2>{shortSubjectTitle(subjectSection.title)}</h2>{subjectSection.sections.map((section) => <div className="progress-syllabus-section" key={section.title ?? "chapters"}>{section.title ? <h3>{section.title}</h3> : null}<div className="progress-chapter-list">{section.chapters.map((chapter) => (
         <article className="progress-chapter-card" key={chapter.id} data-canonical-chapter-id={chapter.id}>
           <div className="progress-chapter-heading">
             <h3><b>{chapter.number}</b>{chapter.title}</h3>
@@ -180,11 +187,10 @@ export function ProgressTracker({
                 ? true
                 : !testStage && active ? clearLocked(chapter.state, stage.key) : false;
               const pending = pendingKey === `${chapter.id}:${stage.key}`;
-              const date = chapter.state[fieldForStage[stage.key]];
               const title = locked
                 ? "Complete the required earlier stage first."
                 : testStage
-                  ? active ? `Open saved ${stage.label} marks (${formatDate(date)})` : `Record ${stage.label} marks`
+                  ? active ? `Open saved ${stage.label} marks` : `Record ${stage.label} marks`
                   : stage.label;
               return <button
                 key={stage.key}
@@ -194,16 +200,15 @@ export function ProgressTracker({
                 onClick={() => void mutate(chapter, stage.key)}
                 title={title}
                 aria-pressed={active}
+                aria-label={`${stage.label}${active ? ", completed" : ""}`}
               >
                 <span>{stage.short}</span>
-                <small>{stage.label}</small>
-                {active && date ? <small>{formatDate(date)}</small> : null}
                 {locked ? <Icon name="lock" size={12}/> : active ? <Icon name="check" size={12}/> : pending ? <Icon name="clock" size={12}/> : testStage ? <Icon name="arrow" size={12}/> : null}
               </button>;
             })}
           </div>
         </article>
-      ))}</div></section>)}</div> : <div className="progress-empty"><Icon name="search"/><h3>No chapters match these filters</h3><p>Clear the search or broaden the subject/group selection.</p></div>}
+      ))}</div></div>)}</section>)}</div> : <div className="progress-empty"><Icon name="search"/><h3>No chapters match these filters</h3><p>Clear the search or broaden the subject/group selection.</p></div>}
 
     </div>
   );

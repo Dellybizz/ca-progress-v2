@@ -22,6 +22,11 @@ test("A1.3 uses direct group and subject selectors before chapter action", () =>
   assert.match(tracker, /All subjects/);
   assert.match(tracker, /Go to Chapter Hub/);
   assert.match(tracker, /flushSync/);
+  assert.match(tracker, /Income Tax \(DT\)/);
+  assert.match(tracker, /Goods and Service Tax \(IDT\)/);
+  assert.match(tracker, /Financial Management/);
+  assert.match(tracker, /Strategic Management/);
+  assert.doesNotMatch(tracker, /<small>\{stage\.label\}<\/small>/);
   assert.doesNotMatch(tracker, /Your portfolio at a glance/);
 });
 
