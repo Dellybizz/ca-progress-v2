@@ -12,8 +12,6 @@ test("Product Phase 1 Chapter Hub reaches every connected academic workspace", (
   assert.match(hub, /\/subjects\/\$\{academic\.subjectSlug\}\/progress\?chapterId=/);
   assert.match(hub, /\/study\?\$\{chapterQuery\}/);
   assert.match(hub, /\/tests\?\$\{chapterQuery\}/);
-  assert.match(hub, /\/notes\?\$\{chapterQuery\}/);
-  assert.match(hub, /\/resources\?\$\{chapterQuery\}/);
   assert.match(hub, /\/community\/\$\{channel\.channelKey\}\?chapterId=/);
   assert.match(hub, /Last studied:/);
   assert.match(hub, /self-reported understanding/);

@@ -59,7 +59,8 @@
 .chapter-hub-date-grid label.is-complete { background: var(--color-success-soft); }
 .chapter-hub-date-grid span { font-size: 10px; font-weight: 700; }
 .chapter-hub-date-grid input { width: 100%; min-width: 0; min-height: 34px; padding: 0 6px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); font-size: 9px; }
-.chapter-hub-date-grid label > button { width: fit-content; padding: 0; background: transparent; color: var(--color-brand-strong); font-size: 9px; font-weight: 700; cursor: pointer; }
+.chapter-hub-date-grid label > button { width: fit-content; min-height: 25px; padding: 0 7px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-brand-strong); font-size: 9px; font-weight: 700; cursor: pointer; }
+.chapter-hub-date-grid label > button:disabled { opacity: .45; cursor: default; }
 .chapter-hub-understanding { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px 12px; padding-top: 2px; }
 .chapter-hub-understanding > span { display: grid; gap: 2px; }
 .chapter-hub-understanding strong { font-size: 11px; }
@@ -112,6 +113,7 @@
 .chapter-hub-resource-results > div:last-child { border-bottom: 0; }
 .chapter-hub-resource-results > div > span { min-width: 0; display: grid; gap: 2px; }
 .chapter-hub-resource-results strong, .chapter-hub-resource-results small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-hub-resource-results code, .chapter-hub-pinned-list code { width: fit-content; padding: 2px 5px; border-radius: var(--radius-sm); background: var(--color-surface-strong); color: var(--color-text-soft); font-family: inherit; font-size: 8px; font-weight: 750; letter-spacing: .035em; }
 .chapter-hub-resource-results strong { font-size: 10px; }
 .chapter-hub-resource-results small, .chapter-hub-resource-results p { color: var(--color-text-faint); font-size: 9px; }
 .chapter-hub-resource-results p { margin: 0; padding: 18px 10px; text-align: center; }
@@ -190,11 +192,15 @@
   .chapter-hub-list small { padding-left: 21px; white-space: normal; }
   .chapter-hub-official-grid { grid-template-columns: 1fr; }
   .chapter-hub-date-grid { grid-template-columns: 1fr; border-radius: var(--radius-md); }
-  .chapter-hub-date-grid label { grid-template-columns: 70px minmax(0, 1fr); align-items: center; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .chapter-hub-date-grid label { grid-template-columns: 55px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 8px; border-right: 0; border-bottom: 1px solid var(--color-border); }
   .chapter-hub-date-grid label:last-child { border-bottom: 0; }
   .chapter-hub-date-grid input { min-height: 40px; font-size: 11px; }
   .chapter-hub-attach, .chapter-hub-link-form { grid-template-columns: 1fr; }
+  .chapter-hub-resource-tabs { position: sticky; top: 58px; z-index: 3; }
   .chapter-hub-resource-tabs button { min-height: 42px; gap: 4px; font-size: 10px; }
+  .chapter-hub-resource-search { position: sticky; top: 107px; z-index: 2; background: var(--color-surface); }
+  .chapter-hub-resource-results > div { grid-template-columns: minmax(0, 1fr) 68px; gap: 6px; }
+  .chapter-hub-resource-results .ui-button { width: 68px; min-height: 38px; padding-inline: 6px; }
   .chapter-hub-resource-results { max-height: 360px; }
   .chapter-hub-resource-results > div { padding-inline: 8px; }
   .chapter-hub-attach button, .chapter-hub-link-form button { width: 100%; }

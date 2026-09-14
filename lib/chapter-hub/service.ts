@@ -62,7 +62,7 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
   const groupAllowed = profile.ca_level === "foundation" || profile.group_choice === "both" || profile.group_choice === "not_applicable" || profile.group_choice === academicRow.group_code;
   if (!applicable || profile.ca_level !== academicRow.level_code || !groupAllowed) return { mode: "scope_mismatch" };
 
-  const [progressRow, progressEventsResult, studyResult, studyAggregate, notesResult, filesResult, channelsResult, topicsResult, preferenceRow, linksResult, pinnedResult, candidateResult] = await Promise.all([
+  const [progressRow, progressEventsResult, studyResult, studyAggregate, notesResult, filesResult, channelsResult, topicsResult, preferenceRow, linksResult, pinnedResult, pinnedCandidateResult, candidateResult] = await Promise.all([
     db.prepare(`SELECT completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at FROM chapter_progress WHERE user_id=?1 AND chapter_id=?2 LIMIT 1`).bind(identity.id, cleanChapterId).first<ProgressRow>(),
     db.prepare(`SELECT id,stage,action,created_at FROM progress_events WHERE user_id=?1 AND chapter_id=?2 ORDER BY created_at DESC LIMIT 10`).bind(identity.id, cleanChapterId).all<ProgressEventRow>(),
     db.prepare(`SELECT s.id,s.started_at,s.ended_at,s.duration_seconds,s.mode,x.understanding_score,x.focus_rating,COALESCE(t.title,dpi.title) AS intended_task_title
@@ -81,6 +81,13 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
     db.prepare("SELECT id,link_kind,title,url FROM chapter_workspace_links WHERE user_id=?1 AND chapter_id=?2 ORDER BY created_at DESC LIMIT 40").bind(identity.id,cleanChapterId).all<WorkspaceLinkRow>(),
     db.prepare("SELECT id,source_kind,source_id FROM chapter_workspace_items WHERE user_id=?1 AND chapter_id=?2 ORDER BY created_at DESC LIMIT 80").bind(identity.id,cleanChapterId).all<WorkspaceItemRow>(),
     db.prepare(`
+      SELECT wi.source_kind,wi.source_id,n.title,'Personal note' AS meta FROM chapter_workspace_items wi JOIN notes n ON n.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='personal_note'
+      UNION ALL SELECT wi.source_kind,wi.source_id,u.title,'Personal file' FROM chapter_workspace_items wi JOIN uploaded_resources u ON u.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='personal_file'
+      UNION ALL SELECT wi.source_kind,wi.source_id,n.title,'Community note' FROM chapter_workspace_items wi JOIN notes n ON n.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='community_note'
+      UNION ALL SELECT wi.source_kind,wi.source_id,u.title,'Community resource' FROM chapter_workspace_items wi JOIN uploaded_resources u ON u.id=wi.source_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='community_resource'
+      UNION ALL SELECT wi.source_kind,wi.source_id,r.title,'Official ICAI resource' FROM chapter_workspace_items wi JOIN autofetch_resource_records a ON a.canonical_resource_id=wi.source_id JOIN icai_resources r ON r.id=a.resource_row_id WHERE wi.user_id=?1 AND wi.chapter_id=?2 AND wi.source_kind='icai_resource' AND a.is_current=1
+    `).bind(identity.id,cleanChapterId).all<CandidateRow>(),
+    db.prepare(`
       SELECT 'personal_note' AS source_kind,id AS source_id,title,'Personal note' AS meta FROM notes WHERE user_id=?1
       UNION ALL SELECT 'personal_file',id,title,'Personal file' FROM uploaded_resources WHERE owner_user_id=?1
       UNION ALL SELECT 'community_note',id,title,'Community note' FROM notes WHERE user_id<>?1 AND visibility='shared' AND moderation_status='approved' AND subject_id=?2
@@ -88,7 +95,7 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
       UNION ALL SELECT 'icai_resource',a.canonical_resource_id,r.title,'Official ICAI resource' FROM autofetch_resource_records a
         JOIN icai_resources r ON r.id=a.resource_row_id JOIN resource_subject_map rsm ON rsm.resource_id=r.id
         WHERE a.is_current=1 AND r.status='active' AND r.verification_status='verified' AND rsm.subject_id=?2
-      LIMIT 240`).bind(identity.id,academicRow.subject_id).all<CandidateRow>(),
+      LIMIT 600`).bind(identity.id,academicRow.subject_id).all<CandidateRow>(),
   ]);
 
   const progress: ProgressState = progressRow ? { completed_at: progressRow.completed_at, revision_1_at: progressRow.revision_1_at, revision_2_at: progressRow.revision_2_at, test_1_at: progressRow.test_1_at, test_2_at: progressRow.test_2_at } : EMPTY_PROGRESS;
@@ -99,7 +106,7 @@ export async function getChapterHubModel(chapterId: string): Promise<ChapterHubM
   const doubtChannels: ChapterHubDoubtChannel[] = (channelsResult.results ?? []).map((row) => ({ id: row.id, channelKey: row.channel_key, title: row.title, description: row.description }));
   const topics: ChapterHubTopic[] = (topicsResult.results ?? []).map((row) => ({ id: row.id, unitNumber: row.unit_number, title: row.title, kind: row.topic_kind }));
   const candidateMap = new Map<string, ChapterHubItem>();
-  for (const row of candidateResult.results ?? []) {
+  for (const row of [...(pinnedCandidateResult.results ?? []), ...(candidateResult.results ?? [])]) {
     const href = row.source_kind === "icai_resource" ? `/resources/${encodeURIComponent(row.source_id)}/open` : row.source_kind.endsWith("note") ? `/notes/${row.source_id}` : `/resources/${row.source_id}`;
     candidateMap.set(`${row.source_kind}:${row.source_id}`, { id: `${row.source_kind}:${row.source_id}`, sourceKind: row.source_kind, sourceId: row.source_id, title: row.title, meta: row.meta, href });
   }
