@@ -38,6 +38,7 @@ export function PlannerClient({ model: serverModel }: { model: PlannerReadyModel
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const selectedSubject = model.subjects.find((subject) => subject.id === subjectId) ?? null;
   const today = useMemo(() => new Date(), []);
@@ -62,12 +63,14 @@ export function PlannerClient({ model: serverModel }: { model: PlannerReadyModel
   function resetForm() {
     setEditingId(null); setTitle(""); setNotes(""); setKind("study"); setSubjectId(""); setChapterId(""); setScheduleMode("fixed");
     setScheduledDate(defaultWhen.slice(0, 10)); setScheduledTime(defaultWhen.slice(11, 16)); setEstimated(30); setError(null);
+    setComposerOpen(false);
   }
 
   function editTask(task: PlannerTask) {
     const scheduled = localInput(new Date(task.dueAt));
     setEditingId(task.id); setTitle(task.title); setNotes(task.notes ?? ""); setKind(task.taskKind); setSubjectId(task.subjectId ?? ""); setChapterId(task.chapterId ?? "");
     setScheduleMode(task.scheduleMode); setScheduledDate(task.targetDate ?? scheduled.slice(0, 10)); setScheduledTime(scheduled.slice(11, 16)); setEstimated(task.estimatedMinutes); setError(null);
+    setComposerOpen(true);
     window.requestAnimationFrame(() => document.querySelector(".planner-add-card")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
@@ -99,8 +102,10 @@ export function PlannerClient({ model: serverModel }: { model: PlannerReadyModel
         <Card><CardBody><Icon name="target"/><span><strong>{model.countdown.periodStatus === "exam_period" ? "Exam period" : model.countdown.periodStatus === "completed" ? "Exam completed" : model.countdown.daysRemaining ?? "—"}</strong><small>{model.countdown.periodStatus === "upcoming" ? `Days to ${model.countdown.attemptLabel ?? "attempt"}` : model.countdown.periodStatus === "unavailable" ? "Attempt date unavailable" : model.countdown.attemptLabel ?? "Selected attempt"}</small></span></CardBody></Card>
       </section>
 
-      <Card className="planner-add-card">
-        <CardHeader title={editingId ? "Edit task" : "Add task"} action={editingId ? <button className="planner-edit-cancel" type="button" disabled={busy} onClick={resetForm}>Cancel</button> : undefined}/>
+      <button className="ui-button ui-button--primary a2-mobile-create" type="button" onClick={() => setComposerOpen(true)}>Add task</button>
+
+      <Card className={`planner-add-card a2-mobile-editor ${composerOpen ? "is-open" : ""}`}>
+        <CardHeader title={editingId ? "Edit task" : "Add task"} action={<button className={`planner-edit-cancel ${editingId ? "" : "a2-editor-close"}`} type="button" disabled={busy} onClick={resetForm}>{editingId ? "Cancel" : "Close"}</button>}/>
         <CardBody><form className="phase6-form planner-form" onSubmit={saveTask}>
           <label className="planner-form__full"><span>Task</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Revise AS 10"/></label>
           <div className="planner-form__grid">

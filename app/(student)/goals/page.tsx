@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { optionalUser } from "@/lib/auth/server";
 import { getPlanFeatureAccessForUser } from "@/lib/billing/feature-access";
 import { getGoalsPageModel } from "@/lib/planner/service";
+import { PlanningNav } from "@/components/planner/planning-nav";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Goals | CA Progress" };
@@ -28,5 +29,5 @@ export default async function Page() {
     <LoginRequired next="/goals" title="Sign in to review plan access"/>
   </div>;
   if (model.mode === "setup") return <div className="phase6-page"><PageHeader preview={false} eyebrow="Goals" title="Complete your academic profile first." description="Goals become part of Today, Calendar and Analytics after setup."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
-  return <div className="phase6-page"><PageHeader preview={false} eyebrow="Goals" title="Set measurable study milestones." description="Study-minute, completion, revision and test goals advance from your recorded work and use the same values in Today and Analytics." actions={<div className="phase6-header-links"><Link href="/planner">Planner</Link><Link href="/calendar">Calendar</Link></div>}/><GoalsClient goals={model.goals}/></div>;
+  return <div className="phase6-page a2-planning-page a2-goals-page"><PlanningNav current="goals"/><PageHeader preview={false} eyebrow="Goals" title="Set your direction" description="Choose measurable outcomes; recorded work updates them automatically."/><GoalsClient goals={model.goals}/></div>;
 }

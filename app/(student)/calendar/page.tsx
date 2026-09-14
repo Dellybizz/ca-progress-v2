@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { optionalUser } from "@/lib/auth/server";
 import { getPlanFeatureAccessForUser } from "@/lib/billing/feature-access";
 import { getCalendarPageModel } from "@/lib/planner/calendar";
+import { PlanningNav } from "@/components/planner/planning-nav";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Calendar | CA Progress" };
@@ -38,8 +39,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
     <LoginRequired next="/calendar" title="Sign in to manage your study calendar"/>
   </div>;
   if (model.mode === "setup") return <div className="phase6-page"><PageHeader preview={false} eyebrow="Calendar" title="Complete your academic profile first." description="Your selected attempt determines which verified official exam events belong on the calendar."/><Link href="/settings/profile" className="ui-button ui-button--primary">Review profile</Link></div>;
-  return <div className="phase6-page">
-    <PageHeader preview={false} eyebrow="Calendar" title="One calendar for study and real-life commitments." description={`Fixed times, flexible study targets, goals, personal events and verified attempt events are composed in ${model.timezone}.`} actions={<div className="phase6-header-links"><Link href="/planner">Planner</Link><Link href="/goals">Goals</Link></div>}/>
+  return <div className="phase6-page a2-planning-page a2-calendar-page">
+    <PlanningNav current="calendar"/>
+    <PageHeader preview={false} eyebrow="Calendar" title="See your time" description={`Study, commitments and verified attempt dates · ${model.timezone}`}/>
     <Card><CardBody><div className="phase6-task-title"><strong>{countdownText(model.countdown.daysRemaining, model.countdown.attemptLabel, model.countdown.periodStatus)}</strong><span className="phase6-kind">{model.countdown.periodStatus === "upcoming" && model.countdown.milestone !== "normal" ? `${model.countdown.milestone}-day state` : "Countdown"}</span></div><p>Official ICAI dates take priority; an admin provisional period is used until verified dates arrive.</p></CardBody></Card>
     <CalendarClient month={model.month} items={model.items}/>
   </div>;

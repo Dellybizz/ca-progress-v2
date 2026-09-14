@@ -1,0 +1,122 @@
+/* A2 — one calm planning workspace across Today, Planner, Calendar and Goals. */
+.a2-planning-page {
+  width: 100%;
+  min-width: 0;
+}
+
+.a2-planning-nav {
+  display: flex;
+  gap: 2px;
+  width: max-content;
+  max-width: 100%;
+  margin-block-end: var(--space-5);
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+
+.a2-planning-nav a {
+  min-height: 38px;
+  padding: 9px 18px;
+  border-radius: calc(var(--radius-md) - 3px);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.a2-planning-nav a:hover { color: var(--color-text); }
+.a2-planning-nav a[aria-current="page"] {
+  color: var(--color-primary-text, #fff);
+  background: var(--color-primary);
+}
+
+.a2-day-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.a2-mobile-create,
+.a2-editor-close { display: none; }
+
+@media (max-width: 720px) {
+  .a2-planning-page { padding-inline: 0; overflow-x: clip; }
+
+  .a2-planning-nav {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+    margin-block-end: 14px;
+    border-inline: 0;
+    border-radius: 0;
+  }
+
+  .a2-planning-nav a {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 4px;
+    font-size: 0.78rem;
+  }
+
+  .a2-day-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .a2-day-summary .ui-card__body { padding: 10px 8px !important; }
+  .a2-day-summary svg,
+  .a2-day-summary small { display: none; }
+  .a2-day-summary strong { font-size: 1rem !important; }
+
+  .a2-mobile-create {
+    display: inline-flex;
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+  }
+
+  .a2-mobile-editor {
+    display: none !important;
+  }
+
+  .a2-mobile-editor.is-open {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 120 !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: 100dvh;
+    margin: 0 !important;
+    overflow-y: auto !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: var(--color-surface);
+    padding: max(12px, env(safe-area-inset-top)) 12px max(20px, env(safe-area-inset-bottom));
+  }
+
+  .a2-mobile-editor.is-open > .ui-card,
+  .a2-mobile-editor.is-open.ui-card {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .a2-editor-close { display: inline-flex; }
+
+  .a2-calendar-page .phase6-calendar-layout {
+    display: block;
+  }
+
+  .a2-calendar-page .phase6-calendar-grid,
+  .a2-calendar-page .phase6-weekdays { display: none; }
+  .a2-calendar-page .phase6-calendar-main > .ui-card { display: none; }
+  .a2-calendar-page .phase6-calendar-agenda { margin-top: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a2-planning-page *, .a2-planning-page *::before, .a2-planning-page *::after {
+    scroll-behavior: auto !important;
+  }
+}

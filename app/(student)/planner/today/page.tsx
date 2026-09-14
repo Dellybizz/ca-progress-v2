@@ -4,6 +4,7 @@ import { LoginRequired } from "@/components/auth/login-required";
 import { NotificationCenter } from "@/components/planner/notification-center";
 import { TodayPlanClient } from "@/components/planner/today-plan-client";
 import { WeekSummaryShare } from "@/components/planner/week-summary-share";
+import { PlanningNav } from "@/components/planner/planning-nav";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -46,9 +47,10 @@ export default async function TodayPlanPage() {
   const countdownValue = planning?.countdown.periodStatus === "exam_period" ? "Exam period" : planning?.countdown.periodStatus === "completed" ? "Exam completed" : daysRemaining ?? "—";
   const activeGoals = planning?.goals.filter((goal) => goal.status === "active").slice(0, 3) ?? [];
 
-  return <div className="phase9-page today-plan-page">
-    <PageHeader preview={false} eyebrow="Today" title="Today’s study plan" description={`${formatPlanDate(model.planDate)} · ${model.forecast.attemptLabel}`}/>
-    <section className="phase9-metrics" aria-label="Today overview"><Card><CardBody><Icon name="calendar"/><div><span>{planning?.countdown.periodStatus === "upcoming" ? "Days remaining" : "Exam status"}</span><strong>{countdownValue}</strong><small>{countdownNote}</small></div></CardBody></Card><Card><CardBody><Icon name="target"/><div><span>Planned study</span><strong>{model.plannedMinutes}m</strong><small>fixed and flexible work</small></div></CardBody></Card><Card><CardBody><Icon name="clock"/><div><span>Completed today</span><strong>{completedStudyMinutes}m</strong><small>from finished study sessions</small></div></CardBody></Card></section>
+  return <div className="phase9-page today-plan-page a2-planning-page">
+    <PlanningNav current="today"/>
+    <PageHeader preview={false} eyebrow="Today" title="Your day" description={`${formatPlanDate(model.planDate)} · ${model.forecast.attemptLabel}`}/>
+    <section className="phase9-metrics a2-day-summary" aria-label="Today overview"><Card><CardBody><Icon name="target"/><div><span>Planned study</span><strong>{model.plannedMinutes}m</strong><small>fixed and flexible</small></div></CardBody></Card><Card><CardBody><Icon name="clock"/><div><span>Completed today</span><strong>{completedStudyMinutes}m</strong><small>recorded focus</small></div></CardBody></Card><Card><CardBody><Icon name="calendar"/><div><span>{planning?.countdown.periodStatus === "upcoming" ? "Days remaining" : "Exam"}</span><strong>{countdownValue}</strong><small>{countdownNote}</small></div></CardBody></Card></section>
     {planning && planning.countdown.periodStatus === "upcoming" && planning.countdown.milestone !== "normal" && planning.countdown.milestone !== "unavailable" ? <Card><CardBody><div className="phase9-warning"><Icon name="calendar" size={17}/><span><strong>{planning.countdown.milestone === "today" ? "Attempt day" : `${planning.countdown.milestone}-day countdown state`}:</strong> keep fixed commitments visible and use flexible study work around them.</span></div></CardBody></Card> : null}
     {evidenceMode === "starter" ? <Card><CardBody><div className="phase9-warning"><Icon name="book" size={17}/><span><strong>Starter Today:</strong> this list is based on your selected attempt, unfinished syllabus and explicit planner items. CA Progress will not call a subject weak until recorded study or progress evidence exists.</span></div></CardBody></Card> : null}
     {!enriched ? <Card><CardBody><div className="phase9-warning"><Icon name="sparkles" size={17}/><span><strong>Today is running in core mode.</strong> Optional timing, evidence and history enrichments are temporarily unavailable, but your canonical plan and actions remain usable.</span></div></CardBody></Card> : null}

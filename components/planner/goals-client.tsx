@@ -20,6 +20,7 @@ export function GoalsClient({ goals }: { goals: PlannerGoal[] }) {
   const [dueDate, setDueDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   async function request(body: Record<string, unknown>) {
     setBusy(true); setError(null);
@@ -36,6 +37,7 @@ export function GoalsClient({ goals }: { goals: PlannerGoal[] }) {
     event.preventDefault();
     if (await request({ action: "create", title, description, dueDate, goalKind, targetValue, startsOn: startsOn || null })) {
       setTitle(""); setDescription(""); setStartsOn(""); setDueDate("");
+      setEditorOpen(false);
     }
   }
 
@@ -47,7 +49,8 @@ export function GoalsClient({ goals }: { goals: PlannerGoal[] }) {
         <button className="phase6-icon-button" disabled={busy} onClick={() => { if (window.confirm("Delete this goal?")) void request({ action: "delete", id: goal.id }); }}><Icon name="close" size={17}/></button>
       </article>)}</div> : <div className="phase6-empty"><Icon name="target"/><strong>No goals yet</strong><p>Add a measurable study or progress goal.</p></div>}
     </CardBody></Card>
-    <Card><CardHeader title="Add goal" description="Choose the recorded activity that should move this goal forward."/><CardBody>
+    <button className="ui-button ui-button--primary a2-mobile-create" type="button" onClick={() => setEditorOpen(true)}>Add goal</button>
+    <Card className={`a2-mobile-editor ${editorOpen ? "is-open" : ""}`}><CardHeader title="Add goal" action={<button className="ui-button ui-button--ghost a2-editor-close" type="button" onClick={() => setEditorOpen(false)}>Close</button>}/><CardBody>
       <form className="phase6-form" onSubmit={create}>
         <label><span>Goal</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Finish 10 revisions this week"/></label>
         <label><span>Goal type</span><select value={goalKind} onChange={(event) => { const next = event.target.value as GoalKind; setGoalKind(next); if (next === "daily_study" || next === "weekly_study") setTargetValue(300); else setTargetValue(1); }}><option value="daily_study">Daily study minutes</option><option value="weekly_study">Weekly study minutes</option><option value="completion">Chapter completions</option><option value="revision">Revisions</option><option value="test">Tests</option><option value="custom">Custom milestone</option></select></label>

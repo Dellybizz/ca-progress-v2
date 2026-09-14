@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { getPlannerPageModel } from "@/lib/planner/service";
 import { OfflineSnapshot } from "@/components/offline/offline-snapshot";
+import { PlanningNav } from "@/components/planner/planning-nav";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Planner | CA Progress" };
@@ -27,12 +28,13 @@ export default async function Page() {
   }
 
   return (
-    <div className="phase6-page planner-page">
+    <div className="phase6-page planner-page a2-planning-page">
+      <PlanningNav current="planner"/>
       <PageHeader
         preview={false}
         eyebrow="Planner"
-        title="Plan your study day."
-        actions={<div className="phase6-header-links planner-header-links"><Link href="/planner/today">Today Plan</Link><Link href="/calendar">Calendar</Link></div>}
+        title="Plan your work"
+        description="Capture, schedule and organise upcoming study."
       />
       <OfflineSnapshot kind="planner" data={model}/>
       <PlannerClient model={model}/>

@@ -12,6 +12,8 @@ test("Product Phase 1 Chapter Hub reaches every connected academic workspace", (
   assert.match(hub, /\/subjects\/\$\{academic\.subjectSlug\}\/progress\?chapterId=/);
   assert.match(hub, /\/study\?\$\{chapterQuery\}/);
   assert.match(hub, /\/tests\?\$\{chapterQuery\}/);
+  assert.match(hub, /\/notes\?\$\{chapterQuery\}/);
+  assert.match(hub, /\/resources\?\$\{chapterQuery\}/);
   assert.match(hub, /\/community\/\$\{channel\.channelKey\}\?chapterId=/);
   assert.match(hub, /Last studied:/);
   assert.match(hub, /self-reported understanding/);
@@ -86,14 +88,13 @@ test("Product Phase 1 existing records stay linked by canonical academic IDs acr
   assert.doesNotMatch(privateLinkage, /chapter_name\s*=|chapter_title\s*=/);
 });
 
-test("Product Phase 1 keeps attached ICAI resources stable when an official file URL moves", () => {
+test("Product Phase 1 keeps one stable Chapter Hub resource card when an official file URL moves", () => {
   const hub = read("components/chapter-hub/chapter-hub.tsx");
-  const service = read("lib/chapter-hub/service.ts");
   const route = read("app/(student)/resources/[id]/open/route.ts");
-  assert.match(service, /'icai_resource',a\.canonical_resource_id/);
-  assert.match(service, /row\.source_kind === "icai_resource"/);
-  assert.match(hub, /item\.href/);
-  assert.doesNotMatch(hub, /model\.officialResources/);
+  assert.match(hub, /key=\{resource\.canonicalResourceId\}/);
+  assert.match(hub, /data-canonical-resource-id=\{resource\.canonicalResourceId\}/);
+  assert.match(hub, /\/resources\/\$\{encodeURIComponent\(resource\.canonicalResourceId\)\}\/open/);
+  assert.doesNotMatch(hub, /href=\{resource\.(?:directFileUrl|officialUrl|sourcePageUrl)\}/);
   assert.match(route, /autofetch_resource_records/);
   assert.match(route, /a\.canonical_resource_id=\?1 OR r\.id=\?1/);
   assert.match(route, /a\.is_current=1/);
