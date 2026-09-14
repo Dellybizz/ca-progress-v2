@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
@@ -24,6 +25,7 @@ function resourceCode(item: ChapterHubItem) {
 function SectionTitle({ icon, eyebrow, title, action }: { icon: IconName; eyebrow: string; title: string; action?: React.ReactNode }) { return <header className="chapter-hub-section__header"><div className="chapter-hub-section__title"><span><Icon name={icon} size={18}/></span><div><small>{eyebrow}</small><h2>{title}</h2></div></div>{action}</header>; }
 
 export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
+  const router = useRouter();
   const [mobileView, setMobileView] = useState<"overview" | "study" | "resources">("overview");
   const [progress, setProgress] = useState(model.progress);
   const [dateDrafts, setDateDrafts] = useState<Record<keyof ProgressState,string>>(Object.fromEntries(STAGES.map((stage)=>[stage.field,model.progress[stage.field]?.slice(0,10)??""])) as Record<keyof ProgressState,string>);
@@ -69,15 +71,18 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
     if(!controlsDirty)return;
     setMessage("Saving…");
     try{
+      const updates:Promise<Record<string,unknown>>[]=[];
       for(const stage of STAGES){
         if(!progress[stage.field])continue;
         const saved=progress[stage.field]?.slice(0,10)??"";
-        if(dateDrafts[stage.field]!==saved) await mutate({action:"set_stage_date",stage:stage.field.replace(/_at$/,""),date:dateDrafts[stage.field]});
+        if(dateDrafts[stage.field]!==saved)updates.push(mutate({action:"set_stage_date",stage:stage.field.replace(/_at$/,""),date:dateDrafts[stage.field]}));
       }
-      if(understandingLevel!==savedUnderstandingLevel) await mutate({action:"set_understanding",level:understandingLevel});
+      if(understandingLevel!==savedUnderstandingLevel)updates.push(mutate({action:"set_understanding",level:understandingLevel}));
+      await Promise.all(updates);
       setProgress((current)=>Object.fromEntries(STAGES.map((stage)=>[stage.field,current[stage.field]? `${dateDrafts[stage.field]}T12:00:00.000Z`:null])) as ProgressState);
       setSavedUnderstandingLevel(understandingLevel);
       setMessage("Saved");
+      router.refresh();
     }catch(error){setMessage(error instanceof Error?error.message:"Chapter controls could not be saved.");}
   }
   async function addLink(event:React.FormEvent){
@@ -89,12 +94,12 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
   }
   async function attachItem(item:ChapterHubItem){
     setAvailableItems((items)=>items.filter((candidate)=>candidate!==item)); setPinnedItems((items)=>[{...item,id:`pending-${item.sourceId}`},...items]); setMessage("Saving…");
-    try{const payload=await mutate({action:"attach_item",sourceKind:item.sourceKind,sourceId:item.sourceId});setPinnedItems((items)=>items.map((candidate)=>candidate.sourceKind===item.sourceKind&&candidate.sourceId===item.sourceId?{...candidate,id:String(payload.id)}:candidate));setMessage("Attached");}
+    try{const payload=await mutate({action:"attach_item",sourceKind:item.sourceKind,sourceId:item.sourceId});setPinnedItems((items)=>items.map((candidate)=>candidate.sourceKind===item.sourceKind&&candidate.sourceId===item.sourceId?{...candidate,id:String(payload.id)}:candidate));setMessage("Attached");router.refresh();}
     catch(error){setPinnedItems((items)=>items.filter((candidate)=>!(candidate.sourceKind===item.sourceKind&&candidate.sourceId===item.sourceId)));setAvailableItems((items)=>[item,...items]);setMessage(error instanceof Error?error.message:"Could not attach item.");}
   }
   async function removeItem(item:ChapterHubItem){
     setPinnedItems((items)=>items.filter((candidate)=>candidate.id!==item.id));setAvailableItems((items)=>[item,...items]);
-    try{await mutate({action:"remove_item",id:item.id});setMessage("Removed");}
+    try{await mutate({action:"remove_item",id:item.id});setMessage("Removed");router.refresh();}
     catch(error){setPinnedItems((items)=>[item,...items]);setAvailableItems((items)=>items.filter((candidate)=>candidate.sourceKind!==item.sourceKind||candidate.sourceId!==item.sourceId));setMessage(error instanceof Error?error.message:"Could not remove item.");}
   }
 

@@ -47,9 +47,20 @@ export async function POST(request: Request) {
       const stageOrder: ProgressStage[]=["completed","revision_1","revision_2"];
       const changes=[...body.changes];
       for(const change of changes) if(!change.chapterId||!stageOrder.includes(change.stage)||typeof change.enabled!=="boolean") return NextResponse.json({ error:"Invalid progress change." },{status:400});
-      changes.sort((a,b)=>a.enabled?stageOrder.indexOf(a.stage)-stageOrder.indexOf(b.stage):stageOrder.indexOf(b.stage)-stageOrder.indexOf(a.stage));
+      const grouped=new Map<string,typeof changes>();
+      for(const change of changes){const list=grouped.get(change.chapterId)??[];list.push(change);grouped.set(change.chapterId,list);}
       const latest=new Map<string,ProgressMutationResult>();
-      for(const change of changes) latest.set(change.chapterId,await setHotProgressStage(user.id,change.chapterId,change.stage,change.enabled) as ProgressMutationResult);
+      const chapterGroups=[...grouped.entries()];
+      for(let offset=0;offset<chapterGroups.length;offset+=8){
+        const batch=chapterGroups.slice(offset,offset+8);
+        const results=await Promise.all(batch.map(async([chapterId,chapterChanges])=>{
+          chapterChanges.sort((a,b)=>a.enabled?stageOrder.indexOf(a.stage)-stageOrder.indexOf(b.stage):stageOrder.indexOf(b.stage)-stageOrder.indexOf(a.stage));
+          let result:ProgressMutationResult|undefined;
+          for(const change of chapterChanges)result=await setHotProgressStage(user.id,chapterId,change.stage,change.enabled) as ProgressMutationResult;
+          return [chapterId,result] as const;
+        }));
+        for(const [chapterId,result] of results)if(result)latest.set(chapterId,result);
+      }
       return NextResponse.json({states:[...latest.values()]});
     }
     if (body.action === "undo") {

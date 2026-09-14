@@ -206,3 +206,5 @@
 
 .chapter-hub-controls-save{min-height:34px;padding-inline:12px;font-size:10px}.chapter-hub-date-grid label.is-disabled{background:var(--color-surface-muted);opacity:.62}.chapter-hub-date-grid input:disabled{cursor:not-allowed}
 @media(max-width:680px){.chapter-hub-controls .chapter-hub-section__header{align-items:flex-start}.chapter-hub-controls-save{min-width:102px}.chapter-hub-date-grid label{grid-template-columns:58px minmax(0,1fr)}.chapter-hub-resource-results code,.chapter-hub-pinned-list code{font-size:7px}.chapter-hub-resource-results>div{align-items:start}.chapter-hub-resource-results .ui-button{min-height:36px;line-height:1.15}}
+
+@media(max-width:680px){.chapter-hub-activity{display:none!important}.chapter-hub-date-grid label{min-width:0;overflow:hidden;grid-template-columns:50px minmax(0,1fr)}.chapter-hub-date-grid input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding-inline:3px;font-size:10px}}

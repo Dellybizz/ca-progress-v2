@@ -21,15 +21,16 @@ async function assertChapter(userId:string,chapterId:string){
   return db;
 }
 async function assertAttachable(db:ReturnType<typeof getD1RuntimeDatabase>,userId:string,chapterId:string,sourceKind:string,sourceId:string){
-  const subjectClause="SELECT s.id FROM chapters c JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id JOIN subjects s ON s.id=sv.subject_id WHERE c.id=?3";
+  const chapter=await db.prepare("SELECT sv.subject_id AS subject_id FROM chapters c JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id WHERE c.id=?1 LIMIT 1").bind(chapterId).first<{subject_id:string}>();
+  if(!chapter?.subject_id)throw new Error("This chapter is no longer available.");
   let row;
   if(sourceKind==="personal_note")row=await db.prepare("SELECT 1 FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(sourceId,userId).first();
   if(sourceKind==="personal_file")row=await db.prepare("SELECT 1 FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(sourceId,userId).first();
-  if(sourceKind==="community_note")row=await db.prepare(`SELECT 1 FROM notes WHERE id=?1 AND user_id<>?2 AND visibility='shared' AND moderation_status='approved' AND subject_id=(${subjectClause}) LIMIT 1`).bind(sourceId,userId,chapterId).first();
-  if(sourceKind==="community_resource")row=await db.prepare(`SELECT 1 FROM uploaded_resources WHERE id=?1 AND owner_user_id<>?2 AND visibility='shared' AND moderation_status='approved' AND subject_id=(${subjectClause}) LIMIT 1`).bind(sourceId,userId,chapterId).first();
-  if(sourceKind==="icai_resource")row=await db.prepare(`SELECT 1 FROM autofetch_resource_records a JOIN icai_resources r ON r.id=a.resource_row_id JOIN resource_subject_map rsm ON rsm.resource_id=r.id
+  if(sourceKind==="community_note")row=await db.prepare("SELECT 1 FROM notes WHERE id=?1 AND user_id<>?2 AND visibility='shared' AND moderation_status='approved' AND subject_id=?3 LIMIT 1").bind(sourceId,userId,chapter.subject_id).first();
+  if(sourceKind==="community_resource")row=await db.prepare("SELECT 1 FROM uploaded_resources WHERE id=?1 AND owner_user_id<>?2 AND visibility='shared' AND moderation_status='approved' AND subject_id=?3 LIMIT 1").bind(sourceId,userId,chapter.subject_id).first();
+  if(sourceKind==="icai_resource")row=await db.prepare(`SELECT 1 FROM autofetch_resource_records a JOIN icai_resources r ON r.id=a.resource_row_id
     WHERE a.canonical_resource_id=?1 AND a.is_current=1 AND r.status='active' AND r.verification_status='verified'
-    AND rsm.subject_id=(${subjectClause}) LIMIT 1`).bind(sourceId,userId,chapterId).first();
+    AND EXISTS(SELECT 1 FROM resource_subject_map rsm WHERE rsm.resource_id=r.id AND rsm.subject_id=?2) LIMIT 1`).bind(sourceId,chapter.subject_id).first();
   if(!row)throw new Error("This item is no longer available to attach.");
 }
 
