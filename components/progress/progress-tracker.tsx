@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
-import { useStudentContext } from "@/components/academic/student-context-provider";
-import type { ProgressChapter, ProgressMutationResult, ProgressReadyModel, ProgressStage, ProgressState } from "@/lib/progress/types";
+import type { ProgressChapter, ProgressReadyModel, ProgressStage, ProgressState } from "@/lib/progress/types";
 
 const STAGES: Array<{ key: ProgressStage; label: string; short: string }> = [
   { key: "completed", label: "First Completion", short: "Done" },
@@ -81,7 +80,6 @@ export function ProgressTracker({
   subjectLocked?: boolean;
   initialChapterId?: string;
 }) {
-  const context = useStudentContext();
   const router = useRouter();
   const initialChapter = initialChapterId ? model.chapters.find((chapter) => chapter.id === initialChapterId) ?? null : null;
   const [chapters, setChapters] = useState(model.chapters);
