@@ -53,6 +53,20 @@
 .chapter-hub-stage-grid > div.is-complete { background: var(--color-success-soft); }
 .chapter-hub-stage-grid > div.is-complete > span { background: var(--color-surface); color: var(--color-success); }
 
+.chapter-hub-date-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+.chapter-hub-date-grid label { min-width: 0; display: grid; gap: 7px; padding: 10px; border-right: 1px solid var(--color-border); background: var(--color-surface); }
+.chapter-hub-date-grid label:last-child { border-right: 0; }
+.chapter-hub-date-grid label.is-complete { background: var(--color-success-soft); }
+.chapter-hub-date-grid span { font-size: 10px; font-weight: 700; }
+.chapter-hub-date-grid input { width: 100%; min-width: 0; min-height: 34px; padding: 0 6px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); font-size: 9px; }
+.chapter-hub-understanding { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px 12px; padding-top: 2px; }
+.chapter-hub-understanding > span { display: grid; gap: 2px; }
+.chapter-hub-understanding strong { font-size: 11px; }
+.chapter-hub-understanding small { color: var(--color-text-faint); font-size: 9px; }
+.chapter-hub-understanding output { color: var(--color-brand-strong); font-size: 15px; font-weight: 750; }
+.chapter-hub-understanding input { grid-column: 1 / -1; width: 100%; accent-color: var(--color-brand); cursor: pointer; }
+.chapter-hub-save-state { margin: 0; color: var(--color-text-soft); font-size: 10px; }
+
 .chapter-hub-study-total { display: grid; gap: 3px; padding: 4px 0; }
 .chapter-hub-study-total strong { font-size: 30px; letter-spacing: -.045em; }
 .chapter-hub-study-total span, .chapter-hub-study-total small { color: var(--color-text-faint); font-size: 10px; }
@@ -86,6 +100,22 @@
 .chapter-hub-content-list > a > span { min-width: 0; display: grid; gap: 2px; }
 .chapter-hub-content-list strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .chapter-hub-content-list small { overflow: hidden; color: var(--color-text-faint); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+.chapter-hub-attach { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.chapter-hub-attach select, .chapter-hub-link-form select, .chapter-hub-link-form input { width: 100%; min-width: 0; min-height: var(--touch-target); padding: 0 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); font-size: 11px; }
+.chapter-hub-pinned-list, .chapter-hub-link-list { display: grid; border-top: 1px solid var(--color-border); }
+.chapter-hub-pinned-list > div, .chapter-hub-link-list > div { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 32px; align-items: center; gap: 8px; border-bottom: 1px solid var(--color-border); }
+.chapter-hub-pinned-list > div:last-child, .chapter-hub-link-list > div:last-child { border-bottom: 0; }
+.chapter-hub-pinned-list a { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px 0; }
+.chapter-hub-pinned-list a > span { min-width: 0; display: grid; gap: 2px; }
+.chapter-hub-pinned-list strong { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.chapter-hub-pinned-list small { color: var(--color-text-faint); font-size: 9px; }
+.chapter-hub-pinned-list button, .chapter-hub-link-list button { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-faint); cursor: pointer; }
+.chapter-hub-pinned-list button:hover, .chapter-hub-link-list button:hover { background: var(--color-danger-soft); color: var(--color-danger); }
+.chapter-hub-pinned-list p, .chapter-hub-link-list p { margin: 11px 0 0; color: var(--color-text-soft); font-size: 10px; }
+.chapter-hub-link-form { display: grid; grid-template-columns: 130px minmax(130px, .7fr) minmax(180px, 1fr) auto; gap: 8px; }
+.chapter-hub-link-list a { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px 0; }
+.chapter-hub-link-list a > span { overflow: hidden; font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 
 .chapter-hub-official-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .chapter-hub-official-grid > a { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
@@ -144,4 +174,10 @@
   .chapter-hub-list > div { grid-template-columns: 1fr; gap: 3px; }
   .chapter-hub-list small { padding-left: 21px; white-space: normal; }
   .chapter-hub-official-grid { grid-template-columns: 1fr; }
+  .chapter-hub-date-grid { grid-template-columns: 1fr; border-radius: var(--radius-md); }
+  .chapter-hub-date-grid label { grid-template-columns: 70px minmax(0, 1fr); align-items: center; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .chapter-hub-date-grid label:last-child { border-bottom: 0; }
+  .chapter-hub-date-grid input { min-height: 40px; font-size: 11px; }
+  .chapter-hub-attach, .chapter-hub-link-form { grid-template-columns: 1fr; }
+  .chapter-hub-attach button, .chapter-hub-link-form button { width: 100%; }
 }

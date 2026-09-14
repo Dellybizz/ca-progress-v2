@@ -36,3 +36,17 @@ test("A1.4 uses one desktop workspace and the global route trail", () => {
   assert.doesNotMatch(hub, /AcademicBreadcrumbs/);
   assert.match(css, /grid-template-columns:\s*minmax\(0, 1\.62fr\)/);
 });
+
+test("A1.4 provides private advanced chapter controls", () => {
+  const hub = read("components/chapter-hub/chapter-hub.tsx");
+  const api = read("app/api/chapters/[chapterId]/workspace/route.ts");
+  const migration = read("d1/migrations/0048_chapter_workspace_controls.sql");
+  for (const label of ["Rev. 1", "Rev. 2", "Test 1", "Test 2", "Understanding", "YouTube video", "Revision link"]) assert.match(hub, new RegExp(label));
+  assert.match(hub, /personal, ICAI or community material/);
+  assert.match(api, /set_stage_date/);
+  assert.match(api, /set_understanding/);
+  assert.match(api, /assertAttachable/);
+  assert.match(migration, /understanding_level INTEGER CHECK\(understanding_level BETWEEN 0 AND 100\)/);
+  assert.match(migration, /UNIQUE\(user_id,chapter_id,source_kind,source_id\)/);
+  assert.doesNotMatch(hub, /Official ICAI resources/);
+});

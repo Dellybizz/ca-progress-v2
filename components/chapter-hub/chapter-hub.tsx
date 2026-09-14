@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
-import type { ChapterHubReadyModel } from "@/lib/chapter-hub/types";
+import type { ChapterHubItem, ChapterHubLink, ChapterHubReadyModel } from "@/lib/chapter-hub/types";
 import type { ProgressState } from "@/lib/progress/types";
 import { AcademicContextBar, AcademicEntityMark } from "@/components/academic/academic-navigation";
 
@@ -20,16 +20,62 @@ function SectionTitle({ icon, eyebrow, title, action }: { icon: IconName; eyebro
 
 export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
   const [mobileView, setMobileView] = useState<"overview" | "study" | "resources">("overview");
+  const [progress, setProgress] = useState(model.progress);
+  const [understandingLevel, setUnderstandingLevel] = useState(model.understandingLevel ?? 0);
+  const [links, setLinks] = useState(model.links);
+  const [pinnedItems, setPinnedItems] = useState(model.pinnedItems);
+  const [availableItems, setAvailableItems] = useState(model.availableItems);
+  const [linkDraft, setLinkDraft] = useState({ kind: "useful" as ChapterHubLink["kind"], title: "", url: "" });
+  const [selectedItem, setSelectedItem] = useState("");
+  const [message, setMessage] = useState("");
   const { academic } = model;
-  const progressCount = STAGES.filter((stage) => Boolean(model.progress[stage.field])).length;
+  const progressCount = STAGES.filter((stage) => Boolean(progress[stage.field])).length;
   const chapterQuery = `chapterId=${encodeURIComponent(academic.chapterId)}&subjectId=${encodeURIComponent(academic.subjectId)}`;
   const lastStudyAt = model.study.recentSessions[0]?.endedAt ?? null;
   const understanding = model.study.averageSelfReportedUnderstanding;
-  const nextStage = STAGES.find((stage) => !model.progress[stage.field]);
+  const nextStage = STAGES.find((stage) => !progress[stage.field]);
   const activity = [
     ...model.progressEvents.map((event) => ({ id: `progress-${event.id}`, at: event.createdAt, icon: "target" as IconName, title: `${event.stage.replaceAll("_", " ")} ${event.action}` })),
     ...model.study.recentSessions.map((session) => ({ id: `study-${session.id}`, at: session.endedAt, icon: "timer" as IconName, title: `${durationLabel(session.durationSeconds)} Focus session` })),
   ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);
+  async function mutate(body:Record<string,unknown>){
+    const response=await fetch(`/api/chapters/${encodeURIComponent(academic.chapterId)}/workspace`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    const payload=await response.json() as {error?:string;[key:string]:unknown};
+    if(!response.ok)throw new Error(payload.error||"Chapter could not be updated.");
+    return payload;
+  }
+  async function saveStageDate(field:keyof ProgressState,date:string){
+    const previous=progress;
+    setProgress((current)=>({...current,[field]:date?`${date}T12:00:00.000Z`:null}));
+    setMessage("Saved");
+    try{await mutate({action:"set_stage_date",stage:field.replace(/_at$/,""),date:date||null});}
+    catch(error){setProgress(previous);setMessage(error instanceof Error?error.message:"Could not save date.");}
+  }
+  async function saveUnderstanding(level:number){
+    const previous=understandingLevel;
+    setUnderstandingLevel(level); setMessage("Saved");
+    try{await mutate({action:"set_understanding",level});}
+    catch(error){setUnderstandingLevel(previous);setMessage(error instanceof Error?error.message:"Could not save understanding.");}
+  }
+  async function addLink(event:React.FormEvent){
+    event.preventDefault(); setMessage("");
+    try{
+      const payload=await mutate({action:"add_link",...linkDraft});
+      setLinks((items)=>[payload.link as ChapterHubLink,...items]); setLinkDraft({...linkDraft,title:"",url:""}); setMessage("Link added");
+    }catch(error){setMessage(error instanceof Error?error.message:"Could not add link.");}
+  }
+  async function attachItem(){
+    const item=availableItems.find((candidate)=>`${candidate.sourceKind}:${candidate.sourceId}`===selectedItem);
+    if(!item)return;
+    setAvailableItems((items)=>items.filter((candidate)=>candidate!==item)); setPinnedItems((items)=>[{...item,id:`pending-${item.sourceId}`},...items]); setSelectedItem(""); setMessage("Attached");
+    try{const payload=await mutate({action:"attach_item",sourceKind:item.sourceKind,sourceId:item.sourceId});setPinnedItems((items)=>items.map((candidate)=>candidate.sourceKind===item.sourceKind&&candidate.sourceId===item.sourceId?{...candidate,id:String(payload.id)}:candidate));}
+    catch(error){setPinnedItems((items)=>items.filter((candidate)=>!(candidate.sourceKind===item.sourceKind&&candidate.sourceId===item.sourceId)));setAvailableItems((items)=>[item,...items]);setMessage(error instanceof Error?error.message:"Could not attach item.");}
+  }
+  async function removeItem(item:ChapterHubItem){
+    setPinnedItems((items)=>items.filter((candidate)=>candidate.id!==item.id));setAvailableItems((items)=>[item,...items]);
+    try{await mutate({action:"remove_item",id:item.id});setMessage("Removed");}
+    catch(error){setPinnedItems((items)=>[item,...items]);setAvailableItems((items)=>items.filter((candidate)=>candidate.sourceKind!==item.sourceKind||candidate.sourceId!==item.sourceId));setMessage(error instanceof Error?error.message:"Could not remove item.");}
+  }
 
   return <div className={`chapter-hub-page chapter-hub-page--${mobileView}`} data-canonical-chapter-id={academic.chapterId}>
     <section className="chapter-hub-hero"><div className="chapter-hub-hero__copy"><div className="chapter-hub-hero__badges"><AcademicEntityMark kind="chapter" label={`Chapter ${academic.chapterNumber}`}/><Badge>{academic.paperLabel}</Badge></div><h1><b>{academic.chapterNumber}</b>{academic.chapterTitle}</h1><p>{academic.subjectTitle} · {academic.groupName}</p><div className="chapter-hub-actions"><Link href={`/study?${chapterQuery}`} className="ui-button ui-button--primary"><Icon name="timer" size={16}/> Start Focus</Link><Link href={`/subjects/${academic.subjectSlug}/progress?chapterId=${encodeURIComponent(academic.chapterId)}`} className="ui-button ui-button--secondary">Update progress</Link></div></div><div className="chapter-hub-hero__stats"><div><span>Progress</span><strong>{progressCount}/5</strong><small>{nextStage ? `Next: ${nextStage.label}` : "All stages complete"}</small></div><div><span>Focused</span><strong>{durationLabel(model.study.totalSeconds)}</strong><small>{model.study.sessionCount} sessions</small></div><div><span>Saved</span><strong>{model.notes.length + model.files.length}</strong><small>notes and files</small></div></div></section>
@@ -38,17 +84,19 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
 
     <div className="chapter-hub-workspace">
       <main className="chapter-hub-main">
-        <Card className="chapter-hub-section chapter-hub-progress" data-mobile-view="overview"><CardBody><SectionTitle icon="target" eyebrow="Progress" title="Chapter stages" action={<Link href={`/subjects/${academic.subjectSlug}/progress?chapterId=${encodeURIComponent(academic.chapterId)}`} className="chapter-hub-text-link">Open tracker <Icon name="arrow" size={13}/></Link>}/><div className="chapter-hub-stage-grid">{STAGES.map((stage) => { const completedAt = model.progress[stage.field]; return <div key={stage.field} className={completedAt ? "is-complete" : ""}><span>{completedAt ? <Icon name="check" size={14}/> : stage.short}</span><strong>{stage.label}</strong><small>{dateLabel(completedAt)}</small></div>; })}</div></CardBody></Card>
+        <Card className="chapter-hub-section chapter-hub-controls" data-mobile-view="overview"><CardBody><SectionTitle icon="target" eyebrow="Chapter controls" title="Progress & understanding"/><div className="chapter-hub-date-grid">{STAGES.map((stage)=><label key={stage.field} className={progress[stage.field]?"is-complete":""}><span>{stage.short}</span><input type="date" value={progress[stage.field]?.slice(0,10)??""} onChange={(event)=>void saveStageDate(stage.field,event.target.value)} aria-label={`${stage.label} date`}/></label>)}</div><label className="chapter-hub-understanding"><span><strong>Understanding</strong><small>Self-reported, not a mastery score</small></span><output>{understandingLevel}%</output><input type="range" min="0" max="100" step="1" value={understandingLevel} onChange={(event)=>setUnderstandingLevel(Number(event.target.value))} onPointerUp={(event)=>void saveUnderstanding(Number(event.currentTarget.value))} onKeyUp={(event)=>{if(["ArrowLeft","ArrowRight","Home","End"].includes(event.key))void saveUnderstanding(Number(event.currentTarget.value));}} aria-label="Chapter understanding level"/></label>{message?<p className="chapter-hub-save-state" role="status">{message}</p>:null}</CardBody></Card>
 
         <Card className="chapter-hub-section chapter-hub-study" data-mobile-view="study"><CardBody><SectionTitle icon="timer" eyebrow="Study history" title="Focus for this chapter" action={<Link href={`/study?${chapterQuery}`} className="chapter-hub-text-link">Start Focus <Icon name="arrow" size={13}/></Link>}/><div className="chapter-hub-study-total"><strong>{durationLabel(model.study.totalSeconds)}</strong><span>{model.study.sessionCount} saved session{model.study.sessionCount === 1 ? "" : "s"} · Last studied: {dateLabel(lastStudyAt)}</span>{understanding !== null ? <small>Average self-reported understanding {Math.round(understanding)}% · not a mastery score</small> : null}</div><div className="chapter-hub-list">{model.study.recentSessions.length ? model.study.recentSessions.slice(0, 4).map((session) => <div key={session.id}><span><Icon name="clock" size={14}/><strong>{session.intendedTaskTitle ?? "General Focus"}</strong></span><small>{durationLabel(session.durationSeconds)} · {dateLabel(session.endedAt)}{session.understandingScore !== null ? ` · ${session.understandingScore}%` : ""}</small></div>) : <p>No Focus sessions for this chapter yet.</p>}</div></CardBody></Card>
 
         <Card className="chapter-hub-section chapter-hub-topics" data-mobile-view="overview"><CardBody><SectionTitle icon="layers" eyebrow="Chapter structure" title="Topics & units"/>{model.topics.length ? <div className="chapter-hub-topic-grid">{model.topics.map((topic) => <span key={topic.id} data-academic-topic-id={topic.id}><b>{topic.unitNumber ?? "Unit"}</b>{topic.title}</span>)}</div> : <p className="chapter-hub-empty-line">No separately indexed topics are available.</p>}</CardBody></Card>
 
-        <Card className="chapter-hub-section chapter-hub-official" data-mobile-view="resources"><CardBody><SectionTitle icon="shield" eyebrow="Official ICAI resources" title="Verified material" action={<Link href={`/resources?${chapterQuery}`} className="chapter-hub-text-link">Browse all <Icon name="arrow" size={13}/></Link>}/>{model.officialResources.length ? <div className="chapter-hub-official-grid">{model.officialResources.map((resource) => <Link key={resource.canonicalResourceId} href={`/resources/${encodeURIComponent(resource.canonicalResourceId)}/open`} data-canonical-resource-id={resource.canonicalResourceId}><span className="chapter-hub-resource-icon"><Icon name="book" size={18}/></span><span><Badge>{resource.resourceType.replaceAll("_", " ")}</Badge><strong>{resource.title}</strong><small>{resource.sourceName} · verified {dateLabel(resource.lastVerifiedAt)}</small></span><Icon name="arrow" size={15}/></Link>)}</div> : <p className="chapter-hub-empty-line">No verified official resources are available for this subject and attempt.</p>}</CardBody></Card>
+        <Card className="chapter-hub-section chapter-hub-materials" data-mobile-view="resources"><CardBody><SectionTitle icon="book" eyebrow="Chapter material" title="Attached to this chapter"/><div className="chapter-hub-attach"><select value={selectedItem} onChange={(event)=>setSelectedItem(event.target.value)} aria-label="Choose existing material"><option value="">Choose personal, ICAI or community material</option>{availableItems.map((item)=><option key={`${item.sourceKind}:${item.sourceId}`} value={`${item.sourceKind}:${item.sourceId}`}>{item.meta} · {item.title}</option>)}</select><button type="button" className="ui-button ui-button--secondary" disabled={!selectedItem} onClick={()=>void attachItem()}>Attach</button></div><div className="chapter-hub-pinned-list">{pinnedItems.length?pinnedItems.map((item)=><div key={item.id}><Link href={item.href}><span><strong>{item.title}</strong><small>{item.meta}</small></span><Icon name="arrow" size={14}/></Link><button type="button" onClick={()=>void removeItem(item)} aria-label={`Remove ${item.title} from chapter`}><Icon name="close" size={14}/></button></div>):<p>Nothing attached yet. Choose any personal, ICAI or community material above.</p>}</div></CardBody></Card>
+
+        <Card className="chapter-hub-section chapter-hub-links" data-mobile-view="resources"><CardBody><SectionTitle icon="arrow" eyebrow="Useful links" title="Videos, revision & references"/><form className="chapter-hub-link-form" onSubmit={(event)=>void addLink(event)}><select value={linkDraft.kind} onChange={(event)=>setLinkDraft((draft)=>({...draft,kind:event.target.value as ChapterHubLink["kind"]}))} aria-label="Link type"><option value="useful">Useful link</option><option value="youtube">YouTube video</option><option value="revision">Revision link</option></select><input value={linkDraft.title} onChange={(event)=>setLinkDraft((draft)=>({...draft,title:event.target.value}))} placeholder="Title" maxLength={160} required/><input type="url" value={linkDraft.url} onChange={(event)=>setLinkDraft((draft)=>({...draft,url:event.target.value}))} placeholder="https://…" maxLength={2048} required/><button className="ui-button ui-button--primary" type="submit">Add link</button></form><div className="chapter-hub-link-list">{links.length?links.map((link)=><div key={link.id}><a href={link.url} target="_blank" rel="noreferrer"><Badge>{link.kind==="youtube"?"Video":link.kind}</Badge><span>{link.title}</span><Icon name="arrow" size={14}/></a><button type="button" aria-label={`Remove ${link.title}`} onClick={()=>{setLinks((items)=>items.filter((item)=>item.id!==link.id));void mutate({action:"remove_link",id:link.id}).catch(()=>setLinks((items)=>[link,...items]));}}><Icon name="close" size={14}/></button></div>):<p>No useful links added yet.</p>}</div></CardBody></Card>
       </main>
 
       <aside className="chapter-hub-rail">
-        <Card className="chapter-hub-section chapter-hub-tests" data-mobile-view="overview"><CardBody><SectionTitle icon="tests" eyebrow="Tests" title="Milestones" action={<Link href={`/tests?${chapterQuery}`} className="chapter-hub-text-link">Open tests <Icon name="arrow" size={13}/></Link>}/><div className="chapter-hub-test-list">{(["test_1_at", "test_2_at"] as const).map((field, index) => <div key={field} className={model.progress[field] ? "is-complete" : ""}><span>{model.progress[field] ? <Icon name="check" size={15}/> : `Test ${index + 1}`}</span><div><strong>Test {index + 1}</strong><small>{model.progress[field] ? dateLabel(model.progress[field]) : "Not completed"}</small></div></div>)}</div></CardBody></Card>
+        <Card className="chapter-hub-section chapter-hub-tests" data-mobile-view="overview"><CardBody><SectionTitle icon="tests" eyebrow="Tests" title="Attempts" action={<Link href={`/tests?${chapterQuery}`} className="chapter-hub-text-link">Record marks <Icon name="arrow" size={13}/></Link>}/><div className="chapter-hub-test-list">{(["test_1_at", "test_2_at"] as const).map((field, index) => <div key={field} className={progress[field] ? "is-complete" : ""}><span>{progress[field] ? <Icon name="check" size={15}/> : `Test ${index + 1}`}</span><div><strong>Test {index + 1}</strong><small>{progress[field] ? dateLabel(progress[field]) : "Not completed"}</small></div></div>)}</div></CardBody></Card>
 
         <Card className="chapter-hub-section chapter-hub-activity" data-mobile-view="overview"><CardBody><SectionTitle icon="clock" eyebrow="Recent" title="Chapter activity"/><div className="chapter-hub-activity-list">{activity.length ? activity.map((item) => <div key={item.id}><span><Icon name={item.icon} size={14}/></span><div><strong>{item.title}</strong><small>{dateLabel(item.at)}</small></div></div>) : <p>No chapter activity yet.</p>}</div></CardBody></Card>
 

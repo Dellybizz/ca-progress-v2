@@ -507,6 +507,27 @@ export async function setHotProgressStage(userId:string,chapterId:string,stage:s
   await rebuildHotRevisionScheduleAfterCommit(userId,db);
   return {chapter_id:chapterId,state:next,event_id:eventId,saved_at:savedAt};
 }
+export async function setHotProgressStageDate(userId:string,chapterId:string,stage:string,date:string|null,db:HotD1Database=getHotD1Database()){
+  if(!["completed","revision_1","revision_2","test_1","test_2"].includes(stage)) throw new Error("Unknown progress stage.");
+  if(date!==null&&!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Choose a valid completion date.");
+  await assertHotProgressChapter(userId,chapterId,db);
+  await db.prepare("INSERT OR IGNORE INTO chapter_progress (user_id,chapter_id) VALUES (?1,?2)").bind(userId,chapterId).run();
+  const row=await db.prepare("SELECT chapter_id,completed_at,revision_1_at,revision_2_at,test_1_at,test_2_at,updated_at FROM chapter_progress WHERE user_id=?1 AND chapter_id=?2 LIMIT 1").bind(userId,chapterId).first<{chapter_id:string;completed_at:string|null;revision_1_at:string|null;revision_2_at:string|null;test_1_at:string|null;test_2_at:string|null;updated_at:string|null}>();
+  const previous=hotProgressState(row);
+  const field=`${stage}_at` as keyof typeof previous;
+  const next={...previous,[field]:date?`${date}T12:00:00.000Z`:null};
+  validateHotProgressState(next);
+  const savedAt=new Date().toISOString();
+  if(JSON.stringify(previous)===JSON.stringify(next)) return {chapter_id:chapterId,state:previous,event_id:null,saved_at:row?.updated_at??savedAt};
+  const eventId=crypto.randomUUID();
+  await db.batch([
+    db.prepare("UPDATE chapter_progress SET completed_at=?1,revision_1_at=?2,revision_2_at=?3,test_1_at=?4,test_2_at=?5,updated_at=?6 WHERE user_id=?7 AND chapter_id=?8").bind(next.completed_at,next.revision_1_at,next.revision_2_at,next.test_1_at,next.test_2_at,savedAt,userId,chapterId),
+    db.prepare("INSERT INTO progress_events (id,user_id,chapter_id,stage,action,previous_state,new_state) VALUES (?1,?2,?3,?4,?5,?6,?7)").bind(eventId,userId,chapterId,stage,date?"set":"clear",JSON.stringify(previous),JSON.stringify(next)),
+    db.prepare("INSERT INTO planner_events(id,user_id,event_type,entity_type,entity_id,payload,created_at) VALUES(?1,?2,'progress_changed','chapter_progress',?3,?4,?5)").bind(crypto.randomUUID(),userId,chapterId,JSON.stringify(next),savedAt)
+  ]);
+  await rebuildHotRevisionScheduleAfterCommit(userId,db);
+  return {chapter_id:chapterId,state:next,event_id:eventId,saved_at:savedAt};
+}
 export async function undoHotProgressEvent(userId:string,eventId:string,db:HotD1Database=getHotD1Database()){
   const event=await db.prepare("SELECT id,chapter_id,stage,action,previous_state,new_state,reverts_event_id,undone_at FROM progress_events WHERE id=?1 AND user_id=?2 LIMIT 1").bind(eventId,userId).first<{id:string;chapter_id:string;stage:string;action:string;previous_state:string;new_state:string;reverts_event_id:string|null;undone_at:string|null}>();
   if(!event) throw new Error("Progress event not found.");
