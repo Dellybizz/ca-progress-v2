@@ -38,4 +38,6 @@ test("A1.3 mobile keeps compact selectors and chapter actions", () => {
   assert.match(css, /\.progress-group-tabs/);
   assert.match(css, /\.progress-subject-tabs/);
   assert.match(css, /academic-chapter-row--workspace/);
+  assert.match(css, /progress-chapter-card\{padding:9px 0/);
+  assert.match(css, /@media\(min-width:981px\)\{\.progress-page\{zoom:\.8\}\}/);
 });
