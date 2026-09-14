@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useStudentContext } from "@/components/academic/student-context-provider";
-import { offlineMutationFetch } from "@/lib/offline/mutation";
 import type { ProgressChapter, ProgressMutationResult, ProgressReadyModel, ProgressStage, ProgressState } from "@/lib/progress/types";
 
 const STAGES: Array<{ key: ProgressStage; label: string; short: string }> = [
@@ -87,14 +85,22 @@ export function ProgressTracker({
   const router = useRouter();
   const initialChapter = initialChapterId ? model.chapters.find((chapter) => chapter.id === initialChapterId) ?? null : null;
   const [chapters, setChapters] = useState(model.chapters);
+  const [savedChapters, setSavedChapters] = useState(model.chapters);
   const [query, setQuery] = useState(initialChapter ? `${initialChapter.number} ${initialChapter.title}` : "");
   const [subject, setSubject] = useState(subjectLocked && model.chapters[0] ? model.chapters[0].subjectId : "all");
   const [group, setGroup] = useState("all");
-  const saveChains = useRef(new Map<string, Promise<void>>());
-  const intentVersions = useRef(new Map<string, number>());
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
-  const [undoEvent, setUndoEvent] = useState<{ id: string; chapterId: string } | null>(null);
+
+  const dirty = useMemo(() => chapters.some((chapter) => {
+    const saved=savedChapters.find((item)=>item.id===chapter.id);
+    return !saved || JSON.stringify(saved.state)!==JSON.stringify(chapter.state);
+  }), [chapters,savedChapters]);
+  useEffect(()=>{
+    const warn=(event:BeforeUnloadEvent)=>{if(!dirty)return;event.preventDefault();event.returnValue="";};
+    window.addEventListener("beforeunload",warn);
+    return()=>window.removeEventListener("beforeunload",warn);
+  },[dirty]);
 
   const subjects = useMemo(() => {
     const map = new Map<string, { id: string; title: string }>();
@@ -115,70 +121,61 @@ export function ProgressTracker({
 
   function mutate(chapter: ProgressChapter, stage: ProgressStage) {
     if (isTestStage(stage)) {
+      if(dirty && !window.confirm("You have unsaved progress changes. Leave without saving them?"))return;
       router.push(`/tests?chapterId=${encodeURIComponent(chapter.id)}&stage=${stage}`);
       return;
     }
     const enabled = !stageEnabled(chapter.state, stage);
     if ((enabled && stageLocked(chapter.state, stage)) || (!enabled && clearLocked(chapter.state, stage))) return;
-    const previous = chapter.state;
-    const next = optimisticState(previous, stage, enabled);
-    const key = `${chapter.id}:${stage}`;
-    const version = (intentVersions.current.get(key) ?? 0) + 1;
-    intentVersions.current.set(key, version);
-    flushSync(() => {
-      setSaveState("saved");
-      setMessage(null);
-      setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
-    });
-    const persist = async () => {
-      try {
-        const {response,queued} = await offlineMutationFetch(context.userId!, "/api/progress", { action: "set_stage", chapterId: chapter.id, stage, enabled }, {state:next,saved_at:new Date().toISOString()}, { ...previous });
-        const payload = await response.json() as ProgressMutationResult & { error?: string };
-        if (!response.ok) throw new Error(payload.error || "Progress could not be saved.");
-        if (intentVersions.current.get(key) === version) setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
-        setUndoEvent(payload.event_id ? { id: payload.event_id, chapterId: chapter.id } : null);
-        if(queued)setMessage("Saved on this device. It will sync when you reconnect.");
-      } catch (error) {
-        if (intentVersions.current.get(key) === version) {
-          setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: previous } : item));
-          setSaveState("error");
-          setMessage(error instanceof Error ? error.message : "Progress could not be saved.");
-        }
-      }
-    };
-    const queuedSave = (saveChains.current.get(key) ?? Promise.resolve()).then(persist, persist);
-    saveChains.current.set(key, queuedSave);
-    void queuedSave.finally(() => { if (saveChains.current.get(key) === queuedSave) saveChains.current.delete(key); });
+    setSaveState("idle");
+    setMessage(null);
+    setChapters((items)=>items.map((item)=>item.id===chapter.id?{...item,state:optimisticState(item.state,stage,enabled)}:item));
   }
 
-  async function undo() {
-    if (!undoEvent) return;
-    setSaveState("saving");
-    setMessage(null);
-    try {
-      const response = await fetch("/api/progress", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "undo", eventId: undoEvent.id }),
-      });
-      const payload = await response.json() as ProgressMutationResult & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Undo failed.");
-      setChapters((items) => items.map((item) => item.id === payload.chapter_id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
-      setUndoEvent(null);
-      setSaveState("saved");
-    } catch (error) {
-      setSaveState("error");
-      setMessage(error instanceof Error ? error.message : "Undo failed.");
+  async function saveChanges(){
+    const changes:{chapterId:string;stage:ProgressStage;enabled:boolean}[]=[];
+    for(const chapter of chapters){
+      const saved=savedChapters.find((item)=>item.id===chapter.id);
+      if(!saved)continue;
+      for(const stage of STAGES){
+        if(isTestStage(stage.key))continue;
+        const enabled=stageEnabled(chapter.state,stage.key);
+        if(enabled!==stageEnabled(saved.state,stage.key))changes.push({chapterId:chapter.id,stage:stage.key,enabled});
+      }
     }
+    if(!changes.length)return;
+    setSaveState("saving");setMessage(null);
+    try{
+      const response=await fetch("/api/progress",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"set_stages",changes})});
+      const payload=await response.json() as {states?:Array<{chapter_id:string;state:ProgressState;saved_at:string}>;error?:string};
+      if(!response.ok)throw new Error(payload.error||"Progress could not be saved.");
+      const states=new Map((payload.states??[]).map((row)=>[row.chapter_id,row]));
+      const committed=chapters.map((chapter)=>{const row=states.get(chapter.id);return row?{...chapter,state:row.state,updatedAt:row.saved_at}:chapter;});
+      setChapters(committed);setSavedChapters(committed);setSaveState("saved");setMessage("All changes saved.");
+    }catch(error){setSaveState("error");setMessage(error instanceof Error?error.message:"Progress could not be saved.");}
+  }
+  function discardChanges(){setChapters(savedChapters);setSaveState("idle");setMessage(null);}
+  function exportRows(){
+    return chapters.map((chapter)=>({Subject:shortSubjectTitle(chapter.subjectTitle),Chapter:`${chapter.number}. ${chapter.title}`,Done:chapter.state.completed_at?.slice(0,10)??"",["Rev. 1"]:chapter.state.revision_1_at?.slice(0,10)??"",["Rev. 2"]:chapter.state.revision_2_at?.slice(0,10)??"",["Test 1"]:chapter.state.test_1_at?.slice(0,10)??"",["Test 2"]:chapter.state.test_2_at?.slice(0,10)??""}));
+  }
+  function downloadExcel(){
+    const rows=exportRows(),headers=Object.keys(rows[0]??{Subject:"",Chapter:"",Done:"",["Rev. 1"]:"",["Rev. 2"]:"",["Test 1"]:"",["Test 2"]:""});
+    const csv=[headers,...rows.map((row)=>headers.map((header)=>String(row[header as keyof typeof row]??"")))].map((row)=>row.map((value)=>`"${value.replaceAll('"','""')}"`).join(",")).join("\n");
+    const url=URL.createObjectURL(new Blob(["\ufeff",csv],{type:"text/csv;charset=utf-8"}));const link=document.createElement("a");link.href=url;link.download="ca-progress.csv";link.click();URL.revokeObjectURL(url);
+  }
+  function downloadPdf(){
+    const rows=exportRows();const popup=window.open("","_blank","noopener,noreferrer");if(!popup)return;
+    const escape=(value:string)=>value.replace(/[&<>"]/g,(character)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[character]??character));
+    popup.document.write(`<!doctype html><title>CA Progress</title><style>body{font:12px Arial;padding:24px;color:#111}h1{font-size:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}th{background:#f2f2f2}@page{size:A4 landscape;margin:12mm}</style><h1>CA Progress</h1><table><thead><tr><th>Subject</th><th>Chapter</th><th>Done</th><th>Rev. 1</th><th>Rev. 2</th><th>Test 1</th><th>Test 2</th></tr></thead><tbody>${rows.map((row)=>`<tr><td>${escape(row.Subject)}</td><td>${escape(row.Chapter)}</td><td>${row.Done}</td><td>${row["Rev. 1"]}</td><td>${row["Rev. 2"]}</td><td>${row["Test 1"]}</td><td>${row["Test 2"]}</td></tr>`).join("")}</tbody></table><script>onload=()=>print()<\/script>`);popup.document.close();
   }
 
   return (
     <div className="progress-workspace">
       {!subjectLocked && groups.length > 1 ? <nav className="progress-group-tabs" aria-label="Group"><button type="button" className={group === "all" ? "is-active" : ""} onClick={() => setGroup("all")}>Both groups</button>{groups.map((item) => <button type="button" key={item.code} className={group === item.code ? "is-active" : ""} onClick={() => { setGroup(item.code); setSubject("all"); }}>{item.name}</button>)}</nav> : null}
       {!subjectLocked ? <nav className="progress-subject-tabs" aria-label="Subject"><span>Subjects</span><button type="button" className={subject === "all" ? "is-active" : ""} onClick={() => setSubject("all")}>All subjects</button>{subjects.filter((item) => group === "all" || chapters.some((chapter) => chapter.subjectId === item.id && chapter.groupCode === group)).map((item) => <button type="button" key={item.id} className={subject === item.id ? "is-active" : ""} onClick={() => setSubject(item.id)}>{shortSubjectTitle(item.title)}</button>)}</nav> : null}
-      <label className="progress-search progress-search--standalone"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chapters" /></label>
+      <div className="progress-action-bar"><label className="progress-search progress-search--standalone"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chapters" /></label><div className="progress-export-actions"><button type="button" onClick={downloadExcel}>Excel</button><button type="button" onClick={downloadPdf}>PDF</button></div><div className="progress-draft-actions"><button type="button" className="ui-button ui-button--secondary" disabled={!dirty||saveState==="saving"} onClick={discardChanges}>Discard</button><button type="button" className="ui-button ui-button--primary" disabled={!dirty||saveState==="saving"} onClick={()=>void saveChanges()}>{saveState==="saving"?"Saving…":"Save changes"}</button></div></div>
 
-      {saveState === "error" ? <div className="progress-save-error" role="alert"><span><Icon name="bell" size={15}/>{message}</span>{undoEvent ? <button onClick={undo}>Undo</button> : null}</div> : null}
+      {message ? <div className={`progress-save-error${saveState==="saved"?" progress-save-state--saved":""}`} role="status"><span><Icon name="bell" size={15}/>{message}</span></div> : null}
 
       {filtered.length ? <div className="progress-subject-sections">{grouped.map((subjectSection) => <section className="progress-subject-section" key={subjectSection.title}><h2>{shortSubjectTitle(subjectSection.title)}</h2>{subjectSection.sections.map((section) => <div className="progress-syllabus-section" key={section.title ?? "chapters"}>{section.title ? <h3>{section.title}</h3> : null}<div className="progress-chapter-list">{section.chapters.map((chapter) => (
         <article className="progress-chapter-card" key={chapter.id} data-canonical-chapter-id={chapter.id}>

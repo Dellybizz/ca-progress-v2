@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 type Body =
   | { action: "set_stage"; chapterId: string; stage: ProgressStage; enabled: boolean }
+  | { action: "set_stages"; changes: Array<{ chapterId: string; stage: ProgressStage; enabled: boolean }> }
   | { action: "undo"; eventId: string };
 
 function cleanError(message: string) {
@@ -40,6 +41,16 @@ export async function POST(request: Request) {
         }, { status: 409 });
       }
       return NextResponse.json(await setHotProgressStage(user.id, body.chapterId, body.stage, body.enabled) as ProgressMutationResult);
+    }
+    if (body.action === "set_stages") {
+      if (!Array.isArray(body.changes) || body.changes.length < 1 || body.changes.length > 500) return NextResponse.json({ error: "Choose between 1 and 500 progress changes." }, { status: 400 });
+      const stageOrder: ProgressStage[]=["completed","revision_1","revision_2"];
+      const changes=[...body.changes];
+      for(const change of changes) if(!change.chapterId||!stageOrder.includes(change.stage)||typeof change.enabled!=="boolean") return NextResponse.json({ error:"Invalid progress change." },{status:400});
+      changes.sort((a,b)=>a.enabled?stageOrder.indexOf(a.stage)-stageOrder.indexOf(b.stage):stageOrder.indexOf(b.stage)-stageOrder.indexOf(a.stage));
+      const latest=new Map<string,ProgressMutationResult>();
+      for(const change of changes) latest.set(change.chapterId,await setHotProgressStage(user.id,change.chapterId,change.stage,change.enabled) as ProgressMutationResult);
+      return NextResponse.json({states:[...latest.values()]});
     }
     if (body.action === "undo") {
       if (!body.eventId) return NextResponse.json({ error: "Choose a progress change to undo." }, { status: 400 });

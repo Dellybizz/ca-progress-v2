@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { Icon, type IconName } from "@/components/ui/icon";
@@ -28,6 +28,7 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
   const [progress, setProgress] = useState(model.progress);
   const [dateDrafts, setDateDrafts] = useState<Record<keyof ProgressState,string>>(Object.fromEntries(STAGES.map((stage)=>[stage.field,model.progress[stage.field]?.slice(0,10)??""])) as Record<keyof ProgressState,string>);
   const [understandingLevel, setUnderstandingLevel] = useState(model.understandingLevel ?? 0);
+  const [savedUnderstandingLevel, setSavedUnderstandingLevel] = useState(model.understandingLevel ?? 0);
   const [links, setLinks] = useState(model.links);
   const [pinnedItems, setPinnedItems] = useState(model.pinnedItems);
   const [availableItems, setAvailableItems] = useState(model.availableItems);
@@ -35,9 +36,9 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
   const [resourceTab, setResourceTab] = useState<"private" | "community" | "icai">("private");
   const [resourceQuery, setResourceQuery] = useState("");
   const [message, setMessage] = useState("");
-  const understandingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { academic } = model;
   const progressCount = STAGES.filter((stage) => Boolean(progress[stage.field])).length;
+  const controlsDirty = understandingLevel !== savedUnderstandingLevel || STAGES.some((stage) => Boolean(progress[stage.field]) && dateDrafts[stage.field] !== progress[stage.field]?.slice(0,10));
   const chapterQuery = `chapterId=${encodeURIComponent(academic.chapterId)}&subjectId=${encodeURIComponent(academic.subjectId)}`;
   const lastStudyAt = model.study.recentSessions[0]?.endedAt ?? null;
   const understanding = model.study.averageSelfReportedUnderstanding;
@@ -64,22 +65,20 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
     if(!response.ok)throw new Error(payload.error||"Chapter could not be updated.");
     return payload;
   }
-  async function saveStageDate(field:keyof ProgressState,date:string){
-    const previous=progress;
-    setProgress((current)=>({...current,[field]:date?`${date}T12:00:00.000Z`:null}));
-    setDateDrafts((current)=>({...current,[field]:date}));
+  async function saveChapterControls(){
+    if(!controlsDirty)return;
     setMessage("Saving…");
-    try{await mutate({action:"set_stage_date",stage:field.replace(/_at$/,""),date:date||null});setMessage("Saved");}
-    catch(error){setProgress(previous);setMessage(error instanceof Error?error.message:"Could not save date.");}
-  }
-  function saveUnderstanding(level:number){
-    setUnderstandingLevel(level);
-    setMessage("Saving…");
-    if(understandingTimer.current) clearTimeout(understandingTimer.current);
-    understandingTimer.current=setTimeout(async()=>{
-      try{await mutate({action:"set_understanding",level});setMessage("Saved");}
-      catch(error){setMessage(error instanceof Error?error.message:"Could not save understanding.");}
-    },250);
+    try{
+      for(const stage of STAGES){
+        if(!progress[stage.field])continue;
+        const saved=progress[stage.field]?.slice(0,10)??"";
+        if(dateDrafts[stage.field]!==saved) await mutate({action:"set_stage_date",stage:stage.field.replace(/_at$/,""),date:dateDrafts[stage.field]});
+      }
+      if(understandingLevel!==savedUnderstandingLevel) await mutate({action:"set_understanding",level:understandingLevel});
+      setProgress((current)=>Object.fromEntries(STAGES.map((stage)=>[stage.field,current[stage.field]? `${dateDrafts[stage.field]}T12:00:00.000Z`:null])) as ProgressState);
+      setSavedUnderstandingLevel(understandingLevel);
+      setMessage("Saved");
+    }catch(error){setMessage(error instanceof Error?error.message:"Chapter controls could not be saved.");}
   }
   async function addLink(event:React.FormEvent){
     event.preventDefault(); setMessage("");
@@ -105,13 +104,13 @@ export function ChapterHub({ model }: { model: ChapterHubReadyModel }) {
 
     <div className="chapter-hub-workspace">
       <main className="chapter-hub-main">
-        <Card className="chapter-hub-section chapter-hub-controls" data-mobile-view="overview"><CardBody><SectionTitle icon="target" eyebrow="Chapter controls" title="Progress & understanding"/><div className="chapter-hub-date-grid">{STAGES.map((stage)=><label key={stage.field} className={progress[stage.field]?"is-complete":""}><span>{stage.short}</span><input type="date" value={dateDrafts[stage.field]} onChange={(event)=>setDateDrafts((current)=>({...current,[stage.field]:event.target.value}))} aria-label={`${stage.label} date`}/><button type="button" disabled={dateDrafts[stage.field]===(progress[stage.field]?.slice(0,10)??"")} onClick={()=>void saveStageDate(stage.field,dateDrafts[stage.field])}>Save</button></label>)}</div><label className="chapter-hub-understanding"><span><strong>Understanding</strong><small>Self-reported, not a mastery score</small></span><output>{understandingLevel}%</output><input type="range" min="0" max="100" step="1" value={understandingLevel} onChange={(event)=>saveUnderstanding(Number(event.target.value))} aria-label="Chapter understanding level"/></label>{message?<p className="chapter-hub-save-state" role="status">{message}</p>:null}</CardBody></Card>
+        <Card className="chapter-hub-section chapter-hub-controls" data-mobile-view="overview"><CardBody><SectionTitle icon="target" eyebrow="Chapter controls" title="Progress & understanding" action={<button type="button" className="ui-button ui-button--primary chapter-hub-controls-save" disabled={!controlsDirty} onClick={()=>void saveChapterControls()}>Save changes</button>}/><div className="chapter-hub-date-grid">{STAGES.map((stage)=><label key={stage.field} className={progress[stage.field]?"is-complete":"is-disabled"}><span>{stage.short}</span><input type="date" disabled={!progress[stage.field]} value={dateDrafts[stage.field]} onChange={(event)=>setDateDrafts((current)=>({...current,[stage.field]:event.target.value}))} aria-label={`${stage.label} date`}/></label>)}</div><label className="chapter-hub-understanding"><span><strong>Understanding</strong><small>Self-reported, not a mastery score</small></span><output>{understandingLevel}%</output><input type="range" min="0" max="100" step="1" value={understandingLevel} onChange={(event)=>setUnderstandingLevel(Number(event.target.value))} aria-label="Chapter understanding level"/></label>{message?<p className="chapter-hub-save-state" role="status">{message}</p>:null}</CardBody></Card>
 
         <Card className="chapter-hub-section chapter-hub-study" data-mobile-view="study"><CardBody><SectionTitle icon="timer" eyebrow="Study history" title="Focus for this chapter" action={<Link href={`/study?${chapterQuery}`} className="chapter-hub-text-link">Start Focus <Icon name="arrow" size={13}/></Link>}/><div className="chapter-hub-study-total"><strong>{durationLabel(model.study.totalSeconds)}</strong><span>{model.study.sessionCount} saved session{model.study.sessionCount === 1 ? "" : "s"} · Last studied: {dateLabel(lastStudyAt)}</span>{understanding !== null ? <small>Average self-reported understanding {Math.round(understanding)}% · not a mastery score</small> : null}</div><div className="chapter-hub-list">{model.study.recentSessions.length ? model.study.recentSessions.slice(0, 4).map((session) => <div key={session.id}><span><Icon name="clock" size={14}/><strong>{session.intendedTaskTitle ?? "General Focus"}</strong></span><small>{durationLabel(session.durationSeconds)} · {dateLabel(session.endedAt)}{session.understandingScore !== null ? ` · ${session.understandingScore}%` : ""}</small></div>) : <p>No Focus sessions for this chapter yet.</p>}</div></CardBody></Card>
 
         <Card className="chapter-hub-section chapter-hub-topics" data-mobile-view="overview"><CardBody><SectionTitle icon="layers" eyebrow="Chapter structure" title="Topics & units"/>{model.topics.length ? <div className="chapter-hub-topic-grid">{model.topics.map((topic) => <span key={topic.id} data-academic-topic-id={topic.id}><b>{topic.unitNumber ?? "Unit"}</b>{topic.title}</span>)}</div> : <p className="chapter-hub-empty-line">No separately indexed topics are available.</p>}</CardBody></Card>
 
-        <Card className="chapter-hub-section chapter-hub-materials" data-mobile-view="resources"><CardBody><SectionTitle icon="book" eyebrow="Chapter material" title="Attached to this chapter"/><div className="chapter-hub-resource-tabs" role="tablist" aria-label="Resource source">{(["private","community","icai"] as const).map((tab)=><button type="button" role="tab" aria-selected={resourceTab===tab} key={tab} onClick={()=>setResourceTab(tab)}><span>{tab==="icai"?"ICAI":tab.charAt(0).toUpperCase()+tab.slice(1)}</span><small>{resourceCounts[tab]}</small></button>)}</div><input className="chapter-hub-resource-search" type="search" value={resourceQuery} onChange={(event)=>setResourceQuery(event.target.value)} placeholder={`Search ${resourceTab === "icai" ? "ICAI" : resourceTab} resources…`} aria-label="Search resources to attach"/><div className="chapter-hub-resource-results">{filteredAvailableItems.length?filteredAvailableItems.slice(0,40).map((item)=><div key={`${item.sourceKind}:${item.sourceId}`}><span><code>{resourceCode(item)}</code><strong>{item.title}</strong><small>{item.meta}</small></span><button type="button" className="ui-button ui-button--secondary" onClick={()=>void attachItem(item)}>Attach</button></div>):<p>No matching {resourceTab === "icai" ? "ICAI" : resourceTab} resources.</p>}</div><div className="chapter-hub-pinned-list">{pinnedItems.length?pinnedItems.map((item)=><div key={item.id}><Link href={item.href}><span><code>{resourceCode(item)}</code><strong>{item.title}</strong><small>{item.meta}</small></span><Icon name="arrow" size={14}/></Link><button type="button" onClick={()=>void removeItem(item)} aria-label={`Remove ${item.title} from chapter`}><Icon name="close" size={14}/></button></div>):<p>Nothing attached yet.</p>}</div></CardBody></Card>
+        <Card className="chapter-hub-section chapter-hub-materials" data-mobile-view="resources"><CardBody><SectionTitle icon="book" eyebrow="Chapter material" title="Attached to this chapter"/><div className="chapter-hub-resource-tabs" role="tablist" aria-label="Resource source">{(["private","community","icai"] as const).map((tab)=><button type="button" role="tab" aria-selected={resourceTab===tab} key={tab} onClick={()=>setResourceTab(tab)}><span>{tab==="icai"?"ICAI":tab.charAt(0).toUpperCase()+tab.slice(1)}</span><small>{resourceCounts[tab]}</small></button>)}</div><input className="chapter-hub-resource-search" type="search" value={resourceQuery} onChange={(event)=>setResourceQuery(event.target.value)} placeholder={`Search ${resourceTab === "icai" ? "ICAI" : resourceTab} resources…`} aria-label="Search resources to attach"/><div className="chapter-hub-resource-results">{filteredAvailableItems.length?filteredAvailableItems.slice(0,40).map((item)=><div key={`${item.sourceKind}:${item.sourceId}`}><span><code>{resourceCode(item)}</code><strong>{item.title}</strong><small>{item.meta}</small></span><button type="button" className="ui-button ui-button--secondary" onClick={()=>void attachItem(item)}>Save to chapter</button></div>):<p>No matching {resourceTab === "icai" ? "ICAI" : resourceTab} resources.</p>}</div><div className="chapter-hub-pinned-list">{pinnedItems.length?pinnedItems.map((item)=><div key={item.id}><Link href={item.href}><span><code>{resourceCode(item)}</code><strong>{item.title}</strong><small>{item.meta}</small></span><Icon name="arrow" size={14}/></Link><button type="button" onClick={()=>void removeItem(item)} aria-label={`Remove ${item.title} from chapter`}><Icon name="close" size={14}/></button></div>):<p>Nothing attached yet.</p>}</div></CardBody></Card>
 
         <Card className="chapter-hub-section chapter-hub-links" data-mobile-view="resources"><CardBody><SectionTitle icon="arrow" eyebrow="Useful links" title="Videos, revision & references"/><form className="chapter-hub-link-form" onSubmit={(event)=>void addLink(event)}><select value={linkDraft.kind} onChange={(event)=>setLinkDraft((draft)=>({...draft,kind:event.target.value as ChapterHubLink["kind"]}))} aria-label="Link type"><option value="useful">Useful link</option><option value="youtube">YouTube video</option><option value="revision">Revision link</option></select><input value={linkDraft.title} onChange={(event)=>setLinkDraft((draft)=>({...draft,title:event.target.value}))} placeholder="Title" maxLength={160} required/><input type="url" value={linkDraft.url} onChange={(event)=>setLinkDraft((draft)=>({...draft,url:event.target.value}))} placeholder="https://…" maxLength={2048} required/><button className="ui-button ui-button--primary" type="submit">Add link</button></form><div className="chapter-hub-link-list">{links.length?links.map((link)=><div key={link.id}><a href={link.url} target="_blank" rel="noreferrer"><Badge>{link.kind==="youtube"?"Video":link.kind}</Badge><span>{link.title}</span><Icon name="arrow" size={14}/></a><button type="button" aria-label={`Remove ${link.title}`} onClick={()=>{setLinks((items)=>items.filter((item)=>item.id!==link.id));void mutate({action:"remove_link",id:link.id}).catch(()=>setLinks((items)=>[link,...items]));}}><Icon name="close" size={14}/></button></div>):<p>No useful links added yet.</p>}</div></CardBody></Card>
       </main>

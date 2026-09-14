@@ -45,7 +45,9 @@ test("A1.4 provides private advanced chapter controls", () => {
   assert.match(hub, /\["private","community","icai"\]/);
   assert.match(hub, /resourceTab === "icai"/);
   assert.match(hub, /Search resources to attach/);
-  assert.match(hub, />Save<\/button>/);
+  assert.match(hub, /Save changes/);
+  assert.match(hub, /disabled=\{!progress\[stage\.field\]\}/);
+  assert.match(hub, /Save to chapter/);
   assert.match(hub, /resourceCode\(item\)/);
   assert.doesNotMatch(hub, /AcademicContextBar/);
   assert.doesNotMatch(hub, /chapter-hub-notes/);

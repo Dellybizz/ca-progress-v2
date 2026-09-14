@@ -59,8 +59,6 @@
 .chapter-hub-date-grid label.is-complete { background: var(--color-success-soft); }
 .chapter-hub-date-grid span { font-size: 10px; font-weight: 700; }
 .chapter-hub-date-grid input { width: 100%; min-width: 0; min-height: 34px; padding: 0 6px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); font-size: 9px; }
-.chapter-hub-date-grid label > button { width: fit-content; min-height: 25px; padding: 0 7px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-brand-strong); font-size: 9px; font-weight: 700; cursor: pointer; }
-.chapter-hub-date-grid label > button:disabled { opacity: .45; cursor: default; }
 .chapter-hub-understanding { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px 12px; padding-top: 2px; }
 .chapter-hub-understanding > span { display: grid; gap: 2px; }
 .chapter-hub-understanding strong { font-size: 11px; }
@@ -205,3 +203,6 @@
   .chapter-hub-resource-results > div { padding-inline: 8px; }
   .chapter-hub-attach button, .chapter-hub-link-form button { width: 100%; }
 }
+
+.chapter-hub-controls-save{min-height:34px;padding-inline:12px;font-size:10px}.chapter-hub-date-grid label.is-disabled{background:var(--color-surface-muted);opacity:.62}.chapter-hub-date-grid input:disabled{cursor:not-allowed}
+@media(max-width:680px){.chapter-hub-controls .chapter-hub-section__header{align-items:flex-start}.chapter-hub-controls-save{min-width:102px}.chapter-hub-date-grid label{grid-template-columns:58px minmax(0,1fr)}.chapter-hub-resource-results code,.chapter-hub-pinned-list code{font-size:7px}.chapter-hub-resource-results>div{align-items:start}.chapter-hub-resource-results .ui-button{min-height:36px;line-height:1.15}}
