@@ -22,6 +22,9 @@ test("A1.3 uses direct group and subject selectors before chapter action", () =>
   assert.match(tracker, /All subjects/);
   assert.match(tracker, /Go to Chapter Hub/);
   assert.match(tracker, /flushSync/);
+  assert.match(tracker, /saveChains/);
+  assert.match(tracker, /disabled=\{locked\}/);
+  for (const label of ["Rev. 1", "Rev. 2", "Test 1", "Test 2"]) assert.match(tracker, new RegExp(label.replace(".", "\\.")));
   assert.match(tracker, /Income Tax \(DT\)/);
   assert.match(tracker, /Goods and Service Tax \(IDT\)/);
   assert.match(tracker, /Financial Management/);

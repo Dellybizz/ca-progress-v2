@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Icon } from "@/components/ui/icon";
 import { useStudentContext } from "@/components/academic/student-context-provider";
@@ -11,10 +11,10 @@ import type { ProgressChapter, ProgressMutationResult, ProgressReadyModel, Progr
 
 const STAGES: Array<{ key: ProgressStage; label: string; short: string }> = [
   { key: "completed", label: "First Completion", short: "Done" },
-  { key: "revision_1", label: "Revision 1", short: "1R" },
-  { key: "revision_2", label: "Revision 2", short: "2R" },
-  { key: "test_1", label: "Test 1", short: "T1" },
-  { key: "test_2", label: "Test 2", short: "T2" },
+  { key: "revision_1", label: "Revision 1", short: "Rev. 1" },
+  { key: "revision_2", label: "Revision 2", short: "Rev. 2" },
+  { key: "test_1", label: "Test 1", short: "Test 1" },
+  { key: "test_2", label: "Test 2", short: "Test 2" },
 ];
 
 const fieldForStage: Record<ProgressStage, keyof ProgressState> = {
@@ -90,7 +90,8 @@ export function ProgressTracker({
   const [query, setQuery] = useState(initialChapter ? `${initialChapter.number} ${initialChapter.title}` : "");
   const [subject, setSubject] = useState(subjectLocked && model.chapters[0] ? model.chapters[0].subjectId : "all");
   const [group, setGroup] = useState("all");
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const saveChains = useRef(new Map<string, Promise<void>>());
+  const intentVersions = useRef(new Map<string, number>());
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [undoEvent, setUndoEvent] = useState<{ id: string; chapterId: string } | null>(null);
@@ -112,7 +113,7 @@ export function ProgressTracker({
   }), [chapters, group, query, subject]);
   const grouped = useMemo(() => [...new Map(filtered.map((chapter) => [chapter.subjectId, { title: chapter.subjectTitle, chapters: filtered.filter((item) => item.subjectId === chapter.subjectId) }])).values()].map((item) => ({ ...item, sections: [...new Map(item.chapters.map((chapter) => [sectionTitle(item.title, chapter.sectionKey) ?? "", { title: sectionTitle(item.title, chapter.sectionKey), chapters: item.chapters.filter((candidate) => (sectionTitle(item.title, candidate.sectionKey) ?? "") === (sectionTitle(item.title, chapter.sectionKey) ?? "")) }])).values()] })), [filtered]);
 
-  async function mutate(chapter: ProgressChapter, stage: ProgressStage) {
+  function mutate(chapter: ProgressChapter, stage: ProgressStage) {
     if (isTestStage(stage)) {
       router.push(`/tests?chapterId=${encodeURIComponent(chapter.id)}&stage=${stage}`);
       return;
@@ -122,26 +123,32 @@ export function ProgressTracker({
     const previous = chapter.state;
     const next = optimisticState(previous, stage, enabled);
     const key = `${chapter.id}:${stage}`;
+    const version = (intentVersions.current.get(key) ?? 0) + 1;
+    intentVersions.current.set(key, version);
     flushSync(() => {
-      setPendingKey(key);
       setSaveState("saved");
       setMessage(null);
       setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
     });
-    try {
-      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/progress", { action: "set_stage", chapterId: chapter.id, stage, enabled }, {state:next,saved_at:new Date().toISOString()}, { ...previous });
-      const payload = await response.json() as ProgressMutationResult & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Progress could not be saved.");
-      setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
-      setUndoEvent(payload.event_id ? { id: payload.event_id, chapterId: chapter.id } : null);
-      if(queued)setMessage("Saved on this device. It will sync when you reconnect.");
-    } catch (error) {
-      setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: previous } : item));
-      setSaveState("error");
-      setMessage(error instanceof Error ? error.message : "Progress could not be saved.");
-    } finally {
-      setPendingKey(null);
-    }
+    const persist = async () => {
+      try {
+        const {response,queued} = await offlineMutationFetch(context.userId!, "/api/progress", { action: "set_stage", chapterId: chapter.id, stage, enabled }, {state:next,saved_at:new Date().toISOString()}, { ...previous });
+        const payload = await response.json() as ProgressMutationResult & { error?: string };
+        if (!response.ok) throw new Error(payload.error || "Progress could not be saved.");
+        if (intentVersions.current.get(key) === version) setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
+        setUndoEvent(payload.event_id ? { id: payload.event_id, chapterId: chapter.id } : null);
+        if(queued)setMessage("Saved on this device. It will sync when you reconnect.");
+      } catch (error) {
+        if (intentVersions.current.get(key) === version) {
+          setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: previous } : item));
+          setSaveState("error");
+          setMessage(error instanceof Error ? error.message : "Progress could not be saved.");
+        }
+      }
+    };
+    const queuedSave = (saveChains.current.get(key) ?? Promise.resolve()).then(persist, persist);
+    saveChains.current.set(key, queuedSave);
+    void queuedSave.finally(() => { if (saveChains.current.get(key) === queuedSave) saveChains.current.delete(key); });
   }
 
   async function undo() {
@@ -186,7 +193,6 @@ export function ProgressTracker({
               const locked = !active && stageLocked(chapter.state, stage.key)
                 ? true
                 : !testStage && active ? clearLocked(chapter.state, stage.key) : false;
-              const pending = pendingKey === `${chapter.id}:${stage.key}`;
               const title = locked
                 ? "Complete the required earlier stage first."
                 : testStage
@@ -196,14 +202,14 @@ export function ProgressTracker({
                 key={stage.key}
                 type="button"
                 className={active ? "is-active" : ""}
-                disabled={locked || pending}
+                disabled={locked}
                 onClick={() => void mutate(chapter, stage.key)}
                 title={title}
                 aria-pressed={active}
                 aria-label={`${stage.label}${active ? ", completed" : ""}`}
               >
                 <span>{stage.short}</span>
-                {locked ? <Icon name="lock" size={12}/> : active ? <Icon name="check" size={12}/> : pending ? <Icon name="clock" size={12}/> : testStage ? <Icon name="arrow" size={12}/> : null}
+                {locked ? <Icon name="lock" size={12}/> : active ? <Icon name="check" size={12}/> : testStage ? <Icon name="arrow" size={12}/> : null}
               </button>;
             })}
           </div>
