@@ -1,4 +1,4 @@
-import type { StudySubjectOption } from "@/lib/study/types";
+import type { NoteSourceAttribution, NoteSubjectOption } from "@/lib/notes/types";
 
 export type ResourceVisibility = "private" | "shared";
 export type ModerationStatus = "private" | "pending" | "approved" | "rejected" | "reported";
@@ -12,9 +12,13 @@ export type NoteCard = {
   bodyHtml: string;
   subjectId: string | null;
   chapterId: string | null;
+  topicId: string | null;
   subjectTitle: string | null;
   chapterTitle: string | null;
+  topicTitle: string | null;
   tags: string[];
+  resourceIds: string[];
+  source: NoteSourceAttribution | null;
   visibility: ResourceVisibility;
   moderationStatus: ModerationStatus;
   ownerLabel: string;
@@ -58,7 +62,7 @@ export type OfficialResourceCard = {
 export type ResourceLibraryReady = {
   mode: "ready";
   viewerName: string;
-  subjects: StudySubjectOption[];
+  subjects: NoteSubjectOption[];
   myNotes: NoteCard[];
   myUploads: UploadCard[];
   sharedNotes: NoteCard[];
@@ -79,7 +83,7 @@ export type ResourceDetailModel =
 export type NoteDetailModel =
   | { mode: "guest" }
   | { mode: "missing" }
-  | { mode: "ready"; note: NoteCard; subjects: StudySubjectOption[]; canManage: boolean; canReport: boolean };
+  | { mode: "ready"; note: NoteCard; subjects: NoteSubjectOption[]; availableUploads: UploadCard[]; canManage: boolean; canReport: boolean };
 
 export type ModerationQueueItem = {
   entityType: ResourceEntityType;

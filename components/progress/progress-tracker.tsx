@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { Icon } from "@/components/ui/icon";
+import { useStudentContext } from "@/components/academic/student-context-provider";
+import { offlineMutationFetch } from "@/lib/offline/mutation";
 import type { ProgressChapter, ProgressMutationResult, ProgressReadyModel, ProgressStage, ProgressState } from "@/lib/progress/types";
 
 const STAGES: Array<{ key: ProgressStage; label: string; short: string }> = [
-  { key: "completed", label: "Completed", short: "Done" },
-  { key: "revision_1", label: "Revision 1", short: "1R" },
-  { key: "revision_2", label: "Revision 2", short: "2R" },
-  { key: "test_1", label: "Test 1", short: "T1" },
-  { key: "test_2", label: "Test 2", short: "T2" },
+  { key: "completed", label: "First Completion", short: "Done" },
+  { key: "revision_1", label: "Revision 1", short: "Rev. 1" },
+  { key: "revision_2", label: "Revision 2", short: "Rev. 2" },
+  { key: "test_1", label: "Test 1", short: "Test 1" },
+  { key: "test_2", label: "Test 2", short: "Test 2" },
 ];
 
 const fieldForStage: Record<ProgressStage, keyof ProgressState> = {
@@ -36,7 +39,6 @@ function stageLocked(state: ProgressState, stage: ProgressStage) {
 function clearLocked(state: ProgressState, stage: ProgressStage) {
   if (stage === "completed") return Boolean(state.revision_1_at || state.test_1_at);
   if (stage === "revision_1") return Boolean(state.revision_2_at);
-  if (stage === "test_1") return Boolean(state.test_2_at);
   return false;
 }
 
@@ -44,27 +46,52 @@ function optimisticState(state: ProgressState, stage: ProgressStage, enabled: bo
   return { ...state, [fieldForStage[stage]]: enabled ? new Date().toISOString() : null };
 }
 
-function summary(chapters: ProgressChapter[]) {
-  const total = chapters.length;
-  const completed = chapters.filter((chapter) => chapter.state.completed_at).length;
-  const revisions = chapters.filter((chapter) => chapter.state.revision_1_at).length + chapters.filter((chapter) => chapter.state.revision_2_at).length;
-  const tests = chapters.filter((chapter) => chapter.state.test_1_at).length + chapters.filter((chapter) => chapter.state.test_2_at).length;
-  const achieved = completed + revisions + tests;
-  return {
-    completed,
-    completion: total ? Math.round((completed / total) * 100) : 0,
-    revisions: total ? Math.round((revisions / (total * 2)) * 100) : 0,
-    tests: total ? Math.round((tests / (total * 2)) * 100) : 0,
-    overall: total ? Math.round((achieved / (total * 5)) * 100) : 0,
-  };
+function isTestStage(stage: ProgressStage): stage is "test_1" | "test_2" {
+  return stage === "test_1" || stage === "test_2";
 }
 
-export function ProgressTracker({ model, subjectLocked = false }: { model: ProgressReadyModel; subjectLocked?: boolean }) {
+function shortSubjectTitle(title: string) {
+  const labels: Record<string, string> = {
+    "Financial Management and Strategic Management": "FM SM",
+    "Cost and Management Accounting": "Costing",
+    "Auditing and Ethics": "Audit",
+    "Corporate and Other Laws": "Law",
+  };
+  return labels[title] ?? title;
+}
+
+function sectionTitle(subjectTitle: string, sectionKey: string | null) {
+  if (!sectionKey) return null;
+  const key = sectionKey.toLocaleLowerCase().replaceAll("_", "-");
+  if (subjectTitle === "Taxation") {
+    if (/gst|goods|indirect/.test(key)) return "Goods and Service Tax (IDT)";
+    if (/income|direct/.test(key)) return "Income Tax (DT)";
+  }
+  if (subjectTitle === "Financial Management and Strategic Management") {
+    if (/strategic|strategy/.test(key)) return "Strategic Management";
+    if (/financial|finance/.test(key)) return "Financial Management";
+  }
+  return null;
+}
+
+export function ProgressTracker({
+  model,
+  subjectLocked = false,
+  initialChapterId,
+}: {
+  model: ProgressReadyModel;
+  subjectLocked?: boolean;
+  initialChapterId?: string;
+}) {
+  const context = useStudentContext();
+  const router = useRouter();
+  const initialChapter = initialChapterId ? model.chapters.find((chapter) => chapter.id === initialChapterId) ?? null : null;
   const [chapters, setChapters] = useState(model.chapters);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialChapter ? `${initialChapter.number} ${initialChapter.title}` : "");
   const [subject, setSubject] = useState(subjectLocked && model.chapters[0] ? model.chapters[0].subjectId : "all");
   const [group, setGroup] = useState("all");
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const saveChains = useRef(new Map<string, Promise<void>>());
+  const intentVersions = useRef(new Map<string, number>());
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [undoEvent, setUndoEvent] = useState<{ id: string; chapterId: string } | null>(null);
@@ -74,43 +101,54 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
     chapters.forEach((chapter) => map.set(chapter.subjectId, { id: chapter.subjectId, title: chapter.subjectTitle }));
     return [...map.values()];
   }, [chapters]);
-  const groups = useMemo(() => [...new Map(chapters.map((chapter) => [chapter.groupCode, { code: chapter.groupCode, name: chapter.groupName }])).values()], [chapters]);
+  const groups = useMemo(
+    () => [...new Map(chapters.map((chapter) => [chapter.groupCode, { code: chapter.groupCode, name: chapter.groupName }])).values()],
+    [chapters],
+  );
   const filtered = useMemo(() => chapters.filter((chapter) => {
     if (subject !== "all" && chapter.subjectId !== subject) return false;
     if (group !== "all" && chapter.groupCode !== group) return false;
     const q = query.trim().toLocaleLowerCase();
     return !q || `${chapter.number} ${chapter.title} ${chapter.subjectTitle}`.toLocaleLowerCase().includes(q);
   }), [chapters, group, query, subject]);
-  const totals = useMemo(() => summary(chapters), [chapters]);
+  const grouped = useMemo(() => [...new Map(filtered.map((chapter) => [chapter.subjectId, { title: chapter.subjectTitle, chapters: filtered.filter((item) => item.subjectId === chapter.subjectId) }])).values()].map((item) => ({ ...item, sections: [...new Map(item.chapters.map((chapter) => [sectionTitle(item.title, chapter.sectionKey) ?? "", { title: sectionTitle(item.title, chapter.sectionKey), chapters: item.chapters.filter((candidate) => (sectionTitle(item.title, candidate.sectionKey) ?? "") === (sectionTitle(item.title, chapter.sectionKey) ?? "")) }])).values()] })), [filtered]);
 
-  async function mutate(chapter: ProgressChapter, stage: ProgressStage) {
+  function mutate(chapter: ProgressChapter, stage: ProgressStage) {
+    if (isTestStage(stage)) {
+      router.push(`/tests?chapterId=${encodeURIComponent(chapter.id)}&stage=${stage}`);
+      return;
+    }
     const enabled = !stageEnabled(chapter.state, stage);
     if ((enabled && stageLocked(chapter.state, stage)) || (!enabled && clearLocked(chapter.state, stage))) return;
     const previous = chapter.state;
     const next = optimisticState(previous, stage, enabled);
     const key = `${chapter.id}:${stage}`;
-    setPendingKey(key);
-    setSaveState("saving");
-    setMessage(null);
-    setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
-    try {
-      const response = await fetch("/api/progress", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "set_stage", chapterId: chapter.id, stage, enabled }),
-      });
-      const payload = await response.json() as ProgressMutationResult & { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Progress could not be saved.");
-      setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
-      setUndoEvent(payload.event_id ? { id: payload.event_id, chapterId: chapter.id } : null);
+    const version = (intentVersions.current.get(key) ?? 0) + 1;
+    intentVersions.current.set(key, version);
+    flushSync(() => {
       setSaveState("saved");
-    } catch (error) {
-      setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: previous } : item));
-      setSaveState("error");
-      setMessage(error instanceof Error ? error.message : "Progress could not be saved.");
-    } finally {
-      setPendingKey(null);
-    }
+      setMessage(null);
+      setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: next } : item));
+    });
+    const persist = async () => {
+      try {
+        const {response,queued} = await offlineMutationFetch(context.userId!, "/api/progress", { action: "set_stage", chapterId: chapter.id, stage, enabled }, {state:next,saved_at:new Date().toISOString()}, { ...previous });
+        const payload = await response.json() as ProgressMutationResult & { error?: string };
+        if (!response.ok) throw new Error(payload.error || "Progress could not be saved.");
+        if (intentVersions.current.get(key) === version) setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: payload.state, updatedAt: payload.saved_at } : item));
+        setUndoEvent(payload.event_id ? { id: payload.event_id, chapterId: chapter.id } : null);
+        if(queued)setMessage("Saved on this device. It will sync when you reconnect.");
+      } catch (error) {
+        if (intentVersions.current.get(key) === version) {
+          setChapters((items) => items.map((item) => item.id === chapter.id ? { ...item, state: previous } : item));
+          setSaveState("error");
+          setMessage(error instanceof Error ? error.message : "Progress could not be saved.");
+        }
+      }
+    };
+    const queuedSave = (saveChains.current.get(key) ?? Promise.resolve()).then(persist, persist);
+    saveChains.current.set(key, queuedSave);
+    void queuedSave.finally(() => { if (saveChains.current.get(key) === queuedSave) saveChains.current.delete(key); });
   }
 
   async function undo() {
@@ -136,43 +174,48 @@ export function ProgressTracker({ model, subjectLocked = false }: { model: Progr
 
   return (
     <div className="progress-workspace">
-      <section className="progress-summary-grid" aria-label="Progress analytics summary">
-        <div><span>Overall</span><strong>{totals.overall}%</strong><small>all 5 stages</small></div>
-        <div><span>Completed</span><strong>{totals.completion}%</strong><small>{totals.completed}/{chapters.length} chapters</small></div>
-        <div><span>Revisions</span><strong>{totals.revisions}%</strong><small>1R + 2R</small></div>
-        <div><span>Tests</span><strong>{totals.tests}%</strong><small>T1 + T2</small></div>
-      </section>
+      {!subjectLocked && groups.length > 1 ? <nav className="progress-group-tabs" aria-label="Group"><button type="button" className={group === "all" ? "is-active" : ""} onClick={() => setGroup("all")}>Both groups</button>{groups.map((item) => <button type="button" key={item.code} className={group === item.code ? "is-active" : ""} onClick={() => { setGroup(item.code); setSubject("all"); }}>{item.name}</button>)}</nav> : null}
+      {!subjectLocked ? <nav className="progress-subject-tabs" aria-label="Subject"><span>Subjects</span><button type="button" className={subject === "all" ? "is-active" : ""} onClick={() => setSubject("all")}>All subjects</button>{subjects.filter((item) => group === "all" || chapters.some((chapter) => chapter.subjectId === item.id && chapter.groupCode === group)).map((item) => <button type="button" key={item.id} className={subject === item.id ? "is-active" : ""} onClick={() => setSubject(item.id)}>{shortSubjectTitle(item.title)}</button>)}</nav> : null}
+      <label className="progress-search progress-search--standalone"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chapters" /></label>
 
-      <section className="progress-toolbar" aria-label="Progress filters">
-        <label className="progress-search"><Icon name="search" size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search chapters or subjects" /></label>
-        {!subjectLocked ? <label><span>Subject</span><select value={subject} onChange={(event) => setSubject(event.target.value)}><option value="all">All subjects</option>{subjects.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
-        {groups.length > 1 ? <label><span>Group</span><select value={group} onChange={(event) => setGroup(event.target.value)}><option value="all">All groups</option>{groups.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label> : null}
-        <Link className="progress-analytics-link" href="/analytics">Analytics <Icon name="arrow" size={14}/></Link>
-      </section>
+      {saveState === "error" ? <div className="progress-save-error" role="alert"><span><Icon name="bell" size={15}/>{message}</span>{undoEvent ? <button onClick={undo}>Undo</button> : null}</div> : null}
 
-      <div className={`progress-save-state progress-save-state--${saveState}`} role="status" aria-live="polite">
-        <span><Icon name={saveState === "error" ? "bell" : saveState === "saving" ? "clock" : "check"} size={15}/>{saveState === "saving" ? "Saving automatically…" : saveState === "error" ? message : saveState === "saved" ? "All changes saved" : "Changes auto-save"}</span>
-        {undoEvent ? <button onClick={undo}>Undo last change</button> : null}
-      </div>
-
-      {filtered.length ? <div className="progress-chapter-list">{filtered.map((chapter) => (
-        <article className="progress-chapter-card" key={chapter.id}>
-          <div className="progress-chapter-heading"><span>{chapter.subjectTitle}</span><h3><b>{chapter.number}</b>{chapter.title}</h3><small>{chapter.groupName}</small></div>
+      {filtered.length ? <div className="progress-subject-sections">{grouped.map((subjectSection) => <section className="progress-subject-section" key={subjectSection.title}><h2>{shortSubjectTitle(subjectSection.title)}</h2>{subjectSection.sections.map((section) => <div className="progress-syllabus-section" key={section.title ?? "chapters"}>{section.title ? <h3>{section.title}</h3> : null}<div className="progress-chapter-list">{section.chapters.map((chapter) => (
+        <article className="progress-chapter-card" key={chapter.id} data-canonical-chapter-id={chapter.id}>
+          <div className="progress-chapter-heading">
+            <h3><b>{chapter.number}</b>{chapter.title}</h3>
+            <Link href={`/chapters/${chapter.id}`}><span className="progress-hub-label--desktop">Go to Chapter Hub</span><span className="progress-hub-label--mobile">Chapter Hub</span><Icon name="arrow" size={12}/></Link>
+          </div>
           <div className="progress-stage-controls" role="group" aria-label={`${chapter.title} stages`}>
             {STAGES.map((stage) => {
               const active = stageEnabled(chapter.state, stage.key);
-              const locked = active ? clearLocked(chapter.state, stage.key) : stageLocked(chapter.state, stage.key);
-              const pending = pendingKey === `${chapter.id}:${stage.key}`;
-              return <button key={stage.key} type="button" className={active ? "is-active" : ""} disabled={locked || Boolean(pendingKey)} onClick={() => mutate(chapter, stage.key)} title={locked ? "Complete the required earlier stage first." : stage.label} aria-pressed={active}><span>{stage.short}</span><small>{stage.label}</small>{locked && !active ? <Icon name="lock" size={12}/> : pending ? <Icon name="clock" size={12}/> : active ? <Icon name="check" size={12}/> : null}</button>;
+              const testStage = isTestStage(stage.key);
+              const locked = !active && stageLocked(chapter.state, stage.key)
+                ? true
+                : !testStage && active ? clearLocked(chapter.state, stage.key) : false;
+              const title = locked
+                ? "Complete the required earlier stage first."
+                : testStage
+                  ? active ? `Open saved ${stage.label} marks` : `Record ${stage.label} marks`
+                  : stage.label;
+              return <button
+                key={stage.key}
+                type="button"
+                className={active ? "is-active" : ""}
+                disabled={locked}
+                onClick={() => void mutate(chapter, stage.key)}
+                title={title}
+                aria-pressed={active}
+                aria-label={`${stage.label}${active ? ", completed" : ""}`}
+              >
+                <span>{stage.short}</span>
+                {locked ? <Icon name="lock" size={12}/> : active ? <Icon name="check" size={12}/> : testStage ? <Icon name="arrow" size={12}/> : null}
+              </button>;
             })}
           </div>
         </article>
-      ))}</div> : <div className="progress-empty"><Icon name="search"/><h3>No chapters match these filters</h3><p>Clear the search or broaden the subject/group selection.</p></div>}
+      ))}</div></div>)}</section>)}</div> : <div className="progress-empty"><Icon name="search"/><h3>No chapters match these filters</h3><p>Clear the search or broaden the subject/group selection.</p></div>}
 
-      <section className="progress-history">
-        <div><span className="eyebrow">Recent history</span><h2>Latest saved changes</h2><p>Every accepted stage change creates an audit event. Undo only applies when no newer change would be overwritten.</p></div>
-        <div className="progress-history-list">{model.history.length ? model.history.slice(0, 8).map((item) => <div key={item.id}><span><strong>{item.chapterTitle}</strong><small>{item.stage.replaceAll("_", " ")} · {item.action}</small></span><Badge tone={item.action === "undo" ? "neutral" : "info"}>{new Date(item.createdAt).toLocaleDateString("en-IN")}</Badge></div>) : <p>No progress changes yet. Your first auto-saved stage update will appear here.</p>}</div>
-      </section>
     </div>
   );
 }

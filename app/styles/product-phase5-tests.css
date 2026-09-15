@@ -1,0 +1,14 @@
+.tests-progress-workspace .ui-card__body{display:grid;gap:16px}
+.tests-progress-workspace .planner-form-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px;align-items:end}
+.tests-progress-workspace .planner-form-grid>label{display:grid;grid-column:span 3;gap:6px;min-width:0;font-size:13px;font-weight:720;color:var(--color-text-soft)}
+.tests-progress-workspace .planner-form-grid>label:first-child{grid-column:span 6}
+.tests-progress-workspace .planner-form-grid input,.tests-progress-workspace .planner-form-grid select,.tests-progress-workspace textarea{width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);background:var(--color-surface);color:var(--color-text);font:inherit;outline:0}
+.tests-progress-workspace textarea{min-height:92px;resize:vertical}
+.tests-progress-workspace fieldset{margin:0;padding:14px;border:1px solid var(--color-border);border-radius:var(--radius-sm)}
+.tests-progress-workspace fieldset legend{padding:0 6px;font-size:13px;font-weight:800}
+.tests-progress-workspace fieldset .phase6-header-links{display:flex;flex-wrap:wrap;gap:10px 18px}
+.tests-progress-workspace fieldset label{display:flex;align-items:center;gap:7px;font-size:13px}
+.tests-progress-workspace fieldset input{width:16px;height:16px;margin:0}
+.tests-progress-workspace>.ui-card:first-child .ui-card__body>label{display:grid;gap:6px;font-size:13px;font-weight:720;color:var(--color-text-soft)}
+@media(max-width:900px){.tests-progress-workspace .planner-form-grid>label,.tests-progress-workspace .planner-form-grid>label:first-child{grid-column:span 6}}
+@media(max-width:620px){.tests-progress-workspace .planner-form-grid>label,.tests-progress-workspace .planner-form-grid>label:first-child{grid-column:1/-1}}

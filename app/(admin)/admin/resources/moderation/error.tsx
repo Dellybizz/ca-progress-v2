@@ -1,3 +1,3 @@
 "use client";
-import { Button } from "@/components/ui/button";
-export default function ErrorState({ reset }: { error: Error & { digest?: string }; reset: () => void }) { return <div className="phase7-page"><div className="phase7-empty"><strong>Resource moderation could not be loaded</strong><p>No submission or report state was changed.</p><Button onClick={reset}>Try again</Button></div></div>; }
+import { RouteErrorView } from "@/components/states/route-error-view";
+export default function ErrorState({ reset }: { error: Error & { digest?: string }; reset: () => void }) { return <RouteErrorView title="Resource moderation could not be loaded" message="No submission or report state was changed." reset={reset}/>; }

@@ -14,7 +14,11 @@ const MIME_BY_EXTENSION: Record<string, string[]> = {
   docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
 };
 
-const ALLOWED_TAGS = new Set(["p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "blockquote", "a", "h2", "h3", "code", "pre"]);
+const ALLOWED_TAGS = new Set([
+  "p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "blockquote", "a",
+  "h1", "h2", "h3", "h4", "code", "pre", "mark", "hr",
+  "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+]);
 
 export type ValidatedUpload = {
   bytes: Uint8Array;
@@ -58,7 +62,7 @@ export async function validateUploadFile(file: File): Promise<ValidatedUpload> {
   if (!(file instanceof File)) throw new Error("A file is required.");
   if (!file.name || file.name.length > 180) throw new Error("File name is invalid.");
   if (file.size <= 0) throw new Error("Empty files are not allowed.");
-  if (file.size > RESOURCE_MAX_BYTES) throw new Error("File exceeds the 10 MB Phase 7 limit.");
+  if (file.size > RESOURCE_MAX_BYTES) throw new Error("File exceeds the 10 MB upload limit.");
 
   const extension = extensionOf(file.name);
   const acceptedMimes = MIME_BY_EXTENSION[extension];
@@ -76,6 +80,12 @@ function safeHref(raw: string) {
   return /^(https?:\/\/|mailto:)/i.test(value) ? value.replace(/"/g, "&quot;") : "";
 }
 
+function safeTableSpan(rawAttrs: string, name: "colspan" | "rowspan") {
+  const match = rawAttrs.match(new RegExp(`${name}\\s*=\\s*(?:\"(\\d+)\"|'(\\d+)'|(\\d+))`, "i"));
+  const value = Number(match?.[1] || match?.[2] || match?.[3] || 0);
+  return Number.isInteger(value) && value >= 2 && value <= 12 ? ` ${name}="${value}"` : "";
+}
+
 export function sanitizeRichTextHtml(input: string) {
   const bounded = input.slice(0, 200000);
   const withoutDangerousBlocks = bounded.replace(/<(script|style|iframe|object|embed|form|input|button|svg|math)[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
@@ -84,12 +94,13 @@ export function sanitizeRichTextHtml(input: string) {
     const tag = rawTag.toLowerCase();
     if (!ALLOWED_TAGS.has(tag)) return "";
     if (closing) return `</${tag}>`;
-    if (tag === "br") return "<br>";
+    if (tag === "br" || tag === "hr") return `<${tag}>`;
     if (tag === "a") {
       const hrefMatch = rawAttrs.match(/href\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i);
       const href = hrefMatch ? safeHref(hrefMatch[1]) : "";
       return href ? `<a href="${href}" rel="noopener noreferrer">` : "<a>";
     }
+    if (tag === "td" || tag === "th") return `<${tag}${safeTableSpan(rawAttrs, "colspan")}${safeTableSpan(rawAttrs, "rowspan")}>`;
     return `<${tag}>`;
   });
 }
@@ -97,7 +108,8 @@ export function sanitizeRichTextHtml(input: string) {
 export function richTextToPlainText(html: string) {
   return html
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>|<\/li>|<\/h2>|<\/h3>|<\/blockquote>|<\/pre>/gi, "\n")
+    .replace(/<\/p>|<\/li>|<\/h[1-4]>|<\/blockquote>|<\/pre>|<\/tr>/gi, "\n")
+    .replace(/<\/td>|<\/th>/gi, "\t")
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")

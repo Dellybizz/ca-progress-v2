@@ -35,6 +35,6 @@ test("Phase 7 routes include loading error empty permission and independent mobi
   assert.match(css, /@media\(max-width:430px\)/);
   assert.match(css, /phase7-upload-drawer/);
   assert.match(library, /Your library is empty/);
-  assert.match(library, /No approved community resources yet/);
+  assert.match(library, /No approved community resources (?:yet|match)/);
   assert.match(admin, /Access denied/);
 });

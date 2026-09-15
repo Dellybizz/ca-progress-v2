@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getEntitlementForUser } from "@/lib/billing/service";
-import { createCommunityMessage, getCommunityMessagePage } from "@/lib/community/service";
+import { createCommunityMessage } from "@/lib/community/service";
+import { getPhase7CommunityMessagePage } from "@/lib/community/phase7";
 
 export const dynamic = "force-dynamic";
 
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Community request failed.";
-  const status = /sign in|authentication/i.test(message) ? 401 : /denied|cannot write|blocked|upgrade|plan/i.test(message) ? 403 : /not found/i.test(message) ? 404 : /must be|duplicate|rate limit|only approved|unavailable/i.test(message) ? 400 : 409;
+  const status = /sign in|authentication/i.test(message) ? 401 : /denied|cannot write|blocked|upgrade|plan/i.test(message) ? 403 : /not found/i.test(message) ? 404 : /must be|duplicate|rate limit|only approved|unavailable|unsupported/i.test(message) ? 400 : 409;
   return NextResponse.json({ error: message }, { status, headers: { "Cache-Control": "private, no-store" } });
 }
 
@@ -15,7 +16,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ chan
   const { channel } = await params;
   const url = new URL(request.url);
   try {
-    const page = await getCommunityMessagePage({ channelSlug: channel, cursor: url.searchParams.get("cursor"), query: url.searchParams.get("q") });
+    const page = await getPhase7CommunityMessagePage({
+      channelSlug: channel,
+      cursor: url.searchParams.get("cursor"),
+      query: url.searchParams.get("q"),
+      filter: url.searchParams.get("filter"),
+    });
     return NextResponse.json(page, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return errorResponse(error); }
 }

@@ -21,6 +21,7 @@ export function CalendarClient({ month, items }: { month: string; items: Calenda
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const monthDate = new Date(`${month}-01T12:00:00`);
   const monthYear = monthDate.getFullYear();
@@ -63,6 +64,7 @@ export function CalendarClient({ month, items }: { month: string; items: Calenda
     setStartsAt("");
     setEndsAt("");
     setAllDay(false);
+    setEditorOpen(false);
   }
 
   async function submit(event: FormEvent) {
@@ -87,6 +89,7 @@ export function CalendarClient({ month, items }: { month: string; items: Calenda
     setStartsAt(toLocalInput(item.startsAt));
     setEndsAt(item.endsAt ? toLocalInput(item.endsAt) : "");
     setAllDay(item.allDay);
+    setEditorOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -109,9 +112,10 @@ export function CalendarClient({ month, items }: { month: string; items: Calenda
           </Card>
         </div>
       </div>
-      <aside>
+      <button className="ui-button ui-button--primary a2-mobile-create" type="button" onClick={() => setEditorOpen(true)}>Add event</button>
+      <aside className={`a2-calendar-editor a2-mobile-editor ${editorOpen ? "is-open" : ""}`}>
         <Card>
-          <CardHeader title={editingId ? "Edit personal event" : "Add personal event"} description="Official ICAI exam events are intentionally read-only."/>
+          <CardHeader title={editingId ? "Edit personal event" : "Add personal event"} action={<button className="ui-button ui-button--ghost a2-editor-close" type="button" onClick={reset}>Close</button>}/>
           <CardBody>
             <form className="phase6-form" onSubmit={submit}>
               <label><span>Title</span><input required maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)}/></label>

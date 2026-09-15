@@ -5,6 +5,24 @@ export type CommunityScope = "global" | "level" | "subject";
 export type CommunityReportReason = "spam" | "harassment" | "misinformation" | "off_topic" | "other";
 export type CommunityReactionEmoji = "👍" | "❤️" | "🎯" | "👏" | "💡" | "✅";
 export type CommunityNotificationType = "mention" | "reply" | "announcement";
+export type CommunityFeedFilter = "all" | "following" | "verified" | "rankers" | "high_scorers" | "saved";
+export type CommunityVerificationKind = "verified_result" | "exemption" | "score_70" | "score_75" | "score_80" | "ranker" | "air";
+
+export type CommunityVerificationBadge = {
+  id: string;
+  kind: CommunityVerificationKind;
+  label: string;
+  evidenceSource: string;
+};
+
+export type CommunityDoubtContext = {
+  id: string;
+  sessionId: string;
+  subjectId: string | null;
+  chapterId: string | null;
+  status: "open" | "answered" | "resolved";
+  source: "study_session";
+};
 
 export type CommunityChannel = {
   id: string;
@@ -63,6 +81,10 @@ export type CommunityMessage = {
   reactions: CommunityReaction[];
   isOwn: boolean;
   isPinned: boolean;
+  verificationBadges?: CommunityVerificationBadge[];
+  doubt?: CommunityDoubtContext | null;
+  savedByViewer?: boolean;
+  followedByViewer?: boolean;
 };
 
 export type CommunityMemberOption = { userId: string; label: string };
@@ -107,9 +129,10 @@ export type CommunityChannelModel =
       members: CommunityMemberOption[];
       resources: CommunityResourceOption[];
       activeBlock: { reason: string; endsAt: string; channelSpecific: boolean } | null;
+      feedFilters?: ReadonlyArray<{ id: CommunityFeedFilter; label: string }>;
     };
 
-export type CommunityMessagePage = { messages: CommunityMessage[]; nextCursor: string | null };
+export type CommunityMessagePage = { messages: CommunityMessage[]; nextCursor: string | null; filter?: CommunityFeedFilter };
 
 export type CommunityModerationReport = {
   id: string;

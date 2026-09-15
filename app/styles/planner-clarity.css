@@ -1,0 +1,551 @@
+/* Planner: clear, compact and immediately understandable. */
+
+.planner-page {
+  max-width: 1220px;
+  gap: 16px;
+  padding-top: 18px;
+}
+
+.planner-page .ui-page-header {
+  align-items: end;
+}
+
+.planner-page .ui-page-header h1 {
+  max-width: 620px;
+  font-size: clamp(30px, 2.5vw, 40px);
+  line-height: 1.05;
+  letter-spacing: -.035em;
+}
+
+.planner-page .ui-page-header p {
+  max-width: 620px;
+  font-size: 13px;
+}
+
+.planner-header-links {
+  gap: 8px;
+}
+
+.planner-header-links a {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.planner-layout {
+  grid-template-columns: minmax(0, 1.55fr) minmax(330px, .7fr);
+  gap: 16px;
+}
+
+/* Desktop keeps the left Planner column continuous. The Add task card spans
+   both rows so its height never pushes Today's tasks down. */
+@media (min-width: 1051px) {
+  .planner-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(330px, .7fr);
+    grid-template-rows: max-content auto;
+    grid-template-areas:
+      "summary add"
+      "tasks add";
+    align-items: start;
+    column-gap: 16px;
+    row-gap: 12px;
+  }
+
+  .planner-summary {
+    grid-area: summary;
+    align-self: start;
+  }
+
+  .planner-add-card {
+    grid-area: add;
+    align-self: start;
+  }
+
+  .planner-tasks-card {
+    grid-area: tasks;
+    align-self: start;
+    width: 100%;
+  }
+}
+
+.planner-main {
+  gap: 12px;
+}
+
+.planner-summary {
+  gap: 10px;
+}
+
+.planner-summary .ui-card {
+  border-radius: 13px;
+  box-shadow: none;
+}
+
+.planner-summary .ui-card__body {
+  gap: 10px;
+  padding: 13px 14px;
+}
+
+.planner-summary svg {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.planner-summary strong {
+  font-size: 22px;
+}
+
+.planner-summary small {
+  font-size: 11px;
+}
+
+.planner-tasks-card,
+.planner-add-card {
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.planner-add-card {
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.planner-add-card:has(.planner-edit-cancel) {
+  border-color: color-mix(in srgb, var(--color-brand) 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-brand-soft) 38%, var(--color-surface));
+  box-shadow: 0 12px 34px rgb(79 70 229 / 10%);
+}
+
+.planner-add-card:has(.planner-edit-cancel) > .ui-card__header {
+  border-bottom-color: color-mix(in srgb, var(--color-brand) 16%, var(--color-border));
+}
+
+.planner-tasks-card > .ui-card__header,
+.planner-add-card > .ui-card__header {
+  padding: 15px 16px 8px;
+}
+
+.planner-tasks-card > .ui-card__header h2,
+.planner-add-card > .ui-card__header h2 {
+  font-size: 16px;
+}
+
+.planner-tasks-card > .ui-card__body,
+.planner-add-card > .ui-card__body {
+  padding: 4px 16px 16px;
+}
+
+.planner-empty {
+  min-height: 210px;
+  align-content: center;
+  gap: 7px;
+  padding: 24px 16px;
+}
+
+.planner-empty__icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 3px;
+  border-radius: 13px;
+  color: var(--color-brand-strong);
+  background: var(--color-brand-soft);
+}
+
+.planner-empty strong {
+  font-size: 15px;
+}
+
+.planner-empty p {
+  font-size: 12px;
+}
+
+.planner-side {
+  gap: 12px !important;
+}
+
+.planner-task {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+.planner-task__content {
+  min-width: 0;
+}
+
+.planner-task__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.planner-task-action {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.planner-task-action:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-subtle);
+}
+
+.planner-task-action--complete {
+  border-color: color-mix(in srgb, var(--color-brand) 22%, var(--color-border));
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+}
+
+.planner-task-action--delete {
+  color: var(--color-danger);
+}
+
+.planner-task-action--delete:hover {
+  border-color: color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  background: var(--color-danger-soft);
+}
+
+.planner-form {
+  gap: 11px;
+}
+
+.planner-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.planner-form label {
+  gap: 5px;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.planner-form label > span {
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+.planner-form label em {
+  color: var(--color-text-faint);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+}
+
+.planner-form input,
+.planner-form select,
+.planner-form textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.planner-form textarea {
+  min-height: 64px;
+}
+
+.planner-schedule {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.planner-schedule__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.planner-schedule__grid label,
+.planner-schedule__grid input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.planner-schedule__grid label > span {
+  color: var(--color-text-soft);
+  font-size: 11px;
+}
+
+.planner-schedule__grid input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-surface);
+}
+
+.planner-add-card:has(.planner-edit-cancel) .planner-schedule__grid input,
+.planner-add-card:has(.planner-edit-cancel) .planner-form input,
+.planner-add-card:has(.planner-edit-cancel) .planner-form select,
+.planner-add-card:has(.planner-edit-cancel) .planner-form textarea {
+  background: var(--color-surface);
+}
+
+.planner-add-button {
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.planner-edit-cancel {
+  border: 0;
+  background: transparent;
+  color: var(--color-brand-strong);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.planner-mobile-links {
+  display: none;
+}
+
+.planner-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 38%);
+  backdrop-filter: blur(3px);
+}
+
+.planner-delete-dialog {
+  width: min(420px, 100%);
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  box-shadow: 0 22px 60px rgb(15 23 42 / 18%);
+}
+
+.planner-delete-dialog__icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.planner-delete-dialog__copy h2 {
+  margin: 1px 0 5px;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.planner-delete-dialog__copy p {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.planner-delete-dialog__copy p strong {
+  color: var(--color-text);
+}
+
+.planner-delete-dialog__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.planner-delete-confirm {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: white;
+}
+
+.planner-delete-confirm:hover {
+  filter: brightness(.95);
+}
+
+@media (max-width: 1050px) {
+  .planner-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-side {
+    position: static !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .planner-page {
+    padding-top: 14px;
+  }
+
+  .planner-page .ui-page-header h1 {
+    font-size: 28px;
+  }
+
+  .planner-header-links {
+    display: none;
+  }
+
+  .planner-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .planner-main,
+  .planner-side {
+    display: contents;
+  }
+
+  .planner-add-card {
+    order: 1;
+  }
+
+  .planner-tasks-card {
+    order: 2;
+  }
+
+  .planner-summary {
+    order: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .planner-mobile-links {
+    order: 4;
+    display: grid;
+    gap: 8px;
+    margin-top: 0;
+  }
+
+  .planner-summary .ui-card__body {
+    display: grid;
+    justify-items: start;
+    gap: 5px;
+    padding: 10px;
+  }
+
+  .planner-summary strong {
+    font-size: 18px;
+  }
+
+  .planner-summary small {
+    font-size: 9px;
+  }
+
+  .planner-task {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .planner-task__actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .planner-task-action {
+    min-height: 38px;
+    padding: 0 8px;
+  }
+
+  .planner-form__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planner-schedule__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planner-schedule,
+  .planner-schedule__grid,
+  .planner-schedule__grid label,
+  .planner-schedule__grid input {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .planner-schedule__grid input[type="date"],
+  .planner-schedule__grid input[type="time"] {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .planner-mobile-links a {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 10px;
+    min-height: 62px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+  }
+
+  .planner-mobile-links a > svg:first-child {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+    border-radius: 10px;
+    color: var(--color-brand-strong);
+    background: var(--color-brand-soft);
+  }
+
+  .planner-mobile-links a span {
+    display: grid;
+    gap: 2px;
+  }
+
+  .planner-mobile-links a strong {
+    font-size: 12px;
+  }
+
+  .planner-mobile-links a small {
+    color: var(--color-text-soft);
+    font-size: 10px;
+  }
+
+  .planner-mobile-links a > svg:last-child {
+    color: var(--color-text-faint);
+  }
+
+  .planner-delete-dialog {
+    padding: 16px;
+  }
+
+  .planner-delete-dialog__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

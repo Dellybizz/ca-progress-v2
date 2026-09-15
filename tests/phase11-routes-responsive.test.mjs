@@ -45,7 +45,9 @@ test("pricing remains configuration-safe and sends only the plan identifier", ()
   const pricing = read("components/billing/pricing-client.tsx");
   assert.match(pricing, /body: JSON\.stringify\(\{ planId: plan\.id \}\)/);
   assert.match(pricing, /Checkout not configured/);
-  assert.match(pricing, /allowance pending configuration/);
+  assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
+  assert.match(pricing, /checkoutMatchesPolicy\(plan, cycle\)/);
+  assert.match(pricing, /published server policy has a valid price/);
   assert.match(pricing, /\/billing\?payment=success/);
   assert.match(pricing, /\/billing\?payment=pending/);
   assert.match(pricing, /\/billing\?payment=failed/);
@@ -61,14 +63,16 @@ test("pricing and billing have dedicated mobile breakpoints and overflow-safe pa
   assert.match(css, /\.phase11-plan-grid\{grid-template-columns:1fr\}/);
 });
 
-test("server-side entitlement checks cover protected Phase 11 integrations", () => {
-  assert.match(read("app/(student)/analytics/forecast/page.tsx"), /analytics\.forecast/);
-  assert.match(read("app/api/planner/today/route.ts"), /planner\.smart/);
+test("server-side entitlement checks cover retained protected Phase 11 integrations while core planning and forecast remain Free", () => {
+  const forecast = read("app/(student)/analytics/forecast/page.tsx");
+  assert.match(forecast, /baseline forecast is part of Free/);
+  assert.doesNotMatch(forecast, /analytics\.forecast|getEntitlementForUser/);
   assert.match(read("app/api/community/channels/[channel]/messages/route.ts"), /community\.attachments/);
-  assert.match(read("app/api/resources/upload/route.ts"), /resources\.storage/);
+  assert.match(read("lib/billing/service.ts"), /resources\.storage/);
+  assert.doesNotMatch(read("app/api/planner/today/route.ts"), /planner\.smart|getEntitlementForUser/);
 });
 
-test("earlier completed phase regression suites remain in the repository", () => {
+test("retained current regression suites remain in the repository", () => {
   const representatives = [
     "phase2-auth.test.mjs",
     "phase3-academic.test.mjs",
@@ -78,7 +82,7 @@ test("earlier completed phase regression suites remain in the repository", () =>
     "phase7-storage-security.test.mjs",
     "phase8-engine.test.mjs",
     "phase9-planner-engine.test.mjs",
-    "phase10-schema-security.test.mjs",
+    "phase10-moderation-realtime-mobile.test.mjs",
   ];
   for (const file of representatives) {
     assert.equal(existsSync(join(root, "tests", file)), true, `${file} should remain`);

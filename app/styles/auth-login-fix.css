@@ -1,8 +1,8 @@
 /* Login/public-shell responsive hardening.
-   Keeps the auth card and supporting copy readable on real desktop widths without
-   changing the authentication flow. */
+   Keeps the auth card fully contained beside the desktop marketing panel and
+   preserves the richer intro on smaller screens where the marketing panel is hidden. */
 .public-content:has(.auth-v2-layout) {
-  max-width: 1040px;
+  max-width: 620px;
   min-width: 0;
 }
 
@@ -24,41 +24,31 @@
 }
 
 .auth-v2-card {
+  width: 100%;
   max-width: 440px;
 }
 
-@media (min-width: 1400px) {
+@media (min-width: 900px) {
   .public-content:has(.auth-v2-layout) {
-    padding-left: clamp(36px, 4vw, 72px);
-    padding-right: clamp(36px, 4vw, 72px);
-  }
-
-  .auth-v2-layout {
-    width: 100%;
-    grid-template-columns: minmax(260px, 1fr) minmax(360px, 440px);
-    gap: clamp(36px, 4vw, 64px);
-    align-items: center;
-  }
-
-  .auth-v2-intro {
-    padding: 0;
-  }
-}
-
-@media (min-width: 900px) and (max-width: 1399px) {
-  .public-content:has(.auth-v2-layout) {
-    max-width: 620px;
+    padding-left: clamp(28px, 3vw, 56px);
+    padding-right: clamp(28px, 3vw, 56px);
   }
 
   .auth-v2-layout {
     width: 100%;
     max-width: 480px;
     margin-inline: auto;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    align-items: center;
   }
 
   .auth-v2-intro {
     display: none;
+  }
+
+  .auth-v2-card {
+    justify-self: center;
   }
 }
 
@@ -70,7 +60,7 @@
 
   .auth-v2-layout {
     width: 100%;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-6);
   }
 

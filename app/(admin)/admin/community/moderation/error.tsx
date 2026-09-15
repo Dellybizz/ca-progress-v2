@@ -1,2 +1,3 @@
 "use client";
-export default function CommunityModerationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) { return <div className="phase10-page"><div className="phase10-route-error"><strong>Community moderation could not be loaded.</strong><p>{error.message || "Try again in a moment."}</p><button className="ui-button ui-button--primary" onClick={reset}>Try again</button></div></div>; }
+import { RouteErrorView } from "@/components/states/route-error-view";
+export default function CommunityModerationError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) { return <RouteErrorView title="Community moderation could not be loaded" message={error.message || "Try again in a moment."} reset={reset}/>; }

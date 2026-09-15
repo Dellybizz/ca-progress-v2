@@ -26,19 +26,27 @@ test("application source does not use Next OG image generation", () => {
 
 test("Cloudflare builds strip the unused Vercel OG runtime without creating rejected startup promises", () => {
   const pkg = JSON.parse(read("package.json"));
+  const wrangler = read("wrangler.jsonc");
+  const ensureBuild = read("scripts/ensure-opennext-build.mjs");
   const patch = read("scripts/patch-opennext-vercel-og.mjs");
   assert.match(pkg.scripts["cf:build"], /patch-opennext-vercel-og\.mjs/);
   assert.match(pkg.scripts["cf:deploy"], /npm run cf:build/);
-  assert.match(pkg.scripts["cf:check"], /npm run cf:build/);
+  assert.match(pkg.scripts["cf:check"], /cf:check:web/);
+  assert.doesNotMatch(pkg.scripts["cf:check"], /^npm run cf:build/);
+  assert.equal(pkg.scripts["cf:ensure-build"], "node scripts/ensure-opennext-build.mjs");
+  assert.match(wrangler, /"build"\s*:\s*\{\s*"command"\s*:\s*"npm run cf:ensure-build"\s*\}/);
+  assert.match(ensureBuild, /\["run", "cf:build"\]/);
   assert.ok(patch.includes("@vercel\\/og\\/index\\.edge\\.js"));
   assert.match(patch, /Refusing to strip @vercel\/og because application source uses OG image generation/);
   assert.match(patch, /Promise\.resolve\(Object\.freeze\(\{\}\)\)/);
   assert.doesNotMatch(patch, /const replacement\s*=\s*["']Promise\.reject/);
 });
 
-test("shared shell degrades to guest rendering instead of returning a Worker-level 500 when viewer lookup fails", () => {
+test("shared shell receives a server-resolved viewer and never flashes guest identity", () => {
   const shell = read("components/shell/app-shell.tsx");
-  assert.match(shell, /try\s*\{[\s\S]*viewer\s*=\s*await loadViewer\(\)/);
-  assert.match(shell, /catch\s*\(error\)/);
-  assert.match(shell, /viewer\s*=\s*guestViewer/);
+  assert.doesNotMatch(shell, /await loadViewer\(\)/);
+  assert.match(shell, /<ViewerProvider viewer=\{viewer\}>/);
+  assert.match(shell, /<TopbarControls area=\{area\}\/>/);
+  assert.match(read("components/shell/viewer-client.ts"), /createContext/);
+  assert.doesNotMatch(read("components/shell/viewer-client.ts"), /Guest|fetch\("\/api\/auth\/viewer"/);
 });

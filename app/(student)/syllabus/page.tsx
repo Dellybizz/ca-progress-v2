@@ -3,6 +3,7 @@ import { SyllabusExplorer } from "@/components/academic/syllabus-explorer";
 import { getAcademicCatalog } from "@/lib/academic/query";
 import { academicSelectionFromProfile } from "@/lib/academic/profile-selection";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
+import { OfflineSnapshot } from "@/components/offline/offline-snapshot";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Syllabus Explorer | CA Progress" };
@@ -17,5 +18,5 @@ export default async function SyllabusPage({ searchParams }: { searchParams: Pro
     group: typeof params.group === "string" ? params.group : preferred.group,
     attempt: typeof params.attempt === "string" ? params.attempt : preferred.attempt,
   });
-  return <SyllabusExplorer catalog={catalog}/>;
+  return <><OfflineSnapshot kind="syllabus" data={catalog}/><SyllabusExplorer catalog={catalog}/></>;
 }

@@ -1,0 +1,22 @@
+export const LEADERBOARD_CATEGORIES: ReadonlyArray<string>;
+export const REFERRAL_ACTIVATION_SESSION_COUNT: number;
+export const REFERRAL_ACTIVATION_XP: number;
+export const IMPOSSIBLE_SESSION_SECONDS: number;
+export const MAX_DAILY_XP_BEFORE_FLAG: number;
+export const ANTI_CHEAT_SIGNAL_TYPES: ReadonlyArray<string>;
+
+export function normalizeLeaderboardCategory(value: unknown): string;
+export function sanitizePublicAlias(value: unknown): string;
+export function monthPeriodKey(instant?: string | number | Date): string;
+export function monthWindow(periodKey: string): { periodKey: string; startsAt: string; endsAt: string };
+export function nextMonthRewardWindow(competitionPeriod: string): { competitionPeriod: string; rewardPeriod: string; startsAt: string; endsAt: string };
+export function rewardForRank(rawRank: unknown): { rank: number; rewardTier: "premium" | "pro"; label: "Premium" | "Pro" } | null;
+export function qualifyingReferralSessions<T extends { id?: unknown; duration_seconds?: unknown; durationSeconds?: unknown }>(rows: T[]): T[];
+export function referralActivationState(rows: Array<{ id?: unknown; duration_seconds?: unknown; durationSeconds?: unknown }>): { qualifyingCount: number; activated: boolean };
+export function detectSessionSignals(rows: Array<{ id?: unknown; duration_seconds?: unknown; durationSeconds?: unknown; started_at?: unknown; startedAt?: unknown; ended_at?: unknown; endedAt?: unknown }>): { impossibleSessionIds: string[]; repeatedImpossible: boolean; overlappingPairs: string[][]; simultaneous: boolean };
+export function detectRapidChapterCompletion(rows: Array<{ chapter_id?: unknown; chapterId?: unknown; completed_at?: unknown; completedAt?: unknown }>): { suspicious: boolean; count: number; windowStart: string | null };
+export function detectFakeTestPattern(rows: Array<{ id?: unknown; completed_at?: unknown; completedAt?: unknown; duration_minutes?: unknown; durationMinutes?: unknown }>): { suspicious: boolean; reason: string | null; count: number };
+export function detectProgressLoop(rows: Array<{ chapter_id?: unknown; chapterId?: unknown; stage?: unknown; action?: unknown; created_at?: unknown; createdAt?: unknown }>): { suspicious: boolean; evidenceKey: string | null; transitions: number };
+export function detectExcessiveDailyXp(rows: Array<{ occurred_at?: unknown; occurredAt?: unknown; xp_amount?: unknown; xp?: unknown }>, threshold?: number): { suspicious: boolean; suspiciousDays: Array<{ day: string; totalXp: number }> };
+export function publicLeaderboardEntry(input: { rank?: unknown; displayName?: unknown; totalXp?: unknown; levelName?: unknown }): Readonly<{ rank: number; displayName: string; totalXp: number; levelName: string }>;
+export function publicShareCard(input: { kind?: unknown; title?: unknown; primary?: unknown; secondary?: unknown }): Readonly<{ kind: string; title: string; primary: string; secondary: string }>;

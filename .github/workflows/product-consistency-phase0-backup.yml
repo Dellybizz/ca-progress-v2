@@ -1,0 +1,58 @@
+name: Product Consistency Phase 0 D1 Backup
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [phase-12-operations-admin-platform]
+    paths:
+      - .github/workflows/product-consistency-phase0-backup.yml
+      - config/product-consistency-route-contracts.mjs
+      - scripts/product-consistency/**
+      - tests/product-consistency-phase0.test.mjs
+      - docs/product-consistency/PHASE_0_BASELINE.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-consistency-phase0-backup
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Create recoverable D1 Time Travel checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p deployment-evidence
+          npx wrangler d1 time-travel info ca-progress-v2-phase4-shadow \
+            --config=wrangler.jsonc --json \
+            > deployment-evidence/ca-progress-v2-phase0-time-travel.json
+          test -s deployment-evidence/ca-progress-v2-phase0-time-travel.json
+          grep -q 'bookmark' deployment-evidence/ca-progress-v2-phase0-time-travel.json
+      - name: Capture read-only integrity findings
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json \
+            --file=scripts/product-consistency/phase0-integrity.sql \
+            > deployment-evidence/product-consistency-phase0-integrity.json
+      - name: Upload recovery bookmark and evidence
+        uses: actions/upload-artifact@v5
+        with:
+          name: product-consistency-phase0-recovery-${{ github.run_id }}
+          path: deployment-evidence/
+          if-no-files-found: error
+          retention-days: 30

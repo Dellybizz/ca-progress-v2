@@ -1,4 +1,4 @@
-export function sanitizeReturnPath(value: string | null | undefined, fallback = "/dashboard") {
+export function sanitizeReturnPath(value: string | null | undefined, fallback = "/planner/today") {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\") || value.includes("\0")) return fallback;
   try {
     const parsed = new URL(value, "https://ca-progress-v2.invalid");
