@@ -102,6 +102,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   const [error, setError] = useState<string | null>(null);
   const [customDates, setCustomDates] = useState<Record<string, string>>({});
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
+  const [optimisticCompletedIds, setOptimisticCompletedIds] = useState<Set<string>>(() => new Set());
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [runningTask, setRunningTask] = useState<RunningTask | null>(null);
   const [organising, setOrganising] = useState(false);
@@ -137,11 +138,11 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   }, [runningTask]);
 
   const visibleItems = useMemo(() => {
-    const byId = new Map(model.items.filter((item) => item.status !== "skipped" && item.status !== "rescheduled" && !hiddenIds.has(item.id)).map((item) => [item.id, item]));
+    const byId = new Map(model.items.filter((item) => item.status !== "skipped" && item.status !== "rescheduled" && !hiddenIds.has(item.id)).map((item) => [item.id, optimisticCompletedIds.has(item.id) ? { ...item, status: "completed" as const, completedAt: new Date().toISOString() } : item]));
     const ordered = orderIds.map((id) => byId.get(id)).filter((item): item is TodayPlanDisplayItem => Boolean(item));
     for (const item of byId.values()) if (!orderIds.includes(item.id)) ordered.push(item);
     return ordered;
-  }, [hiddenIds, model.items, orderIds]);
+  }, [hiddenIds, model.items, optimisticCompletedIds, orderIds]);
 
   const activeItems = visibleItems.filter((item) => item.status === "planned").length;
 
@@ -155,19 +156,26 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   }
 
   async function postPlanner(action: TodayPlanInteractionAction, busyKey = "refresh", hideAfter = false) {
+    const itemId = "itemId" in action ? action.itemId : null;
+    const optimisticallyComplete = action.action === "complete" && Boolean(itemId);
+    const optimisticallyHide = hideAfter && Boolean(itemId);
     setBusyId(busyKey);
     setError(null);
+    if (optimisticallyComplete && itemId) setOptimisticCompletedIds((current) => new Set(current).add(itemId));
+    if (optimisticallyHide && itemId) setHiddenIds((current) => new Set(current).add(itemId));
     try {
       await requestPlanner(action);
-      if (hideAfter && "itemId" in action) setHiddenIds((current) => new Set(current).add(action.itemId));
       if (action.action === "undo") {
         setHiddenIds(new Set());
+        setOptimisticCompletedIds(new Set());
         setOrganising(false);
         setOrderHistory([]);
       }
       router.refresh();
       return true;
     } catch (err) {
+      if (optimisticallyComplete && itemId) setOptimisticCompletedIds((current) => { const next = new Set(current); next.delete(itemId); return next; });
+      if (optimisticallyHide && itemId) setHiddenIds((current) => { const next = new Set(current); next.delete(itemId); return next; });
       setError(err instanceof Error ? err.message : "Today Plan could not be updated.");
       return false;
     } finally {
