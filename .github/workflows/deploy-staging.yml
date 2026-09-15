@@ -4,7 +4,7 @@ name: Cloudflare V2 Deploy
 on:
   workflow_dispatch:
   push:
-    branches: [phase-12-operations-admin-platform]
+    branches: [phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d]
     paths:
       - .github/workflows/deploy-staging.yml
       - app/**

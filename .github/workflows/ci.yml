@@ -3,7 +3,7 @@ name: V2 CI
 on:
   pull_request:
   push:
-    branches: [main, phase-12-operations-admin-platform]
+    branches: [main, phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d]
 
 permissions:
   contents: read
