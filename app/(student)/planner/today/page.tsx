@@ -4,7 +4,6 @@ import { LoginRequired } from "@/components/auth/login-required";
 import { NotificationCenter } from "@/components/planner/notification-center";
 import { TodayPlanClient } from "@/components/planner/today-plan-client";
 import { WeekSummaryShare } from "@/components/planner/week-summary-share";
-import { PlanningNav } from "@/components/planner/planning-nav";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
@@ -48,23 +47,23 @@ export default async function TodayPlanPage() {
   const activeGoals = planning?.goals.filter((goal) => goal.status === "active").slice(0, 3) ?? [];
 
   return <div className="phase9-page today-plan-page a2-planning-page">
-    <PlanningNav current="today"/>
-    <div className="today-day-heading">
-      <PageHeader preview={false} eyebrow="Today" title="Your day" description={`${formatPlanDate(model.planDate)} · ${model.forecast.attemptLabel}`}/>
-      <div className="button-row today-primary-actions" aria-label="Today actions"><Link href="/study" className="ui-button ui-button--primary"><Icon name="timer" size={16}/>Start Focus</Link><Link href="/planner?create=1" className="ui-button ui-button--secondary"><Icon name="plus" size={16}/>Add Task</Link></div>
-    </div>
-    <section className="today-day-overview" aria-label="Today overview">
-      <div className="today-day-overview__copy"><small>Planned study</small><strong>{model.plannedMinutes} of {model.targetMinutes} minutes</strong><span>Completed today · {completedStudyMinutes} minutes</span></div>
-      <div className="today-day-overview__track" aria-label={`${Math.min(100, Math.round((model.plannedMinutes / Math.max(1, model.targetMinutes)) * 100))}% of daily target planned`}><span style={{ width: `${Math.min(100, Math.round((model.plannedMinutes / Math.max(1, model.targetMinutes)) * 100))}%` }}/></div>
-      <div className="today-day-overview__exam"><span>{planning?.countdown.periodStatus === "upcoming" ? "Days remaining" : "Exam"}</span><strong>{countdownValue}</strong><small>{countdownNote}</small></div>
-    </section>
+    <header className="today-workspace-toolbar">
+      <div className="today-workspace-date"><span>Today</span><h1>{formatPlanDate(model.planDate)}</h1><p>{model.forecast.attemptLabel}</p><nav className="today-workspace-links" aria-label="Planning shortcuts"><a href="#study-order">Rearrange</a><Link href="/planner">View Full Planner</Link></nav></div>
+      <dl className="today-workspace-stats">
+        <div><dt>Planned study</dt><dd>{model.plannedMinutes}m</dd></div>
+        <div><dt>Completed today</dt><dd>{completedStudyMinutes}m</dd></div>
+        <div><dt>{planning?.countdown.periodStatus === "upcoming" ? "Days remaining" : "Exam"}</dt><dd title={countdownNote}>{countdownValue}</dd></div>
+      </dl>
+      <div className="today-workspace-actions" aria-label="Today actions"><Link href="/study" className="ui-button ui-button--primary"><Icon name="timer" size={16}/>Start Focus</Link><Link href="/planner?create=1" className="ui-button ui-button--secondary"><Icon name="plus" size={16}/>Add Task</Link></div>
+    </header>
     {planning && planning.countdown.periodStatus === "upcoming" && planning.countdown.milestone !== "normal" && planning.countdown.milestone !== "unavailable" ? <Card><CardBody><div className="phase9-warning"><Icon name="calendar" size={17}/><span><strong>{planning.countdown.milestone === "today" ? "Attempt day" : `${planning.countdown.milestone}-day countdown state`}:</strong> keep fixed commitments visible and use flexible study work around them.</span></div></CardBody></Card> : null}
     {evidenceMode === "starter" ? <Card><CardBody><div className="phase9-warning"><Icon name="book" size={17}/><span><strong>Starter Today:</strong> this list is based on your selected attempt, unfinished syllabus and explicit planner items. CA Progress will not call a subject weak until recorded study or progress evidence exists.</span></div></CardBody></Card> : null}
     {!enriched ? <Card><CardBody><div className="phase9-warning"><Icon name="sparkles" size={17}/><span><strong>Today is running in core mode.</strong> Optional timing, evidence and history enrichments are temporarily unavailable, but your canonical plan and actions remain usable.</span></div></CardBody></Card> : null}
-    <nav className="today-secondary-actions" aria-label="Planning shortcuts"><Link href="#study-order">Rearrange</Link><Link href="/planner">View Full Planner</Link></nav>
-    {activeGoals.length ? <Card><CardHeader title="Active goals" description="These are the same recorded goal values shown in Goals and Analytics."/><CardBody><div className="phase6-goal-list">{activeGoals.map((goal) => <article className="phase6-goal" key={goal.id}><div><strong>{goal.title}</strong><p>{goal.currentValue}/{goal.targetValue} {goal.targetUnit} · {goal.progressPercent}%</p></div></article>)}</div><Link href="/goals" className="ui-text-link">Open goals</Link></CardBody></Card> : null}
-    {planning ? <NotificationCenter notifications={planning.notifications} preferences={planning.notificationPreferences} compact/> : null}
-    {firstWeek ? <Card><CardHeader title={firstWeek.title}/><CardBody><p>{firstWeek.body}</p><div className="button-row">{firstWeek.primaryHref && firstWeek.primaryLabel ? <Link href={firstWeek.primaryHref} className="ui-button ui-button--primary">{firstWeek.primaryLabel}</Link> : null}{firstWeek.secondaryHref && firstWeek.secondaryLabel ? <Link href={firstWeek.secondaryHref} className="ui-button ui-button--secondary">{firstWeek.secondaryLabel}</Link> : null}{firstWeek.shareText ? <WeekSummaryShare text={firstWeek.shareText}/> : null}</div></CardBody></Card> : null}
     <div id="study-order"><TodayPlanClient model={model}/></div>
+    {(activeGoals.length || (planning?.notifications.length ?? 0) > 0 || firstWeek) ? <section className="today-supporting-content" aria-label="Planning follow-up">
+      {planning && planning.notifications.length > 0 ? <NotificationCenter notifications={planning.notifications} preferences={planning.notificationPreferences} compact/> : null}
+      {activeGoals.length ? <Card><CardHeader title="Active goals"/><CardBody><div className="phase6-goal-list">{activeGoals.map((goal) => <article className="phase6-goal" key={goal.id}><div><strong>{goal.title}</strong><p>{goal.currentValue}/{goal.targetValue} {goal.targetUnit} · {goal.progressPercent}%</p></div></article>)}</div><Link href="/goals" className="ui-text-link">Open goals</Link></CardBody></Card> : null}
+      {firstWeek ? <Card><CardHeader title={firstWeek.title}/><CardBody><p>{firstWeek.body}</p><div className="button-row">{firstWeek.primaryHref && firstWeek.primaryLabel ? <Link href={firstWeek.primaryHref} className="ui-button ui-button--primary">{firstWeek.primaryLabel}</Link> : null}{firstWeek.secondaryHref && firstWeek.secondaryLabel ? <Link href={firstWeek.secondaryHref} className="ui-button ui-button--secondary">{firstWeek.secondaryLabel}</Link> : null}{firstWeek.shareText ? <WeekSummaryShare text={firstWeek.shareText}/> : null}</div></CardBody></Card> : null}
+    </section> : null}
   </div>;
 }
