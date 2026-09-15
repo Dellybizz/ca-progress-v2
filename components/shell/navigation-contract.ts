@@ -42,20 +42,32 @@ export const shellNavigation: Record<ShellArea, readonly ShellNavSection[]> = {
   admin: [
     { label: "Operations", items: [
       { label: "Command center", shortLabel: "Admin", description: "Operational overview", href: "/admin", icon: "shield", exact: true, mobilePrimary: true },
-      { label: "System health", shortLabel: "Health", description: "Runtime and service health", href: "/admin/health", icon: "chart", mobilePrimary: true },
-      { label: "Control centre", description: "Publish configuration", href: "/admin/control", icon: "settings" },
+      { label: "Jobs", description: "Inspect background jobs", href: "/admin/jobs", icon: "timer" },
+    ]},
+    { label: "Users", items: [
       { label: "Users", description: "Manage student accounts", href: "/admin/users", icon: "community", mobilePrimary: true },
       { label: "Staff & roles", description: "Manage privileged access", href: "/admin/staff", icon: "shield" },
-      { label: "Audit log", description: "Inspect action history", href: "/admin/audit", icon: "notes" },
     ]},
-    { label: "Academic & content", items: [
+    { label: "Billing", items: [
+      { label: "Plans & policies", description: "Manage plans and entitlement policy", href: "/admin/plans", icon: "sparkles", mobilePrimary: true },
+    ]},
+    { label: "Content", items: [
       { label: "Syllabus preview", description: "Review academic structure", href: "/admin/syllabus", icon: "book" },
-      { label: "ICAI sync", shortLabel: "ICAI", description: "Manage ICAI updates", href: "/admin/icai-sync", icon: "bell", mobilePrimary: true },
-      { label: "Jobs", description: "Inspect background jobs", href: "/admin/jobs", icon: "timer" },
-      { label: "Plans", description: "Review product plans", href: "/admin/plans", icon: "sparkles" },
       { label: "Notifications", description: "Review delivery health", href: "/admin/notifications", icon: "bell" },
+    ]},
+    { label: "ICAI Sync", items: [
+      { label: "ICAI sync", shortLabel: "ICAI", description: "Manage ICAI updates", href: "/admin/icai-sync", icon: "bell", mobilePrimary: true },
+    ]},
+    { label: "Moderation", items: [
       { label: "Resource moderation", description: "Review reported resources", href: "/admin/resources/moderation", icon: "notes" },
       { label: "Community moderation", description: "Review community reports", href: "/admin/community/moderation", icon: "community" },
+    ]},
+    { label: "System", items: [
+      { label: "System health", shortLabel: "Health", description: "Runtime and service health", href: "/admin/health", icon: "chart" },
+      { label: "Control centre", description: "Publish configuration", href: "/admin/control", icon: "settings" },
+    ]},
+    { label: "Audit", items: [
+      { label: "Audit log", description: "Inspect immutable action history", href: "/admin/audit", icon: "notes" },
     ]},
   ],
 };

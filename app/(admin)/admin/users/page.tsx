@@ -35,7 +35,7 @@ export default async function AdminUsersPage({ searchParams }: { searchParams: P
           {['User','Role / state','CA profile','Plan','Last seen','Created'].map((label) => <th key={label}>{label}</th>)}
         </tr></thead>
         <tbody>{result.users.length ? result.users.map((user) => <tr key={user.userId}>
-          <td data-label="User"><strong>{user.displayName ?? "Unnamed user"}</strong><small>{user.email ?? "No email on current identity"}</small><code>{user.userId}</code></td>
+          <td data-label="User"><strong><Link href={`/admin/users/${encodeURIComponent(user.userId)}`}>{user.displayName ?? "Unnamed user"}</Link></strong><small>{user.email ?? "No email on current identity"}</small><code>{user.userId}</code></td>
           <td data-label="Role / state"><strong>{user.role.replaceAll("_", " ")}</strong><small>{user.accountState}</small></td>
           <td data-label="CA profile">{user.caLevel ?? "—"}<small>{[user.groupChoice, user.attemptKey].filter(Boolean).join(" · ") || "—"}</small></td>
           <td data-label="Plan">{user.planName ?? "Free / no active paid subscription"}</td>

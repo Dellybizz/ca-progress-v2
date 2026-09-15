@@ -55,6 +55,8 @@ export const routeContracts = Object.freeze([
   admin("/admin/staff", "staff", "Staff roles", "lib/admin/phase1.ts", ["app_users", "admin_audit_events"]),
   admin("/admin/syllabus", "syllabus", "Academic structure preview", "lib/academic/query.ts", ["course_levels", "course_groups", "subjects", "syllabus_versions", "chapters"], "partial", "Quarantine and compatibility resolution controls do not exist yet."),
   admin("/admin/users", "users", "Student accounts", "lib/admin/phase1.ts", ["app_users", "profiles", "user_subscriptions"]),
+  admin("/admin/users/[userId]", "users/[userId]", "Privacy-scoped user account detail", "lib/admin/subscription-access.ts", ["app_users", "profiles", "user_subscriptions", "payment_orders"]),
+  admin("/admin/users/[userId]/subscription-access", "users/[userId]/subscription-access", "Effective access explanation and manual grant lifecycle", "lib/admin/subscription-access.ts", ["user_subscriptions", "admin_subscription_grants", "subscription_events", "payment_orders"]),
 ]);
 
 export const personaContracts = Object.freeze([

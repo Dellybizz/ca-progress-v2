@@ -1,0 +1,33 @@
+.admin-user-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-detail-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.admin-detail-card,.admin-access-summary,.admin-access-management,.admin-grant { padding: 18px; }
+.admin-detail-card h2,.admin-access-summary h2,.admin-access-management h2 { margin-top: 0; }
+.admin-detail-card dl { display: grid; grid-template-columns: minmax(110px,.42fr) minmax(0,1fr); gap: 10px 14px; margin: 0; }
+.admin-detail-card dt { color: var(--color-text-faint); font-size: var(--text-sm); }
+.admin-detail-card dd { margin: 0; overflow-wrap: anywhere; }
+.admin-access-source { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.admin-access-source span { color: var(--color-text-soft); font-size: var(--text-sm); }
+.admin-access-form { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.admin-access-form label,.admin-grant form label { display: grid; gap: 5px; font-size: var(--text-sm); font-weight: 600; }
+.admin-access-form input,.admin-access-form select,.admin-access-form textarea,.admin-grant form input,.admin-grant form textarea { width: 100%; }
+.admin-access-form__wide { grid-column: 1/-1; }
+.admin-action-preview { padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-muted); }
+.admin-action-preview p { margin: 5px 0 10px; }
+.admin-action-preview label { display: flex; grid-template-columns: auto 1fr; align-items: start; }
+.admin-action-preview input { width: auto; margin-top: 3px; }
+.admin-grant-list { display: grid; gap: 12px; }
+.admin-grant header { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.admin-grant header small { display: block; margin-top: 4px; color: var(--color-text-faint); }
+.admin-grant code { overflow-wrap: anywhere; }
+.admin-grant-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.admin-grant-actions details { padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.admin-grant-actions summary { cursor: pointer; font-weight: 650; }
+.admin-grant-actions form { display: grid; gap: 10px; margin-top: 12px; }
+
+@media (max-width: 760px) {
+  .admin-detail-grid,.admin-access-form,.admin-grant-actions { grid-template-columns: 1fr; }
+  .admin-access-form__wide { grid-column: auto; }
+  .admin-detail-card dl { grid-template-columns: 1fr; gap: 3px; }
+  .admin-detail-card dd { margin-bottom: 8px; }
+  .admin-user-actions .ui-button { flex: 1 1 auto; }
+}
