@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
 import { NotificationCenter } from "@/components/planner/notification-center";
+import { PlanningNav } from "@/components/planner/planning-nav";
 import { TodayPlanClient } from "@/components/planner/today-plan-client";
 import { WeekSummaryShare } from "@/components/planner/week-summary-share";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -47,6 +48,7 @@ export default async function TodayPlanPage() {
   const activeGoals = planning?.goals.filter((goal) => goal.status === "active").slice(0, 3) ?? [];
 
   return <div className="phase9-page today-plan-page a2-planning-page">
+    <PlanningNav current="today" />
     <header className="today-workspace-toolbar">
       <div className="today-workspace-date"><span>Today</span><h1>{formatPlanDate(model.planDate)}</h1><p>{model.forecast.attemptLabel}</p><nav className="today-workspace-links" aria-label="Planning shortcuts"><a href="#study-order">Rearrange</a><Link href="/planner">View Full Planner</Link></nav></div>
       <dl className="today-workspace-stats">

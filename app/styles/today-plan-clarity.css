@@ -638,6 +638,171 @@
   .today-plan-actions > button { min-width: 0; padding-inline: 5px; }
 }
 
+/* Today R3 — rebuilt from a visual day timeline and a fast task list. */
+.today-plan-page {
+  --today-accent: #5b57d9;
+  --today-accent-soft: color-mix(in srgb, var(--today-accent) 10%, var(--color-surface));
+  max-width: 1180px;
+  gap: 0;
+}
+.today-plan-page > .a2-planning-nav {
+  align-self: start;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+.today-plan-page > .a2-planning-nav a {
+  position: relative;
+  min-height: 34px;
+  padding-inline: 12px;
+  color: var(--color-text-soft);
+  background: transparent;
+}
+.today-plan-page > .a2-planning-nav a[aria-current="page"] { color: var(--color-text); background: transparent; }
+.today-plan-page > .a2-planning-nav a[aria-current="page"]::after { content: ""; position: absolute; right: 10px; bottom: -1px; left: 10px; height: 2px; border-radius: 2px; background: var(--today-accent); }
+
+.today-workspace-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  padding: 0 0 18px;
+  border: 0;
+}
+.today-workspace-date > span { color: var(--today-accent); }
+.today-workspace-date h1 { margin-top: 5px; font-size: clamp(25px, 3vw, 34px); font-weight: 760; letter-spacing: -.045em; }
+.today-workspace-date p { font-size: 12px; }
+.today-workspace-links { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
+.today-workspace-stats { display: none; }
+.today-workspace-actions .ui-button { min-height: 38px; border-radius: 9px; }
+
+.today-week-strip {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  align-items: center;
+  max-width: 700px;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+}
+.today-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.today-week-days > div { display: grid; justify-items: center; gap: 5px; color: var(--color-text-faint); }
+.today-week-days span { font-size: 9px; font-weight: 750; text-transform: uppercase; }
+.today-week-days strong { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; font-size: 12px; }
+.today-week-days .is-current { color: var(--today-accent); }
+.today-week-days .is-current strong { color: #fff; background: var(--today-accent); box-shadow: 0 5px 14px color-mix(in srgb, var(--today-accent) 24%, transparent); }
+.today-week-arrow { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; color: var(--color-text-soft); background: transparent; cursor: pointer; }
+.today-week-arrow:hover { background: var(--color-surface-muted); }
+.today-week-arrow.is-next svg { transform: rotate(180deg); }
+
+.today-plan-layout { grid-template-columns: minmax(0, 700px) minmax(240px, 310px); justify-content: space-between; gap: clamp(28px, 5vw, 64px); }
+.today-plan-layout .phase9-today-main { min-width: 0; }
+.today-agenda { border: 0; border-radius: 0; background: transparent; }
+.today-agenda__header { min-height: auto; padding: 0 0 11px; border-bottom: 1px solid var(--color-border); }
+.today-agenda__header > div:first-child > span { color: var(--today-accent); }
+.today-agenda__header h2 { margin-top: 4px; font-size: 18px; }
+.today-agenda__header p { margin: 3px 0 0; color: var(--color-text-soft); font-size: 10px; }
+.today-agenda__body { padding: 0; }
+.today-agenda .today-plan-header-actions button { min-height: 32px; }
+
+.today-plan-timeline { position: relative; display: grid; gap: 0; padding-top: 10px; }
+.today-plan-timeline .phase9-plan-item {
+  display: grid;
+  grid-template-columns: 58px 18px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+}
+.today-timeline-time { display: grid; align-content: start; justify-items: end; gap: 2px; padding: 15px 9px 0 0; color: var(--color-text-soft); }
+.today-timeline-time strong { font-size: 9px; font-weight: 750; }
+.today-timeline-time span { color: var(--color-text-faint); font-size: 8px; }
+.today-timeline-axis { position: relative; display: flex; justify-content: center; }
+.today-timeline-axis::before { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; background: var(--color-border); }
+.today-timeline-axis > span { position: relative; z-index: 1; display: grid; place-items: center; width: 10px; height: 10px; margin-top: 18px; border: 2px solid var(--color-surface); border-radius: 50%; color: #fff; background: var(--today-accent); box-shadow: 0 0 0 1px var(--today-accent); }
+.today-plan-timeline .phase9-plan-item:last-child .today-timeline-axis::before { bottom: calc(100% - 24px); }
+
+.today-plan-item {
+  position: relative;
+  margin: 4px 0 8px 7px;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--today-accent) 16%, var(--color-border));
+  border-left: 4px solid var(--today-accent);
+  border-radius: 11px;
+  background: var(--today-accent-soft);
+  transition: transform .14s ease, box-shadow .14s ease;
+}
+.today-plan-item:hover { transform: translateY(-1px); box-shadow: 0 8px 22px color-mix(in srgb, var(--color-text) 7%, transparent); }
+.today-plan-item--test { border-left-color: #d97706; background: color-mix(in srgb, #f59e0b 8%, var(--color-surface)); }
+.today-plan-item--revision { border-left-color: #0891b2; background: color-mix(in srgb, #06b6d4 8%, var(--color-surface)); }
+.today-plan-item .phase9-plan-heading h3 { font-size: 13px; }
+.today-plan-item .phase9-plan-heading > strong { font-size: 9px; }
+.today-plan-chip-row { display: none; }
+.today-plan-time-row { margin-top: 5px; }
+.today-plan-actions { position: absolute; right: 11px; bottom: 10px; margin: 0; }
+.today-plan-actions > button { min-height: 28px; }
+.today-plan-completed-time, .today-plan-running { margin-right: 160px; }
+.today-plan-timeline .phase9-plan-item.is-running .today-plan-item { margin-inline: 7px 0; padding-inline: 14px; border-radius: 11px; background: color-mix(in srgb, var(--today-accent) 14%, var(--color-surface)); }
+
+.today-completed-list { margin-top: 12px; border-top: 1px solid var(--color-border); }
+.today-completed-list > summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; color: var(--color-text-soft); font-size: 11px; font-weight: 750; cursor: pointer; list-style: none; }
+.today-completed-list > summary span { display: flex; align-items: center; gap: 7px; }
+.today-completed-list > summary strong { display: grid; place-items: center; min-width: 22px; height: 22px; border-radius: 11px; background: var(--color-surface-muted); font-size: 9px; }
+.today-quick-add { display: flex; align-items: center; gap: 8px; min-height: 42px; margin: 4px 0 0 83px; color: var(--color-text-soft); font-size: 11px; font-weight: 700; text-decoration: none; }
+.today-quick-add:hover { color: var(--today-accent); }
+
+.today-plan-side { position: sticky; top: calc(var(--topbar-height) + 14px); align-self: start; padding: 0; border: 0; }
+.today-day-details__content { gap: 14px; }
+.today-side-focus { display: grid; gap: 7px; padding: 16px; border-radius: 14px; color: #fff; background: linear-gradient(145deg, #4540c9, #7772f3); box-shadow: 0 12px 30px color-mix(in srgb, var(--today-accent) 20%, transparent); }
+.today-side-focus > span { font-size: 9px; font-weight: 750; text-transform: uppercase; letter-spacing: .07em; opacity: .8; }
+.today-side-focus > strong { font-size: 16px; line-height: 1.25; }
+.today-side-focus p { margin: 0; font-size: 10px; opacity: .8; }
+.today-side-focus a { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; margin-top: 6px; border-radius: 9px; color: #3730a3; background: #fff; font-size: 11px; font-weight: 800; text-decoration: none; }
+.today-side-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 12px 0; border-block: 1px solid var(--color-border); }
+.today-side-summary > div { display: grid; gap: 2px; padding-inline: 10px; border-left: 1px solid var(--color-border); }
+.today-side-summary > div:first-child { padding-left: 0; border: 0; }
+.today-side-summary strong { font-size: 14px; }
+.today-side-summary span { color: var(--color-text-faint); font-size: 8px; text-transform: uppercase; }
+.today-plan-side .ui-card { padding: 0; border: 0; background: transparent; }
+.today-plan-side .ui-card__header { padding: 3px 0; }
+.today-plan-side .ui-card__body { padding: 7px 0 12px; }
+
+@media (max-width: 900px) {
+  .today-plan-layout { grid-template-columns: minmax(0, 1fr) 240px; gap: 24px; }
+}
+
+@media (max-width: 720px) {
+  .today-plan-page > .a2-planning-nav { margin-bottom: 14px; padding-inline: 6px; }
+  .today-plan-page > .a2-planning-nav a[aria-current="page"]::after { right: 6px; left: 6px; }
+  .today-workspace-toolbar { padding: 0 12px 14px; }
+  .today-workspace-date h1 { font-size: 25px; }
+  .today-workspace-actions { grid-template-columns: 1fr auto; }
+  .today-workspace-actions .ui-button { min-height: 40px; }
+  .today-week-strip { grid-template-columns: 24px minmax(0, 1fr) 24px; margin: 0 8px 14px; padding-inline: 4px; }
+  .today-week-days strong { width: 28px; height: 28px; }
+  .today-plan-layout { grid-template-columns: 1fr; gap: 14px; }
+  .today-agenda__header { padding: 0 12px 10px; }
+  .today-agenda__body { padding: 0 8px; }
+  .today-plan-timeline .phase9-plan-item { grid-template-columns: 44px 14px minmax(0, 1fr); }
+  .today-timeline-time { padding-right: 6px; }
+  .today-plan-item { margin-left: 5px; padding: 12px 10px; }
+  .today-plan-actions { position: static; margin-top: 9px; }
+  .today-plan-actions > button { min-height: 36px; }
+  .today-plan-completed-time, .today-plan-running { margin-right: 0; }
+  .today-quick-add { margin-left: 62px; }
+  .today-plan-side { padding: 0 8px 16px; }
+  .today-day-details-toggle { border-radius: 12px; }
+  .today-plan-side .today-day-details__content { margin-top: 10px; }
+  .today-plan-side .ui-card { border: 0; background: transparent; }
+}
+
+@media (max-width: 390px) {
+  .today-workspace-actions .ui-button { padding-inline: 10px; font-size: 10px; }
+  .today-week-days span { font-size: 8px; }
+  .today-week-days strong { width: 25px; height: 25px; font-size: 10px; }
+  .today-plan-timeline .phase9-plan-item { grid-template-columns: 40px 12px minmax(0, 1fr); }
+  .today-timeline-time strong { font-size: 8px; }
+  .today-timeline-time span { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .today-plan-loading > *,
   .today-plan-loading span,
@@ -650,6 +815,20 @@
   max-width: 1280px;
   gap: 16px;
   padding-top: 12px;
+}
+
+.today-plan-page > .a2-planning-nav {
+  margin: 0 0 -2px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.today-plan-page > .a2-planning-nav a {
+  min-height: 30px;
+  padding: 5px 11px;
+  border-radius: 7px;
+  font-size: 10px;
 }
 
 .today-workspace-toolbar {
@@ -763,6 +942,13 @@
 
 @media (max-width: 720px) {
   .today-plan-page { gap: 12px; padding-top: 0; }
+  .today-plan-page > .a2-planning-nav {
+    margin-bottom: 0;
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface);
+  }
+  .today-plan-page > .a2-planning-nav a { min-height: 40px; padding: 7px 3px; font-size: 10px; }
   .today-workspace-toolbar { grid-template-columns: 1fr; gap: 12px; padding: 6px 8px 14px; }
   .today-workspace-date h1 { font-size: 19px; }
   .today-workspace-stats { grid-column: auto; grid-row: auto; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
