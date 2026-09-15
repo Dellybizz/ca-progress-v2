@@ -14,10 +14,7 @@ const migrations = [
   ["0020", "d1/migrations/0020_product_phase10_study_profiles.sql"],
   ["0021", "d1/migrations/0021_product_phase11_study_buddy.sql"],
   ["0022", "d1/migrations/0022_product_phase12_gamification.sql"],
-  [
-    "0023",
-    "d1/migrations/0023_product_phase13_leaderboards_rewards_referrals.sql",
-  ],
+  ["0023", "d1/migrations/0023_product_phase13_leaderboards_rewards_referrals.sql"],
   ["0024", "d1/migrations/0024_icai_source_bootstrap.sql"],
   ["0025", "d1/migrations/0025_icai_review_audit.sql"],
   ["0026", "d1/migrations/0026_icai_sync_recovery.sql"],
@@ -44,6 +41,7 @@ const migrations = [
   ["0047", "d1/migrations/0047_product_consistency_phase10_scanner.sql"],
   ["0048", "d1/migrations/0048_chapter_workspace_controls.sql"],
   ["0049", "d1/migrations/0049_refinement_phase1_admin_subscription_access.sql"],
+  ["0050", "d1/migrations/0050_refinement_phase2_commercial_policy.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
@@ -95,7 +93,7 @@ function query(sql) {
 }
 
 const ledgerResult = query(
-  "SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0048' OR version='0049' ORDER BY version;",
+  "SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0050' ORDER BY version;",
 );
 const applied = new Set(
   (ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)),
