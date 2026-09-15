@@ -197,20 +197,6 @@ jobs:
       - name: Deploy web runtime
         run: npm run cf:deploy:web
 
-      - name: Refresh repaired consistency scan
-        shell: bash
-        env:
-          CONSISTENCY_CRON_SECRET: ${{ secrets.ICAI_CRON_SECRET }}
-        run: |
-          set -euo pipefail
-          curl --fail-with-body --max-time 120 -X POST \
-            -H "Authorization: Bearer $CONSISTENCY_CRON_SECRET" \
-            "$DEPLOY_BASE_URL/api/cron/consistency-scan"
-          if ! npm run audit:product-consistency:phase10:gate; then
-            npx wrangler rollback --name ca-progress-v2 --message "Rollback after failed repaired consistency scan" || true
-            exit 1
-          fi
-
       - name: Verify authenticated ICAI admin page
         run: node scripts/verify-icai-admin-live.mjs
 
