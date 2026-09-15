@@ -55,19 +55,19 @@ export async function listPublishedPricingOffers():Promise<PublishedPricingOffer
 export async function listActivePlanEntitlements():Promise<PlanEntitlement[]>{
   const now=new Date().toISOString();
   const result=await db().prepare(`SELECT pv.plan_id,f.feature_key,f.enabled,COALESCE(f.quantity_limit,f.time_limit_minutes,CASE WHEN f.storage_limit_bytes IS NULL THEN NULL ELSE f.storage_limit_bytes/1048576.0 END) limit_value,CASE WHEN f.storage_limit_bytes IS NOT NULL THEN 'megabytes' WHEN f.time_limit_minutes IS NOT NULL THEN 'minutes' WHEN f.quantity_limit IS NOT NULL THEN 'count' ELSE 'unlimited' END limit_unit,CASE WHEN f.reset_period='lifetime' THEN 'never' ELSE f.reset_period END reset_period,f.upgrade_message
-    FROM plan_policy_versions pv JOIN plan_policy_features f ON f.policy_version_id=pv.id JOIN plan_policy_pages pg ON pg.policy_version_id=pv.id AND pg.page_key=f.page_key AND pg.enabled=1
+    FROM plan_policy_versions pv JOIN plan_policy_features f ON f.policy_version_id=pv.id JOIN plan_policy_pages pg ON pg.policy_version_id=f.policy_version_id AND pg.page_key=f.page_key AND pg.enabled=1
     WHERE ${activePolicySql} ORDER BY pv.plan_id,f.feature_key`).bind(now).all<Row>();
   return asRows(result).map(row=>({plan_id:String(row.plan_id),feature_key:String(row.feature_key),enabled:Boolean(row.enabled),limit_value:row.limit_value==null?null:Number(row.limit_value),limit_unit:String(row.limit_unit),reset_period:String(row.reset_period),upgrade_message:String(row.upgrade_message)}));
 }
 
 export async function getCommercialPolicyAdminData(){
-  const database=db();
+  const database=db(),nowIso=new Date().toISOString();
   const [terms,contracts,scheduled]=await Promise.all([
     database.prepare("SELECT * FROM plan_policy_offer_terms ORDER BY updated_at DESC").all<Row>(),
     database.prepare("SELECT policy_version_id,COUNT(*) contract_count FROM subscription_policy_contracts GROUP BY policy_version_id").all<Row>(),
     database.prepare(`SELECT sc.*,sp.name to_plan_name,sp.billing_cycle to_billing_cycle FROM scheduled_plan_changes sc JOIN subscription_plans sp ON sp.id=sc.to_plan_id ORDER BY sc.effective_at DESC LIMIT 100`).all<Row>(),
   ]);
-  return{offerTerms:asRows(terms),contractCounts:asRows(contracts),scheduledChanges:asRows(scheduled)};
+  return{nowIso,offerTerms:asRows(terms),contractCounts:asRows(contracts),scheduledChanges:asRows(scheduled)};
 }
 
 const clean=(value:unknown,limit:number)=>String(value??"").trim().slice(0,limit);
