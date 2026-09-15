@@ -79,6 +79,12 @@ function expectedEnd(startedAt: string, minutes: number) {
   return new Date(started.getTime() + Math.max(1, minutes) * 60_000).toISOString();
 }
 
+function remainingClock(expectedEndAt: string, now: number) {
+  const seconds = Math.max(0, Math.ceil((new Date(expectedEndAt).getTime() - now) / 1000));
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+  return `${minutes}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
 function scheduleCopy(item: TodayPlanDisplayItem, timezone: string) {
   if (item.status !== "planned") return null;
   if (item.scheduleState === "overdue" && item.scheduledAt) return { tone: "urgent", text: `Scheduled ${formatClock(item.scheduledAt, timezone)} · time passed` };
@@ -108,6 +114,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   const [organising, setOrganising] = useState(false);
   const [orderIds, setOrderIds] = useState<string[]>(() => model.items.filter((item) => item.status !== "skipped" && item.status !== "rescheduled").map((item) => item.id));
   const [orderHistory, setOrderHistory] = useState<string[][]>([]);
+  const [clockNow, setClockNow] = useState(() => Date.now());
 
   useEffect(() => {
     let frame: number | null = null;
@@ -137,6 +144,33 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
     else window.localStorage.removeItem(RUNNING_KEY);
   }, [runningTask]);
 
+  useEffect(() => {
+    if (!runningTask) return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [runningTask]);
+
+  useEffect(() => {
+    function closeOpenMenus(event: MouseEvent) {
+      document.querySelectorAll<HTMLDetailsElement>(".today-plan-more[open]").forEach((menu) => {
+        if (!menu.contains(event.target as Node)) menu.removeAttribute("open");
+      });
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      document.querySelectorAll<HTMLDetailsElement>(".today-plan-more[open]").forEach((menu) => {
+        menu.removeAttribute("open");
+        menu.querySelector<HTMLElement>("summary")?.focus();
+      });
+    }
+    document.addEventListener("mousedown", closeOpenMenus);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOpenMenus);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
+
   const visibleItems = useMemo(() => {
     const byId = new Map(model.items.filter((item) => item.status !== "skipped" && item.status !== "rescheduled" && !hiddenIds.has(item.id)).map((item) => [item.id, optimisticCompletedIds.has(item.id) ? { ...item, status: "completed" as const, completedAt: new Date().toISOString() } : item]));
     const ordered = orderIds.map((id) => byId.get(id)).filter((item): item is TodayPlanDisplayItem => Boolean(item));
@@ -145,6 +179,14 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   }, [hiddenIds, model.items, optimisticCompletedIds, orderIds]);
 
   const activeItems = visibleItems.filter((item) => item.status === "planned").length;
+  const plannedItems = visibleItems.filter((item) => item.status === "planned");
+  const completedItems = visibleItems.filter((item) => item.status === "completed");
+  const groupedItems = [
+    { key: "now", label: "Now", items: plannedItems.slice(0, 1) },
+    { key: "next", label: "Next", items: plannedItems.slice(1, 3) },
+    { key: "later", label: "Later", items: plannedItems.slice(3) },
+    { key: "completed", label: "Completed", items: completedItems },
+  ].filter((group) => group.items.length);
 
   async function requestPlanner(action: TodayPlanInteractionAction) {
     const response = await fetch("/api/planner/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action) });
@@ -214,6 +256,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   }
 
   function askPlanner(action: TodayPlanInteractionAction, item: TodayPlanDisplayItem, hideAfter = false) {
+    document.querySelectorAll<HTMLDetailsElement>(".today-plan-more[open]").forEach((menu) => menu.removeAttribute("open"));
     setConfirmation({ item, action, kind: "planner", hideAfter, ...plannerActionCopy(action, item) });
   }
 
@@ -299,57 +342,61 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
     const anotherRunning = Boolean(runningTask && !isRunning);
     const lockSecondary = Boolean(busyId) || isRunning;
     return <div className="phase9-item-actions today-plan-actions">
-      {isRunning ? <button className="today-plan-start-action is-running" disabled={Boolean(busyId)} onClick={() => askFinish(item)}><Icon name="timer" size={15}/>Finish task</button> : <button className="today-plan-start-action" disabled={Boolean(busyId) || anotherRunning} onClick={() => void startTask(item)}><Icon name="timer" size={15}/>{anotherRunning ? "Another task active" : "Start task"}</button>}
-      <button disabled={Boolean(busyId)} onClick={() => askPlanner({ action: "complete", itemId: item.id }, item)}><Icon name="check" size={15}/>Complete</button>
-      <button disabled={lockSecondary} onClick={() => askPlanner({ action: "snooze", itemId: item.id, minutes: 60 }, item)}><Icon name="clock" size={15}/>Snooze 1h</button>
-      <button disabled={lockSecondary} onClick={() => askPlanner({ action: "reschedule", itemId: item.id, date: tomorrow() }, item, true)}><Icon name="calendar" size={15}/>Tomorrow</button>
-      <label className="phase9-date-action"><span className="sr-only">Move to another date</span><input disabled={isRunning} type="date" value={customDate} onChange={(event) => setCustomDates((current) => ({ ...current, [item.id]: event.target.value }))}/><button type="button" disabled={lockSecondary} onClick={() => askPlanner({ action: "reschedule", itemId: item.id, date: customDate }, item, true)}>Move</button></label>
-      <button className="phase9-action-muted" disabled={lockSecondary} onClick={() => askPlanner({ action: "skip", itemId: item.id }, item, true)}>Skip</button>
+      <button className="today-plan-complete-action" disabled={Boolean(busyId)} onClick={() => askPlanner({ action: "complete", itemId: item.id }, item)}><Icon name="check" size={15}/>Complete</button>
+      {isRunning ? <button className="today-plan-start-action is-running" disabled={Boolean(busyId)} onClick={() => askFinish(item)}><Icon name="timer" size={15}/>Finish</button> : <button className="today-plan-start-action" disabled={Boolean(busyId) || anotherRunning} onClick={() => void startTask(item)}><Icon name="timer" size={15}/>{anotherRunning ? "Focus active" : "Start Focus"}</button>}
+      <details className="today-plan-more">
+        <summary aria-label={`More actions for ${item.displayTitle ?? item.title}`}><Icon name="more" size={17}/></summary>
+        <div className="today-plan-more__menu">
+          <button disabled={lockSecondary} onClick={() => askPlanner({ action: "snooze", itemId: item.id, minutes: 60 }, item)}><Icon name="clock" size={15}/>Snooze 1h</button>
+          <button disabled={lockSecondary} onClick={() => askPlanner({ action: "reschedule", itemId: item.id, date: tomorrow() }, item, true)}><Icon name="calendar" size={15}/>Move to tomorrow</button>
+          <label className="phase9-date-action"><span>Choose date</span><input disabled={isRunning} type="date" value={customDate} onChange={(event) => setCustomDates((current) => ({ ...current, [item.id]: event.target.value }))}/><button type="button" disabled={lockSecondary} onClick={() => askPlanner({ action: "reschedule", itemId: item.id, date: customDate }, item, true)}>Move</button></label>
+          <button className="phase9-action-muted" disabled={lockSecondary} onClick={() => askPlanner({ action: "skip", itemId: item.id }, item, true)}>Skip for today</button>
+        </div>
+      </details>
     </div>;
+  }
+
+  function renderItem(item: TodayPlanDisplayItem, index: number) {
+    const schedule = scheduleCopy(item, model.timezone);
+    const isRunning = runningTask?.itemId === item.id;
+    const startedAt = isRunning && runningTask ? runningTask.startedAt : item.startedAt;
+    const expectedFinish = isRunning && runningTask ? runningTask.expectedEndAt : startedAt ? expectedEnd(startedAt, item.estimatedMinutes) : null;
+    return <article key={item.id} className={`phase9-plan-item phase9-plan-item--${item.status} ${item.manualOverride ? "is-manual" : ""} ${item.scheduleState === "overdue" ? "is-time-overdue" : ""} ${isRunning ? "is-running" : ""}`}>
+      <div className="phase9-timeline-marker"><span>{item.status === "completed" ? <Icon name="check" size={14}/> : index + 1}</span></div>
+      <div className="phase9-plan-content today-plan-item">
+        <div className="phase9-plan-heading"><div><span className={`phase9-kind phase9-kind--${item.itemKind}`}>{item.itemKind.replace("_", " ")}</span><h3>{item.displayTitle ?? item.title}</h3></div><strong>{item.estimatedMinutes}m</strong></div>
+        <div className="phase9-item-meta today-plan-item-meta"><span>{item.subjectTitle ?? "General"}</span></div>
+        <div className="today-plan-time-row">{schedule ? <span className={`today-plan-schedule today-plan-schedule--${schedule.tone}`}><Icon name="clock" size={13}/>{schedule.text}</span> : null}{item.scheduleState === "overdue" ? <span className="today-plan-urgency">Urgent</span> : null}</div>
+        <div className="phase9-chip-row today-plan-chip-row"><span className={`phase9-priority phase9-priority--${priorityLabel(item.priorityScore).toLowerCase()}`}>{priorityLabel(item.priorityScore)}</span><span className="phase9-reason-chip">{reasonLabel(item.reasonCode)}</span>{item.manualOverride ? <span className="phase9-manual-chip">Adjusted</span> : null}</div>
+        {item.status === "planned" && startedAt && expectedFinish ? <div className="today-plan-running"><Icon name="timer" size={16}/><div><strong>{isRunning ? "In progress" : "Started"}</strong><span>Started {formatClock(startedAt, model.timezone)} · expected finish {formatClock(expectedFinish, model.timezone)}</span></div></div> : null}
+        {item.status === "completed" && (startedAt || item.completedAt) ? <div className="today-plan-completed-time"><Icon name="check" size={15}/><span>{startedAt ? `Started ${formatClock(startedAt, model.timezone)}` : ""}{startedAt && item.completedAt ? " · " : ""}{item.completedAt ? `Completed ${formatClock(item.completedAt, model.timezone)}` : ""}</span></div> : null}
+        {item.manualNote && item.manualNote !== "Order adjusted" && item.manualNote !== "Order adjusted by student" ? <div className="phase9-manual-note">{item.manualNote}</div> : null}
+        {organising && item.status === "planned" ? <div className="today-plan-order-controls"><span>{item.scheduleState === "planned" ? "Flexible" : "Time fixed"}</span><div><button aria-label="Move task earlier" disabled={item.scheduleState !== "planned" || Boolean(busyId)} onClick={() => moveFlexible(item.id, -1)}>↑</button><button aria-label="Move task later" disabled={item.scheduleState !== "planned" || Boolean(busyId)} onClick={() => moveFlexible(item.id, 1)}>↓</button></div></div> : actions(item)}
+      </div>
+    </article>;
   }
 
   return <>
     <div className="phase9-today-layout today-plan-layout">
       <div className="phase9-today-main">
-        <section className="phase9-metrics today-plan-metrics" aria-label="Today plan summary">
-          <Card><CardBody><Icon name="target"/><div><span>Planned time</span><strong>{model.plannedMinutes}m</strong><small>{model.targetMinutes}m target</small></div></CardBody></Card>
-          <Card><CardBody><Icon name="clock"/><div><span>Revisions</span><strong>{model.dueRevisionCount}</strong><small>due today</small></div></CardBody></Card>
-          <Card><CardBody><Icon name="sparkles"/><div><span>Plan items</span><strong>{activeItems}</strong><small>remaining</small></div></CardBody></Card>
-        </section>
+        <section className="today-plan-summary" aria-label="Today plan summary"><span><strong>{activeItems}</strong> remaining</span><span><strong>{model.dueRevisionCount}</strong> revisions due</span><span><strong>{model.plannedMinutes}m</strong> planned</span></section>
         {model.warnings.length ? <div className="phase9-warning-stack">{model.warnings.map((warning) => <div key={warning} className="phase9-warning"><Icon name="bell" size={17}/><span>{warning}</span></div>)}</div> : null}
         {error ? <div className="phase9-error" role="alert">{error}</div> : null}
         <Card className="today-plan-list-card">
           <CardHeader title="Study order" action={<div className="today-plan-header-actions"><button className="ui-button ui-button--secondary today-plan-refresh" disabled={!model.canUndo || Boolean(busyId)} onClick={() => void postPlanner({ action: "undo" }, "undo")}>{busyId === "undo" ? "Undoing…" : "Undo"}</button><button className="ui-button ui-button--secondary today-plan-refresh" disabled={Boolean(busyId)} onClick={() => setOrganising((value) => !value)}>{organising ? "Close organiser" : "Organise"}</button><button className="ui-button ui-button--secondary today-plan-refresh" disabled={Boolean(busyId)} onClick={() => void postPlanner({ action: "refresh" })}>{busyId === "refresh" ? "Refreshing…" : "Refresh plan"}</button></div>}/>
           <CardBody>
             {organising ? <div className="today-plan-organiser"><div><Icon name="layers" size={18}/><span><strong>Organise flexible work</strong><small>Use the arrows to reorder flexible study. Scheduled tasks stay anchored to their assigned time.</small></span></div><div><button disabled={!orderHistory.length || Boolean(busyId)} onClick={undoOrder}>Undo move</button><button className="is-primary" disabled={Boolean(busyId)} onClick={() => void saveOrder()}>{busyId === "organise" ? "Saving…" : "Save order"}</button></div></div> : null}
-            {visibleItems.length ? <div className="phase9-timeline today-plan-timeline">{visibleItems.map((item, index) => {
-              const schedule = scheduleCopy(item, model.timezone);
-              const isRunning = runningTask?.itemId === item.id;
-              const startedAt = isRunning && runningTask ? runningTask.startedAt : item.startedAt;
-              const expectedFinish = isRunning && runningTask ? runningTask.expectedEndAt : startedAt ? expectedEnd(startedAt, item.estimatedMinutes) : null;
-              return <article key={item.id} className={`phase9-plan-item phase9-plan-item--${item.status} ${item.manualOverride ? "is-manual" : ""} ${item.scheduleState === "overdue" ? "is-time-overdue" : ""} ${isRunning ? "is-running" : ""}`}>
-                <div className="phase9-timeline-marker"><span>{index + 1}</span></div>
-                <div className="phase9-plan-content today-plan-item">
-                  <div className="phase9-plan-heading"><div><span className={`phase9-kind phase9-kind--${item.itemKind}`}>{item.itemKind.replace("_", " ")}</span><h3>{item.displayTitle ?? item.title}</h3></div><strong>{item.estimatedMinutes}m</strong></div>
-                  <div className="phase9-item-meta today-plan-item-meta"><span>{item.subjectTitle ?? "General"}</span></div>
-                  <div className="today-plan-time-row">{schedule ? <span className={`today-plan-schedule today-plan-schedule--${schedule.tone}`}><Icon name="clock" size={13}/>{schedule.text}</span> : null}{item.scheduleState === "overdue" ? <span className="today-plan-urgency">Urgent</span> : null}</div>
-                  <div className="phase9-chip-row today-plan-chip-row"><span className={`phase9-priority phase9-priority--${priorityLabel(item.priorityScore).toLowerCase()}`}>{priorityLabel(item.priorityScore)}</span><span className="phase9-reason-chip">{reasonLabel(item.reasonCode)}</span>{item.manualOverride ? <span className="phase9-manual-chip">Adjusted</span> : null}</div>
-                  {item.status === "planned" && startedAt && expectedFinish ? <div className="today-plan-running"><Icon name="timer" size={16}/><div><strong>{isRunning ? "In progress" : "Started"}</strong><span>Started {formatClock(startedAt, model.timezone)} · expected finish {formatClock(expectedFinish, model.timezone)}</span></div></div> : null}
-                  {item.status === "completed" && (startedAt || item.completedAt) ? <div className="today-plan-completed-time"><Icon name="check" size={15}/><span>{startedAt ? `Started ${formatClock(startedAt, model.timezone)}` : ""}{startedAt && item.completedAt ? " · " : ""}{item.completedAt ? `Completed ${formatClock(item.completedAt, model.timezone)}` : ""}</span></div> : null}
-                  {item.manualNote && item.manualNote !== "Order adjusted" && item.manualNote !== "Order adjusted by student" ? <div className="phase9-manual-note">{item.manualNote}</div> : null}
-                  {organising && item.status === "planned" ? <div className="today-plan-order-controls"><span>{item.scheduleState === "planned" ? "Flexible" : "Time fixed"}</span><div><button aria-label="Move task earlier" disabled={item.scheduleState !== "planned" || Boolean(busyId)} onClick={() => moveFlexible(item.id, -1)}>↑</button><button aria-label="Move task later" disabled={item.scheduleState !== "planned" || Boolean(busyId)} onClick={() => moveFlexible(item.id, 1)}>↓</button></div></div> : actions(item)}
-                </div>
-              </article>;
-            })}</div> : <div className="phase9-empty"><Icon name="check"/><strong>Your plan is clear</strong><p>Nothing needs your attention right now. Add a task if you want to plan more study.</p><Link href="/planner">Open planner</Link></div>}
+            {visibleItems.length ? <div className="today-plan-groups">{groupedItems.map((group) => <section key={group.key} className={`today-plan-group today-plan-group--${group.key}`}><h3>{group.label}<span>{group.items.length}</span></h3><div className="phase9-timeline today-plan-timeline">{group.items.map((item, index) => renderItem(item, index))}</div></section>)}</div> : <div className="phase9-empty"><Icon name="check"/><strong>Your plan is clear</strong><p>Nothing needs your attention right now. Add a task if you want to plan more study.</p><Link href="/planner">Open planner</Link></div>}
           </CardBody>
         </Card>
       </div>
-      <aside className="phase9-today-side today-plan-side">
+      <aside className="phase9-today-side today-plan-side"><details className="today-day-details"><summary><span>Day details</span><small>Forecast and subjects</small><Icon name="chevron" size={16}/></summary><div className="today-day-details__content">
         <Card className="today-plan-forecast-card"><CardHeader title="Forecast" description={model.forecast.attemptLabel}/><CardBody><div className={`phase9-forecast-status phase9-forecast-status--${model.forecast.status}`}><strong>{statusLabel(model.forecast.status)}</strong><span>{model.forecast.completionPercent}% complete</span></div><div className="phase9-progress-track"><span style={{ width: `${Math.min(100, Math.max(0, model.forecast.completionPercent))}%` }}/></div><dl className="phase9-forecast-grid"><div><dt>Remaining</dt><dd>{model.forecast.remainingChapters}</dd></div><div><dt>Current pace</dt><dd>{model.forecast.observedChaptersPerWeek}/wk</dd></div><div><dt>Needed pace</dt><dd>{model.forecast.requiredChaptersPerWeek}/wk</dd></div><div><dt>Target</dt><dd>{formatDate(model.forecast.targetCompletionDate)}</dd></div></dl>{model.forecast.dateSource === "attempt_month" ? <small className="phase9-estimate-note">Based on your selected attempt month.</small> : null}<Link href="/analytics/forecast" className="ui-text-link">View forecast →</Link></CardBody></Card>
         <Card className="today-plan-weak-card"><CardHeader title="Needs attention"/><CardBody>{model.weakSubjects.length ? <div className="phase9-weak-list today-plan-weak-list">{model.weakSubjects.slice(0, 4).map((subject) => <div key={subject.subjectId}><div><strong>{subject.subjectTitle}</strong><span>{subject.completionPercent}% complete</span></div></div>)}</div> : <div className="phase9-mini-empty">No subject needs extra attention right now.</div>}</CardBody></Card>
         <div className="phase9-side-links today-plan-side-links"><Link href="/planner/revision-settings"><Icon name="settings" size={17}/>Revision settings</Link><Link href="/planner"><Icon name="calendar" size={17}/>Planner</Link></div>
-      </aside>
+      </div></details></aside>
     </div>
+    {runningTask ? <div className="today-focus-dock" role="status"><div><Icon name="timer" size={18}/><span><small>Focus in progress</small><strong>{model.items.find((item) => item.id === runningTask.itemId)?.displayTitle ?? model.items.find((item) => item.id === runningTask.itemId)?.title ?? "Study task"}</strong></span></div><time>{remainingClock(runningTask.expectedEndAt, clockNow)}</time><button onClick={() => { const item = model.items.find((entry) => entry.id === runningTask.itemId); if (item) askFinish(item); }}>Finish</button></div> : null}
     {confirmation ? <div className="today-plan-confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setConfirmation(null); }}><section className="today-plan-confirm" role="dialog" aria-modal="true" aria-labelledby="today-plan-confirm-title"><span className="today-plan-confirm__icon"><Icon name={confirmation.kind === "finish" || confirmation.action?.action === "complete" ? "check" : "clock"} size={20}/></span><div><h2 id="today-plan-confirm-title">{confirmation.title}</h2><p>{confirmation.description}</p></div><div className="today-plan-confirm__actions"><button onClick={() => setConfirmation(null)}>Cancel</button><button className="is-primary" disabled={Boolean(busyId)} onClick={() => void confirmAction()}>Confirm</button></div></section></div> : null}
   </>;
 }
