@@ -102,10 +102,18 @@ async function getDashboardPageModelUncached(
 
   const firstExam = live.examEvents[0] ?? null;
   const lastExam = live.examEvents.at(-1) ?? null;
-  const targetDate = firstExam?.eventDate ?? estimate?.estimatedDate ?? null;
-  const endDate =
-    lastExam?.eventDate ?? estimate?.estimatedEndDate ?? targetDate;
-  const usingEstimate = !firstExam && Boolean(estimate);
+  const officialStartDate =
+    firstExam?.eventDate ?? live.attempt?.startDate ?? null;
+  const officialEndDate = firstExam
+    ? (lastExam?.eventDate ?? firstExam.eventDate)
+    : (live.attempt?.endDate ?? live.attempt?.startDate ?? null);
+  const targetDate = officialStartDate ?? estimate?.estimatedDate ?? null;
+  const endDate = officialStartDate
+    ? (officialEndDate ?? officialStartDate)
+    : (estimate?.estimatedEndDate ?? estimate?.estimatedDate ?? null);
+  const usingEstimate = !officialStartDate && Boolean(estimate);
+  const usingOfficialBridge =
+    usingEstimate && estimate?.provenance === "official_bridge";
   const startDates = new Set(
     live.examEvents
       .filter((event) => event.eventType === "exam_start")
@@ -140,12 +148,19 @@ async function getDashboardPageModelUncached(
         endDate,
         title: firstExam?.title ?? live.attempt?.label ?? attemptKey,
         sourceUrl: usingEstimate
-          ? null
+          ? usingOfficialBridge
+            ? (estimate?.sourceUrl ?? null)
+            : null
           : (firstExam?.sourceUrl ?? live.attempt?.sourceUrl ?? null),
         lastVerifiedAt: usingEstimate
-          ? null
+          ? usingOfficialBridge
+            ? (estimate?.updatedAt ?? null)
+            : null
           : (firstExam?.lastVerifiedAt ?? live.attempt?.lastVerifiedAt ?? null),
-        sourceKind: usingEstimate ? "admin_estimate" : "exam_event",
+        sourceKind:
+          usingEstimate && !usingOfficialBridge
+            ? "admin_estimate"
+            : "exam_event",
         conflictWarning,
       };
 
