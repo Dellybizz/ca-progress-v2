@@ -63,7 +63,8 @@ test("Phase 2 retained migration remains covered through Phase 3EF migration 003
   assert.match(retained, /\["0036", "d1\/migrations\/0036_icai_phase2c_future_state\.sql"\]/);
   assert.match(retained, /\["0037", "d1\/migrations\/0037_icai_phase3b_operator_controls\.sql"\]/);
   assert.match(retained, /\["0038", "d1\/migrations\/0038_icai_phase3ef_item_isolation\.sql"\]/);
-  assert.match(retained, /BETWEEN '0012' AND '0048'/);
+  const retainedEnd = retained.match(/BETWEEN '0012' AND '(\d{4})'/)?.[1];
+  assert.ok(retainedEnd && Number(retainedEnd) >= 38, "retained D1 verification must continue through ICAI migration 0038 or later");
   assert.match(validator, /0033_icai_phase2_incremental_watermarks\.sql/);
   assert.match(validator, /icai_source_watermarks/);
   assert.match(validator, /icai_source_watermark_after_success/);

@@ -69,7 +69,8 @@ test("Phase 3E/3F are permanent retained-D1 and focused ICAI regression gates", 
   const validator = read("scripts/validate-d1-hot-indexes.mjs");
   const pkg = JSON.parse(read("package.json"));
   assert.match(retained, /0038_icai_phase3ef_item_isolation\.sql/);
-  assert.match(retained, /BETWEEN '0012' AND '0048'/);
+  const retainedEnd = retained.match(/BETWEEN '0012' AND '(\d{4})'/)?.[1];
+  assert.ok(retainedEnd && Number(retainedEnd) >= 38, "retained D1 verification must continue through ICAI migration 0038 or later");
   assert.match(validator, /0038_icai_phase3ef_item_isolation\.sql/);
   assert.match(validator, /icai_sync_items/);
   assert.match(pkg.scripts["test:icai:phase5"], /icai-phase3ef-item-isolation\.test\.mjs/);
