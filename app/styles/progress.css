@@ -16,3 +16,90 @@
 @media(max-width:640px){.progress-chapter-card{align-items:stretch;padding:7px 6px;gap:6px}.progress-chapter-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:0 1px}.progress-chapter-heading h3{min-width:0;align-items:center}.progress-chapter-heading>a{min-height:30px;padding:0 7px;border:1px solid #dedff0;border-radius:7px;white-space:nowrap;text-decoration:none}.progress-hub-label--desktop{display:none}.progress-hub-label--mobile{display:inline}.progress-stage-controls{width:100%;padding:0;scrollbar-width:none}.progress-stage-controls::-webkit-scrollbar{display:none}.progress-stage-controls button:first-child{margin-left:0}.progress-stage-controls button:last-child{margin-right:0}}
 
 .progress-action-bar{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;align-items:center;gap:10px}.progress-export-actions,.progress-draft-actions{display:flex;gap:7px}.progress-export-actions button{min-height:40px;padding:0 12px;border:1px solid #dfe3ec;border-radius:10px;background:#fff;color:#42485a;font-weight:750;cursor:pointer}.progress-draft-actions .ui-button{min-height:40px}.progress-action-bar button:disabled{opacity:.48;cursor:default}@media(max-width:640px){.progress-action-bar{position:sticky;top:6px;z-index:5;grid-template-columns:1fr auto;padding:8px;border:1px solid #e2e5ed;border-radius:12px;background:#fff;box-shadow:0 6px 20px rgba(22,25,39,.08)}.progress-action-bar .progress-search{grid-column:1/-1}.progress-export-actions button{min-height:36px;padding-inline:10px}.progress-draft-actions{justify-content:flex-end}.progress-draft-actions .ui-button{min-height:36px;padding-inline:10px;font-size:11px}}
+
+/* Dark-mode bridge for the legacy Progress palette at ae0cb36d. */
+:root[data-theme="dark"] .progress-summary-grid>div,
+:root[data-theme="dark"] .analytics-hero-grid .ui-card__body,
+:root[data-theme="dark"] .progress-toolbar,
+:root[data-theme="dark"] .progress-chapter-card,
+:root[data-theme="dark"] .progress-history,
+:root[data-theme="dark"] .progress-portfolio,
+:root[data-theme="dark"] .progress-mobile-filters,
+:root[data-theme="dark"] .progress-subject-tabs button,
+:root[data-theme="dark"] .progress-search--standalone,
+:root[data-theme="dark"] .progress-mobile-filters input,
+:root[data-theme="dark"] .progress-mobile-filters select,
+:root[data-theme="dark"] .progress-export-actions button,
+:root[data-theme="dark"] .progress-action-bar {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+:root[data-theme="dark"] .progress-toolbar select,
+:root[data-theme="dark"] .progress-search {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+:root[data-theme="dark"] .progress-toolbar label>span,
+:root[data-theme="dark"] .progress-chapter-heading small,
+:root[data-theme="dark"] .progress-history p,
+:root[data-theme="dark"] .progress-history-list small,
+:root[data-theme="dark"] .progress-subject-status span,
+:root[data-theme="dark"] .progress-subject-status small,
+:root[data-theme="dark"] .progress-portfolio__heading>small,
+:root[data-theme="dark"] .progress-portfolio__list small,
+:root[data-theme="dark"] .progress-subject-tabs>span,
+:root[data-theme="dark"] .progress-syllabus-section>h3,
+:root[data-theme="dark"] .analytics-consistency span,
+:root[data-theme="dark"] .analytics-list small,
+:root[data-theme="dark"] .analytics-subject-table small,
+:root[data-theme="dark"] .analytics-subject-table em { color: var(--color-text-soft); }
+:root[data-theme="dark"] .progress-stage-controls button,
+:root[data-theme="dark"] .analytics-consistency>div {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-soft);
+}
+:root[data-theme="dark"] .progress-stage-controls button span { color: var(--color-text); }
+:root[data-theme="dark"] .progress-stage-controls button.is-active,
+:root[data-theme="dark"] .progress-subject-tabs button.is-active {
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
+  color: var(--color-brand-strong);
+}
+:root[data-theme="dark"] .progress-stage-controls button.is-active span { color: var(--color-brand-strong); }
+:root[data-theme="dark"] .progress-chapter-heading h3 b,
+:root[data-theme="dark"] .progress-syllabus-section>h3 {
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+}
+:root[data-theme="dark"] .progress-save-state { background: var(--color-bg-subtle); color: var(--color-text-soft); }
+:root[data-theme="dark"] .progress-save-state--error,
+:root[data-theme="dark"] .progress-save-error { background: var(--color-danger-soft); color: var(--color-danger); }
+:root[data-theme="dark"] .progress-save-state--saved { background: var(--color-success-soft); color: var(--color-success); }
+:root[data-theme="dark"] .progress-subject-status,
+:root[data-theme="dark"] .progress-subject-status>div,
+:root[data-theme="dark"] .progress-portfolio__heading,
+:root[data-theme="dark"] .progress-portfolio__list>a,
+:root[data-theme="dark"] .progress-history-list>div,
+:root[data-theme="dark"] .analytics-subject-table>a,
+:root[data-theme="dark"] .progress-group-tabs,
+:root[data-theme="dark"] .progress-subject-section>h2,
+:root[data-theme="dark"] .progress-chapter-heading>a { border-color: var(--color-border); }
+:root[data-theme="dark"] .progress-group-tabs button { color: var(--color-text-soft); }
+:root[data-theme="dark"] .progress-group-tabs button:hover { background: var(--color-surface-muted); }
+:root[data-theme="dark"] .progress-group-tabs button.is-active,
+:root[data-theme="dark"] .progress-analytics-link { background: var(--color-brand); color: var(--color-brand-contrast); }
+:root[data-theme="dark"] .progress-chapter-heading>span,
+:root[data-theme="dark"] .progress-chapter-heading>a,
+:root[data-theme="dark"] .analytics-subject-table b,
+:root[data-theme="dark"] .progress-save-state button { color: var(--color-brand-strong); }
+:root[data-theme="dark"] .progress-portfolio__meter,
+:root[data-theme="dark"] .analytics-meter { background: var(--color-surface-strong); }
+:root[data-theme="dark"] .progress-portfolio__meter i,
+:root[data-theme="dark"] .analytics-meter span { background: var(--color-brand); }
+:root[data-theme="dark"] .progress-loading span {
+  background: linear-gradient(90deg,var(--color-surface-muted),var(--color-surface-strong),var(--color-surface-muted));
+  background-size: 200% 100%;
+}
