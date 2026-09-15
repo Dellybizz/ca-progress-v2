@@ -21,12 +21,44 @@ test("provisional exam dates are centrally managed and audited", () => {
   assert.match(admin, /name="estimatedEndDate"/);
 });
 
-test("verified ICAI events automatically take priority over admin estimates", () => {
+test("upcoming attempts have temporary fallbacks without inventing a January Final attempt", () => {
+  const estimates = read("lib/icai/exam-date-estimates.ts");
+  assert.match(estimates, /attemptKey: "2026-11"/);
+  assert.match(estimates, /estimatedDate: "2026-11-02"/);
+  assert.match(estimates, /estimatedEndDate: "2026-11-13"/);
+  assert.match(estimates, /attemptKey: "2027-01"/);
+  assert.match(estimates, /estimatedDate: "2027-01-06"/);
+  assert.match(estimates, /estimatedDate: "2027-01-18"/);
+  assert.match(estimates, /attemptKey: "2027-05"/);
+  assert.match(estimates, /estimatedDate: "2027-05-02"/);
+  assert.match(estimates, /estimatedDate: "2027-05-03"/);
+  assert.match(estimates, /estimatedDate: "2027-05-14"/);
+  assert.match(estimates, /provenance: "system_expected"/);
+  assert.match(estimates, /provenance: "official_bridge"/);
+  assert.match(estimates, /findBuiltInEstimate/);
+  assert.match(estimates, /BUILT_IN_EXAM_DATE_ESTIMATES\.map/);
+  assert.doesNotMatch(
+    estimates,
+    /levelCode: "final",\s*attemptKey: "2027-01"/s,
+  );
+});
+
+test("verified ICAI dates automatically take priority over temporary estimates", () => {
   const service = read("lib/dashboard/service.ts");
   const student = read("components/dashboard/student-dashboard.tsx");
-  assert.match(service, /firstExam\?\.eventDate \?\? estimate\?\.estimatedDate \?\? null/);
-  assert.match(service, /lastExam\?\.eventDate \?\? estimate\?\.estimatedEndDate/);
-  assert.match(service, /sourceKind: usingEstimate \? "admin_estimate" : "exam_event"/);
+  assert.match(
+    service,
+    /firstExam\?\.eventDate \?\? live\.attempt\?\.startDate \?\? null/,
+  );
+  assert.match(
+    service,
+    /officialStartDate \?\? estimate\?\.estimatedDate \?\? null/,
+  );
+  assert.match(service, /estimate\?\.provenance === "official_bridge"/);
+  assert.match(
+    service,
+    /usingEstimate && !usingOfficialBridge[\s\S]*?"admin_estimate"[\s\S]*?: "exam_event"/,
+  );
   assert.match(student, /Set by CA Progress admin/);
   assert.doesNotMatch(student, /Set by you|user_estimate/);
   assert.match(student, /"Exam period"/);
