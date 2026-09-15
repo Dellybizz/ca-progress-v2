@@ -1,0 +1,88 @@
+name: Refinement P0 Live State Lock
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refinement-p0-live-state
+  cancel-in-progress: false
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Verify pinned repository state
+        run: npm run audit:refinement:p0
+      - name: Run authoritative repository gates
+        run: |
+          npm run verify:retirement
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+          npm run cf:check
+          npm run audit:product-consistency:phase10:gate
+      - name: Capture read-only Worker deployment and rollback references
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="deployment-evidence/p0-live-state"
+          mkdir -p "$evidence_dir"
+          npx wrangler deployments list --name ca-progress-v2 --json > "$evidence_dir/web-deployments.json"
+          npx wrangler deployments list --name ca-progress-v2-billing --json > "$evidence_dir/billing-deployments.json"
+          npx wrangler deployments list --name ca-progress-v2-icai-sync --json > "$evidence_dir/icai-deployments.json"
+          P0_EVIDENCE_DIR="$evidence_dir" node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const dir = process.env.P0_EVIDENCE_DIR;
+          const names = ["web", "billing", "icai"];
+          const workers = {};
+          for (const name of names) {
+            const rows = JSON.parse(fs.readFileSync(path.join(dir, `${name}-deployments.json`), "utf8"));
+            if (!Array.isArray(rows) || rows.length === 0) throw new Error(`No ${name} Worker deployment found.`);
+            const latest = rows[0];
+            workers[name] = {
+              deployment_id: latest.id ?? latest.deployment_id ?? null,
+              version_ids: latest.versions?.map((version) => version.version_id ?? version.id).filter(Boolean) ?? [],
+              created_on: latest.created_on ?? latest.created_at ?? null,
+            };
+            if (!workers[name].deployment_id && workers[name].version_ids.length === 0) throw new Error(`${name} deployment has no recoverable deployment/version ID.`);
+          }
+          fs.writeFileSync(path.join(dir, "rollback-manifest.json"), JSON.stringify({
+            captured_at: new Date().toISOString(),
+            source_commit: process.env.GITHUB_SHA,
+            purpose: "Read-only pre-P1 rollback references. No rollback or deployment was executed.",
+            workers,
+          }, null, 2));
+          NODE
+      - name: Capture aggregate D1 integrity and commercial state
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --command "SELECT COUNT(*) AS migration_count, MIN(version) AS first_version, MAX(version) AS latest_version FROM _ca_schema_migrations; SELECT status,COUNT(*) AS count FROM user_subscriptions GROUP BY status ORDER BY status; SELECT status,COUNT(*) AS count FROM payment_orders GROUP BY status ORDER BY status; SELECT provider_status,verified,COUNT(*) AS count FROM payment_events GROUP BY provider_status,verified ORDER BY provider_status,verified; SELECT COUNT(*) AS publication_count FROM plan_policy_publications; SELECT COUNT(*) AS active_override_count FROM entitlement_overrides WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP); SELECT COUNT(*) AS active_promotion_count FROM plan_promotions WHERE active=1 AND starts_at<=CURRENT_TIMESTAMP AND ends_at>CURRENT_TIMESTAMP; SELECT COUNT(*) AS scheduled_change_count FROM scheduled_plan_changes WHERE state='scheduled'; PRAGMA foreign_key_check;" > deployment-evidence/p0-live-state/d1-state.json
+      - name: Verify credentialed production evidence
+        run: npm run audit:refinement:p0:production
+      - name: Upload immutable P0 evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: refinement-p0-live-state-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: error
+          path: deployment-evidence/p0-live-state/

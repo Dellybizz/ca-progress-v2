@@ -42,8 +42,8 @@ test("A1.4 provides private advanced chapter controls", () => {
   const api = read("app/api/chapters/[chapterId]/workspace/route.ts");
   const migration = read("d1/migrations/0048_chapter_workspace_controls.sql");
   for (const label of ["Rev. 1", "Rev. 2", "Test 1", "Test 2", "Understanding", "YouTube video", "Revision link"]) assert.match(hub, new RegExp(label));
-  assert.match(hub, /\["private","community","icai"\]/);
-  assert.match(hub, /resourceTab === "icai"/);
+  assert.match(hub, /\["private","community"\]/);
+  assert.doesNotMatch(hub, /resourceTab === "icai"/);
   assert.match(hub, /Search resources to attach/);
   assert.match(hub, /Save changes/);
   assert.match(hub, /disabled=\{!progress\[stage\.field\]\}/);
