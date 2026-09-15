@@ -1,0 +1,76 @@
+.dayflow-shell {
+  --df-bg: #f4f4f6;
+  --df-panel: #ffffff;
+  --df-text: #17171a;
+  --df-muted: #8c8b91;
+  --df-line: #e7e6ea;
+  --df-coral: #ff9695;
+  --df-blue: #6189b1;
+  --df-green: #91c56b;
+  --df-navy: #285579;
+  --df-berry: #a74d6c;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  color: var(--df-text);
+  background: var(--df-bg);
+  font-family: Arial, Helvetica, sans-serif;
+}
+.dayflow-shell *, .dayflow-shell *::before, .dayflow-shell *::after { box-sizing: border-box; }
+.dayflow-shell button, .dayflow-shell input, .dayflow-shell select { font: inherit; }
+.dayflow-inbox { position: sticky; top: 0; height: 100dvh; padding: 28px 22px; overflow: auto; border-right: 1px solid var(--df-line); background: #f1f1f3; }
+.dayflow-inbox header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; }
+.dayflow-pill { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border: 0; border-radius: 999px; color: #fff; background: var(--df-coral); font-size: 14px; font-weight: 750; box-shadow: 0 8px 20px rgba(255,150,149,.24); }
+.dayflow-icon-button { display: none; border: 0; background: transparent; font-size: 24px; }
+.dayflow-inbox-list { display: grid; gap: 14px; }
+.dayflow-inbox-item { display: grid; grid-template-columns: 34px minmax(0,1fr) 32px; align-items: center; gap: 10px; min-height: 63px; padding: 10px 8px 10px 14px; border-radius: 14px; background: #fff; box-shadow: 0 5px 16px rgba(20,20,25,.025); }
+.dayflow-inbox-icon { color: var(--tone); font-size: 20px; font-weight: 800; }
+.dayflow-inbox-item div { display: grid; gap: 3px; }
+.dayflow-inbox-item small { color: var(--df-muted); font-size: 10px; }
+.dayflow-inbox-item strong { font-size: 13px; }
+.dayflow-inbox-item > button { width: 30px; height: 30px; border: 0; color: var(--tone); background: transparent; font-size: 23px; cursor: pointer; }
+.dayflow-sidebar-add { width: 100%; min-height: 42px; margin-top: 17px; border: 1px dashed #d3d1d7; border-radius: 12px; color: #6d6b72; background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+.dayflow-inbox-empty { display: grid; justify-items: center; gap: 5px; padding: 40px 16px; color: var(--df-muted); text-align: center; }
+.dayflow-inbox-empty span { font-size: 24px; }.dayflow-inbox-empty strong { color: var(--df-text); }.dayflow-inbox-empty p { margin: 0; font-size: 11px; }
+
+.dayflow-workspace { min-width: 0; padding: 26px 34px 0; }
+.dayflow-topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 52px; }
+.dayflow-date-title { grid-column: 2; display: flex; align-items: center; gap: 6px; }
+.dayflow-date-title h1 { margin: 0; font-size: 22px; letter-spacing: -.025em; }.dayflow-date-title h1 em { color: var(--df-coral); font-style: normal; }
+.dayflow-date-title button { border: 0; color: var(--df-coral); background: transparent; font-size: 25px; cursor: pointer; }
+.dayflow-top-actions { justify-self: end; display: flex; gap: 8px; }.dayflow-top-actions button { min-width: 38px; height: 38px; padding: 0 12px; border: 1px solid #fff; border-radius: 19px; color: #68666e; background: rgba(255,255,255,.7); box-shadow: 0 6px 18px rgba(20,20,25,.04); cursor: pointer; }
+.dayflow-week { display: grid; grid-template-columns: repeat(7, minmax(50px,1fr)); max-width: 610px; margin: 7px auto 19px; }
+.dayflow-week button { display: grid; justify-items: center; gap: 7px; padding: 0; border: 0; background: transparent; cursor: pointer; }.dayflow-week button > span { color: #77767c; font-size: 9px; }.dayflow-week button > strong { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-size: 12px; }.dayflow-week button.is-current > strong { color: #fff; background: var(--df-coral); }.dayflow-week i { display: flex; gap: 1px; height: 6px; }.dayflow-week i b { width: 6px; height: 6px; border: 1px solid #fff; border-radius: 50%; background: var(--df-blue); }.dayflow-week i b:nth-child(2) { background: var(--df-coral); }.dayflow-week i b:nth-child(3) { background: var(--df-green); }
+
+.dayflow-canvas { position: relative; max-width: 860px; min-height: calc(100dvh - 155px); margin: auto; padding: 26px 70px 80px; overflow: hidden; border-radius: 30px 30px 0 0; background: var(--df-panel); box-shadow: 0 -2px 30px rgba(20,20,25,.035); }
+.dayflow-canvas::before { content: ""; position: absolute; top: 5px; left: 50%; width: 50px; height: 4px; border-radius: 4px; background: #b9b8bc; transform: translateX(-50%); }
+.dayflow-shortcuts { display: flex; gap: 30px; margin: 0 0 30px 44px; }.dayflow-shortcuts button { display: grid; justify-items: center; gap: 7px; padding: 0; border: 0; background: transparent; font-size: 10px; cursor: pointer; }.dayflow-shortcuts button > span { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; color: #fff; font-size: 20px; }.dayflow-shortcuts button strong { font-size: 10px; line-height: 1.15; }
+.dayflow-progress { height: 3px; margin: 0 58px 14px 112px; border-radius: 3px; background: #f0eff2; }.dayflow-progress span { display: block; height: 100%; border-radius: inherit; background: var(--df-coral); transition: width .25s ease; }
+.dayflow-timeline { position: relative; display: grid; }.dayflow-event { --tone: var(--df-blue); display: grid; grid-template-columns: 70px 66px minmax(0,1fr) 38px; min-height: 82px; }.dayflow-time { display: grid; align-content: space-between; justify-items: end; padding: 4px 12px 4px 0; color: #aaa9ae; font-size: 9px; }.dayflow-time strong { align-self: center; color: var(--df-text); font-size: 10px; }.dayflow-track { position: relative; display: flex; justify-content: center; }.dayflow-track::before { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; background: #e8e7ea; }.dayflow-event-icon { position: relative; z-index: 1; display: grid; place-items: center; width: 50px; min-height: 62px; margin: 0 0 20px; border-radius: 27px; color: #fff; background: var(--tone); font-size: 20px; font-weight: 700; }.dayflow-event-copy { display: grid; align-content: center; gap: 5px; padding: 0 12px; }.dayflow-event-copy small { color: #96959a; font-size: 10px; }.dayflow-event-copy strong { font-size: 14px; }.dayflow-event-copy em { color: #8d8c91; font-size: 9px; font-style: normal; }.dayflow-check { align-self: center; width: 20px; height: 20px; padding: 0; border: 2px solid var(--tone); border-radius: 50%; color: #fff; background: transparent; font-size: 11px; cursor: pointer; }.dayflow-event.is-complete .dayflow-check { background: var(--tone); }.dayflow-event.is-complete .dayflow-event-copy strong { color: #8d8c91; text-decoration: line-through; }.dayflow-event.is-complete .dayflow-event-icon { opacity: .7; }
+.dayflow-free-time { display: flex; align-items: center; gap: 6px; min-height: 42px; margin-left: 136px; border: 0; color: #aaa9ae; background: transparent; font-size: 11px; cursor: pointer; }.dayflow-free-time strong { color: var(--df-coral); }
+.tone-coral { --tone: var(--df-coral); }.tone-blue { --tone: var(--df-blue); }.tone-green { --tone: var(--df-green); }.tone-navy { --tone: var(--df-navy); }.tone-berry { --tone: var(--df-berry); }.tone-purple { --tone: #8c79c6; }.tone-yellow { --tone: #ffb413; }
+
+.dayflow-mobile-nav, .dayflow-fab { display: none; }
+.dayflow-modal-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 18px; background: rgba(28,27,31,.35); backdrop-filter: blur(5px); }.dayflow-composer { width: min(460px,100%); padding: 22px; border-radius: 20px; background: #fff; box-shadow: 0 30px 80px rgba(20,20,25,.2); }.dayflow-composer header { display: flex; justify-content: space-between; gap: 12px; }.dayflow-composer header small { color: var(--df-coral); font-size: 9px; font-weight: 800; letter-spacing: .08em; }.dayflow-composer h2 { margin: 5px 0 18px; font-size: 19px; }.dayflow-composer header button { border: 0; background: transparent; font-size: 24px; cursor: pointer; }.dayflow-composer > input { width: 100%; height: 50px; padding: 0 14px; border: 1px solid #dedde1; border-radius: 11px; outline: 0; }.dayflow-composer > input:focus { border-color: var(--df-coral); box-shadow: 0 0 0 3px rgba(255,150,149,.16); }.dayflow-composer-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }.dayflow-composer-options label { display: grid; gap: 5px; color: #77767c; font-size: 10px; }.dayflow-composer select { height: 40px; padding: 0 10px; border: 1px solid #dedde1; border-radius: 9px; background: #fff; }.dayflow-composer footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }.dayflow-composer footer button { min-height: 40px; padding: 0 15px; border: 0; border-radius: 9px; color: #68666e; background: #f0eff2; font-size: 11px; font-weight: 750; cursor: pointer; }.dayflow-composer footer .is-primary { color: #fff; background: var(--df-coral); }.dayflow-composer footer button:disabled { opacity: .45; cursor: default; }
+
+@media (max-width: 720px) {
+  .dayflow-shell { display: block; min-height: 100dvh; background: #fff; }
+  .dayflow-inbox { position: fixed; inset: 0; z-index: 25; display: none; height: auto; padding: 22px 16px 100px; border: 0; background: #f4f4f6; }.dayflow-inbox.is-mobile-open { display: block; }.dayflow-icon-button { display: block; }
+  .dayflow-workspace { padding: 16px 0 90px; }
+  .dayflow-topbar { display: flex; justify-content: space-between; padding: 0 20px; }.dayflow-date-title { gap: 2px; }.dayflow-date-title h1 { font-size: 23px; }.dayflow-date-title button { display: none; }.dayflow-top-actions button:first-child { display: none; }.dayflow-top-actions button { border-color: #eee; background: #fafafa; }
+  .dayflow-week { grid-template-columns: repeat(7,minmax(0,1fr)); margin: 2px 10px 12px; }.dayflow-week button > strong { width: 27px; height: 27px; }.dayflow-week i b { width: 5px; height: 5px; }
+  .dayflow-canvas { min-height: calc(100dvh - 123px); padding: 20px 12px 95px 6px; border-radius: 26px 26px 0 0; box-shadow: 0 -4px 20px rgba(20,20,25,.055); }
+  .dayflow-shortcuts { gap: 18px; margin: 0 0 26px 14px; }.dayflow-shortcuts button > span { width: 49px; height: 49px; }.dayflow-progress { margin: 0 20px 14px 98px; }
+  .dayflow-event { grid-template-columns: 42px 60px minmax(0,1fr) 34px; min-height: 84px; }.dayflow-time { padding-right: 5px; font-size: 8px; }.dayflow-event-icon { width: 48px; min-height: 64px; }.dayflow-event-copy { padding-inline: 5px; }.dayflow-event-copy strong { font-size: 14px; }.dayflow-event-copy small { font-size: 9px; }.dayflow-check { width: 20px; height: 20px; }
+  .dayflow-free-time { margin-left: 103px; }
+  .dayflow-mobile-nav { position: fixed; right: 76px; bottom: 13px; left: 13px; z-index: 20; display: grid; grid-template-columns: repeat(4,1fr); min-height: 64px; padding: 7px 6px; border: 1px solid rgba(235,234,237,.9); border-radius: 22px; background: rgba(255,255,255,.92); box-shadow: 0 8px 28px rgba(20,20,25,.12); backdrop-filter: blur(16px); }.dayflow-mobile-nav button { display: grid; justify-items: center; gap: 3px; border: 0; color: #77767c; background: transparent; font-size: 8px; }.dayflow-mobile-nav button span { font-size: 17px; }.dayflow-mobile-nav button.is-active { color: var(--df-coral); }
+  .dayflow-fab { position: fixed; right: 13px; bottom: 13px; z-index: 21; display: grid; place-items: center; width: 62px; height: 62px; padding: 0; border: 0; border-radius: 50%; color: #fff; background: var(--df-coral); box-shadow: 0 10px 26px rgba(255,150,149,.34); font-size: 30px; cursor: pointer; }
+}
+
+@media (max-width: 390px) {
+  .dayflow-date-title h1 { font-size: 20px; }.dayflow-topbar { padding-inline: 14px; }.dayflow-week { margin-inline: 4px; }.dayflow-week button > span { font-size: 8px; }.dayflow-canvas { padding-left: 0; padding-right: 7px; }.dayflow-event { grid-template-columns: 38px 54px minmax(0,1fr) 29px; }.dayflow-event-icon { width: 44px; }.dayflow-event-copy strong { font-size: 13px; }.dayflow-mobile-nav { right: 70px; left: 8px; }.dayflow-fab { right: 8px; width: 58px; height: 58px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dayflow-shell *, .dayflow-shell *::before, .dayflow-shell *::after { scroll-behavior: auto !important; transition: none !important; }
+}
