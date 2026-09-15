@@ -17,19 +17,19 @@ type TimelineItem = {
 type InboxItem = { id: number; title: string; icon: string; duration: string; tone: string };
 
 const seedTimeline: TimelineItem[] = [
-  { id: 1, title: "Rise and Shine", icon: "⏰", start: "08:30", end: "08:45", duration: "15 min", tone: "coral", complete: true },
-  { id: 2, title: "Yoga Workout", icon: "⚑", start: "08:45", end: "09:45", duration: "60 min", tone: "blue", note: "19 min remaining" },
-  { id: 3, title: "Take a Shower", icon: "♨", start: "10:00", end: "10:15", duration: "15 min", tone: "navy" },
-  { id: 4, title: "Have a Coffee", icon: "☕", start: "10:15", end: "10:30", duration: "15 min", tone: "berry" },
-  { id: 5, title: "Bike to Office", icon: "♧", start: "10:30", end: "11:00", duration: "30 min", tone: "green" },
-  { id: 6, title: "Team Meeting", icon: "●●", start: "11:30", end: "12:30", duration: "1 hr", tone: "coral", note: "3 subtasks" },
+  { id: 1, title: "Accounting Standards · Rev. 1", icon: "✓", start: "08:30", end: "09:15", duration: "45 min", tone: "coral", complete: true },
+  { id: 2, title: "Amalgamation · Question Practice", icon: "▤", start: "09:15", end: "10:15", duration: "60 min", tone: "blue", note: "19 min remaining" },
+  { id: 3, title: "Law · Company Incorporation", icon: "§", start: "10:30", end: "11:00", duration: "30 min", tone: "navy" },
+  { id: 4, title: "Taxation · GST Revision", icon: "%", start: "11:00", end: "11:45", duration: "45 min", tone: "berry" },
+  { id: 5, title: "Audit · Chapter Notes", icon: "✎", start: "12:00", end: "12:30", duration: "30 min", tone: "green" },
+  { id: 6, title: "Costing · Chapter Test", icon: "T1", start: "13:00", end: "14:00", duration: "1 hr", tone: "coral", note: "3 sections" },
 ];
 
 const seedInbox: InboxItem[] = [
-  { id: 101, title: "Do Laundry", icon: "▣", duration: "1 hr", tone: "blue" },
-  { id: 102, title: "Do Homework", icon: "▤", duration: "1 hr", tone: "green" },
-  { id: 103, title: "Call Grandparents", icon: "●", duration: "30 min", tone: "blue" },
-  { id: 104, title: "Go for a Run", icon: "↗", duration: "1 hr", tone: "coral" },
+  { id: 101, title: "Review ICAI revision notes", icon: "▣", duration: "30 min", tone: "blue" },
+  { id: 102, title: "Complete pending law questions", icon: "▤", duration: "1 hr", tone: "green" },
+  { id: 103, title: "Revisit mistake journal", icon: "!", duration: "30 min", tone: "blue" },
+  { id: 104, title: "Take a taxation mock test", icon: "T2", duration: "1 hr", tone: "coral" },
 ];
 
 const weekdays = [
@@ -64,20 +64,20 @@ export function DayflowClient() {
 
   return <main className="dayflow-shell">
     <aside className={`dayflow-inbox ${activeView === "inbox" ? "is-mobile-open" : ""}`}>
-      <header><button className="dayflow-pill"><span>▣</span>Inbox</button><button className="dayflow-icon-button" aria-label="Close inbox" onClick={() => setActiveView("timeline")}>×</button></header>
+      <header><button className="dayflow-pill"><span>▣</span>Study Inbox</button><button className="dayflow-icon-button" aria-label="Close inbox" onClick={() => setActiveView("timeline")}>×</button></header>
       <div className="dayflow-inbox-list">
         {inbox.map((item) => <article key={item.id} className={`dayflow-inbox-item tone-${item.tone}`}>
           <span className="dayflow-inbox-icon">{item.icon}</span><div><small>{item.duration}</small><strong>{item.title}</strong></div><button aria-label={`Schedule ${item.title}`} onClick={() => schedule(item)}>＋</button>
         </article>)}
-        {!inbox.length ? <div className="dayflow-inbox-empty"><span>✓</span><strong>Inbox cleared</strong><p>Everything has a place in your day.</p></div> : null}
+        {!inbox.length ? <div className="dayflow-inbox-empty"><span>✓</span><strong>Backlog cleared</strong><p>Everything has a place in your study day.</p></div> : null}
       </div>
       <button className="dayflow-sidebar-add" onClick={() => setComposerOpen(true)}>＋ Capture task</button>
     </aside>
 
     <section className="dayflow-workspace">
       <header className="dayflow-topbar">
-        <div className="dayflow-date-title"><button aria-label="Previous day">‹</button><h1>16. October <em>2025</em></h1><button aria-label="Next day">›</button></div>
-        <div className="dayflow-top-actions"><button>✦ <span>Plan</span></button><button aria-label="Settings">⚙</button></div>
+        <div className="dayflow-date-title"><button aria-label="Previous day">‹</button><div><small>INTERMEDIATE · BOTH GROUPS · JANUARY 2027</small><h1>15. September <em>2026</em></h1></div><button aria-label="Next day">›</button></div>
+        <div className="dayflow-top-actions"><button>✦ <span>Auto-plan</span></button><button aria-label="Study settings">⚙</button></div>
       </header>
 
       <nav className="dayflow-week" aria-label="Week">
@@ -86,9 +86,9 @@ export function DayflowClient() {
 
       <section className="dayflow-canvas">
         <div className="dayflow-shortcuts">
-          <button><span className="tone-green">●</span><strong>Call Mum</strong></button>
-          <button><span className="tone-coral">✓</span><strong>Structure<br/>Tomorrow</strong></button>
-          <button><span className="tone-yellow">✦</span><strong>Book<br/>Vacation</strong></button>
+          <button><span className="tone-green">▶</span><strong>Start<br/>Focus</strong></button>
+          <button><span className="tone-coral">✓</span><strong>Plan<br/>Tomorrow</strong></button>
+          <button><span className="tone-yellow">T</span><strong>Quick<br/>Test</strong></button>
         </div>
 
         <div className="dayflow-progress"><span style={{ width: `${Math.max(14, completed / Math.max(1, timeline.length) * 100)}%` }}/></div>
@@ -99,23 +99,23 @@ export function DayflowClient() {
             <div className="dayflow-event-copy">{item.note ? <small>{item.note}</small> : <small>{item.start} – {item.end} ({item.duration})</small>}<strong>{item.title}</strong>{item.note === "3 subtasks" ? <em>▣ 1 / 3</em> : null}</div>
             <button className="dayflow-check" aria-label={`${item.complete ? "Reopen" : "Complete"} ${item.title}`} onClick={() => toggleComplete(item.id)}>{item.complete ? "✓" : ""}</button>
           </article>)}
-          <button className="dayflow-free-time" onClick={() => setComposerOpen(true)}><span>◷</span><strong>30 min</strong> of free time?</button>
+          <button className="dayflow-free-time" onClick={() => setComposerOpen(true)}><span>◷</span><strong>30 min</strong> study gap available</button>
         </div>
       </section>
     </section>
 
     <nav className="dayflow-mobile-nav" aria-label="App navigation">
-      <button className={activeView === "inbox" ? "is-active" : ""} onClick={() => setActiveView("inbox")}><span>▣</span>Inbox</button>
+      <button className={activeView === "inbox" ? "is-active" : ""} onClick={() => setActiveView("inbox")}><span>▣</span>Backlog</button>
       <button className={activeView === "timeline" ? "is-active" : ""} onClick={() => setActiveView("timeline")}><span>≡</span>Timeline</button>
-      <button className={activeView === "ai" ? "is-active" : ""} onClick={() => setActiveView("ai")}><span>✦</span>AI</button>
+      <button className={activeView === "ai" ? "is-active" : ""} onClick={() => setActiveView("ai")}><span>✦</span>Plan</button>
       <button className={activeView === "settings" ? "is-active" : ""} onClick={() => setActiveView("settings")}><span>⚙</span>Settings</button>
     </nav>
     <button className="dayflow-fab" aria-label="Add task" onClick={() => setComposerOpen(true)}>＋</button>
 
     {composerOpen ? <div className="dayflow-modal-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setComposerOpen(false); }}>
       <section className="dayflow-composer" role="dialog" aria-modal="true" aria-labelledby="dayflow-add-title">
-        <header><div><small>QUICK ADD</small><h2 id="dayflow-add-title">What do you want to do?</h2></div><button aria-label="Close" onClick={() => setComposerOpen(false)}>×</button></header>
-        <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addTask(); }} placeholder="e.g. Read for 30 minutes"/>
+        <header><div><small>QUICK ADD</small><h2 id="dayflow-add-title">What do you want to study?</h2></div><button aria-label="Close" onClick={() => setComposerOpen(false)}>×</button></header>
+        <input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") addTask(); }} placeholder="e.g. Revise Accounting Standards"/>
         <div className="dayflow-composer-options"><label>Duration<select value={duration} onChange={(event) => setDuration(event.target.value)}><option>15 min</option><option>30 min</option><option>45 min</option><option>1 hr</option></select></label><label>Start<select defaultValue="13:00"><option>13:00</option><option>13:30</option><option>14:00</option></select></label></div>
         <footer><button onClick={() => setComposerOpen(false)}>Cancel</button><button className="is-primary" disabled={!title.trim()} onClick={addTask}>Add to timeline</button></footer>
       </section>
