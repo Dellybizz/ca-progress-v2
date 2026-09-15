@@ -41,3 +41,6 @@
 .offline-workspace { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .offline-controls { padding: 16px 0; border-block: 1px solid var(--border, #e5e7eb); margin-bottom: 16px; }
 .offline-controls button { cursor: pointer; }
+
+/* Chapter Hub has two attachable resource sources: keep both tabs evenly aligned. */
+.chapter-hub-resource-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
