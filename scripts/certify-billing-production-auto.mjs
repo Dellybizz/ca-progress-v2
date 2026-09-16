@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const text = (value) => String(value ?? "").trim();
 const required = (name) => {
@@ -97,8 +98,11 @@ async function main() {
   if (child.status !== 0) process.exitCode = child.status ?? 1;
 }
 
-main().catch(async (error) => {
-  const message = error instanceof Error ? error.message : "Automatic Billing Phase A certification failed.";
-  console.error(message);
-  process.exitCode = 1;
-});
+const invoked = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (invoked) {
+  main().catch(async (error) => {
+    const message = error instanceof Error ? error.message : "Automatic Billing Phase A certification failed.";
+    console.error(message);
+    process.exitCode = 1;
+  });
+}
