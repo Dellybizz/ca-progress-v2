@@ -35,9 +35,9 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
   ]) {
     assert.ok(billing.includes(phrase), `${phrase} should be represented`);
   }
-  assert.match(billing, /state === "success"/);
-  assert.match(billing, /state === "pending"/);
-  assert.match(billing, /state === "failed"/);
+  assert.match(billing, /state\s*===\s*"success"/);
+  assert.match(billing, /state\s*===\s*"pending"/);
+  assert.match(billing, /state\s*===\s*"failed"/);
   assert.match(billing, /payment\.failed/);
 });
 
@@ -47,7 +47,7 @@ test("pricing remains configuration-safe and sends only the plan identifier", ()
   assert.doesNotMatch(pricing, /body:JSON\.stringify\(\{[^}]*\b(?:amount|price_subunits)\b[^}]*\}\)/);
   assert.match(pricing, /Checkout not configured/);
   assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
-  assert.match(pricing, /checkoutMatchesPolicy\(plan, cycle\)/);
+  assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer\)/);
   assert.match(pricing, /published server policy has a valid price/);
   assert.match(pricing, /payment=\$\{verified\.providerStatus/);
   assert.match(pricing, /\/billing\?payment=pending/);
