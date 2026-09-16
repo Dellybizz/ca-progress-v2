@@ -14,5 +14,5 @@ export default async function PricingPage() {
     listPublishedPricingOffers(),
     listActivePlanEntitlements(),
   ]);
-  return <div className="phase11-page"><PageHeader preview={false} eyebrow="Plans" title="Free, Pro or Premium — choose only what you need." description="Prices and access come from the published server policy, not trusted from the browser. Checkout snapshots the exact commercial terms before any payment is created." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link><Link href="/settings">Settings</Link></div>}/><PricingClient {...model} entitlements={entitlements} offers={offers}/></div>;
+  return <div className="phase11-page"><PageHeader preview={false} eyebrow="Plans" title="Free, Pro or Premium — choose only what you need." description="Prices and access are resolved by the server, not trusted from the browser. Checkout snapshots the exact commercial terms before any payment is created." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link><Link href="/settings">Settings</Link></div>}/><PricingClient {...model} entitlements={entitlements} offers={offers}/></div>;
 }

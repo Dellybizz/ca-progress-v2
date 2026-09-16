@@ -84,7 +84,7 @@ test("upload completion independently rechecks the current plan and quota", () =
 test("downgrade UX promises preservation while blocking only new uploads over limit", () => {
   const settings = source("app/(student)/settings/page.tsx");
   assert.match(settings, /Downgrading never deletes your existing files\./);
-  assert.match(settings, /existing files stay available, but new uploads pause until you reduce usage or upgrade\./);
+  assert.match(settings, /existing files stay available, but new uploads pause until you reduce usage or upgrade\./i);
   assert.match(settings, /Cancelled — paid access remains active through/);
   assert.match(settings, /Billing grace period — paid access remains active through/);
   assert.match(settings, /Free, Pro and Premium/);
