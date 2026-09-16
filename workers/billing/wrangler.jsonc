@@ -1,13 +1,12 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "ca-progress-v2-billing",
-  "main": "./p4.ts",
+  "main": "./p4-final.ts",
   "minify": true,
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
   "keep_vars": true,
-  "build": { "command": "npx wrangler queues create ca-progress-v2-billing-ops >/dev/null 2>&1 || true" },
   "d1_databases": [{
     "binding": "DB",
     "database_name": "ca-progress-v2-phase4-shadow",
