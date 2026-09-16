@@ -38,7 +38,7 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
   assert.match(billing, /state\s*===\s*"success"/);
   assert.match(billing, /state\s*===\s*"pending"/);
   assert.match(billing, /state\s*===\s*"failed"/);
-  assert.match(billing, /payment\.failed/);
+  assert.match(billing, /Retry payment/);
 });
 
 test("pricing remains configuration-safe and sends only the plan identifier", () => {
