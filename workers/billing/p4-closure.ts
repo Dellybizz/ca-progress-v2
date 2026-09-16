@@ -44,6 +44,51 @@ async function releaseFailedCheckoutReservation(request: Request, response: Resp
     .bind(stamp, claimKey, userId).run();
 }
 
+function safeAuthorizationUrl(value: unknown) {
+  const raw = clean(value, 500);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    const allowedHost = url.hostname === "rzp.io" || url.hostname.endsWith(".razorpay.com");
+    return url.protocol === "https:" && allowedHost ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function providerAuthorizationUrl(subscriptionId: string, env: Env) {
+  const keyId = env.RAZORPAY_KEY_ID?.trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
+  if (!keyId || !keySecret || !/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) return null;
+  const response = await fetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "GET",
+    headers: {
+      authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`,
+      accept: "application/json",
+    },
+  });
+  if (!response.ok) return null;
+  const payload = await response.json().catch(() => null) as { short_url?: unknown } | null;
+  return safeAuthorizationUrl(payload?.short_url);
+}
+
+async function enrichCheckoutResponse(method: string, pathname: string, response: Response, env: Env) {
+  if (!response.ok || method !== "POST" || pathname !== "/create-subscription") return response;
+  const payload = await response.clone().json().catch(() => null) as Record<string, unknown> | null;
+  const subscriptionId = clean(payload?.subscriptionId, 100);
+  if (!payload || !/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) return response;
+  const authorizationUrl = await providerAuthorizationUrl(subscriptionId, env).catch(() => null);
+  if (!authorizationUrl) return response;
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "application/json; charset=utf-8");
+  headers.set("cache-control", "private, no-store");
+  return new Response(JSON.stringify({ ...payload, authorizationUrl }), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function sweepCampaignLifecycle(env: Env) {
   const db = database(env);
   const stamp = now();
@@ -66,9 +111,11 @@ async function sweepCampaignLifecycle(env: Env) {
 const worker = {
   async fetch(request: Request, env: Env) {
     const evidence = request.clone();
+    const method = request.method;
+    const pathname = new URL(request.url).pathname;
     const response = await p4FinalWorker.fetch(request, env as never);
     await releaseFailedCheckoutReservation(evidence, response, env).catch(() => undefined);
-    return response;
+    return enrichCheckoutResponse(method, pathname, response, env);
   },
   async queue(batch: QueueBatch<BillingJob>, env: Env) {
     return p4FinalWorker.queue(batch as never, env as never);
