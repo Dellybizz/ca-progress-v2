@@ -16,7 +16,6 @@ export async function runBillingOperation(form:FormData){
   const payload=await response.json().catch(()=>null) as {error?:string;result?:unknown}|null;
   if(!response.ok)throw new Error(payload?.error||"Billing operation failed.");
   revalidatePath("/admin/billing");
-  return payload;
 }
 
 export async function createBillingCampaign(form:FormData){
@@ -31,8 +30,8 @@ export async function createBillingCampaign(form:FormData){
     perUserLimit:Number(field(form,"perUserLimit")||1),firstNLimit:numberOrNull(field(form,"firstNLimit")),freeAccessDays:Number(field(form,"freeAccessDays")||0),
     discountCycles:Number(field(form,"discountCycles")||1),requireAllowlist:field(form,"requireAllowlist")==="on",priority:Number(field(form,"priority")||100),changeReason:field(form,"reason")
   };
-  const result=await createCampaignDraft(input,{userId:actor.user.id,role:actor.role,traceId:crypto.randomUUID()});
-  revalidatePath("/admin/billing"); return result;
+  await createCampaignDraft(input,{userId:actor.user.id,role:actor.role,traceId:crypto.randomUUID()});
+  revalidatePath("/admin/billing");
 }
 
 export async function publishBillingCampaign(form:FormData){
@@ -49,9 +48,8 @@ export async function updateCampaignAllowlist(form:FormData){
 
 export async function grantBillingCampaignAccess(form:FormData){
   const actor=await requireAdminCapability("billing.manage");
-  const result=await grantCampaignAccess({versionId:field(form,"versionId"),userId:field(form,"userId"),reason:field(form,"reason")},{userId:actor.user.id,role:actor.role,traceId:crypto.randomUUID()});
+  await grantCampaignAccess({versionId:field(form,"versionId"),userId:field(form,"userId"),reason:field(form,"reason")},{userId:actor.user.id,role:actor.role,traceId:crypto.randomUUID()});
   revalidatePath("/admin/billing");
-  return result;
 }
 
 export async function retireBillingCampaign(form:FormData){
