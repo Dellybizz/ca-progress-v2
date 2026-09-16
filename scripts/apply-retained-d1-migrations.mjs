@@ -43,44 +43,31 @@ const migrations = [
   ["0049", "d1/migrations/0049_refinement_phase1_admin_subscription_access.sql"],
   ["0050", "d1/migrations/0050_refinement_phase2_commercial_policy.sql"],
   ["0051", "d1/migrations/0051_refinement_phase3_razorpay_subscriptions.sql"],
+  ["0052", "d1/migrations/0052_refinement_phase4_billing_operations_campaigns.sql"],
 ];
 
-if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) {
-  throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
-}
+if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
 
 function wrangler(args, { capture = false } = {}) {
-  const result = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["wrangler", ...args], {
-    encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    env: process.env,
-  });
-  if (result.status !== 0) {
-    if (capture) { if (result.stdout) process.stderr.write(result.stdout); if (result.stderr) process.stderr.write(result.stderr); }
-    throw new Error(`wrangler ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}.`);
-  }
+  const result = spawnSync(process.platform === "win32" ? "npx.cmd" : "npx", ["wrangler", ...args], { encoding: "utf8", stdio: capture ? ["ignore","pipe","pipe"] : "inherit", env: process.env });
+  if (result.status !== 0) { if (capture) { if (result.stdout) process.stderr.write(result.stdout); if (result.stderr) process.stderr.write(result.stderr); } throw new Error(`wrangler ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}.`); }
   return result.stdout ?? "";
 }
-
 function query(sql) {
   const output = wrangler(["d1","execute",database,"--remote",`--config=${config}`,"--json","--command",sql], { capture: true });
-  const start = output.indexOf("[");
-  if (start < 0) throw new Error(`Unexpected Wrangler JSON output: ${output.slice(0, 500)}`);
+  const start = output.indexOf("["); if (start < 0) throw new Error(`Unexpected Wrangler JSON output: ${output.slice(0,500)}`);
   return JSON.parse(output.slice(start));
 }
-
-const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0051' ORDER BY version;");
+const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0052' ORDER BY version;");
 const applied = new Set((ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)));
-for (const [version, file] of migrations) {
+for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }
-  console.log(`[retained-d1] applying ${version} from ${file}`);
-  wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${file}`]);
+  console.log(`[retained-d1] applying ${version} from ${file}`); wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${file}`]);
 }
-const versions = migrations.map(([version]) => `'${version}'`).join(",");
-const verification = query(`SELECT version FROM _ca_schema_migrations WHERE version IN (${versions}) ORDER BY version; PRAGMA foreign_key_check;`);
-const verified = new Set((verification?.[0]?.results ?? []).map((row) => String(row.version)));
-const missing = migrations.map(([version]) => version).filter((version) => !verified.has(version));
-if (missing.length) throw new Error(`Retained D1 migrations missing after apply: ${missing.join(", ")}`);
-const fkViolations = verification?.[1]?.results ?? [];
-if (fkViolations.length) throw new Error(`D1 foreign-key verification failed with ${fkViolations.length} violation(s).`);
+const versions=migrations.map(([version])=>`'${version}'`).join(",");
+const verification=query(`SELECT version FROM _ca_schema_migrations WHERE version IN (${versions}) ORDER BY version; PRAGMA foreign_key_check;`);
+const verified=new Set((verification?.[0]?.results??[]).map((row)=>String(row.version)));
+const missing=migrations.map(([version])=>version).filter((version)=>!verified.has(version));
+if(missing.length)throw new Error(`Retained D1 migrations missing after apply: ${missing.join(", ")}`);
+const fkViolations=verification?.[1]?.results??[];if(fkViolations.length)throw new Error(`D1 foreign-key verification failed with ${fkViolations.length} violation(s).`);
 console.log(`[retained-d1] PASS: ${migrations.length} required migrations present; foreign keys clean.`);

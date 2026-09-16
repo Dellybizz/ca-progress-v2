@@ -139,7 +139,7 @@ export async function grantCampaignAccess(input:{versionId:string;userId:string;
       VALUES(?1,?2,?3,?4,NULL,'granted','campaign',?5,?6,?7,?5)`).bind(eventId,subscriptionId,input.userId,planId,nowIso,endsAt,JSON.stringify({campaign_version_id:input.versionId,claim_id:claimId})),
     db().prepare(`UPDATE billing_campaign_claims SET state='applied',grant_subscription_id=?1,applied_at=?2 WHERE id=?3 AND state='reserved'`).bind(subscriptionId,nowIso,claimId),
   ]);
-  await appendAudit({actorUserId:actor.user.id,actorRole:actor.role,action:"billing.campaign.access.grant",targetType:"billing_campaign_claim",targetId:claimId,reason:clean(input.reason,1000),newValue:{userId:input.userId,planId,endsAt,campaignVersionId:input.versionId},traceId:actor.traceId,reversible:true});
+  await appendAudit({actorUserId:actor.userId,actorRole:actor.role,action:"billing.campaign.access.grant",targetType:"billing_campaign_claim",targetId:claimId,reason:clean(input.reason,1000),newValue:{userId:input.userId,planId,endsAt,campaignVersionId:input.versionId},traceId:actor.traceId,reversible:true});
   return{claimId,subscriptionId,planId,endsAt};
 }
 
