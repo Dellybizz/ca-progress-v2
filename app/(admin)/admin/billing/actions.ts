@@ -48,7 +48,7 @@ export async function updateCampaignAllowlist(form:FormData){
 
 export async function grantBillingCampaignAccess(form:FormData){
   const actor=await requireAdminCapability("billing.manage");
-  await grantCampaignAccess({versionId:field(form,"versionId"),userId:field(form,"userId"),reason:field(form,"reason")},{userId:actor.user.id,role:actor.role,traceId:crypto.randomUUID()});
+  await grantCampaignAccess({versionId:field(form,"versionId"),userId:field(form,"userId"),reason:field(form,"reason"),requestId:field(form,"requestId")},{userId:actor.user.id,role:actor.role,traceId:crypto.randomUUID()});
   revalidatePath("/admin/billing");
 }
 
