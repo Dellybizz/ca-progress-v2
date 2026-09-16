@@ -47,9 +47,14 @@ test("P4 campaign provider failures release reserved inventory and cancel orphan
   assert.match(read("d1/migrations/0052_refinement_phase4_billing_operations_campaigns.sql"),/OLD\.state='reserved' AND NEW\.state IN \('failed','revoked'\)/);
 });
 
-test("billing deployment enters through the final P4 worker",()=>{
+test("billing deployment enters through the P4 closure worker and retains the final campaign worker",()=>{
   const config=read("workers/billing/wrangler.jsonc");
-  assert.match(config,/"main": "\.\/p4-final\.ts"/);
+  const closure=read("workers/billing/p4-closure.ts");
+  assert.match(config,/"main": "\.\/p4-closure\.ts"/);
+  assert.match(closure,/import p4FinalWorker from "\.\/p4-final"/);
+  assert.match(closure,/p4FinalWorker\.fetch/);
+  assert.match(closure,/p4FinalWorker\.queue/);
+  assert.match(closure,/p4FinalWorker\.scheduled/);
   assert.match(config,/ca-progress-v2-billing-ops/);
   assert.match(config,/15 \* \* \* \*/);
 });
