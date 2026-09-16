@@ -53,3 +53,19 @@ test("P2 checkout derives amount server-side and snapshots the complete offer",(
   assert.match(worker,/body\?\.planId/);
   assert.doesNotMatch(worker,/body\?\.amount/);
 });
+
+test("P2 production repair replaces only legacy zero-priced monthly policy versions",()=>{
+  const sql=read("d1/migrations/0053_refinement_phase2_live_pricing_repair.sql");
+  assert.match(sql,/policy-0053-price-repair-/);
+  assert.match(sql,/sp\.billing_cycle='monthly'/);
+  assert.match(sql,/source\.price_subunits IS NULL OR source\.price_subunits<100/);
+  assert.match(sql,/WHEN 'basic' THEN 5000 WHEN 'pro' THEN 15000/);
+  assert.match(sql,/WHEN sp\.tier_key='basic' THEN 2500/);
+  assert.match(sql,/checkout_enabled=1/);
+  assert.match(sql,/price_subunits IS NULL OR price_subunits<100/);
+  assert.doesNotMatch(sql,/UPDATE plan_policy_versions\s+SET\s+price_subunits/i);
+  assert.match(sql,/VALUES \('0053'/);
+  const retained=read("scripts/apply-retained-d1-migrations.mjs");
+  assert.match(retained,/0053_refinement_phase2_live_pricing_repair\.sql/);
+  assert.match(retained,/BETWEEN '0012' AND '0053'/);
+});
