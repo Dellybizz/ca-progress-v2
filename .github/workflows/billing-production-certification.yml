@@ -1,6 +1,14 @@
 name: Billing Phase A Production Certification
 
 on:
+  push:
+    branches: [hotfix/dark-mode-ae0cb36d]
+    paths:
+      - .github/workflows/billing-production-certification.yml
+      - scripts/certify-billing-production.mjs
+      - scripts/certify-billing-production-auto.mjs
+      - tests/refinement-phase-a-billing-certification.test.mjs
+      - tests/refinement-phase-a-billing-auto.test.mjs
   workflow_dispatch:
     inputs:
       provider_subscription_id:
@@ -24,7 +32,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: billing-phase-a-production-${{ inputs.provider_subscription_id }}
+  group: billing-phase-a-production-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -56,7 +64,7 @@ jobs:
           node-version: 22
 
       - name: Verify Phase A certification contracts
-        run: node --test tests/refinement-phase-a-billing-certification.test.mjs
+        run: node --test tests/refinement-phase-a-billing-certification.test.mjs tests/refinement-phase-a-billing-auto.test.mjs
 
       - name: Confirm production Billing Worker target
         shell: bash
@@ -66,8 +74,8 @@ jobs:
           grep -q '"main": "./p4-closure.ts"' workers/billing/wrangler.jsonc
           grep -q '"database_id": "6f002cbe-fe40-4d1b-9cf4-df6faaf52350"' workers/billing/wrangler.jsonc
 
-      - name: Certify live Razorpay to D1 to entitlement flow
-        run: node scripts/certify-billing-production.mjs
+      - name: Certify existing live transaction or record pending gate
+        run: node scripts/certify-billing-production-auto.mjs
 
       - name: Upload sanitized certification evidence
         if: always()
