@@ -142,7 +142,8 @@ async function action(request:Request,env:Env,ctx:InternalContext){
 }
 
 async function recordWebhookEvent(db:D1Database,input:{eventId:string;local:Row;subscriptionId:string;paymentId?:string|null;invoiceId?:string|null;eventType:string;createdAt?:number;raw:string;evidence:Record<string,unknown>}){
-  const result=await db.prepare("INSERT OR IGNORE INTO razorpay_subscription_events(id,provider_event_id,razorpay_subscription_id,provider_subscription_id,provider_payment_id,provider_invoice_id,event_type,provider_created_at,payload_sha256,evidence_json,outcome,received_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'received',?11)").bind(uuid(),input.eventId,input.local.id,input.subscriptionId,input.paymentId??null,input.invoiceId??null,input.eventType,iso(input.createdAt),await sha256(input.raw),JSON.stringify(input.evidence),nowIso()).run();return Number(result.meta?.changes??0)===1;
+  const receipt=db.prepare("INSERT OR IGNORE INTO razorpay_subscription_events(id,provider_event_id,razorpay_subscription_id,provider_subscription_id,provider_payment_id,provider_invoice_id,event_type,provider_created_at,payload_sha256,evidence_json,outcome,received_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,'received',?11)");
+  const result=await receipt.bind(uuid(),input.eventId,input.local.id,input.subscriptionId,input.paymentId??null,input.invoiceId??null,input.eventType,iso(input.createdAt),await sha256(input.raw),JSON.stringify(input.evidence),nowIso()).run();return Number(result.meta?.changes??0)===1;
 }
 
 async function webhook(request:Request,env:Env){

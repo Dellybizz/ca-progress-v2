@@ -42,6 +42,7 @@ export const routeContracts = Object.freeze([
   student("/updates", "updates", "Official ICAI updates", "lib/icai/query.ts", ["icai_resources", "icai_resource_subject_map", "icai_resource_attempt_map"], "profile", "baseline", "snapshot", "partial", "Group and subject context is incomplete for some resource types."),
   admin("/admin", "", "Admin command centre", "lib/admin/phase1.ts", ["app_users", "admin_audit_events", "background_jobs"]),
   admin("/admin/audit", "audit", "Privileged action history", "lib/admin/phase1.ts", ["admin_audit_events"]),
+  admin("/admin/billing", "billing", "Billing operations and reconciliation", "lib/billing/p4-admin.ts", ["razorpay_subscriptions", "razorpay_subscription_charges", "billing_reconciliation_cases", "billing_campaigns", "admin_audit_events"]),
   admin("/admin/community/moderation", "community/moderation", "Community moderation", "lib/community/service.ts", ["message_reports", "moderation_actions", "chat_blocks"]),
   admin("/admin/consistency", "consistency", "Cross-system consistency health", "lib/consistency/scanner.ts", ["consistency_scan_runs", "consistency_findings", "consistency_repair_receipts", "admin_audit_events"]),
   admin("/admin/control", "control", "Versioned operational configuration", "lib/admin/control-centre.ts", ["admin_control_versions", "admin_control_publications", "admin_audit_events"]),

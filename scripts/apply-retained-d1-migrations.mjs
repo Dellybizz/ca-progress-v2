@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 const database = "ca-progress-v2-phase4-shadow";
+// Historical certification window retained verbatim: BETWEEN '0012' AND '0048'.
 const config = "wrangler.jsonc";
 const migrations = [
   ["0012", "d1/migrations/0012_product_phase0_autofetch_contracts.sql"],

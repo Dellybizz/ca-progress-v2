@@ -8,7 +8,7 @@ test("Phase 8 exposes every required operator area without starting Phase 9 edit
   const service=read("lib/admin/control-centre.ts");
   for(const key of ["system","academic","attempts","icai","resources","accounts","plans","community","notifications"])
     assert.match(service,new RegExp(`key: "${key}"`));
-  assert.match(read("app/(admin)/admin/plans/page.tsx"),/Plan policy centre/);
+  assert.match(read("app/(admin)/admin/plans/page.tsx"),/Plans, access and pricing/);
 });
 
 test("Phase 8 configuration is versioned idempotent authorized and audited",()=>{

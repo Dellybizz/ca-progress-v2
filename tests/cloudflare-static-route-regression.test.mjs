@@ -12,6 +12,6 @@ test("shared-shell preview routes use the dynamic Worker render path", () => {
     "app/(student)/tests/page.tsx",
     "app/(admin)/admin/page.tsx",
   ]) {
-    assert.match(read(route), /export const dynamic = ["']force-dynamic["']/);
+    assert.match(read(route), /export const dynamic\s*=\s*["']force-dynamic["']/);
   }
 });
