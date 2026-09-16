@@ -50,6 +50,7 @@ export const shellNavigation: Record<ShellArea, readonly ShellNavSection[]> = {
     ]},
     { label: "Billing", items: [
       { label: "Plans & policies", description: "Manage plans and entitlement policy", href: "/admin/plans", icon: "sparkles", mobilePrimary: true },
+      { label: "Billing operations", description: "Reconcile Razorpay, access and campaigns", href: "/admin/billing", icon: "shield" },
     ]},
     { label: "Content", items: [
       { label: "Syllabus preview", description: "Review academic structure", href: "/admin/syllabus", icon: "book" },
