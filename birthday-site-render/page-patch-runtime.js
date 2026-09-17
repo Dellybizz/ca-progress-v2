@@ -115,7 +115,7 @@
 
   function applyPatch(anchor,patch,patchIndex){
     if(!anchor)return;
-    if(patch.hidden)anchor.style.setProperty('display','none','important');
+    if(patch.hidden){if(adminPreview){anchor.style.removeProperty('display');anchor.style.setProperty('outline','2px dashed #ff7f7f');anchor.style.setProperty('outline-offset','2px');anchor.dataset.bdayHiddenPreview='1'}else anchor.style.setProperty('display','none','important')}else if(adminPreview&&anchor.dataset.bdayHiddenPreview==='1'){anchor.style.removeProperty('outline');anchor.style.removeProperty('outline-offset');delete anchor.dataset.bdayHiddenPreview}
     if(patch.src&&anchor.matches?.('img,video,audio,source')){
       anchor.setAttribute('src',patch.src);
       if('src' in anchor)anchor.src=patch.src;
