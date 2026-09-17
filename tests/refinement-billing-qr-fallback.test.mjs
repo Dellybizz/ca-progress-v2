@@ -16,11 +16,11 @@ test("billing worker exposes only a provider-owned secure authorization fallback
   assert.match(worker,/JSON\.stringify\(\{ \.\.\.payload, authorizationUrl \}\)/);
 });
 
-test("pricing prefers the provider-hosted authorization page before embedded checkout without creating a second subscription",()=>{
+test("API-created subscriptions authenticate through Razorpay Standard Checkout while preserving the hosted fallback",()=>{
   const client=read("components/billing/pricing-client.tsx");
-  assert.match(client,/if\(authorizationUrl\)\{setBusy\(null\);window\.location\.assign\(authorizationUrl\);return;\}/);
-  assert.doesNotMatch(client,/created\.reused&&authorizationUrl/);
-  assert.ok(client.indexOf("if(authorizationUrl)")<client.indexOf("new window.Razorpay"));
+  assert.match(client,/subscription_id:created\.subscriptionId/);
+  assert.match(client,/new window\.Razorpay\(/);
+  assert.doesNotMatch(client,/window\.location\.assign\(authorizationUrl\)/);
   assert.equal((client.match(/\/api\/payments\/create-subscription/g)||[]).length,1);
   assert.match(client,/setFallbackUrl\(authorizationUrl\)/);
   assert.match(client,/UPI QR not loading\?/);
@@ -28,8 +28,8 @@ test("pricing prefers the provider-hosted authorization page before embedded che
   assert.match(client,/rel="noopener noreferrer"/);
 });
 
-test("web checkout retry uses Razorpay-supported web option shape",()=>{
+test("web subscription checkout leaves retry handling to Razorpay defaults",()=>{
   const client=read("components/billing/pricing-client.tsx");
-  assert.match(client,/retry:\{enabled:true\}/);
+  assert.doesNotMatch(client,/retry:\{/);
   assert.doesNotMatch(client,/max_count/);
 });
