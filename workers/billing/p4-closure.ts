@@ -63,7 +63,7 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
   if (!planId) return null;
 
   const db = database(env);
-  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,billing_cycle,recurring_price_subunits,status
+  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status
     FROM razorpay_subscriptions
     WHERE user_id=?1 AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
     ORDER BY created_at DESC LIMIT 21`).bind(userId).all<Row>();
@@ -73,7 +73,7 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
   }
 
   if (rows.length === 0) {
-    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,billing_cycle,recurring_price_subunits,status
+    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status
       FROM razorpay_subscriptions WHERE user_id=?1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
     if (latest) rows = [latest];
   }
@@ -114,6 +114,10 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
     const current = verifiedOpen[0];
     const subscriptionId = clean(current.local.provider_subscription_id, 100);
     const samePlan = clean(current.local.plan_id, 100) === planId;
+    const legacySplitPlan = clean(current.local.provider_plan_id, 100) !== clean(current.local.recurring_provider_plan_id, 100);
+    if (legacySplitPlan) {
+      return json({ error: "This checkout uses the retired introductory-plan switching model and must be repaired before retrying. No new subscription was created.", code: "legacy_intro_plan_requires_repair" }, 409);
+    }
     if (samePlan && (current.providerStatus === "created" || current.providerStatus === "authenticated")) {
       const keyId = env.RAZORPAY_KEY_ID?.trim();
       if (!keyId) return json({ error: "Razorpay recurring checkout is not configured." }, 503);
