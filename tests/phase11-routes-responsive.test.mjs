@@ -52,7 +52,8 @@ test("pricing remains configuration-safe and sends only the plan identifier", ()
   assert.match(pricing, /payment=\$\{verified\.providerStatus/);
   assert.match(pricing, /\/billing\?payment=pending/);
   assert.match(pricing, /\/billing\?payment=failed/);
-  assert.match(pricing, /retry:\{enabled:true,max_count:3\}/);
+  assert.match(pricing, /retry:\{enabled:true\}/);
+  assert.doesNotMatch(pricing, /max_count/);
 });
 
 test("pricing and billing have dedicated mobile breakpoints and overflow-safe payment history", () => {
