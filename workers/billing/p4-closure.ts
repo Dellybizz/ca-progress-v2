@@ -8,6 +8,8 @@ type D1Statement = {
   run<T = Record<string, unknown>>(): Promise<D1Result<T>>;
 };
 type D1Database = { prepare(query: string): D1Statement };
+type Row = Record<string, unknown>;
+type ProviderSubscriptionSnapshot = { status?: unknown; short_url?: unknown };
 type BillingJob =
   | { kind: "webhook"; raw: string; signature: string; eventId: string | null }
   | { kind: "reconcile"; subscriptionId: string; userId: string; reason: string; runId: string | null };
@@ -28,6 +30,113 @@ const database = (env: Env) => {
   return env.DB;
 };
 const clean = (value: unknown, max = 160) => String(value ?? "").trim().slice(0, max);
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" },
+});
+const KNOWN_SUBSCRIPTION_STATUSES = new Set(["created", "authenticated", "active", "pending", "halted", "paused", "cancelled", "completed", "expired"]);
+const TERMINAL_SUBSCRIPTION_STATUSES = new Set(["cancelled", "completed", "expired"]);
+
+async function providerSubscriptionSnapshot(subscriptionId: string, env: Env) {
+  const keyId = env.RAZORPAY_KEY_ID?.trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
+  if (!keyId || !keySecret) throw new Error("Razorpay recurring checkout is not configured.");
+  if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) throw new Error("Stored Razorpay subscription ID is invalid.");
+  const response = await fetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: "GET",
+    headers: {
+      authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`,
+      accept: "application/json",
+    },
+  });
+  if (!response.ok) throw new Error(`Razorpay subscription verification failed (${response.status}).`);
+  return await response.json() as ProviderSubscriptionSnapshot;
+}
+
+async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
+  if (request.method !== "POST" || new URL(request.url).pathname !== "/create-subscription") return null;
+  if (request.headers.get("x-ca-progress-internal") !== "ca-progress-v2-web") return null;
+  const userId = clean(request.headers.get("x-ca-progress-user-id"), 128);
+  if (!userId) return null;
+  const body = await request.json().catch(() => null) as { planId?: unknown } | null;
+  const planId = clean(body?.planId, 100);
+  if (!planId) return null;
+
+  const db = database(env);
+  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,billing_cycle,recurring_price_subunits,status
+    FROM razorpay_subscriptions
+    WHERE user_id=?1 AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
+    ORDER BY created_at DESC LIMIT 21`).bind(userId).all<Row>();
+  let rows = unresolved.results ?? [];
+  if (rows.length > 20) {
+    return json({ error: "Checkout is frozen because this account has too many unresolved subscription records. Reconcile billing before retrying.", code: "subscription_inventory_requires_reconciliation" }, 409);
+  }
+
+  if (rows.length === 0) {
+    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,billing_cycle,recurring_price_subunits,status
+      FROM razorpay_subscriptions WHERE user_id=?1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
+    if (latest) rows = [latest];
+  }
+  if (rows.length === 0) return null;
+
+  const verifiedOpen: Array<{ local: Row; providerStatus: string; authorizationUrl: string | null }> = [];
+  for (const local of rows) {
+    const localStatus = clean(local.status, 32);
+    if (!KNOWN_SUBSCRIPTION_STATUSES.has(localStatus)) {
+      return json({ error: "Checkout is frozen because an existing subscription has an unknown local state. Reconcile billing before retrying.", code: "subscription_state_requires_reconciliation", localStatus }, 409);
+    }
+
+    const subscriptionId = clean(local.provider_subscription_id, 100);
+    let providerState: ProviderSubscriptionSnapshot;
+    try {
+      providerState = await providerSubscriptionSnapshot(subscriptionId, env);
+    } catch {
+      return json({ error: "Checkout is frozen because the existing Razorpay subscription could not be verified. Retry reconciliation before starting another subscription.", code: "provider_subscription_unverifiable" }, 503);
+    }
+
+    const providerStatus = clean(providerState.status, 32);
+    if (!KNOWN_SUBSCRIPTION_STATUSES.has(providerStatus)) {
+      return json({ error: "Checkout is frozen because Razorpay returned an unknown subscription state. Reconcile billing before retrying.", code: "provider_subscription_state_unknown", providerStatus }, 409);
+    }
+
+    const localTerminal = TERMINAL_SUBSCRIPTION_STATUSES.has(localStatus);
+    const providerTerminal = TERMINAL_SUBSCRIPTION_STATUSES.has(providerStatus);
+    if (localTerminal !== providerTerminal) {
+      return json({ error: "Checkout is frozen because local and Razorpay subscription states disagree. Reconcile the existing subscription before starting another.", code: "subscription_state_mismatch", localStatus, providerStatus }, 409);
+    }
+    if (!providerTerminal) {
+      verifiedOpen.push({ local, providerStatus, authorizationUrl: safeAuthorizationUrl(providerState.short_url) });
+    }
+  }
+
+  if (verifiedOpen.length === 0) return null;
+  if (verifiedOpen.length === 1) {
+    const current = verifiedOpen[0];
+    const subscriptionId = clean(current.local.provider_subscription_id, 100);
+    const samePlan = clean(current.local.plan_id, 100) === planId;
+    if (samePlan && (current.providerStatus === "created" || current.providerStatus === "authenticated")) {
+      const keyId = env.RAZORPAY_KEY_ID?.trim();
+      if (!keyId) return json({ error: "Razorpay recurring checkout is not configured." }, 503);
+      return json({
+        subscriptionId,
+        keyId,
+        billingCycle: current.local.billing_cycle,
+        recurringAmount: current.local.recurring_price_subunits,
+        policyVersionId: current.local.policy_version_id,
+        reused: true,
+        providerStatus: current.providerStatus,
+        authorizationUrl: current.authorizationUrl,
+        phase0Frozen: true,
+      });
+    }
+  }
+
+  return json({
+    error: "An existing Razorpay subscription is still unresolved. Checkout is frozen until that subscription is reconciled; no new subscription was created.",
+    code: verifiedOpen.length > 1 ? "multiple_open_subscriptions" : "existing_subscription_requires_reconciliation",
+    providerStatuses: verifiedOpen.map((item) => item.providerStatus),
+  }, 409);
+}
 
 async function releaseFailedCheckoutReservation(request: Request, response: Response, env: Env) {
   if (response.ok || request.method !== "POST" || new URL(request.url).pathname !== "/create-subscription") return;
@@ -57,19 +166,12 @@ function safeAuthorizationUrl(value: unknown) {
 }
 
 async function providerAuthorizationUrl(subscriptionId: string, env: Env) {
-  const keyId = env.RAZORPAY_KEY_ID?.trim();
-  const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
-  if (!keyId || !keySecret || !/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) return null;
-  const response = await fetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
-    method: "GET",
-    headers: {
-      authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`,
-      accept: "application/json",
-    },
-  });
-  if (!response.ok) return null;
-  const payload = await response.json().catch(() => null) as { short_url?: unknown } | null;
-  return safeAuthorizationUrl(payload?.short_url);
+  try {
+    const payload = await providerSubscriptionSnapshot(subscriptionId, env);
+    return safeAuthorizationUrl(payload.short_url);
+  } catch {
+    return null;
+  }
 }
 
 async function enrichCheckoutResponse(method: string, pathname: string, response: Response, env: Env) {
@@ -113,6 +215,8 @@ const worker = {
     const evidence = request.clone();
     const method = request.method;
     const pathname = new URL(request.url).pathname;
+    const frozen = await freezeUnsafeSubscriptionCreation(request.clone(), env);
+    if (frozen) return frozen;
     const response = await p4FinalWorker.fetch(request, env as never);
     await releaseFailedCheckoutReservation(evidence, response, env).catch(() => undefined);
     return enrichCheckoutResponse(method, pathname, response, env);
