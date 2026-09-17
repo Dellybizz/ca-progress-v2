@@ -16,10 +16,12 @@ test("billing worker exposes only a provider-owned secure authorization fallback
   assert.match(worker,/JSON\.stringify\(\{ \.\.\.payload, authorizationUrl \}\)/);
 });
 
-test("pricing retries bypass a stuck embedded QR without creating a second subscription",()=>{
+test("pricing prefers the provider-hosted authorization page before embedded checkout without creating a second subscription",()=>{
   const client=read("components/billing/pricing-client.tsx");
-  assert.match(client,/created\.reused&&authorizationUrl/);
-  assert.match(client,/window\.location\.assign\(authorizationUrl\)/);
+  assert.match(client,/if\(authorizationUrl\)\{setBusy\(null\);window\.location\.assign\(authorizationUrl\);return;\}/);
+  assert.doesNotMatch(client,/created\.reused&&authorizationUrl/);
+  assert.ok(client.indexOf("if(authorizationUrl)")<client.indexOf("new window.Razorpay"));
+  assert.equal((client.match(/\/api\/payments\/create-subscription/g)||[]).length,1);
   assert.match(client,/setFallbackUrl\(authorizationUrl\)/);
   assert.match(client,/UPI QR not loading\?/);
   assert.match(client,/Open Razorpay secure page/);
