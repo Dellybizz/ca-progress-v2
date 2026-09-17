@@ -121,6 +121,7 @@
       if('src' in anchor)anchor.src=patch.src;
       if(anchor.tagName==='VIDEO'||anchor.tagName==='AUDIO')anchor.load?.();
     }
+    if(patch.text!==undefined&&patch.text!==null&&!anchor.matches?.('img,video,audio,source,input,textarea,select'))anchor.textContent=String(patch.text);
     if(patch.href&&anchor.matches?.('a'))anchor.setAttribute('href',patch.href);
     if(patch.styles&&typeof patch.styles==='object'){
       for(const [name,value] of Object.entries(patch.styles)){
