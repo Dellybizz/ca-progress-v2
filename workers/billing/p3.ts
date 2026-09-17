@@ -84,7 +84,8 @@ async function recordCharge(db:D1Database,local:Row,payment:ProviderPayment,mapp
   return mismatch;
 }
 
-async function maybeScheduleIntro(_env:Env,_local:Row,_subscription:ProviderSubscription){
+async function maybeScheduleIntro(env:Env,local:Row,subscription:ProviderSubscription){
+  void env;void local;void subscription;
   // Phase 3: introductory pricing is a Razorpay Subscription Offer on the stable recurring plan.
   // Never PATCH a provider plan after UPI/eMandate authorisation.
   return;
