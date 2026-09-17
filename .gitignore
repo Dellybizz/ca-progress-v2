@@ -3,7 +3,12 @@ node_modules/
 
 # next/open-next/cloudflare build output
 .next/
-.open-next/
+# Keep only the assets bootstrap marker so Wrangler can validate a fresh checkout
+# before its build.command generates the real OpenNext output.
+.open-next/*
+!.open-next/assets/
+.open-next/assets/*
+!.open-next/assets/.gitkeep
 .wrangler/
 
 # local environment values
