@@ -249,7 +249,29 @@
     visual.querySelector('#veChooseMedia').onclick=async()=>{vePicker.classList.toggle('open');if(vePicker.classList.contains('open'))await veLoad()};
     veSearch.oninput=veRender;
     place.onclick=e=>{const b=e.target.closest('button[data-p]');if(!b)return;vePlacement=b.dataset.p;place.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));if(oldPlace)oldPlace.value=vePlacement};
-    veUse.onclick=async()=>{if(vePicked<0||!mediaItems[vePicked]){mediaStatus.textContent='Pick a thumbnail first.';return}try{if(oldPlace)oldPlace.value=vePlacement;await applyMedia(mediaItems[vePicked])}catch(e){mediaStatus.textContent=e?.message||String(e)}};
+    async function veApplySelected(rec){
+      if(!selected?.selector)throw new Error('Select a media-enabled section first.');
+      if(!rec?.url)throw new Error('Pick a media file first.');
+      const p=patchFor(selected.selector);
+      if(targetIsDirectMedia()){
+        p.src=rec.url;
+      }else{
+        p.insertImages??=[];
+        const item={id:'media-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),url:rec.url,type:rec.type||'',name:veLabel(rec),alt:'',placement:vePlacement||'replace'};
+        if(item.placement==='replace')p.insertImages=[item];
+        else p.insertImages.push(item);
+      }
+      dirty();
+      mediaStatus.textContent='Publishing media…';
+      await save();
+      mediaStatus.textContent='Media added and published.';
+      reloadPreview();
+    }
+    veUse.onclick=async()=>{
+      if(vePicked<0||!mediaItems[vePicked]){mediaStatus.textContent='Pick a thumbnail first.';return}
+      try{await veApplySelected(mediaItems[vePicked])}
+      catch(e){mediaStatus.textContent=e?.message||String(e)}
+    };
     window.veRefreshMedia=veLoad;
   }
 
@@ -285,6 +307,50 @@
   }
   new MutationObserver(()=>queueMicrotask(veDecorate)).observe(document.getElementById('inspectorFields'),{subtree:true,childList:true});
   setInterval(veDecorate,350);
+
+
+  function installEnhancedFramePicking(){
+    const frame=document.getElementById('previewFrame');if(!frame)return;
+    function attach(){
+      let d,w;try{d=frame.contentDocument;w=frame.contentWindow}catch(e){return}
+      if(!d||!w||w.__bdayEnhancedPicking)return;w.__bdayEnhancedPicking=true;
+      const s=d.createElement('style');
+      s.textContent='.scribble,.handwritten,.note,[id*="scribble"],[class*="scribble"],[class*="handwritten"]{pointer-events:auto!important}';
+      d.head?.appendChild(s);
+
+      const selector='a,button,img,video,audio,source,h1,h2,h3,h4,h5,h6,p,span,div,small,strong,em,li,section,article';
+      const directText=el=>[...el.childNodes].some(n=>n.nodeType===3&&n.textContent.trim());
+      const depth=el=>{let n=el,k=0;while(n&&n!==d.body){k++;n=n.parentElement}return k};
+
+      w.addEventListener('click',e=>{
+        if(window.__previewInteractMode)return;
+        const x=e.clientX,y=e.clientY;
+        let target=e.target?.closest?.(selector)||null;
+        const candidates=[];
+        for(const el of d.querySelectorAll(selector)){
+          const r=el.getBoundingClientRect();
+          if(r.width<=0||r.height<=0||x<r.left||x>r.right||y<r.top||y>r.bottom)continue;
+          const cls=(typeof el.className==='string'?el.className:'').toLowerCase();
+          const special=/scribble|handwritten|caption|note/.test(cls)||/scribble/i.test(el.id||'');
+          const text=directText(el);
+          if(!special&&!text)continue;
+          const area=Math.max(1,r.width*r.height);
+          const score=(special?1000000:0)+(text?100000:0)+(el.id?10000:0)+(depth(el)*100)-(area/1000);
+          candidates.push({el,score});
+        }
+        if(candidates.length){
+          candidates.sort((a,b)=>b.score-a.score);
+          target=candidates[0].el;
+        }
+        if(!target)return;
+        e.preventDefault();e.stopImmediatePropagation();
+        try{selectElement(target)}catch(err){}
+      },true);
+    }
+    frame.addEventListener('load',()=>setTimeout(attach,30));
+    setTimeout(attach,120);
+  }
+  installEnhancedFramePicking();
 
   renderSharedMedia();
 })();
