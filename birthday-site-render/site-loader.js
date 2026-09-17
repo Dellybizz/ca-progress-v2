@@ -211,7 +211,7 @@ fetch(base + encodeURIComponent(sourcePage), { cache: 'no-store' })
   .then(html => {
     if (sourcePage === 'control.html') html = controlRoomEnhancement(html);
     else {
-      html = injectBeforeBody(html, insertedMediaRuntime(sourcePage));
+      // Media/text/visibility patches are handled only by page-patch-runtime.js.
       if (sourcePage === 'countdown.html') html = injectBeforeBody(html, countdownLockEnhancement());
     }
     document.open();
