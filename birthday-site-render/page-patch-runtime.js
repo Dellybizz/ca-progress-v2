@@ -132,6 +132,81 @@
     inserted.forEach((item,index)=>insertOne(anchor,item,patchIndex+'-'+index));
   }
 
+  function heartMediaType(el){
+    if(!el)return 'image';
+    const tag=String(el.tagName||'').toLowerCase();
+    if(tag==='video')return 'video';
+    if(tag==='audio')return 'audio';
+    const src=String(el.currentSrc||el.getAttribute?.('src')||el.src||'').toLowerCase().split('?')[0];
+    if(/\.(mp4|webm|mov|m4v)$/.test(src))return 'video';
+    if(/\.(mp3|wav|m4a|aac|ogg|flac)$/.test(src))return 'audio';
+    return 'image';
+  }
+
+  function syncHeartCard(index,card){
+    if(PAGE!=='heart.html'||!card)return;
+    try{
+      if(typeof MEMORIES==='undefined'||!Array.isArray(MEMORIES)||!MEMORIES[index])return;
+      const media=card.querySelector('video[src],img[src],audio[src]');
+      if(!media)return;
+      const src=media.currentSrc||media.getAttribute('src')||media.src||'';
+      if(!src)return;
+      MEMORIES[index].src=src;
+      MEMORIES[index].type=heartMediaType(media);
+      card.dataset.heartMediaSrc=src;
+      card.dataset.heartMediaType=MEMORIES[index].type;
+    }catch(e){}
+  }
+
+  function syncHeartCards(){
+    if(PAGE!=='heart.html')return;
+    try{
+      [...document.querySelectorAll('#nodeLayer .node')].forEach((card,index)=>syncHeartCard(index,card));
+    }catch(e){}
+  }
+
+  function installHeartCardMediaBridge(){
+    if(PAGE!=='heart.html'||window.__heartCardMediaBridge)return;
+    window.__heartCardMediaBridge=true;
+
+    document.addEventListener('click',e=>{
+      const card=e.target?.closest?.('#nodeLayer .node');
+      if(!card)return;
+      const cards=[...document.querySelectorAll('#nodeLayer .node')];
+      const index=cards.indexOf(card);
+      if(index>=0)syncHeartCard(index,card);
+    },true);
+
+    try{
+      if(typeof openPopup==='function'){
+        const nativeOpenPopup=openPopup;
+        openPopup=function(index){
+          const cards=[...document.querySelectorAll('#nodeLayer .node')];
+          const normalized=((index%cards.length)+cards.length)%cards.length;
+          if(cards[normalized])syncHeartCard(normalized,cards[normalized]);
+
+          try{
+            const item=(typeof MEMORIES!=='undefined'&&MEMORIES[normalized])?MEMORIES[normalized]:null;
+            if(item?.type==='audio'&&item?.src){
+              popupIndex=normalized;
+              popupMedia.innerHTML='';
+              const audio=document.createElement('audio');
+              audio.src=item.src;audio.controls=true;audio.autoplay=true;audio.preload='metadata';
+              popupMedia.appendChild(audio);
+              popupTitle.textContent=item.title;
+              popupNote.textContent=item.note;
+              popupType.textContent='audio · '+String(normalized+1).padStart(2,'0')+'/'+MEMORIES.length;
+              popup.classList.add('show');
+              stage.classList.add('popup-open');
+              return;
+            }
+          }catch(e){}
+          return nativeOpenPopup(index);
+        };
+      }
+    }catch(e){}
+  }
+
   let cachedState=null;
   async function applyAll(forceRead=false){
     if(forceRead||!cachedState)cachedState=await readLive();
@@ -141,10 +216,12 @@
       const anchor=findTarget(patch.selector);
       if(anchor)applyPatch(anchor,patch,index);
     });
+    syncHeartCards();
+    installHeartCardMediaBridge();
   }
 
   const style=document.createElement('style');
-  style.textContent='.bday-added-media-group{display:grid;gap:14px;margin:16px 0}.bday-added-media{display:block;max-width:min(100%,680px);width:auto;height:auto;margin:0 auto;border-radius:18px;object-fit:cover}.bday-added-media-group>audio,.bday-added-media-group>video{width:min(100%,680px)}';
+  style.textContent='.bday-added-media-group{display:grid;gap:14px;margin:16px 0}.bday-added-media{display:block;max-width:min(100%,680px);width:auto;height:auto;margin:0 auto;border-radius:18px;object-fit:cover}.bday-added-media-group>audio,.bday-added-media-group>video{width:min(100%,680px)}.node .placeholder:has(.bday-added-media){padding:0}.node .bday-added-media{width:100%;height:100%;max-width:none;margin:0;border-radius:0;object-fit:cover}';
   document.head.appendChild(style);
 
   [40,250,800,1800].forEach((delay,index)=>setTimeout(()=>applyAll(index===0),delay));
