@@ -16,7 +16,8 @@ test("0056 provisions one expiring student-only reviewer credential",()=>{
   assert.doesNotMatch(sql,/'admin'|'owner'|'moderator'/);
   const retained=read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(retained,/0056_razorpay_reviewer_access\.sql/);
-  assert.match(retained,/BETWEEN '0012' AND '0056'/);
+  assert.match(retained,/0057_razorpay_reviewer_password_rotation\.sql/);
+  assert.match(retained,/BETWEEN '0012' AND '0057'/);
 });
 
 test("reviewer login uses normal server sessions with PBKDF2 and lockout",()=>{
