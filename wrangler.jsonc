@@ -5,10 +5,11 @@
   "minify": true,
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
   "routes": [
     {
-      "pattern": "caprogress.zanisheluxe.in",
-      "custom_domain": true
+      "pattern": "caprogress.zanisheluxe.in/*",
+      "zone_name": "zanisheluxe.in"
     }
   ],
   "keep_vars": true,
