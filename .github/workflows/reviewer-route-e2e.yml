@@ -18,7 +18,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       BASE_URL: https://ca-progress-v2.habeebaasif622.workers.dev
-      DIAG_REV: 2
+      DIAG_REV: 3
     steps:
       - uses: actions/checkout@v5
         with:
