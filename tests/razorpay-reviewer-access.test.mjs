@@ -28,7 +28,7 @@ test("reviewer login uses normal server sessions with PBKDF2 and lockout",()=>{
   assert.match(auth,/node:crypto/);
   assert.match(auth,/sha256/);
   assert.doesNotMatch(auth,/crypto\.subtle\.deriveBits\([\s\S]*PBKDF2/);
-  assert.match(auth,/constantTimeEqual/);
+  assert.match(auth,/timingSafeEqual/);
   assert.match(auth,/failed_attempts/);
   assert.match(auth,/locked_until/);
   assert.match(auth,/15 \* 60 \* 1000/);
