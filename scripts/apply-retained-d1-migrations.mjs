@@ -48,6 +48,7 @@ const migrations = [
   ["0053", "d1/migrations/0053_refinement_phase2_live_pricing_repair.sql"],
   ["0054", "d1/migrations/0054_refinement_phase2_checkout_enablement_repair.sql"],
   ["0055", "d1/migrations/0055_billing_subscription_offer_normalization.sql"],
+  ["0056", "d1/migrations/0056_razorpay_reviewer_access.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
@@ -62,7 +63,7 @@ function query(sql) {
   const start = output.indexOf("["); if (start < 0) throw new Error(`Unexpected Wrangler JSON output: ${output.slice(0,500)}`);
   return JSON.parse(output.slice(start));
 }
-const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0055' ORDER BY version;");
+const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0056' ORDER BY version;");
 const applied = new Set((ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)));
 for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }
