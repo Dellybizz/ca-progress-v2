@@ -25,7 +25,7 @@ export function AppShell({ children, area = "student", viewer, studentContext, a
         <DesktopNavigation area={area}/>
         <div className="sidebar-spacer"/>
         {studentContext ? <AttemptSwitcher context={studentContext} attempts={attempts}/> : null}
-        <Link href="/settings/profile" className="shell-identity"><Avatar name={viewer.label} src={viewer.avatarUrl} size={34}/><span><strong>{viewer.label}</strong><small>{viewer.role ?? "Account"}</small></span></Link>
+        <Link href={viewer.authenticated ? "/settings/profile" : "/login?next=%2Fdashboard"} className="shell-identity"><Avatar name={viewer.label} src={viewer.avatarUrl} size={34}/><span><strong>{viewer.authenticated ? viewer.label : "Sign in"}</strong><small>{viewer.authenticated ? (viewer.role ?? "Account") : "Sync your CA Progress account"}</small></span></Link>
         {area === "admin" ? <Link className="sidebar-switch" href="/dashboard">Student workspace</Link> : null}
       </aside>
       <div className="app-main">
