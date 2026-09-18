@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { sanitizeReturnPath } from "@/lib/auth/navigation";
-import { ReviewerAuthError, signInRazorpayReviewer } from "@/lib/auth/cloudflare";
+import { ReviewerAuthError, signInRazorpayReviewer } from "@/lib/auth/reviewer";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function sameOrigin(request: Request) {
   const origin = request.headers.get("origin");

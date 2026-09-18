@@ -21,7 +21,8 @@ test("0056 provisions one expiring student-only reviewer credential",()=>{
 });
 
 test("reviewer login uses normal server sessions with PBKDF2 and lockout",()=>{
-  const auth=read("lib/auth/cloudflare.ts");
+  const auth=read("lib/auth/reviewer.ts");
+  const shared=read("lib/auth/cloudflare.ts");
   assert.match(auth,/signInRazorpayReviewer/);
   assert.match(auth,/pbkdf2Sync/);
   assert.match(auth,/node:crypto/);
@@ -31,7 +32,8 @@ test("reviewer login uses normal server sessions with PBKDF2 and lockout",()=>{
   assert.match(auth,/failed_attempts/);
   assert.match(auth,/locked_until/);
   assert.match(auth,/15 \* 60 \* 1000/);
-  assert.match(auth,/issueSession\(\{ applicationUserId: row\.application_user_id, identityId: null/);
+  assert.match(auth,/issueRazorpayReviewerSession\(row\.application_user_id/);
+  assert.match(shared,/issueRazorpayReviewerSession/);
 });
 
 test("reviewer route is POST-only and same-origin",()=>{
@@ -40,6 +42,7 @@ test("reviewer route is POST-only and same-origin",()=>{
   assert.match(route,/sameOrigin/);
   assert.match(route,/reviewer_auth_failed/);
   assert.match(route,/signInRazorpayReviewer/);
+  assert.match(route,/runtime = "nodejs"/);
   assert.doesNotMatch(route,/export async function GET/);
 });
 
