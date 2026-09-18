@@ -42,7 +42,7 @@ function reviewerPasswordHash(password: string, salt: string, iterations: number
 }
 
 export class ReviewerAuthError extends Error {
-  constructor(public readonly code: "store" | "crypto" | "credentials" | "session") {
+  constructor(public readonly code: "store" | "crypto_decode" | "crypto_derive" | "crypto_compare" | "credentials" | "session") {
     super("Reviewer authentication failed.");
   }
 }
@@ -64,13 +64,25 @@ export async function signInRazorpayReviewer(input: { username: string; password
   const dummyHash = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
   const salt = row?.password_salt || dummySalt;
   const iterations = row?.password_iterations || 310000;
+  let expected: Buffer;
+  try {
+    expected = Buffer.from(row?.password_hash || dummyHash, "base64url");
+  } catch {
+    throw new ReviewerAuthError("crypto_decode");
+  }
+
+  let actual: Buffer;
+  try {
+    actual = reviewerPasswordHash(input.password, salt, iterations);
+  } catch {
+    throw new ReviewerAuthError("crypto_derive");
+  }
+
   let passwordValid = false;
   try {
-    const expected = Buffer.from(row?.password_hash || dummyHash, "base64url");
-    const actual = reviewerPasswordHash(input.password, salt, iterations);
     passwordValid = actual.length === expected.length && timingSafeEqual(actual, expected);
   } catch {
-    throw new ReviewerAuthError("crypto");
+    throw new ReviewerAuthError("crypto_compare");
   }
 
   const now = Date.now();
