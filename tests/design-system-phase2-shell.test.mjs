@@ -44,6 +44,14 @@ test("Phase 2 desktop navigation keeps the primary study flow visible and every 
   assert.match(desktopNav, /aria-controls=\{regionId\}/);
 });
 
+test("guest shell exposes sign in instead of account-only controls", () => {
+  const topbar = read("components/shell/topbar-controls.tsx");
+  assert.match(shell, /viewer\.authenticated \? "\/settings\/profile" : "\/login\?next=%2Fdashboard"/);
+  assert.match(topbar, /viewer\.authenticated \? <Popover/);
+  assert.match(topbar, /<span>Sign in<\/span>/);
+  assert.match(topbar, /loginPathFor\(pathname \|\| "\/planner\/today"\)/);
+});
+
 test("Phase 2 student mobile navigation exposes the core flow and keeps secondary pages under More", () => {
   for (const label of ["Home", "Today", "Study", "Progress", "More"]) {
     assert.ok(mobileNav.includes(`<span>${label}</span>`), `Missing primary mobile item: ${label}`);
