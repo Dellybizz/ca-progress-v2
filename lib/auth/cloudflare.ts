@@ -375,10 +375,6 @@ async function issueSession(input: {
   return sessionId;
 }
 
-export async function issueRazorpayReviewerSession(applicationUserId: string, remember: boolean) {
-  return issueSession({ applicationUserId, identityId: null, remember });
-}
-
 export async function exchangeCloudflareOAuthCode(code: string, state: string): Promise<CloudflareOAuthCallbackResult> {
   if (!code.trim()) throw new Error("OAuth code is required.");
   const transaction = await readOAuthTransaction(state);
