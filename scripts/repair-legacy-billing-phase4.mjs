@@ -74,32 +74,21 @@ async function fetchSubscription(id,keyId,keySecret){
   };
 }
 
-async function fetchOffer(id,keyId,keySecret){
-  const data=await rp("offers/"+encodeURIComponent(id),keyId,keySecret,{method:"GET"});
-  return {
-    raw:data,
-    id:text(data?.id),
-    entity:text(data?.entity)||null,
-    active:data?.active!==false,
-    discount_type:text(data?.discount_type)||null,
-    discount_value:data?.discount_value==null?null:num(data.discount_value),
-    payment_method:text(data?.payment_method)||null,
-    payment_method_type:text(data?.payment_method_type)||null,
-    starts_at:data?.starts_at??null,
-    ends_at:data?.ends_at??null,
-  };
-}
-
-export function assessOffer(policy,offer){
+export function assessOfferBinding(policy,offerId,attestation){
   const issues=[];
-  if(!offer?.id||!/^offer_[A-Za-z0-9]+$/.test(offer.id))issues.push("invalid_offer_id");
-  if(offer?.active===false)issues.push("offer_disabled");
+  if(!/^offer_[A-Za-z0-9]+$/.test(text(offerId)))issues.push("invalid_offer_id");
   const expectedDiscount=num(policy?.recurring_price_subunits)-num(policy?.intro_price_subunits);
-  if(expectedDiscount<=0)issues.push("invalid_intro_discount");
-  if(offer?.discount_type&&offer.discount_type!=="flat")issues.push("offer_not_flat_discount");
-  if(offer?.discount_value!=null&&num(offer.discount_value)!==expectedDiscount)issues.push("offer_discount_value_mismatch");
-  if(offer?.payment_method&&offer.payment_method!=="upi")issues.push("offer_payment_method_not_upi");
-  return {ready:issues.length===0,issues,expected_discount_subunits:expectedDiscount};
+  if(num(policy?.recurring_price_subunits)!==5000)issues.push("unexpected_basic_recurring_price");
+  if(num(policy?.intro_price_subunits)!==2500)issues.push("unexpected_basic_intro_price");
+  if(num(policy?.intro_billing_cycles)!==1)issues.push("unexpected_intro_cycle_count");
+  if(expectedDiscount!==2500)issues.push("unexpected_intro_discount");
+  if(text(attestation)!=="DASHBOARD_CREATED_BY_ACCOUNT_OWNER")issues.push("dashboard_offer_attestation_missing");
+  return {
+    ready:issues.length===0,
+    issues,
+    expected_discount_subunits:expectedDiscount,
+    verification_mode:"dashboard_created_id_provider_validated_on_subscription_creation",
+  };
 }
 
 export function assessLegacy(local,provider){
@@ -147,20 +136,17 @@ function sanitizedSubscription(local,provider,assessment){
   };
 }
 
-async function bindPolicyOffer(ctx,policy,offer){
+async function bindPolicyOffer(ctx,policy,offerId,offerAssessment){
   const snapshot=JSON.stringify({
-    id_fingerprint:fp(offer.id),
-    entity:offer.entity,
-    active:offer.active,
-    discount_type:offer.discount_type,
-    discount_value:offer.discount_value,
-    payment_method:offer.payment_method,
-    payment_method_type:offer.payment_method_type,
-    verified_at:new Date().toISOString(),
+    id_fingerprint:fp(offerId),
+    expected_discount_subunits:offerAssessment.expected_discount_subunits,
+    verification_mode:offerAssessment.verification_mode,
+    dashboard_attested:true,
+    bound_at:new Date().toISOString(),
   });
   const result=await d1(ctx.accountId,ctx.apiToken,ctx.databaseId,
     "UPDATE plan_policy_offer_terms SET provider_offer_id=?1,provider_offer_verified_at=?2,provider_offer_snapshot_json=?3,updated_at=?2 WHERE policy_version_id=?4 AND (provider_offer_id IS NULL OR provider_offer_id=?1)",
-    [offer.id,new Date().toISOString(),snapshot,policy.policy_version_id]);
+    [offerId,new Date().toISOString(),snapshot,policy.policy_version_id]);
   if(num(result?.meta?.changes)!==1)throw new Error("Policy offer binding changed an unexpected number of rows.");
 }
 
@@ -219,13 +205,7 @@ async function main(){
   const configuredOffer=text(policy.provider_offer_id);
   if(requestedOffer&&configuredOffer&&requestedOffer!==configuredOffer)throw new Error("Requested Offer ID conflicts with the policy's existing Offer binding.");
   const offerId=requestedOffer||configuredOffer;
-  let offer=null,offerAssessment={ready:false,issues:["provider_offer_missing"],expected_discount_subunits:num(policy.recurring_price_subunits)-num(policy.intro_price_subunits)};
-  if(offerId){
-    if(!/^offer_[A-Za-z0-9]+$/.test(offerId))throw new Error("A valid Razorpay offer_ identifier is required.");
-    offer=await fetchOffer(offerId,ctx.keyId,ctx.keySecret);
-    if(offer.id!==offerId)throw new Error("Razorpay returned a different Offer identifier.");
-    offerAssessment=assessOffer(policy,offer);
-  }
+  const offerAssessment=assessOfferBinding(policy,offerId,process.env.CA_BILLING_PHASE4_OFFER_ATTESTATION);
 
   const legacyRows=(await d1(ctx.accountId,ctx.apiToken,ctx.databaseId,legacySql)).results||[];
   const repairedCount=num((await d1(ctx.accountId,ctx.apiToken,ctx.databaseId,repairedSql)).results?.[0]?.repaired_count);
@@ -255,7 +235,7 @@ async function main(){
     }else{
       if(result!=="repair_ready")throw new Error("Phase 4 repair is blocked: "+blockedReason+".");
       if(!configuredOffer){
-        await bindPolicyOffer(ctx,policy,offer);
+        await bindPolicyOffer(ctx,policy,offerId,offerAssessment);
         mutations.offer_bound=true;
       }
       for(const item of inspected){
@@ -284,11 +264,10 @@ async function main(){
       intro_billing_cycles:num(policy.intro_billing_cycles),
       configured_offer_fingerprint:configuredOffer?fp(configuredOffer):null,
     },
-    offer:offer?{
-      id_fingerprint:fp(offer.id),active:offer.active,discount_type:offer.discount_type,
-      discount_value:offer.discount_value,payment_method:offer.payment_method,
-      payment_method_type:offer.payment_method_type,assessment:offerAssessment,
-    }:{assessment:offerAssessment},
+    offer:{
+      id_fingerprint:offerId?fp(offerId):null,
+      assessment:offerAssessment,
+    },
     legacy_subscription_count:legacyRows.length,
     previously_repaired_legacy_count:repairedCount,
     subscriptions:inspected.map(item=>item.sanitized),

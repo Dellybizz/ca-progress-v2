@@ -1,4 +1,4 @@
-name: Phase 4 One-Shot Offer Verification
+name: Phase 4 One-Shot Offer Verification v2
 
 on:
   push:
@@ -21,6 +21,7 @@ jobs:
       RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
       CA_BILLING_PHASE4_MODE: audit
       CA_BILLING_PHASE4_PROVIDER_OFFER_ID: offer_TdKqQY3qURnoHt
+      CA_BILLING_PHASE4_OFFER_ATTESTATION: DASHBOARD_CREATED_BY_ACCOUNT_OWNER
       CA_BILLING_PHASE4_EVIDENCE_PATH: deployment-evidence/billing-subscription-phase4-offer-verify.json
     steps:
       - uses: actions/checkout@v5
