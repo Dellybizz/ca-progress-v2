@@ -68,6 +68,7 @@ async function ensurePlan(env:Env,terms:Commercial,kind:"recurring"|"intro",amou
 }
 
 function requireIntroOffer(terms:Commercial){
+  // Razorpay validates dashboard-created Subscription Offers when the subscription is created.
   if(terms.introPrice===null)return null;
   const offerId=String(terms.introProviderOfferId??"").trim();
   if(!/^offer_[A-Za-z0-9]+$/.test(offerId))throw new Error("Introductory Razorpay Subscription Offer is not configured.");
