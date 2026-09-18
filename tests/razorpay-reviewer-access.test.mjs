@@ -23,8 +23,10 @@ test("0056 provisions one expiring student-only reviewer credential",()=>{
 test("reviewer login uses normal server sessions with PBKDF2 and lockout",()=>{
   const auth=read("lib/auth/cloudflare.ts");
   assert.match(auth,/signInRazorpayReviewer/);
-  assert.match(auth,/PBKDF2/);
-  assert.match(auth,/SHA-256/);
+  assert.match(auth,/pbkdf2Sync/);
+  assert.match(auth,/node:crypto/);
+  assert.match(auth,/sha256/);
+  assert.doesNotMatch(auth,/crypto\.subtle\.deriveBits\([\s\S]*PBKDF2/);
   assert.match(auth,/constantTimeEqual/);
   assert.match(auth,/failed_attempts/);
   assert.match(auth,/locked_until/);
