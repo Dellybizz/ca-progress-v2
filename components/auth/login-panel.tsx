@@ -63,6 +63,15 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
             <span><strong>Remember this device</strong><small>Keep me signed in on this browser. Turn this off on shared devices.</small></span>
           </label>
 
+          <div className="auth-divider"><span>reviewer access</span></div>
+          <form method="post" action="/auth/reviewer" className="auth-reviewer-form">
+            <input type="hidden" name="next" value={next} />
+            <input type="hidden" name="remember" value={remember ? "true" : "false"} />
+            <label><span>Reviewer username</span><input name="username" type="text" autoComplete="username" required /></label>
+            <label><span>Reviewer password</span><input name="password" type="password" autoComplete="current-password" required /></label>
+            <Button type="submit" size="lg" variant="secondary">Reviewer sign in</Button>
+          </form>
+
           <div className="auth-divider"><span>or continue without an account</span></div>
           <Button size="lg" variant="ghost" isLoading={loading === "guest"} onClick={() => void continueAsGuest()}>Continue as Guest <Icon name="arrow" size={16} /></Button>
           <p className="auth-terms">Guest mode stays on this browser and does not create synced private records. You can sign in later when you want cross-device access.</p>
