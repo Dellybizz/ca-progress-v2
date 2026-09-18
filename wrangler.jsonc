@@ -5,6 +5,12 @@
   "minify": true,
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "caprogress.zanisheluxe.in",
+      "custom_domain": true
+    }
+  ],
   "keep_vars": true,
   "build": { "command": "npm run cf:ensure-build" },
   "assets": { "binding": "ASSETS", "directory": ".open-next/assets" },
