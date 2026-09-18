@@ -22,7 +22,7 @@ test("Phase 3 creates intro subscriptions on the stable recurring plan with an O
   const create=worker.slice(start,end);
   assert.match(create,/ensurePlan\(env,terms,"recurring",terms\.recurringPrice\)/);
   assert.doesNotMatch(create,/ensurePlan\(env,terms,"intro"/);
-  assert.match(create,/requireIntroOffer\\(terms\\)/);
+  assert.match(create,/requireIntroOffer\(terms\)/);
   assert.match(create,/plan_id:recurring\.providerPlanId/);
   assert.match(create,/payload\.offer_id=introOfferId/);
   assert.match(create,/provider_plan_id,recurring_provider_plan_id/);
