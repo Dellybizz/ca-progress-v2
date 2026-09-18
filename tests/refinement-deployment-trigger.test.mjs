@@ -23,7 +23,10 @@ test("PR deployment checks out the exact branch head and never the synthetic mer
   assert.doesNotMatch(workflow, /refs\/pull\/.*\/merge/);
 });
 
-test("duplicate push and PR events cannot run production deployment concurrently", () => {
-  assert.match(workflow, /group: cloudflare-v2-deploy-\$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+test("newer commits cancel older branch deploys and stale runs cannot roll back production", () => {
+  assert.match(workflow, /group: cloudflare-v2-deploy-\$\{\{ github\.event\.pull_request\.head\.ref \|\| github\.ref_name \}\}/);
   assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(workflow, /Abort stale deployment run/);
+  assert.match(workflow, /remote_head/);
+  assert.match(workflow, /Skipping stale .* rollback/);
 });
