@@ -12,7 +12,7 @@ test("Phase 3 adds policy-level Razorpay Subscription Offer binding",()=>{
   assert.match(sql,/VALUES \('0055'/);
   const retained=read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(retained,/0055_billing_subscription_offer_normalization\.sql/);
-  assert.match(retained,/BETWEEN '0012' AND '0057'/);
+  assert.match(retained,/BETWEEN '0012' AND '0058'/);
 });
 
 test("Phase 3 creates intro subscriptions on the stable recurring plan with an Offer",()=>{
