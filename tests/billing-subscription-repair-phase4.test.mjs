@@ -46,5 +46,6 @@ test("Phase 4 cancellation is bounded to the provider cancel endpoint and local 
   assert.match(script,/cancel_at_cycle_end:0/);
   assert.match(script,/UPDATE razorpay_subscriptions SET status='cancelled'/);
   assert.match(script,/repair\.legacy_intro\.cancelled/);
-  assert.match(script,/provider_offer_not_ready/);\n  assert.doesNotMatch(script,/offers\\/"\\+encodeURIComponent/);
+  assert.match(script,/provider_offer_not_ready/);
+  assert.doesNotMatch(script,/offers\\/"\\+encodeURIComponent/);
 });
