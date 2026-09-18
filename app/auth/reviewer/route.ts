@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { sanitizeReturnPath } from "@/lib/auth/navigation";
-import { signInRazorpayReviewer } from "@/lib/auth/cloudflare";
+import { ReviewerAuthError, signInRazorpayReviewer } from "@/lib/auth/cloudflare";
 
 export const dynamic = "force-dynamic";
 
