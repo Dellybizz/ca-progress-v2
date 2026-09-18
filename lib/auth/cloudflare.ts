@@ -345,6 +345,40 @@ function isoAfter(seconds: number) {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
+type ReviewerCredentialRow = {
+  credential_id: string;
+  application_user_id: string;
+  username_normalized: string;
+  password_salt: string;
+  password_hash: string;
+  password_iterations: number;
+  active: number;
+  expires_at: string;
+  failed_attempts: number;
+  locked_until: string | null;
+};
+
+function normalizeReviewerUsername(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function constantTimeEqual(left: Uint8Array, right: Uint8Array) {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) diff |= left[index] ^ right[index];
+  return diff === 0;
+}
+
+async function reviewerPasswordHash(password: string, salt: string, iterations: number) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: base64UrlToBytes(salt), iterations },
+    key,
+    256,
+  );
+  return new Uint8Array(bits);
+}
+
 async function issueSession(input: {
   applicationUserId: string;
   identityId: string | null;
@@ -373,6 +407,42 @@ async function issueSession(input: {
     maxAge: Math.max(1, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)),
   });
   return sessionId;
+}
+
+export async function signInRazorpayReviewer(input: { username: string; password: string; remember: boolean }) {
+  const username = normalizeReviewerUsername(input.username);
+  const db = getDb();
+  const row = await db.prepare(
+    "SELECT credential_id,application_user_id,username_normalized,password_salt,password_hash,password_iterations,active,expires_at,failed_attempts,locked_until FROM reviewer_credentials WHERE username_normalized=?1 LIMIT 1",
+  ).bind(username).first<ReviewerCredentialRow>();
+
+  const dummySalt = "AAAAAAAAAAAAAAAAAAAAAA";
+  const dummyHash = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+  const salt = row?.password_salt || dummySalt;
+  const iterations = row?.password_iterations || 310000;
+  const expected = base64UrlToBytes(row?.password_hash || dummyHash);
+  const actual = await reviewerPasswordHash(input.password, salt, iterations);
+  const passwordValid = constantTimeEqual(actual, expected);
+  const now = Date.now();
+  const locked = Boolean(row?.locked_until && Date.parse(row.locked_until) > now);
+  const expired = !row || row.active !== 1 || Date.parse(row.expires_at) <= now;
+
+  if (!row || !passwordValid || locked || expired) {
+    if (row) {
+      const nextAttempts = row.failed_attempts + 1;
+      const lockUntil = nextAttempts >= 5 ? new Date(now + 15 * 60 * 1000).toISOString() : null;
+      await db.prepare(
+        "UPDATE reviewer_credentials SET failed_attempts=?1,locked_until=COALESCE(?2,locked_until),updated_at=CURRENT_TIMESTAMP WHERE credential_id=?3",
+      ).bind(nextAttempts, lockUntil, row.credential_id).run();
+    }
+    throw new Error("Reviewer credentials could not be verified.");
+  }
+
+  await db.prepare(
+    "UPDATE reviewer_credentials SET failed_attempts=0,locked_until=NULL,last_login_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE credential_id=?1",
+  ).bind(row.credential_id).run();
+  await issueSession({ applicationUserId: row.application_user_id, identityId: null, remember: input.remember });
+  return { applicationUserId: row.application_user_id };
 }
 
 export async function exchangeCloudflareOAuthCode(code: string, state: string): Promise<CloudflareOAuthCallbackResult> {
