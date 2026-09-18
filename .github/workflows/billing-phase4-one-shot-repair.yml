@@ -1,0 +1,63 @@
+name: Phase 4 One-Shot Legacy Repair
+
+on:
+  push:
+    branches: [hotfix/dark-mode-ae0cb36d]
+    paths:
+      - .github/workflows/billing-phase4-one-shot-repair.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: billing-phase4-one-shot-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      CA_BILLING_PHASE4_MODE: repair
+      CA_BILLING_PHASE4_PROVIDER_OFFER_ID: offer_TdKqQY3qURnoHt
+      CA_BILLING_PHASE4_OFFER_ATTESTATION: DASHBOARD_CREATED_BY_ACCOUNT_OWNER
+      CA_BILLING_PHASE4_CONFIRMATION: REPAIR LEGACY INTRO SUBSCRIPTIONS
+      CA_BILLING_PHASE4_EVIDENCE_PATH: deployment-evidence/billing-subscription-phase4-repair-executed.json
+    steps:
+      - name: Check out exact repair SHA
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Verify bounded repair contracts
+        run: node --test tests/billing-subscription-repair-phase4.test.mjs
+
+      - name: Execute bounded legacy repair
+        run: node scripts/repair-legacy-billing-phase4.mjs
+
+      - name: Verify post-repair state
+        env:
+          CA_BILLING_PHASE4_MODE: audit
+          CA_BILLING_PHASE4_EVIDENCE_PATH: deployment-evidence/billing-subscription-phase4-post-repair.json
+        run: node scripts/repair-legacy-billing-phase4.mjs
+
+      - name: Upload repair evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: billing-phase4-repair-${{ github.sha }}
+          path: |
+            deployment-evidence/billing-subscription-phase4-repair-executed.json
+            deployment-evidence/billing-subscription-phase4-post-repair.json
+          if-no-files-found: error
+          retention-days: 30
