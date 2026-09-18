@@ -22,5 +22,5 @@ test("0054 enables checkout only for the exact monthly plans repaired by 0053",(
 test("retained production migration runner includes 0054",()=>{
   const runner=read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(runner,/0054_refinement_phase2_checkout_enablement_repair\.sql/);
-  assert.match(runner,/BETWEEN '0012' AND '0056'/);
+  assert.match(runner,/BETWEEN '0012' AND '0057'/);
 });

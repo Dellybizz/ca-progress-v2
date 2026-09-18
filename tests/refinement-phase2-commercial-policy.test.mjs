@@ -67,5 +67,5 @@ test("P2 production repair replaces only legacy zero-priced monthly policy versi
   assert.match(sql,/VALUES \('0053'/);
   const retained=read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(retained,/0053_refinement_phase2_live_pricing_repair\.sql/);
-  assert.match(retained,/BETWEEN '0012' AND '0056'/);
+  assert.match(retained,/BETWEEN '0012' AND '0057'/);
 });
