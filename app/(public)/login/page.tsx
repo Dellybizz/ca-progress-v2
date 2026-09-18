@@ -8,6 +8,7 @@ const errors: Record<string, string> = {
   linkedin_unavailable: "LinkedIn sign-in is not configured for this staging project yet.",
   missing_auth_code: "The sign-in callback was missing its authorization code. Please try again.",
   auth_callback_failed: "We could not complete that sign-in. Please try again.",
+  reviewer_auth_failed: "Reviewer credentials could not be verified.",
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
