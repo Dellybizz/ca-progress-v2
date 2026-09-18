@@ -29,8 +29,9 @@ export async function POST(request: Request) {
   try {
     await signInRazorpayReviewer({ username, password, remember });
     return NextResponse.redirect(new URL(next, request.url), 303);
-  } catch {
+  } catch (error) {
     failure.searchParams.set("next", next);
+    if (error instanceof ReviewerAuthError) failure.searchParams.set("reason", error.code);
     return NextResponse.redirect(failure, 303);
   }
 }
