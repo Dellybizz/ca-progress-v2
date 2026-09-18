@@ -1,0 +1,31 @@
+name: Reviewer Live Diagnostic
+
+on:
+  push:
+    branches: [hotfix/dark-mode-ae0cb36d]
+    paths:
+      - .github/workflows/reviewer-live-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Inspect live reviewer state
+        run: |
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --command "SELECT rc.username_normalized,rc.active,rc.expires_at,rc.failed_attempts,rc.locked_until,rc.last_login_at,u.role,u.account_state,p.onboarding_completed_at,length(rc.password_salt) AS salt_length,length(rc.password_hash) AS hash_length,rc.password_iterations FROM reviewer_credentials rc JOIN app_users u ON u.user_id=rc.application_user_id LEFT JOIN profiles p ON p.user_id=rc.application_user_id WHERE rc.username_normalized='razorpay-review'; SELECT version,description FROM _ca_schema_migrations WHERE version IN ('0056','0057') ORDER BY version;" > reviewer-live.json
+          cat reviewer-live.json
