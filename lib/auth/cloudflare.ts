@@ -458,7 +458,11 @@ export async function signInRazorpayReviewer(input: { username: string; password
   await db.prepare(
     "UPDATE reviewer_credentials SET failed_attempts=0,locked_until=NULL,last_login_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE credential_id=?1",
   ).bind(row.credential_id).run();
-  try {\n    await issueSession({ applicationUserId: row.application_user_id, identityId: null, remember: input.remember });\n  } catch {\n    throw new ReviewerAuthError("session");\n  }
+  try {
+    await issueSession({ applicationUserId: row.application_user_id, identityId: null, remember: input.remember });
+  } catch {
+    throw new ReviewerAuthError("session");
+  }
   return { applicationUserId: row.application_user_id };
 }
 
