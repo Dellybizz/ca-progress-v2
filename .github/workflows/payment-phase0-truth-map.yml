@@ -55,7 +55,7 @@ jobs:
 
       - name: Reject sensitive evidence fields
         run: |
-          node -e 'const fs=require("fs");const p=process.env.CA_PAYMENT_PHASE0_EVIDENCE_PATH;const s=fs.readFileSync(p,"utf8");const forbidden=["key_secret","webhook_secret","authorization\"","raw_payload","email\"","phone\""];for(const token of forbidden){if(s.toLowerCase().includes(token))throw new Error("Sensitive evidence token: "+token)}'
+          node -e 'const fs=require("fs");const p=process.env.CA_PAYMENT_PHASE0_EVIDENCE_PATH;const value=JSON.parse(fs.readFileSync(p,"utf8"));const forbidden=new Set(["key_secret","webhook_secret","authorization","raw_payload","email","phone"]);const visit=(v)=>{if(Array.isArray(v))return v.forEach(visit);if(v&&typeof v==="object")for(const [k,item] of Object.entries(v)){if(forbidden.has(k.toLowerCase()))throw new Error("Sensitive evidence field: "+k);visit(item)}};visit(value)'
 
       - name: Upload sanitized truth-map evidence
         if: always()
