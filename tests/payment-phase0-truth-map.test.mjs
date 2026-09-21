@@ -4,6 +4,7 @@ import test from "node:test";
 import { SQL, commercialRisks, databaseConfig, safeMapping, safePolicy } from "../scripts/audit-payment-phase0.mjs";
 
 const source=readFileSync(new URL("../scripts/audit-payment-phase0.mjs",import.meta.url),"utf8");
+const workflow=readFileSync(new URL("../.github/workflows/payment-phase0-truth-map.yml",import.meta.url),"utf8");
 
 test("Phase 0 D1 inventory is structurally read only",()=>{
   for(const [name,sql] of Object.entries(SQL)){
@@ -45,4 +46,10 @@ test("Phase 0 serializers expose terms but not raw identifiers",()=>{
 test("Phase 0 resolves the production D1 target without exposing it",()=>{
   assert.deepEqual(databaseConfig('{"database_name":"ca-progress-v2","database_id":"abc"}'),{name:"ca-progress-v2",id:"abc"});
   assert.throws(()=>databaseConfig("{}"),/Could not resolve/);
+});
+
+test("Phase 0 evidence scan rejects sensitive keys without flagging negative safety assertions",()=>{
+  assert.match(workflow,/JSON\.parse\(fs\.readFileSync/);
+  assert.match(workflow,/forbidden\.has\(k\.toLowerCase\(\)\)/);
+  assert.doesNotMatch(workflow,/s\.toLowerCase\(\)\.includes\(token\)/);
 });
