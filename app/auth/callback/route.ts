@@ -19,6 +19,11 @@ export async function GET(request: NextRequest) {
     if (!cloudflareResult) await applyRememberDevicePreference(requestedRemember);
     await ensureUserBootstrap();
     const destination = await resolvePostAuthDestination(next);
+    if (cloudflareResult?.clientKind === "mobile") {
+      const deepLink = new URL("ca-progress://auth/complete");
+      deepLink.searchParams.set("next", destination);
+      return NextResponse.redirect(deepLink);
+    }
     return NextResponse.redirect(new URL(destination, request.nextUrl.origin));
   } catch {
     return NextResponse.redirect(new URL(`/login?error=auth_callback_failed&next=${encodeURIComponent(requestedNext)}`, request.nextUrl.origin));

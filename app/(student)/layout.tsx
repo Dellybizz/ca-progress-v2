@@ -5,11 +5,12 @@ import { getStudentContext } from "@/lib/academic/student-context";
 import { OfflineRuntime } from "@/components/offline/offline-runtime";
 import { loadAttemptOptions } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
+import { SessionRuntime } from "@/components/auth/session-runtime";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const context = await getStudentContext();
   const attempts = context.mode === "ready" ? await loadAttemptOptions() : [];
   const guestSession = context.userId ? await isCurrentGuestTestUser(context.userId) : context.mode === "guest";
   const viewer = { authenticated: !guestSession && context.mode !== "guest", label: context.displayName, initial: context.displayName.charAt(0).toUpperCase() || "S", role: context.role };
-  return <StudentContextProvider value={context}><AppShell area="student" viewer={viewer} studentContext={context} attempts={attempts}><TimezoneSync/><OfflineRuntime/>{children}</AppShell></StudentContextProvider>;
+  return <StudentContextProvider value={context}><AppShell area="student" viewer={viewer} studentContext={context} attempts={attempts}><SessionRuntime authenticated={viewer.authenticated}/><TimezoneSync/><OfflineRuntime/>{children}</AppShell></StudentContextProvider>;
 }
