@@ -24,6 +24,14 @@ test("Phase 3 sessions are hashed, rotating, device-aware and remotely revocable
   assert.match(migration, /append-only/);
 });
 
+test("Phase 3 remains compatible until the retained mobile session migration is applied", () => {
+  const auth = read("lib/auth/cloudflare.ts");
+  assert.match(auth, /isMobileSessionSchemaUnavailable/);
+  assert.match(auth, /INSERT INTO sessions\(session_id,application_user_id,auth_identity_id,token_hash,remember_device,expires_at,absolute_expires_at,rotated_from_session_id\) VALUES/);
+  assert.match(auth, /SELECT session_id,last_seen_at,expires_at,created_at FROM sessions/);
+  assert.match(auth, /writeOptionalSessionEvent/);
+});
+
 test("Phase 3 exposes safe automatic rotation and device controls through v1", () => {
   const route = read("app/api/v1/session/route.ts");
   const runtime = read("components/auth/session-runtime.tsx");
