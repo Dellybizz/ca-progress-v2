@@ -135,7 +135,7 @@ export function NoteEditor({
     setBusy(true);
     setError(null);
     try {
-      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/notes", {
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/v1/notes", {
           id: note?.id ?? null,
           title,
           bodyHtml: editorRef.current?.innerHTML ?? "",

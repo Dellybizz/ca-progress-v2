@@ -66,7 +66,7 @@ export function StudyBuddyWorkspace({ ownerUserId, initialDashboard }: { ownerUs
   const [buddyId, setBuddyId] = useState("");
 
   async function refresh() {
-    const response = await fetch("/api/study-buddy", { cache: "no-store" });
+    const response = await fetch("/api/v1/study-buddy", { cache: "no-store" });
     const payload = await response.json() as { ok?: boolean; dashboard?: StudyBuddyDashboard; error?: string };
     if (!response.ok || !payload.dashboard) throw new Error(payload.error || "Study Buddy could not be refreshed.");
     setDashboard(payload.dashboard);
@@ -75,7 +75,7 @@ export function StudyBuddyWorkspace({ ownerUserId, initialDashboard }: { ownerUs
   async function mutate(payload: Record<string, unknown>, success: string) {
     setBusy(true); setError(""); setNotice("");
     try {
-      const response = await fetch("/api/study-buddy", {
+      const response = await fetch("/api/v1/study-buddy", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),

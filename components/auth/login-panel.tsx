@@ -20,7 +20,7 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
 
   async function continueAsGuest() {
     setLoading("guest");
-    const response = await fetch("/api/offline/context", { cache: "no-store", credentials: "same-origin" });
+    const response = await fetch("/api/v1/offline/context", { cache: "no-store", credentials: "same-origin" });
     const context = response.ok ? await response.json() as { guestId?: string } : null;
     getOrCreateGuestIdentity(context?.guestId ?? null);
     router.push(next);

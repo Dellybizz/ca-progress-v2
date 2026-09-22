@@ -13,7 +13,7 @@ const actionIcons: Record<DashboardQuickAction["key"], IconName> = {
 };
 
 function recordDashboardEvent(eventType: "dashboard_view" | "quick_action", actionKey?: DashboardQuickAction["key"]) {
-  void fetch("/api/dashboard/events", {
+  void fetch("/api/v1/dashboard/events", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ eventType, actionKey }),
@@ -57,7 +57,7 @@ export function DashboardLeaderboard() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/leaderboard?category=overall", { cache: "no-store", signal: controller.signal })
+    fetch("/api/v1/leaderboard?category=overall", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as { ok?: boolean; leaderboard?: { entries?: LeaderboardEntry[] } };
         if (!response.ok || !payload.ok) throw new Error("Leaderboard unavailable");

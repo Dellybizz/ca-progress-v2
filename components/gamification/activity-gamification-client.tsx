@@ -82,7 +82,7 @@ export function ActivityGamificationClient({ initialReferralCode = "" }: { initi
   useEffect(() => {
     let active = true;
 
-    void fetch("/api/gamification", { cache: "no-store" })
+    void fetch("/api/v1/gamification", { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json() as SummaryResponse;
         if (!response.ok || !payload.ok || !payload.summary) throw new Error(payload.error || "Gamification summary could not be loaded.");
@@ -91,7 +91,7 @@ export function ActivityGamificationClient({ initialReferralCode = "" }: { initi
       .catch(() => { if (active) setSummary(null); })
       .finally(() => { if (active) setSummaryPending(false); });
 
-    void fetch("/api/gamification/phase13", { cache: "no-store" })
+    void fetch("/api/v1/gamification/phase13", { cache: "no-store" })
       .then(async (response) => {
         const payload = await response.json() as Phase13Response;
         if (!response.ok || !payload.ok || !payload.model) throw new Error(payload.error || "Leaderboard data could not be loaded.");

@@ -21,7 +21,7 @@ test("API-created subscriptions authenticate through Razorpay Standard Checkout 
   assert.match(client,/subscription_id:created\.subscriptionId/);
   assert.match(client,/new window\.Razorpay\(/);
   assert.doesNotMatch(client,/window\.location\.assign\(authorizationUrl\)/);
-  assert.equal((client.match(/\/api\/payments\/create-subscription/g)||[]).length,1);
+  assert.equal((client.match(/\/api\/v1\/payments\/create-subscription/g)||[]).length,1);
   assert.match(client,/setFallbackUrl\(authorizationUrl\)/);
   assert.match(client,/UPI QR not loading\?/);
   assert.match(client,/Open Razorpay secure page/);

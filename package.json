@@ -13,6 +13,7 @@
     "lint": "eslint . --max-warnings=0",
     "test": "node --test tests/*.test.mjs",
     "test:smoke": "node --test tests/phase0-*.test.mjs",
+    "test:mobile:phase2": "node --test tests/mobile-phase1-foundation.test.mjs tests/mobile-phase2-versioned-api.test.mjs",
     "audit:product-consistency:phase0": "node scripts/product-consistency/phase0-audit.mjs",
     "audit:product-consistency:phase10:gate": "node scripts/product-consistency/phase10-critical-gate.mjs",
     "audit:product-consistency:phase12": "node scripts/product-consistency/phase12-certify.mjs",

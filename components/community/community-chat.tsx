@@ -56,7 +56,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
 
   const markRead = useCallback(async (sequence: number) => {
     if (isGuest) return;
-    await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/read`, {
+    await fetch(`/api/v1/community/channels/${encodeURIComponent(model.channel.slug)}/read`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sequence }),
     }).catch(() => null);
   }, [isGuest, model.channel.slug]);
@@ -64,7 +64,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
   const refreshMessages = useCallback(async (search = activeQuery, filter: CommunityFeedFilter = activeFilter) => {
     const params = new URLSearchParams({ filter });
     if (search) params.set("q", search);
-    const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/messages?${params.toString()}`, { cache: "no-store" });
+    const response = await fetch(`/api/v1/community/channels/${encodeURIComponent(model.channel.slug)}/messages?${params.toString()}`, { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as CommunityMessagePage & { error?: string };
     if (!response.ok) throw new Error(payload.error || "Messages could not be refreshed.");
     setMessages(payload.messages);
@@ -102,7 +102,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     try {
       const params = new URLSearchParams({ cursor: nextCursor, filter: activeFilter });
       if (activeQuery) params.set("q", activeQuery);
-      const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/messages?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/v1/community/channels/${encodeURIComponent(model.channel.slug)}/messages?${params.toString()}`, { cache: "no-store" });
       const payload = await response.json().catch(() => ({})) as CommunityMessagePage & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Older messages could not be loaded.");
       setMessages((current) => dedupeMessages([...payload.messages, ...current]));
@@ -116,7 +116,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     if (!body.trim() || !model.channel.canWrite || model.activeBlock) return;
     setBusy("send"); setError(null);
     try {
-      const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/messages`, {
+      const response = await fetch(`/api/v1/community/channels/${encodeURIComponent(model.channel.slug)}/messages`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body, replyToId: replyTo?.id ?? null, resourceId: resourceId || null, mentionUserIds: mentionUserId ? [mentionUserId] : [] }),
       });
@@ -133,7 +133,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     if (isGuest) return;
     setBusy(`reaction:${messageId}:${emoji}`); setError(null);
     try {
-      const response = await fetch(`/api/community/messages/${messageId}/reaction`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) });
+      const response = await fetch(`/api/v1/community/messages/${messageId}/reaction`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ emoji }) });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Reaction could not be updated.");
       realtimeRef.current?.send({ type: "refresh", reason: "reaction" });
@@ -146,7 +146,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     if (isGuest) return;
     setBusy(`save:${message.id}`); setError(null);
     try {
-      const response = await fetch(`/api/community/messages/${message.id}/save`, { method: "POST" });
+      const response = await fetch(`/api/v1/community/messages/${message.id}/save`, { method: "POST" });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Message could not be saved.");
       await refreshMessages();
@@ -158,7 +158,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     if (isGuest || message.isOwn) return;
     setBusy(`follow:${message.id}`); setError(null);
     try {
-      const response = await fetch(`/api/community/messages/${message.id}/follow`, { method: "POST" });
+      const response = await fetch(`/api/v1/community/messages/${message.id}/follow`, { method: "POST" });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Follow state could not be updated.");
       await refreshMessages();
@@ -173,7 +173,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     const details = window.prompt("Optional details", "") ?? "";
     setBusy(`report:${message.id}`); setError(null);
     try {
-      const response = await fetch(`/api/community/messages/${message.id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason, details }) });
+      const response = await fetch(`/api/v1/community/messages/${message.id}/report`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason, details }) });
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Message could not be reported.");
     } catch (err) { setError(err instanceof Error ? err.message : "Message could not be reported."); }
@@ -212,7 +212,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
 
   const loadComposerOptions = useCallback(async () => {
     if (optionsLoaded || isGuest) return;
-    const response = await fetch(`/api/community/channels/${encodeURIComponent(model.channel.slug)}/options`, { cache: "no-store" });
+    const response = await fetch(`/api/v1/community/channels/${encodeURIComponent(model.channel.slug)}/options`, { cache: "no-store" });
     const payload = await response.json().catch(() => ({})) as { members?: typeof members; resources?: typeof resources; error?: string };
     if (!response.ok) throw new Error(payload.error || "Composer options could not be loaded.");
     setMembers(payload.members ?? []); setResources(payload.resources ?? []); setOptionsLoaded(true);

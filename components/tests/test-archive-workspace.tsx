@@ -87,7 +87,7 @@ export function TestArchiveWorkspace({
     setBusy(true); setMessage(null); setError(null);
     try {
       const previous = attempts.find((item) => item.chapterId === chapter.id && item.stage === stage) ?? null;
-      const response = await fetch("/api/tests/attempts", {
+      const response = await fetch("/api/v1/tests/attempts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chapterId: chapter.id, stage, marksScored: Number(marksScored), marksTotal: Number(marksTotal), durationMinutes: Number(durationMinutes), completedOn, mistakeCategories: mistakes, mistakeNote, idempotencyKey }),
@@ -114,13 +114,13 @@ export function TestArchiveWorkspace({
     if (!attachmentAttemptId || !attachmentFile) return;
     setBusy(true); setMessage(null); setError(null);
     try {
-      const issue = await fetch("/api/tests/attachments/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ attemptId: attachmentAttemptId, kind: attachmentKind, filename: attachmentFile.name, mimeType: attachmentFile.type, sizeBytes: attachmentFile.size }) });
+      const issue = await fetch("/api/v1/tests/attachments/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ attemptId: attachmentAttemptId, kind: attachmentKind, filename: attachmentFile.name, mimeType: attachmentFile.type, sizeBytes: attachmentFile.size }) });
       const issued = await issue.json() as { uploadId?: string; uploadUrl?: string; headers?: Record<string, string>; error?: string };
       if (!issue.ok || !issued.uploadId || !issued.uploadUrl) throw new Error(issued.error || "Attachment upload could not start.");
       const put = await fetch(issued.uploadUrl, { method: "PUT", headers: issued.headers, body: attachmentFile });
       if (!put.ok) throw new Error("The private R2 upload failed before metadata was committed.");
-      let complete = await fetch("/api/tests/attachments/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issued.uploadId }) });
-      if (!complete.ok && complete.status >= 500) complete = await fetch("/api/tests/attachments/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issued.uploadId }) });
+      let complete = await fetch("/api/v1/tests/attachments/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issued.uploadId }) });
+      if (!complete.ok && complete.status >= 500) complete = await fetch("/api/v1/tests/attachments/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issued.uploadId }) });
       const saved = await complete.json() as TestAttemptAttachment & { retry?: boolean; error?: string };
       if (!complete.ok || !saved.id) throw new Error(saved.error || "Attachment could not be finalized.");
       setAttempts((items) => items.map((item) => item.id === attachmentAttemptId && !item.attachments.some((file) => file.id === saved.id) ? { ...item, attachments: [...item.attachments, saved] } : item));
@@ -132,7 +132,7 @@ export function TestArchiveWorkspace({
 
   async function openAttachment(id: string) {
     setError(null);
-    const response = await fetch(`/api/tests/attachments/${encodeURIComponent(id)}/access`, { cache: "no-store" });
+    const response = await fetch(`/api/v1/tests/attachments/${encodeURIComponent(id)}/access`, { cache: "no-store" });
     const payload = await response.json() as { url?: string; error?: string };
     if (!response.ok || !payload.url) { setError(payload.error || "Private attachment could not be opened."); return; }
     window.open(payload.url, "_blank", "noopener,noreferrer");

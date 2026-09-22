@@ -41,7 +41,7 @@ export function StudyReflection({ session, ready = true, onClose }: { session: S
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/study/reflection", {
+      const response = await fetch("/api/v1/study/reflection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

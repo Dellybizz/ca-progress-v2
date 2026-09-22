@@ -146,7 +146,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   const activeItems = visibleItems.filter((item) => item.status === "planned").length;
 
   async function requestPlanner(action: TodayPlanInteractionAction) {
-    const response = await fetch("/api/planner/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action) });
+    const response = await fetch("/api/v1/planner/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(action) });
     const text = await response.text();
     let payload: { error?: string; startedAt?: string } = {};
     if (text) { try { payload = JSON.parse(text) as { error?: string; startedAt?: string }; } catch { payload = {}; } }
@@ -176,7 +176,7 @@ export function TodayPlanClient({ model }: { model: TodayPlanDisplayModel }) {
   }
 
   async function timerAction(body: Record<string, unknown>) {
-    const response = await fetch("/api/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const response = await fetch("/api/v1/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const payload = await response.json().catch(() => ({})) as { error?: string };
     if (!response.ok) throw new Error(payload.error || "Study timer could not be updated.");
   }

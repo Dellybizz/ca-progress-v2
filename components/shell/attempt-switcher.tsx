@@ -15,7 +15,7 @@ export function AttemptSwitcher({ context, attempts, compact = false }: { contex
   async function change(attemptKey: string) {
     if (!context.selection || attemptKey === context.selection.attemptKey) return;
     setSaving(true); setError("");
-    const response = await fetch("/api/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ displayName: context.displayName, level: context.selection.level, group: context.selection.group, attemptKey, dailyTargetMinutes: context.dailyTargetMinutes }) });
+    const response = await fetch("/api/v1/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ displayName: context.displayName, level: context.selection.level, group: context.selection.group, attemptKey, dailyTargetMinutes: context.dailyTargetMinutes }) });
     const result = await response.json().catch(() => null) as { error?: string } | null;
     if (!response.ok) { setError(result?.error ?? "Could not change attempt."); setSaving(false); return; }
     router.refresh(); setSaving(false);

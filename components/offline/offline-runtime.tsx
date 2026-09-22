@@ -13,7 +13,7 @@ export function OfflineRuntime() {
     let cancelled = false;
     const ready = (async () => {
       if (context.mode === "guest") {
-        const response = await fetch("/api/offline/context", { cache: "no-store", credentials: "same-origin" });
+        const response = await fetch("/api/v1/offline/context", { cache: "no-store", credentials: "same-origin" });
         const server = response.ok ? await response.json() as { guestId?: string; contextKey?: string } : null;
         const guest = getOrCreateGuestIdentity(server?.guestId ?? null);
         return setOfflineIdentity({ userId: guest.id, contextKey: server?.contextKey ?? "guest:en-IN", context: { mode: "guest" } });
@@ -27,7 +27,7 @@ export function OfflineRuntime() {
       const approved = window.confirm(`Preserve your guest work in this account?\n\n${migration.summary.snapshots} saved screens · ${migration.summary.mutations} pending edits · ${migration.summary.files} downloaded files\n\nExisting account data will be kept. Any conflicts will wait for your review.`);
       if (!approved) throw new Error("Your guest data is still stored on this device. You can preserve it after your next sign-in.");
       const send = async (body: Record<string, unknown>) => {
-        const response = await fetch("/api/offline/guest-migration", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ guestId: migration!.guestId, ...body }) });
+        const response = await fetch("/api/v1/offline/guest-migration", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ guestId: migration!.guestId, ...body }) });
         const data = await response.json() as Record<string, unknown>;
         if (!response.ok) throw new Error(String(data.error ?? "Guest data migration is waiting to resume."));
         return data;

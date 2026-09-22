@@ -43,8 +43,8 @@ test("Activity filters invalid evidence timestamps and isolates optional gamific
   assert.match(page, /Promise\.allSettled\(\[getActivityPageModel\(\), optionalUser\(\)\]\)/);
   assert.match(page, /ActivityGamificationClient/);
   assert.doesNotMatch(page, /getGamificationSummary|getPhase13UserModel/);
-  assert.match(client, /fetch\("\/api\/gamification"/);
-  assert.match(client, /fetch\("\/api\/gamification\/phase13"/);
+  assert.match(client, /fetch\("\/api\/v1\/gamification"/);
+  assert.match(client, /fetch\("\/api\/v1\/gamification\/phase13"/);
   assert.match(client, /XP summary is temporarily unavailable/);
   assert.match(client, /Leaderboard and referrals are temporarily unavailable/);
 });

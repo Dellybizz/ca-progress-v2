@@ -158,7 +158,7 @@ export function ProgressTracker({
     if(!changes.length)return;
     setSaveState("saving");setMessage(null);
     try{
-      const response=await fetch("/api/progress",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"set_stages",changes})});
+      const response=await fetch("/api/v1/progress",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"set_stages",changes})});
       const payload=await response.json() as {states?:Array<{chapter_id:string;state:ProgressState;saved_at:string}>;error?:string};
       if(!response.ok)throw new Error(payload.error||"Progress could not be saved.");
       const states=new Map((payload.states??[]).map((row)=>[row.chapter_id,row]));

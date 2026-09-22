@@ -63,12 +63,12 @@ function UploadPanel({ model, close, initialSubjectId, initialChapterId }: { mod
       if (selectedFile.size > CLIENT_UPLOAD_MAX_BYTES) throw new Error("This file is larger than the 10 MB upload limit.");
 
       const descriptor = { filename: selectedFile.name, mimeType: selectedFile.type, sizeBytes: selectedFile.size, title: form.get("title"), description: form.get("description"), subjectId, chapterId, visibility };
-      const issueResponse = await fetch("/api/resources/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(descriptor) });
+      const issueResponse = await fetch("/api/v1/resources/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(descriptor) });
       const issuePayload = await readApiPayload<{ uploadId?: string; uploadUrl?: string; headers?: Record<string, string>; error?: string }>(issueResponse);
       if (!issueResponse.ok || !issuePayload.uploadId || !issuePayload.uploadUrl) throw new Error(issuePayload.error || uploadFallbackMessage(issueResponse.status));
       const directResponse = await fetch(issuePayload.uploadUrl, { method: "PUT", headers: issuePayload.headers, body: selectedFile });
       if (!directResponse.ok) throw new Error("Direct R2 upload failed. Please retry.");
-      const completeResponse = await fetch("/api/resources/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issuePayload.uploadId }) });
+      const completeResponse = await fetch("/api/v1/resources/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issuePayload.uploadId }) });
       const completePayload = await readApiPayload<{ error?: string }>(completeResponse);
       if (!completeResponse.ok) throw new Error(completePayload.error || uploadFallbackMessage(completeResponse.status));
       close(); router.refresh();

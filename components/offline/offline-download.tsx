@@ -11,7 +11,7 @@ export function OfflineDownload({ id, title }: { id: string; title: string }) {
     if (!context.userId || busy) return;
     setBusy(true); setStatus("");
     try {
-      const response = await fetch(`/api/resources/${encodeURIComponent(id)}/access`, { cache: "no-store" });
+      const response = await fetch(`/api/v1/resources/${encodeURIComponent(id)}/access`, { cache: "no-store" });
       if (!response.ok) throw new Error("Download unavailable. Reconnect and check access to this file.");
       if (Number(response.headers.get("Content-Length")) > 50 * 1024 * 1024) throw new Error("Offline downloads must be smaller than 50 MB.");
       const file = await response.blob();

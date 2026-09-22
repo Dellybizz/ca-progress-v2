@@ -89,7 +89,7 @@ export function TestProgressWorkspace({
     setMessage(null);
     setError(null);
     try {
-      const response = await fetch("/api/tests/stage", {
+      const response = await fetch("/api/v1/tests/stage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -124,7 +124,7 @@ export function TestProgressWorkspace({
     setMessage(null);
     setError(null);
     try {
-      const response = await fetch("/api/tests/stage", {
+      const response = await fetch("/api/v1/tests/stage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "undo", recordId: existing.id }),

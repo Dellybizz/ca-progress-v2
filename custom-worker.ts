@@ -316,7 +316,11 @@ async function handleRequest(request: Request, env: WorkerEnv, ctx: WorkerContex
       headers.set("x-ratelimit-limit", String(limit));
       headers.set("x-ratelimit-remaining", String(rate.remaining));
     }
-    headers.set("server-timing", `worker;dur=${Math.round((performance.now() - startedAt) * 100) / 100}`);
+    const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+    headers.set("server-timing", `worker;dur=${durationMs}`);
+    if (pathname.startsWith("/api/v1/") && (!isRead || response.status >= 400 || durationMs >= 1_000)) {
+      console.info(JSON.stringify({ event: "api.v1.request", requestId: id, method: request.method, path: pathname, status: response.status, durationMs }));
+    }
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   } catch (error) {
     const fingerprint = errorFingerprint(error);

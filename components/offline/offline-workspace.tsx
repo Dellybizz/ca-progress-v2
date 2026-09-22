@@ -35,7 +35,7 @@ export function OfflineWorkspace() {
       const identity = await getOfflineIdentity();
       if (!identity) { if (!cancelled) { setContext(null); setData(null); setError("Open a student page while signed in to enable offline access on this device."); } return; }
       if (navigator.onLine) {
-        const response = await fetch("/api/offline/context", { cache: "no-store" }).catch(() => null);
+        const response = await fetch("/api/v1/offline/context", { cache: "no-store" }).catch(() => null);
         if (response?.ok) {
           const current = await response.json() as StudentContextContract;
           if (current.userId !== identity.userId || current.contextKey !== identity.contextKey) { await setOfflineIdentity(null); if (!cancelled) { setContext(null); setData(null); setError("Your account or academic selection changed. Open a student page online."); } return; }

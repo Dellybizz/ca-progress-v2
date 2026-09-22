@@ -108,7 +108,7 @@ export function OnboardingWizard({
   async function saveDraft(nextStep: number) {
     setSaving(true);
     setError(null);
-    const response = await fetch("/api/onboarding", {
+    const response = await fetch("/api/v1/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -146,7 +146,7 @@ export function OnboardingWizard({
       return setError("Choose your current preparation state.");
     setSaving(true);
     setError(null);
-    const response = await fetch("/api/onboarding", {
+    const response = await fetch("/api/v1/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

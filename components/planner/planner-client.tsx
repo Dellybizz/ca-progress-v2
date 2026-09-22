@@ -51,7 +51,7 @@ export function PlannerClient({ model: serverModel }: { model: PlannerReadyModel
   async function request(body: Record<string, unknown>) {
     setBusy(true); setError(null);
     try {
-      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/planner/tasks", body);
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/v1/planner/tasks", body);
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Task could not be saved.");
       if(!queued)router.refresh(); return true;

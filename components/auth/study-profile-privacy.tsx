@@ -32,7 +32,7 @@ export function StudyProfilePrivacy({ ownerUserId, initialSettings }: { ownerUse
 
   async function save() {
     setSaving(true); setStatus(null);
-    const response = await fetch("/api/study-profile", {
+    const response = await fetch("/api/v1/study-profile", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -53,7 +53,7 @@ export function StudyProfilePrivacy({ ownerUserId, initialSettings }: { ownerUse
 
   async function changeBuddy(method: "POST" | "DELETE", id: string) {
     setBuddyBusy(true); setStatus(null);
-    const response = await fetch("/api/study-profile/buddies", {
+    const response = await fetch("/api/v1/study-profile/buddies", {
       method,
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ buddyUserId: id }),

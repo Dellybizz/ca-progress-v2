@@ -76,7 +76,7 @@ export function ProfileForm({
   async function saveProfile() {
     setSaving(true);
     setStatus(null);
-    const response = await fetch("/api/profile", {
+    const response = await fetch("/api/v1/profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -102,7 +102,7 @@ export function ProfileForm({
     setStatus(null);
     const data = new FormData();
     data.set("avatar", file);
-    const response = await fetch("/api/profile/avatar", {
+    const response = await fetch("/api/v1/profile/avatar", {
       method: "POST",
       body: data,
     });

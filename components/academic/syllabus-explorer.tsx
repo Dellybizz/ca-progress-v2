@@ -46,7 +46,7 @@ export function SyllabusExplorer({ catalog }: { catalog: AcademicCatalog }) {
       group: catalog.selectedGroup,
     });
     if (catalog.selectedAttempt) params.set("attempt", catalog.selectedAttempt);
-    return `/api/academic/search?${params.toString()}`;
+    return `/api/v1/academic/search?${params.toString()}`;
   }, [
     search,
     catalog.selectedLevel.code,
