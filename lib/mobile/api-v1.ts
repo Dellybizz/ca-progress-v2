@@ -1,12 +1,34 @@
+import { MOBILE_STUDENT_FEATURES } from "@/config/mobile-feature-parity";
+
 export const API_V1_DOMAINS = [
-  "session", "dashboard", "progress", "chapters", "today", "planner",
-  "focus", "notes", "resources", "community", "icai", "search",
-  "profile", "settings", "notifications", "subscriptions", "offline",
+  "session",
+  "dashboard",
+  "progress",
+  "chapters",
+  "today",
+  "planner",
+  "focus",
+  "notes",
+  "resources",
+  "community",
+  "icai",
+  "search",
+  "profile",
+  "settings",
+  "notifications",
+  "subscriptions",
+  "offline",
+  "feature-tour",
 ] as const;
 
 export type ApiV1Domain = (typeof API_V1_DOMAINS)[number];
 export type ApiV1Error = {
-  error: { code: string; message: string; retryable: boolean; details?: Record<string, unknown> };
+  error: {
+    code: string;
+    message: string;
+    retryable: boolean;
+    details?: Record<string, unknown>;
+  };
   meta?: { requestId: string; apiVersion: 1 };
 };
 export type ApiV1Page<T> = {
@@ -24,9 +46,17 @@ export const API_V1_CAPABILITIES = Object.freeze({
   sameOriginCookies: true,
   requestIdHeader: "X-Request-ID",
   idempotencyHeader: "Idempotency-Key",
-  pagination: { cursorParameter: "cursor", limitParameter: "limit", maximumLimit: 100 },
-  deltaSync: { cursorParameter: "syncCursor", contextHeader: "X-CA-Context-Version" },
+  pagination: {
+    cursorParameter: "cursor",
+    limitParameter: "limit",
+    maximumLimit: 100,
+  },
+  deltaSync: {
+    cursorParameter: "syncCursor",
+    contextHeader: "X-CA-Context-Version",
+  },
   domains: API_V1_DOMAINS,
+  studentFeatureParity: MOBILE_STUDENT_FEATURES,
 });
 
 export function apiV1Path(path: string) {
@@ -35,5 +65,9 @@ export function apiV1Path(path: string) {
 }
 
 export function apiV1MutationHeaders(idempotencyKey = crypto.randomUUID()) {
-  return { "Content-Type": "application/json", "X-CA-API-Version": "1", "Idempotency-Key": idempotencyKey };
+  return {
+    "Content-Type": "application/json",
+    "X-CA-API-Version": "1",
+    "Idempotency-Key": idempotencyKey,
+  };
 }

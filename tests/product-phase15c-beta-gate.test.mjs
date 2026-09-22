@@ -82,7 +82,7 @@ test("planner paid mutations are server gated while Free notification read state
   assert.match(goals, /getPlanFeatureAccessForUser\(user\.id, "detailed_goals_reports"\)/);
   assert.match(notifications, /if \(body\.action === "read"\)/);
   assert.match(notifications, /if \(body\.action === "read_all"\)/);
-  assert.match(notifications, /if \(body\.action === "preferences"\)[\s\S]*getPlanFeatureAccessForUser\(user\.id, "customisation_reminders"\)/);
+  assert.match(notifications, /if \(body\.action === "preferences"\)[\s\S]*getPlanFeatureAccessForUser\(\s*user\.id,\s*"customisation_reminders",?\s*\)/);
   assert.match(calendar, /PLAN_UPGRADE_REQUIRED/);
   assert.match(goals, /PLAN_UPGRADE_REQUIRED/);
   assert.match(notifications, /PLAN_UPGRADE_REQUIRED/);

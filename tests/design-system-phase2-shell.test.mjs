@@ -48,7 +48,7 @@ test("guest shell exposes sign in instead of account-only controls", () => {
   const topbar = read("components/shell/topbar-controls.tsx");
   const studentLayout = read("app/(student)/layout.tsx");
   assert.match(shell, /viewer\.authenticated \? "\/settings\/profile" : "\/login\?next=%2Fdashboard"/);
-  assert.match(topbar, /viewer\.authenticated \? <Popover/);
+  assert.match(topbar, /viewer\.authenticated\s*\?\s*\(?\s*<Popover/);
   assert.match(topbar, /<span>Sign in<\/span>/);
   assert.match(topbar, /loginPathFor\(pathname \|\| "\/planner\/today"\)/);
   assert.match(studentLayout, /isCurrentGuestTestUser/);

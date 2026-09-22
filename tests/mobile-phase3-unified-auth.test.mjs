@@ -59,5 +59,5 @@ test("Phase 3 preserves idempotent lossless guest migration and owner isolation"
 test("Phase 3 migration is retained but production remains an explicit action", () => {
   const runner = read("scripts/apply-retained-d1-migrations.mjs");
   assert.match(runner, /0059_mobile_phase3_session_devices\.sql/);
-  assert.match(runner, /version='0059'/);
+  assert.match(runner, /version IN \('0059','0060'\)/);
 });
