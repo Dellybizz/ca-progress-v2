@@ -13,6 +13,7 @@ import { POST as timer } from "@/app/api/study/timer/route";
 export const dynamic = "force-dynamic";
 const handlers = { "/api/progress": progress, "/api/planner/tasks": tasks, "/api/notes": notes, "/api/study/timer": timer };
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
+const conflict = (error: string, expected: Record<string, unknown> | null, current: Record<string, unknown> | null, local: Record<string, unknown>) => json({ error, conflict: { expected, current, local } }, 409);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type Receipt = { request_hash: string; response_json: string; response_status: number };
 
@@ -61,9 +62,9 @@ export async function POST(request: Request) {
     const predecessor = input.predecessor && UUID.test(input.predecessor)
       ? await db.prepare("SELECT entity_after_json FROM offline_mutation_receipts WHERE user_id=?1 AND mutation_id=?2 AND entity_key=?3").bind(context.userId, input.predecessor, entity).first<{entity_after_json: string}>()
       : null;
-    if (input.predecessor && (!predecessor || predecessor.entity_after_json !== current)) return json({ error: "An earlier edit changed or has not synchronized. Review the pending edits." }, 409);
+    if (input.predecessor && (!predecessor || predecessor.entity_after_json !== current)) return conflict("An earlier edit changed or has not synchronized. Review the pending edits.", input.expected, currentObject, body);
     const emptyProgress = input.url === "/api/progress" && currentObject === null && input.expected && Object.values(input.expected).every(v => v === null);
-    if (!predecessor && !emptyProgress && (input.expected === null ? currentObject !== null : !currentObject || Object.entries(input.expected).some(([name, value]) => !columns.includes(name) || currentObject[name] !== value))) return json({ error: "This item changed on another device. Your edit has been kept for review." }, 409);
+    if (!predecessor && !emptyProgress && (input.expected === null ? currentObject !== null : !currentObject || Object.entries(input.expected).some(([name, value]) => !columns.includes(name) || currentObject[name] !== value))) return conflict("This item changed on another device. Your edit has been kept for review.", input.expected, currentObject, body);
     if (input.expected && !Object.keys(input.expected).length) return json({ error: "Missing conflict baseline." }, 409);
     const staged = stageOfflineWrites(db);
     const afterCommit: Array<() => Promise<void>> = [];

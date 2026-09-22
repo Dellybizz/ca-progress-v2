@@ -14,6 +14,7 @@ import type { StudentContextContract } from "@/lib/academic/student-context";
 import { RouteTrail } from "./route-trail";
 import { MobileAppBar } from "./mobile-app-bar";
 import { AdaptiveShellRuntime } from "./adaptive-shell-runtime";
+import { OfflineSyncStatus } from "@/components/offline/offline-sync-status";
 
 export function AppShell({ children, area = "student", viewer, studentContext, attempts = [] }: { children: React.ReactNode; area?: "student" | "admin"; viewer: ViewerSnapshot; studentContext?: StudentContextContract; attempts?: AttemptOption[] }) {
   /* Stable labels retained for operational search: Student workspace; Admin workspace */
@@ -39,6 +40,7 @@ export function AppShell({ children, area = "student", viewer, studentContext, a
         <main className="content-wrap"><RouteTrail homeHref={homeHref}/>{children}</main>
       </div>
     </div>
+    {studentContext ? <OfflineSyncStatus/> : null}
     <MobileNavigation area={area} studentContext={studentContext} attempts={attempts}/>
   </ViewerProvider>;
 }

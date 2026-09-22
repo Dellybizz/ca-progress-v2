@@ -1,7 +1,7 @@
 export const API_V1_DOMAINS = [
   "session", "dashboard", "progress", "chapters", "today", "planner",
   "focus", "notes", "resources", "community", "icai", "search",
-  "profile", "settings", "notifications", "subscriptions",
+  "profile", "settings", "notifications", "subscriptions", "offline",
 ] as const;
 
 export type ApiV1Domain = (typeof API_V1_DOMAINS)[number];

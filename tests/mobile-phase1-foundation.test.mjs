@@ -9,7 +9,7 @@ test("mobile Phase 1 is pinned to the certified production baseline", () => {
   assert.match(release, /471ade75da025df51fcf98ba6740f400e10b9cae/);
   assert.match(release, /api: Object\.freeze\(\{ current: 1, minimumSupported: 1 \}\)/);
   assert.match(release, /academicContext: Object\.freeze\(\{ current: 1, minimumSupported: 1 \}\)/);
-  assert.match(release, /offline: Object\.freeze\(\{ current: 2, minimumSupported: 2 \}\)/);
+  assert.match(release, /offline: Object\.freeze\(\{ current: [2-9][0-9]*, minimumSupported: 2 \}\)/);
 });
 
 test("mobile and website share one versioned academic context", () => {

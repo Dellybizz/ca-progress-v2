@@ -43,6 +43,7 @@ export function OfflineRuntime() {
     ready.catch(() => { if (!cancelled) setError("Offline storage is unavailable. Changes cannot be saved on this device."); });
     const sync = async () => { await ready; if (!cancelled && context.userId && navigator.onLine) await flushPendingMutations(context.userId); };
     const update = () => void sync().catch(() => undefined);
+    const serviceWorkerMessage = (event: MessageEvent) => { if (event.data?.type === "SYNC_OFFLINE_EDITS") update(); };
     const click = (event: MouseEvent) => {
       if (navigator.onLine || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const link = (event.target as Element)?.closest?.("a");
@@ -57,11 +58,12 @@ export function OfflineRuntime() {
     window.addEventListener("offline-storage-error", storageError);
     window.addEventListener("offline-data-change", verifyOwner);
     window.addEventListener("online", update);
+    navigator.serviceWorker?.addEventListener("message", serviceWorkerMessage);
     document.addEventListener("click", click, true);
     document.addEventListener("submit", signout, true);
     const interval = window.setInterval(update, 15_000);
     update();
-    return () => { cancelled = true; window.removeEventListener("offline-storage-error", storageError); window.removeEventListener("offline-data-change", verifyOwner); window.clearInterval(interval); window.removeEventListener("online", update); document.removeEventListener("click", click, true); document.removeEventListener("submit", signout, true); };
+    return () => { cancelled = true; window.removeEventListener("offline-storage-error", storageError); window.removeEventListener("offline-data-change", verifyOwner); window.clearInterval(interval); window.removeEventListener("online", update); navigator.serviceWorker?.removeEventListener("message", serviceWorkerMessage); document.removeEventListener("click", click, true); document.removeEventListener("submit", signout, true); };
   }, [context]);
   return error ? <p role="status">{error}</p> : null;
 }

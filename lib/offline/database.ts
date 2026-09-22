@@ -1,12 +1,13 @@
 import { projectOfflineEdit } from "@/lib/offline/projection";
 export const OFFLINE_DB_NAME = "ca-progress-offline";
-export const OFFLINE_SCHEMA_VERSION = 2;
+export const OFFLINE_SCHEMA_VERSION = 3;
 const STORES = ["snapshots", "mutations", "files", "meta"] as const;
 export type OfflineStore = (typeof STORES)[number];
 export type OfflineMutation = {
   key: string; idempotencyKey: string; ownerId: string; contextKey: string;
   url: string; body: string; createdAt: string; order: number; attempts: number;
   nextAttemptAt: string; status: "pending" | "conflict" | "blocked"; lastError: string | null;
+  conflict?: { expected: Record<string, unknown> | null; current: Record<string, unknown> | null; local: Record<string, unknown> } | null;
 };
 type Row = { key: string; ownerId: string; [key: string]: unknown };
 export type OfflineIdentity = { userId: string; contextKey: string; context: unknown };
@@ -151,8 +152,39 @@ export async function queueOfflineMutation(input: Pick<OfflineMutation, "ownerId
       done();
     };
   }); changed();
+  void navigator.serviceWorker?.ready.then(registration => {
+    const sync = (registration as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } }).sync;
+    return sync?.register("ca-progress-offline-sync");
+  }).catch(() => undefined);
 }
 export async function getPendingMutations(ownerId: string) { return (await ownerRows<OfflineMutation>("mutations", ownerId)).sort((a, b) => a.order - b.order || a.createdAt.localeCompare(b.createdAt)); }
+export async function retryOfflineConflict(ownerId: string, key: string) {
+  const row = (await getPendingMutations(ownerId)).find(item => item.key === key);
+  if (!row || row.status !== "conflict" || !row.conflict || row.conflict.current === undefined) throw new Error("This edit cannot be safely retried. Keep an export and use the cloud version.");
+  const envelope = JSON.parse(row.body) as Record<string, unknown>;
+  await put("mutations", { ...row, status: "pending", attempts: 0, nextAttemptAt: new Date().toISOString(), lastError: null, conflict: null, body: JSON.stringify({ ...envelope, expected: row.conflict.current, predecessor: null }) });
+}
+export async function discardOfflineMutationChain(ownerId: string, key: string) {
+  const rows = await getPendingMutations(ownerId);
+  const selected = rows.find(item => item.key === key);
+  if (!selected || !["conflict", "blocked"].includes(selected.status)) throw new Error("Only an edit requiring review can be discarded here.");
+  const discarded = new Set([selected.idempotencyKey]);
+  let changedSet = true;
+  while (changedSet) {
+    changedSet = false;
+    for (const row of rows) {
+      const predecessor = (JSON.parse(row.body) as { predecessor?: string | null }).predecessor;
+      if (predecessor && discarded.has(predecessor) && !discarded.has(row.idempotencyKey)) { discarded.add(row.idempotencyKey); changedSet = true; }
+    }
+  }
+  await transact<void>("mutations", "readwrite", (tx, done) => {
+    const store = tx.objectStore("mutations");
+    for (const row of rows) if (discarded.has(row.idempotencyKey)) store.delete(row.key);
+    done();
+  });
+  changed();
+  return discarded.size;
+}
 export async function getOfflineMutationResult(ownerId: string, id: string) { return getOfflineMeta<{ data: Record<string, unknown>; status: number }>(ownerId, `result:${id}`); }
 export async function flushPendingMutations(ownerId: string, fetcher: typeof fetch = fetch) {
   if (!navigator.locks) throw new Error("This browser cannot safely synchronize offline edits. Export your edits or use a browser with Web Locks.");
@@ -162,7 +194,7 @@ export async function flushPendingMutations(ownerId: string, fetcher: typeof fet
     if (!queued.length || queued[0].status !== "pending" || Date.parse(queued[0].nextAttemptAt) > Date.now()) return { completed, remaining: queued.length };
     const active = await getOfflineIdentity();
     if (active?.userId !== ownerId) return { completed, remaining: (await getPendingMutations(ownerId)).length };
-    const auth = await fetcher("/api/offline/context", { cache: "no-store", credentials: "same-origin" });
+    const auth = await fetcher("/api/v1/offline/context", { cache: "no-store", credentials: "same-origin", headers: { "X-CA-API-Version": "1" } });
     if (!auth.ok) return { completed, remaining: (await getPendingMutations(ownerId)).length };
     const current = await auth.json() as { userId?: string; contextKey?: string };
     if (current.userId !== ownerId) { await setOfflineIdentity(null); return { completed, remaining: (await getPendingMutations(ownerId)).length }; }
@@ -172,12 +204,13 @@ export async function flushPendingMutations(ownerId: string, fetcher: typeof fet
       if ((await getOfflineIdentity())?.userId !== ownerId) break;
       if (row.contextKey !== current.contextKey) { await put("mutations", { ...row, status: "conflict", lastError: "Academic selection changed. Export and review this edit." }); break; }
       try {
-        const response = await fetcher("/api/offline/mutations", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "Idempotency-Key": row.idempotencyKey }, body: row.body });
+        const response = await fetcher("/api/v1/offline/mutations", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json", "X-CA-API-Version": "1", "Idempotency-Key": row.idempotencyKey }, body: row.body });
         if (response.redirected || !response.headers.get("Content-Type")?.includes("application/json")) throw new Error("Synchronization did not return a valid response.");
         const payload = await response.json() as Record<string, unknown>;
         if (!response.ok) {
           if (response.status === 409 || (response.status >= 400 && response.status < 500 && ![401, 408, 429].includes(response.status))) {
-            await put("mutations", { ...row, status: response.status === 409 ? "conflict" : "blocked", lastError: String(payload.error ?? "Edit requires review.") }); break;
+            const conflict = response.status === 409 && payload.conflict && typeof payload.conflict === "object" ? safeOfflineData(payload.conflict) : null;
+            await put("mutations", { ...row, status: response.status === 409 ? "conflict" : "blocked", conflict, lastError: String(payload.error ?? "Edit requires review.") }); break;
           }
           throw new Error(String(payload.error ?? `Server returned ${response.status}.`));
         }

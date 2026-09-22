@@ -15,6 +15,12 @@ self.addEventListener("install", event => event.waitUntil((async () => {
 self.addEventListener("message", event => {
   if (event.data?.type === "SKIP_WAITING") event.waitUntil(self.skipWaiting());
 });
+self.addEventListener("sync", event => {
+  if (event.tag !== "ca-progress-offline-sync") return;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: false }).then(clients => {
+    for (const client of clients) client.postMessage({ type: "SYNC_OFFLINE_EDITS" });
+  }));
+});
 self.addEventListener("activate", event => event.waitUntil((async () => {
   for (const name of await caches.keys()) if (name.startsWith("ca-progress-shell-") && name !== BASE) await caches.delete(name);
   await self.clients.claim();
