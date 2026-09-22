@@ -14,6 +14,8 @@ function Overlay({ open, onClose, title, children, kind }: OverlayProps & { kind
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const dialog = dialogRef.current;
     const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []);
     (focusable()[0] ?? dialog)?.focus();
@@ -27,8 +29,10 @@ function Overlay({ open, onClose, title, children, kind }: OverlayProps & { kind
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     };
+    const onBack = () => onClose();
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); previous?.focus(); };
+    window.addEventListener("popstate", onBack);
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", onKey); window.removeEventListener("popstate", onBack); previous?.focus(); };
   }, [open, onClose]);
   if (!open) return null;
   return <div className={`ui-overlay ui-overlay--${kind}`} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section ref={dialogRef} tabIndex={-1} className={`ui-dialog ui-dialog--${kind}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><header><div><span className="ui-dialog__eyebrow">CA Progress</span><h2 id={titleId}>{title}</h2></div><button className="ui-icon-button" aria-label={`Close ${title}`} onClick={onClose}><Icon name="close" /></button></header><div className="ui-dialog__body">{children}</div></section></div>;

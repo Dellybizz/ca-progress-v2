@@ -12,13 +12,15 @@ import { AttemptSwitcher } from "./attempt-switcher";
 import type { AttemptOption } from "@/lib/profile/validation";
 import type { StudentContextContract } from "@/lib/academic/student-context";
 import { RouteTrail } from "./route-trail";
+import { MobileAppBar } from "./mobile-app-bar";
+import { AdaptiveShellRuntime } from "./adaptive-shell-runtime";
 
 export function AppShell({ children, area = "student", viewer, studentContext, attempts = [] }: { children: React.ReactNode; area?: "student" | "admin"; viewer: ViewerSnapshot; studentContext?: StudentContextContract; attempts?: AttemptOption[] }) {
   /* Stable labels retained for operational search: Student workspace; Admin workspace */
   const workspaceLabel = area === "admin" ? "Operations" : "Student workspace";
   const homeHref = area === "admin" ? "/admin" : "/dashboard";
   return <ViewerProvider viewer={viewer}>
-    <AppearanceRuntime/><NavigationProgress/><MobileOverscrollGuard/><EnvironmentBanner/>
+    <AppearanceRuntime/><AdaptiveShellRuntime/><NavigationProgress/><MobileOverscrollGuard/><EnvironmentBanner/>
     <div className="app-shell app-shell--r3">
       <aside className="desktop-sidebar" aria-label={`${area} workspace`}>
         <Link href={homeHref} className="sidebar-brand"><span className="sidebar-brand__mark">CP</span><span><strong>CA Progress</strong><small>{workspaceLabel}</small></span></Link>
@@ -30,7 +32,7 @@ export function AppShell({ children, area = "student", viewer, studentContext, a
       </aside>
       <div className="app-main">
         <header className="topbar">
-          <Link href={homeHref} className="mobile-brand"><span className="sidebar-brand__mark">CP</span><span><strong>CA Progress</strong><small>{workspaceLabel}</small></span></Link>
+          <MobileAppBar area={area} homeHref={homeHref}/>
           <div className="topbar-context"><span className="topbar-context__dot"/><div><strong>{workspaceLabel}</strong><span>{studentContext?.selection ? `${studentContext.selection.level.replace("_", " ")} · ${studentContext.selection.group.replace("_", " ")}` : "CA Progress"}</span></div></div>
           <TopbarControls area={area}/>
         </header>
