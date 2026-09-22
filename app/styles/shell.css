@@ -214,6 +214,17 @@ kbd { padding: 2px 5px; border: 1px solid var(--color-border); border-radius: va
   .sidebar-nav-group__chevron { transition: none; }
 }
 
+/* Mobile Phase 5 — install and controlled-update notice. */
+.pwa-notice { position: fixed; z-index: 120; right: max(14px, env(safe-area-inset-right)); bottom: max(78px, calc(env(safe-area-inset-bottom) + 68px)); left: max(14px, env(safe-area-inset-left)); display: flex; align-items: center; justify-content: space-between; gap: 14px; max-width: 520px; margin-left: auto; padding: 13px 14px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-lg); color: var(--color-text); }
+.pwa-notice__copy { min-width: 0; display: grid; gap: 3px; }
+.pwa-notice__copy strong { font-size: 12px; line-height: 1.35; }
+.pwa-notice__copy span { color: var(--color-text-soft); font-size: 11px; line-height: 1.45; }
+.pwa-notice__actions { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
+@media (min-width: 720px) { .pwa-notice { right: 20px; bottom: 20px; left: auto; } }
+@media (max-width: 440px) { .pwa-notice { align-items: stretch; flex-direction: column; } .pwa-notice__actions .ui-button { flex: 1; } }
+@media (display-mode: standalone) { .pwa-notice { bottom: max(78px, calc(env(safe-area-inset-bottom) + 68px)); } }
+@media (prefers-reduced-motion: reduce) { .pwa-notice { scroll-behavior: auto; } }
+
 /* R3 — one calm, identity-stable workspace shell */
 .app-shell--r3 .topbar { background: var(--color-surface); }
 .topbar-context__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 4px var(--color-success-soft); }

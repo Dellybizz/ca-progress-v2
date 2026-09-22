@@ -1,6 +1,6 @@
 /* Cache only public build assets and the data-free offline shell. Private HTML,
    RSC payloads, API responses, avatars and file download URLs never enter Cache API. */
-const BASE = "ca-progress-shell-v4";
+const BASE = "ca-progress-shell-v5";
 const ROUTES = new Set(["/offline", "/dashboard", "/syllabus", "/progress", "/study", "/planner", "/notes", "/resources"]);
 const blocked = url => /[?&](?:[^=]*(?:token|signature|credential)|expires)=/i.test(url.search);
 self.addEventListener("install", event => event.waitUntil((async () => {
@@ -11,8 +11,10 @@ self.addEventListener("install", event => event.waitUntil((async () => {
   const assets = [...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+)"/g)].map(match => match[1]))];
   await cache.addAll(assets);
   await cache.put("/offline", shell);
-  await self.skipWaiting();
 })()));
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") event.waitUntil(self.skipWaiting());
+});
 self.addEventListener("activate", event => event.waitUntil((async () => {
   for (const name of await caches.keys()) if (name.startsWith("ca-progress-shell-") && name !== BASE) await caches.delete(name);
   await self.clients.claim();
