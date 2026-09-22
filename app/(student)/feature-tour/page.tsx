@@ -7,13 +7,22 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Feature Tour | CA Progress" };
 
 export default async function FeatureTourPage() {
-  const user = await optionalUser();
-  const progress = user
-    ? await getFeatureTourProgress(user.id)
-    : { step: 0, completedAt: null };
+  let authenticated = false;
+  let progress: { step: number; completedAt: string | null } = {
+    step: 0,
+    completedAt: null,
+  };
+  try {
+    const user = await optionalUser();
+    authenticated = Boolean(user);
+    if (user) progress = await getFeatureTourProgress(user.id);
+  } catch {
+    // Feature Tour is non-critical and remains fully usable with local state
+    // when a branch preview has no auth or D1 binding.
+  }
   return (
     <FeatureTour
-      authenticated={Boolean(user)}
+      authenticated={authenticated}
       initialStep={progress.step}
       completedAt={progress.completedAt}
     />

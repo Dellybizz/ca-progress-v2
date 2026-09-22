@@ -28,6 +28,7 @@ test("Phase 7 Feature Tour is responsive, recoverable and reachable", () => {
   const navigation = read("components/shell/navigation-contract.ts");
   assert.match(tour, /ca-progress:feature-tour/);
   assert.match(tour, /Progress remains on this device/);
+  assert.match(read("app/(student)/feature-tour/page.tsx"), /branch preview has no auth or D1 binding/);
   assert.match(css, /\.feature-tour/);
   assert.match(css, /@media \(max-width: 520px\)/);
   assert.match(navigation, /href: "\/feature-tour"/);
@@ -45,6 +46,7 @@ test("Phase 7 synchronizes tour progress through D1 without blocking guests", ()
   assert.match(service, /WHERE user_id=\?3/);
   assert.match(service, /isFeatureTourSchemaUnavailable/);
   assert.match(service, /cloudReady: false/);
+  assert.match(service, /storage-unavailable/);
   assert.match(route, /FEATURE_TOUR_SYNC_NOT_READY/);
   assert.match(migrations, /0060_mobile_phase7_feature_tour\.sql/);
 });

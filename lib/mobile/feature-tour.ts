@@ -33,8 +33,14 @@ export async function getFeatureTourProgress(userId: string) {
       cloudReady: true,
     };
   } catch (error) {
-    if (!isFeatureTourSchemaUnavailable(error)) throw error;
-    return { step: 0, completedAt: null, cloudReady: false };
+    return {
+      step: 0,
+      completedAt: null,
+      cloudReady: false,
+      reason: isFeatureTourSchemaUnavailable(error)
+        ? "migration-pending"
+        : "storage-unavailable",
+    };
   }
 }
 
@@ -51,10 +57,10 @@ export async function saveFeatureTourProgress(
       )
       .bind(safeStep, completed ? 1 : 0, userId)
       .run();
-  } catch (error) {
-    if (isFeatureTourSchemaUnavailable(error))
-      throw new FeatureTourStorageUnavailableError();
-    throw error;
+  } catch {
+    // Tour progress is optional product state. Keep the local copy usable
+    // when preview bindings or D1 are temporarily unavailable.
+    throw new FeatureTourStorageUnavailableError();
   }
   return getFeatureTourProgress(userId);
 }
