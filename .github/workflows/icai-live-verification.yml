@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Focused ICAI Phase 5 verification
         run: npm run test:icai:phase5
       - name: Prepare evidence

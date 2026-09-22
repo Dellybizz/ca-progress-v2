@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Verify Phase 1 live-proof contract
         run: node --test tests/admin-phase1-live.test.mjs
       - name: Run authenticated Phase 1 production admin proof

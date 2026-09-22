@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Enforce retired migration/runtime paths
         run: npm run verify:retirement
       - name: Retirement regression contract

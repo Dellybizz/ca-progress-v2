@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Enforce permanent Supabase retirement
         run: npm run verify:retirement
       - run: npm run typecheck

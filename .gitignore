@@ -19,6 +19,7 @@ node_modules/
 
 # test/coverage output
 coverage/
+*.tsbuildinfo
 
 # OS/editor
 .DS_Store

@@ -32,7 +32,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Repository and Cloudflare certification
         run: npm run audit:product-consistency:phase12:production
       - name: Upload immutable certification evidence
