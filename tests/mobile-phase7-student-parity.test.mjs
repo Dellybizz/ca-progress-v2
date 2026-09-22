@@ -43,6 +43,9 @@ test("Phase 7 synchronizes tour progress through D1 without blocking guests", ()
   assert.match(route, /localOnly: true/);
   assert.match(route, /Number\(input\.step\) > 14/);
   assert.match(service, /WHERE user_id=\?3/);
+  assert.match(service, /isFeatureTourSchemaUnavailable/);
+  assert.match(service, /cloudReady: false/);
+  assert.match(route, /FEATURE_TOUR_SYNC_NOT_READY/);
   assert.match(migrations, /0060_mobile_phase7_feature_tour\.sql/);
 });
 

@@ -3,6 +3,7 @@ import { optionalUser } from "@/lib/auth/server";
 import {
   getFeatureTourProgress,
   saveFeatureTourProgress,
+  FeatureTourStorageUnavailableError,
 } from "@/lib/mobile/feature-tour";
 
 export const dynamic = "force-dynamic";
@@ -44,8 +45,17 @@ export async function POST(request: Request) {
       { error: "Invalid Feature Tour progress." },
       { status: 400, headers },
     );
-  return NextResponse.json(
-    await saveFeatureTourProgress(user.id, Number(input.step), input.completed),
-    { headers },
-  );
+  try {
+    return NextResponse.json(
+      await saveFeatureTourProgress(user.id, Number(input.step), input.completed),
+      { headers },
+    );
+  } catch (error) {
+    if (error instanceof FeatureTourStorageUnavailableError)
+      return NextResponse.json(
+        { error: error.message, code: "FEATURE_TOUR_SYNC_NOT_READY" },
+        { status: 503, headers },
+      );
+    throw error;
+  }
 }
