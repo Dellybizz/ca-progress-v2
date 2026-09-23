@@ -5,11 +5,12 @@ import { join } from "node:path";
 
 const read = path => readFileSync(join(process.cwd(), path), "utf8");
 
-test("Capacitor packages both platforms against the shared HTTPS production origin", () => {
+test("Capacitor packages both platforms from installed assets", () => {
   const config = read("capacitor.config.ts");
   assert.match(config, /appId: "in\.zanisheluxe\.caprogress"/);
-  assert.match(config, /https:\/\/caprogress\.zanisheluxe\.in/);
-  assert.match(config, /cleartext: false/);
+  assert.match(config, /webDir: "native-shell"/);
+  assert.match(config, /CAPACITOR_LIVE_RELOAD_URL/);
+  assert.doesNotMatch(config, /server:\s*\{\s*url:\s*"https:\/\/caprogress\.zanisheluxe\.in"/);
   assert.match(config, /CAProgressNative\/\$\{platform\}\/1/);
   for (const path of ["android/app/build.gradle", "ios/App/App.xcodeproj/project.pbxproj"]) assert.ok(existsSync(join(process.cwd(), path)));
 });

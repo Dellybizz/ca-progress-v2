@@ -7,6 +7,8 @@ export const APP_RELEASE_CONTRACT = Object.freeze({
   academicContext: Object.freeze({ current: 1, minimumSupported: 1 }),
   offline: Object.freeze({ current: 3, minimumSupported: 2 }),
   native: Object.freeze({
+    updateMode: "store",
+    bundleBuild: 2,
     android: Object.freeze({ minimumSupported: 1, recommended: 1, billing: "google_play_billing", checkoutReady: false, storeUrl: null }),
     ios: Object.freeze({ minimumSupported: 1, recommended: 1, billing: "apple_iap", checkoutReady: false, storeUrl: null }),
   }),

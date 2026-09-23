@@ -5,5 +5,5 @@ import nextTypescript from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
-  globalIgnores([".next/**", ".open-next/**", "cloudflare-env.d.ts"]),
+  globalIgnores([".next/**", ".open-next/**", "native-shell/assets/**", "android/app/src/main/assets/public/**", "ios/App/App/public/**", "cloudflare-env.d.ts"]),
 ]);
