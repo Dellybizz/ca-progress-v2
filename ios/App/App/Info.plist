@@ -16,6 +16,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleURLTypes</key>
+	<array><dict><key>CFBundleURLName</key><string>in.zanisheluxe.caprogress.auth</string><key>CFBundleURLSchemes</key><array><string>ca-progress</string></array></dict></array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

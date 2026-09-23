@@ -11,7 +11,7 @@ test("Phase 14 release config loads only the installed bundle", () => {
   assert.match(config, /CAPACITOR_LIVE_RELOAD_URL/);
   assert.doesNotMatch(config, /url: "https:\/\/caprogress\.zanisheluxe\.in"/);
   assert.match(read("config/app-release.ts"), /updateMode: "store"/);
-  assert.match(read("config/app-release.ts"), /bundleBuild: 2/);
+  assert.match(read("config/app-release.ts"), /bundleBuild: [2-9]/);
 });
 
 test("bundled React shell includes every initial route frame", () => {
@@ -20,7 +20,7 @@ test("bundled React shell includes every initial route frame", () => {
   assert.match(source, /createRoot/);
   assert.match(source, /readLocalAccount/);
   assert.match(source, /function Bootstrap/);
-  assert.match(source, /Continue on this device/);
+  assert.match(source, /Continue on this device|Open local preview/);
   assert.match(source, /requestAnimationFrame\(\(\) => document\.documentElement\.dataset\.shellReady/);
   assert.doesNotMatch(source, /\bfetch\s*\(/);
 });
@@ -60,7 +60,7 @@ test("Phase 14 workflow builds the bundle and certifies the phase", () => {
   const workflow = read(".github/workflows/mobile-release.yml");
   const packageJson = read("package.json");
   assert.match(workflow, /apps\/mobile\/\*\*/);
-  assert.match(workflow, /test:mobile:phase14/);
+  assert.match(workflow, /test:mobile:phase1[4-9]/);
   assert.match(packageJson, /native:bundle/);
   assert.match(packageJson, /native:sync:android.*native:bundle/);
   assert.match(read("docs/mobile-local-first/PHASE_14_STATUS.md"), /Status: Complete/);

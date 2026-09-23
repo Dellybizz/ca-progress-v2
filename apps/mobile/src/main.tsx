@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { MOBILE_BUILD } from "./build";
 import { hasRetainedLocalAccount, localPreview, readLocalAccount, retainLocalAccount } from "./repository";
 import { installNativeRuntime, type NativeRoute } from "./runtime";
+import { completeNativeSignIn, logoutNative, readNativeSession, revokeOtherDevices, startNativeSignIn, type NativeSessionSnapshot } from "./native-auth";
 import "./styles.css";
 
 const navigation: Array<{ route: NativeRoute; label: string; glyph: string }> = [
@@ -49,23 +50,27 @@ function Community() {
   return <section className="screen"><header><p className="eyebrow">RECENT CHANNELS</p><h1>Community</h1><p>Channels and recent messages will open from SQLite before realtime updates arrive.</p></header><div className="list">{localPreview.community.map((item) => <article className="row channel" key={item.channel}><span className="avatar">#</span><div><strong>{item.channel}</strong><small>{item.preview}</small></div><span className="time">{item.time}</span></article>)}</div><div className="stale-banner">No connection is required to keep this frame and saved history visible.</div></section>;
 }
 
-function Settings() {
-  return <section className="screen"><header><p className="eyebrow">THIS DEVICE</p><h1>Settings</h1><p>Local storage and account controls remain explicit and account-scoped.</p></header><div className="settings-list"><button><span>Account on this device</span><small>Local preview</small></button><button><span>Offline storage</span><small>Shell only · schema {MOBILE_BUILD.localSchemaVersion}</small></button><button><span>Application build</span><small>{MOBILE_BUILD.channel} · {MOBILE_BUILD.build}</small></button><button><span>Compatibility</span><small>API v{MOBILE_BUILD.apiVersion}</small></button></div></section>;
+function Settings({ authenticated, onLogout }: { authenticated: boolean; onLogout: () => Promise<void> }) {
+  const [message, setMessage] = useState("");
+  return <section className="screen"><header><p className="eyebrow">THIS DEVICE</p><h1>Settings</h1><p>Secure sessions are revocable and shared with the same CA Progress cloud account.</p></header><div className="settings-list"><button><span>Account on this device</span><small>{authenticated ? "Secure native session" : "Local preview"}</small></button>{authenticated && <button onClick={() => void revokeOtherDevices().then(() => setMessage("Other device sessions were revoked.")).catch((error) => setMessage(error.message))}><span>Revoke other devices</span><small>Keep this phone signed in</small></button>}<button><span>Offline storage</span><small>Shell only · schema {MOBILE_BUILD.localSchemaVersion}</small></button><button><span>Application build</span><small>{MOBILE_BUILD.channel} · {MOBILE_BUILD.build}</small></button>{authenticated && <button onClick={() => void onLogout()}><span>Sign out on this device</span><small>Revokes and removes the secure token</small></button>}</div>{message && <p className="note">{message}</p>}</section>;
 }
 
-const screens: Record<NativeRoute, React.ComponentType> = { today: Today, progress: Progress, planner: Planner, focus: Focus, community: Community, settings: Settings };
+const screens: Record<Exclude<NativeRoute, "settings">, React.ComponentType> = { today: Today, progress: Progress, planner: Planner, focus: Focus, community: Community };
 
 function Bootstrap({ onContinue }: { onContinue: () => void }) {
-  return <div className="bootstrap"><div className="bootstrap-card"><span className="bootstrap-logo">CA</span><p className="eyebrow">INSTALLED WORKSPACE</p><h1>CA Progress is ready</h1><p>The application interface is stored on this device. Open a local preview now; secure account sign-in and cloud data arrive in Phase 15.</p><button className="primary" onClick={onContinue}>Continue on this device</button><button className="secondary" disabled>Sign in · available after secure session upgrade</button><small>No website is loaded to show this screen.</small></div></div>;
+  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const signIn = (provider: "google" | "linkedin_oidc") => { setBusy(true); setError(""); void startNativeSignIn(provider).catch((cause) => { setBusy(false); setError(cause.message); }); };
+  return <div className="bootstrap"><div className="bootstrap-card"><span className="bootstrap-logo">CA</span><p className="eyebrow">INSTALLED WORKSPACE</p><h1>CA Progress is ready</h1><p>The application interface is stored on this device. Sign in securely to use the same account and cloud data as the website.</p><button className="primary" disabled={busy} onClick={() => signIn("google")}>Continue with Google</button><button className="secondary" disabled={busy} onClick={() => signIn("linkedin_oidc")}>Continue with LinkedIn</button><button className="secondary" disabled={busy} onClick={onContinue}>Open local preview</button>{error && <small>{error}</small>}<small>Your password and session token never pass through this screen.</small></div></div>;
 }
 
 function AppShell() {
   const [route, setRoute] = useState<NativeRoute>(routeFromHash);
   const [online, setOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
-  const [account] = useState(readLocalAccount);
+  const [account, setAccount] = useState(readLocalAccount);
+  const [authenticated, setAuthenticated] = useState(false);
   const [selected, setSelected] = useState(hasRetainedLocalAccount);
-  const Screen = screens[route];
+  const applySession = (value: NativeSessionSnapshot | null) => { if (!value?.authenticated) return; const next = { id: value.user?.applicationUserId || "cloud-account", displayName: value.user?.displayName || value.user?.email || "CA Progress student", subtitle: value.user?.email || "Cloud account" }; setAccount(next); retainLocalAccount(next); setAuthenticated(true); setSelected(true); };
 
   useEffect(() => {
     const changed = () => setRoute(routeFromHash());
@@ -75,14 +80,16 @@ function AppShell() {
     addEventListener("popstate", changed);
     addEventListener("online", connected);
     addEventListener("offline", disconnected);
-    const removeNative = installNativeRuntime(navigate, resume);
+    const removeNative = installNativeRuntime(navigate, resume, (url) => { void completeNativeSignIn(url).then(applySession).catch(() => setSelected(false)); });
+    void readNativeSession().then((value) => { if (value) applySession(value); }).catch(() => undefined);
     // Network compatibility checks begin after the bundled shell has painted.
     requestAnimationFrame(() => document.documentElement.dataset.shellReady = "true");
     return () => { removeEventListener("popstate", changed); removeEventListener("online", connected); removeEventListener("offline", disconnected); removeNative(); };
   }, []);
 
   if (!selected) return <Bootstrap onContinue={() => { retainLocalAccount(account); setSelected(true); }} />;
-  return <div className="app-shell"><aside><div className="brand"><span>CA</span><div><strong>CA Progress</strong><small>Native workspace</small></div></div><nav>{navigation.map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i>{item.label}</button>)}</nav><div className="account"><span>Z</span><div><strong>{account.displayName}</strong><small>{account.subtitle}</small></div></div></aside><main><div className="topbar"><div className="mobile-brand"><span>CA</span><strong>CA Progress</strong></div><Status online={online} syncing={syncing}/></div><Screen /></main><nav className="bottom-nav">{navigation.slice(0, 5).map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i><span>{item.label}</span></button>)}<button className={route === "settings" ? "active" : ""} onClick={() => navigate("settings")}><i>◇</i><span>More</span></button></nav></div>;
+  const content = route === "settings" ? <Settings authenticated={authenticated} onLogout={async () => { await logoutNative(); setAuthenticated(false); setSelected(false); }} /> : React.createElement(screens[route]);
+  return <div className="app-shell"><aside><div className="brand"><span>CA</span><div><strong>CA Progress</strong><small>Native workspace</small></div></div><nav>{navigation.map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i>{item.label}</button>)}</nav><div className="account"><span>Z</span><div><strong>{account.displayName}</strong><small>{account.subtitle}</small></div></div></aside><main><div className="topbar"><div className="mobile-brand"><span>CA</span><strong>CA Progress</strong></div><Status online={online} syncing={syncing}/></div>{content}</main><nav className="bottom-nav">{navigation.slice(0, 5).map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i><span>{item.label}</span></button>)}<button className={route === "settings" ? "active" : ""} onClick={() => navigate("settings")}><i>◇</i><span>More</span></button></nav></div>;
 }
 
 const root = document.getElementById("root");

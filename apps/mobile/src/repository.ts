@@ -1,7 +1,7 @@
 export type LocalAccount = { id: string; displayName: string; subtitle: string };
 
 const ACCOUNT_KEY = "ca.mobile.shell.account.v1";
-const DEFAULT_ACCOUNT: LocalAccount = { id: "local-preview", displayName: "Your study space", subtitle: "Local preview · sign in arrives in Phase 15" };
+const DEFAULT_ACCOUNT: LocalAccount = { id: "local-preview", displayName: "Your study space", subtitle: "Local preview · sign in when ready" };
 
 export function readLocalAccount(): LocalAccount {
   try {

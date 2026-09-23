@@ -17,11 +17,14 @@ export async function GET(request: NextRequest) {
     const cloudflareResult = await exchangeOAuthCodeForSession(code, state);
     const next = cloudflareResult?.next ?? requestedNext;
     if (!cloudflareResult) await applyRememberDevicePreference(requestedRemember);
-    await ensureUserBootstrap();
-    const destination = await resolvePostAuthDestination(next);
+    if (cloudflareResult?.clientKind !== "mobile") await ensureUserBootstrap();
+    const destination = cloudflareResult?.clientKind === "mobile" ? next : await resolvePostAuthDestination(next);
     if (cloudflareResult?.clientKind === "mobile") {
       const deepLink = new URL("ca-progress://auth/complete");
       deepLink.searchParams.set("next", destination);
+      if (!cloudflareResult.nativeExchange) throw new Error("Native OAuth exchange was not created.");
+      deepLink.searchParams.set("transaction", cloudflareResult.nativeExchange.transactionId);
+      deepLink.searchParams.set("code", cloudflareResult.nativeExchange.exchangeCode);
       return NextResponse.redirect(deepLink);
     }
     return NextResponse.redirect(new URL(destination, request.nextUrl.origin));

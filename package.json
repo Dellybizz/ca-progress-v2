@@ -27,6 +27,7 @@
     "audit:mobile:boundaries": "node scripts/mobile/validate-local-first-boundaries.mjs",
     "test:mobile:phase13": "npm run test:mobile:phase12 && npm run audit:mobile:boundaries && node --test tests/mobile-phase13-architecture.test.mjs",
     "test:mobile:phase14": "npm run test:mobile:phase13 && npm run native:bundle && node --test tests/mobile-phase14-bundled-foundation.test.mjs",
+    "test:mobile:phase15": "npm run test:mobile:phase14 && node --test tests/mobile-phase15-native-auth.test.mjs",
     "native:bundle": "node scripts/mobile/build-native-shell.mjs",
     "native:add:android": "npm run native:bundle && CAPACITOR_PLATFORM=android cap add android",
     "native:add:ios": "npm run native:bundle && CAPACITOR_PLATFORM=ios cap add ios",
@@ -69,6 +70,7 @@
     "cf:smoke": "node scripts/smoke-cloudflare-runtime.mjs"
   },
   "dependencies": {
+    "@ca-progress/capacitor-secure-session": "file:packages/capacitor-secure-session",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.2",
     "@capacitor/keyboard": "^8.0.0",

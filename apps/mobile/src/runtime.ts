@@ -19,11 +19,11 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
   } catch { return null; }
 }
 
-export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onResume: () => void) {
+export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onResume: () => void, onAuthCallback: (url: string) => void) {
   if (!Capacitor.isNativePlatform()) return () => undefined;
   document.documentElement.dataset.nativePlatform = Capacitor.getPlatform();
   const handles = [
-    App.addListener("appUrlOpen", ({ url }) => { const route = routeFromDeepLink(url); if (route) onRoute(route); }),
+    App.addListener("appUrlOpen", ({ url }) => { if (url.startsWith("ca-progress://auth/complete")) onAuthCallback(url); else { const route = routeFromDeepLink(url); if (route) onRoute(route); } }),
     App.addListener("resume", onResume),
     App.addListener("backButton", ({ canGoBack }) => { if (canGoBack) history.back(); else void App.minimizeApp(); }),
   ];
