@@ -246,6 +246,9 @@ export async function saveOfflineFile(ownerId: string, id: string, file: Blob, m
   await put("files", { key: ownerKey(ownerId, id), ownerId, id, file, metadata: safeOfflineData(metadata), savedAt: new Date().toISOString() });
 }
 export async function getOfflineFiles(ownerId: string) { return ownerRows<{ key: string; id: string; file: Blob; metadata: { title?: string } }>("files", ownerId); }
+export async function getOfflineFile(ownerId: string, id: string) {
+  return get<{ id: string; file: Blob; metadata: { title?: string } }>("files", ownerKey(ownerId, id));
+}
 export async function clearOfflineOwner(ownerId: string) {
   await transact<void>([...STORES], "readwrite", (tx, done) => {
     for (const name of STORES) { const request = tx.objectStore(name).index("owner").openCursor(IDBKeyRange.only(ownerId)); request.onsuccess = () => { const cursor = request.result; if (cursor) { cursor.delete(); cursor.continue(); } }; }

@@ -35,7 +35,7 @@ function objectPath(key: string) {
   return `/${RESOURCE_R2_BUCKET_NAME}/${key.split("/").map(encoded).join("/")}`;
 }
 
-export async function createR2PresignedUrl(input: { key: string; method: "GET" | "PUT"; expiresInSeconds?: number; contentType?: string }) {
+export async function createR2PresignedUrl(input: { key: string; method: "GET" | "PUT"; expiresInSeconds?: number; contentType?: string; responseContentDisposition?: string; responseContentType?: string }) {
   const cfg = config();
   const endpoint = (cfg.endpoint || `https://${cfg.accountId}.r2.cloudflarestorage.com`).replace(/\/$/, "");
   const url = new URL(endpoint);
@@ -53,7 +53,10 @@ export async function createR2PresignedUrl(input: { key: string; method: "GET" |
     "X-Amz-Expires": String(expires),
     "X-Amz-SignedHeaders": headersToSign,
   };
-  const query = Object.entries(signedHeaders).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${encoded(key)}=${encoded(value)}`).join("&");
+  const queryValues: Record<string, string> = { ...signedHeaders };
+  if (input.method === "GET" && input.responseContentDisposition) queryValues["response-content-disposition"] = input.responseContentDisposition;
+  if (input.method === "GET" && input.responseContentType) queryValues["response-content-type"] = input.responseContentType;
+  const query = Object.entries(queryValues).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${encoded(key)}=${encoded(value)}`).join("&");
   const lineBreak = String.fromCharCode(10);
   const canonicalHeaders = input.method === "PUT"
     ? [`content-type:${input.contentType ?? "application/octet-stream"}`, `host:${url.host}`, ""].join(lineBreak)

@@ -30,7 +30,8 @@ function officialCards(catalog: Awaited<ReturnType<typeof getIcaiPublicCatalog>>
     title: resource.title,
     summary: resource.summary,
     resourceType: resource.type,
-    officialUrl: resource.officialUrl,
+    // Use the verified redirect so stale or broken official destinations fail closed.
+    officialUrl: `/resources/${encodeURIComponent(resource.id)}/open`,
     sourceName: resource.sourceName,
     lastVerifiedAt: resource.lastVerifiedAt,
     publishedOn: resource.publishedOn,

@@ -2,7 +2,7 @@
 import { OfflineDownload } from "@/components/offline/offline-download";
 import { useOfflineModel } from "@/components/offline/use-offline-model";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,21 @@ function uploadFallbackMessage(status: number) {
   return `Upload failed (${status}). Please check the file and try again.`;
 }
 
+function uploadDirect(url: string, headers: Record<string, string> | undefined, file: File, requestRef: { current: XMLHttpRequest | null }, onProgress: (value: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    requestRef.current = request;
+    request.open("PUT", url);
+    for (const [name, value] of Object.entries(headers || {})) request.setRequestHeader(name, value);
+    request.upload.onprogress = (event) => { if (event.lengthComputable) onProgress(Math.round(event.loaded / event.total * 100)); };
+    request.onload = () => request.status >= 200 && request.status < 300 ? resolve() : reject(new Error("Direct R2 upload failed. Please retry."));
+    request.onerror = () => reject(new Error("The direct upload could not reach R2. Check your connection and try again."));
+    request.onabort = () => reject(new DOMException("Upload cancelled.", "AbortError"));
+    request.onloadend = () => { requestRef.current = null; };
+    request.send(file);
+  });
+}
+
 function NoteCardView({ note }: { note: NoteCard }) {
   return <Link href={`/notes/${note.id}`} className="phase7-document-card phase7-document-card--note"><div className="phase7-document-icon"><Icon name="notes"/></div><div className="phase7-document-copy"><div className="phase7-document-title"><strong>{note.title}</strong><Badge tone={statusTone(note.moderationStatus)}>{note.isOwner ? note.moderationStatus : "Community · Approved"}</Badge></div><p>{note.excerpt || "Rich-text note"}</p><div className="phase7-document-meta"><span>{note.topicTitle ?? note.chapterTitle ?? note.subjectTitle ?? "General note"}</span>{note.source?.type === "community" ? <span>Saved Community answer</span> : null}{note.tags.slice(0, 3).map((tag) => <span key={tag}>#{tag}</span>)}<span>{note.ownerLabel}</span></div></div><Icon name="chevron" size={17}/></Link>;
 }
@@ -52,10 +67,10 @@ function UploadCardView({ resource }: { resource: UploadCard }) {
 function UploadPanel({ model, close, initialSubjectId, initialChapterId }: { model: ResourceLibraryReady; close: () => void; initialSubjectId?: string; initialChapterId?: string }) {
   const router = useRouter();
   const initialContext = resolveAcademicContext(model, { subjectId: initialSubjectId, chapterId: initialChapterId });
-  const [subjectId, setSubjectId] = useState(initialContext.subjectId); const [chapterId, setChapterId] = useState(initialContext.chapterId); const [visibility, setVisibility] = useState("private"); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
+  const [subjectId, setSubjectId] = useState(initialContext.subjectId); const [chapterId, setChapterId] = useState(initialContext.chapterId); const [visibility, setVisibility] = useState("private"); const [busy, setBusy] = useState(false); const [progress, setProgress] = useState(0); const [error, setError] = useState<string | null>(null); const uploadRequest = useRef<XMLHttpRequest | null>(null);
   const selectedSubject = model.subjects.find((subject) => subject.id === subjectId) ?? null;
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError(null);
+    event.preventDefault(); setBusy(true); setProgress(0); setError(null);
     try {
       const form = new FormData(event.currentTarget);
       const selectedFile = form.get("file");
@@ -66,8 +81,7 @@ function UploadPanel({ model, close, initialSubjectId, initialChapterId }: { mod
       const issueResponse = await fetch("/api/v1/resources/upload-url", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(descriptor) });
       const issuePayload = await readApiPayload<{ uploadId?: string; uploadUrl?: string; headers?: Record<string, string>; error?: string }>(issueResponse);
       if (!issueResponse.ok || !issuePayload.uploadId || !issuePayload.uploadUrl) throw new Error(issuePayload.error || uploadFallbackMessage(issueResponse.status));
-      const directResponse = await fetch(issuePayload.uploadUrl, { method: "PUT", headers: issuePayload.headers, body: selectedFile });
-      if (!directResponse.ok) throw new Error("Direct R2 upload failed. Please retry.");
+      await uploadDirect(issuePayload.uploadUrl, issuePayload.headers, selectedFile, uploadRequest, setProgress);
       const completeResponse = await fetch("/api/v1/resources/upload-complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: issuePayload.uploadId }) });
       const completePayload = await readApiPayload<{ error?: string }>(completeResponse);
       if (!completeResponse.ok) throw new Error(completePayload.error || uploadFallbackMessage(completeResponse.status));
@@ -75,9 +89,9 @@ function UploadPanel({ model, close, initialSubjectId, initialChapterId }: { mod
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Upload failed.";
       setError(message === "Failed to fetch" ? "The direct upload could not reach R2. Check your connection and try again." : message);
-    } finally { setBusy(false); }
+    } finally { uploadRequest.current = null; setBusy(false); }
   }
-  return <div className="phase7-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}><aside className="phase7-upload-drawer" role="dialog" aria-modal="true" aria-label="Upload resource"><div className="phase7-drawer-head"><div><span>Private Storage</span><h2>Upload a resource</h2></div><button onClick={close} aria-label="Close upload drawer"><Icon name="close"/></button></div><form onSubmit={submit} className="phase7-form"><label><span>File</span><input name="file" type="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"/><small>PDF, images, DOC or DOCX · maximum 10 MB. The browser uploads directly to private R2; the server issues a short-lived URL and rechecks ownership, MIME, size, moderation and quota.</small></label><label><span>Title</span><input name="title" maxLength={160} placeholder="Audit chapter 3 summary"/></label><label><span>Description</span><textarea name="description" maxLength={4000} rows={4} placeholder="Optional context for this file"/></label><label><span>Subject</span><select value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">No subject</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label><label><span>Chapter</span><select disabled={!selectedSubject} value={chapterId} onChange={(event) => setChapterId(event.target.value)}><option value="">No chapter</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label><label><span>Visibility</span><select value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="private">Private</option><option value="shared">Share with Community</option></select></label><div className="phase7-policy-note"><Icon name={visibility === "private" ? "lock" : "shield"} size={17}/><span>{visibility === "private" ? "Private files are stored in Cloudflare R2 and opened only through an authorized Worker route." : "Community uploads are hidden until a moderator approves them."}</span></div>{error ? <div className="phase7-inline-error" role="alert">{error}</div> : null}<button disabled={busy} type="submit" className="ui-button ui-button--primary">{busy ? "Uploading…" : "Upload resource"}</button></form></aside></div>;
+  return <div className="phase7-drawer-backdrop" role="presentation" onMouseDown={(event) => { if (!busy && event.target === event.currentTarget) close(); }}><aside className="phase7-upload-drawer" role="dialog" aria-modal="true" aria-label="Upload resource"><div className="phase7-drawer-head"><div><span>Private Storage</span><h2>Upload a resource</h2></div><button disabled={busy} onClick={close} aria-label="Close upload drawer"><Icon name="close"/></button></div><form onSubmit={submit} className="phase7-form"><label><span>File</span><input name="file" type="file" required disabled={busy} accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"/><small>PDF, images, DOC or DOCX · maximum 10 MB. The browser uploads directly to private R2; the server rechecks ownership, MIME, size, moderation and quota.</small></label><label><span>Title</span><input name="title" maxLength={160} disabled={busy} placeholder="Audit chapter 3 summary"/></label><label><span>Description</span><textarea name="description" maxLength={4000} disabled={busy} rows={4} placeholder="Optional context for this file"/></label><label><span>Subject</span><select disabled={busy} value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setChapterId(""); }}><option value="">No subject</option>{model.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.title}</option>)}</select></label><label><span>Chapter</span><select disabled={busy || !selectedSubject} value={chapterId} onChange={(event) => setChapterId(event.target.value)}><option value="">No chapter</option>{selectedSubject?.chapters.map((chapter) => <option key={chapter.id} value={chapter.id}>{chapter.number}. {chapter.title}</option>)}</select></label><label><span>Visibility</span><select disabled={busy} value={visibility} onChange={(event) => setVisibility(event.target.value)}><option value="private">Private</option><option value="shared">Share with Community</option></select></label><div className="phase7-policy-note"><Icon name={visibility === "private" ? "lock" : "shield"} size={17}/><span>{visibility === "private" ? "Private files are stored in Cloudflare R2 and opened only through an authorized Worker route." : "Community uploads are hidden until a moderator approves them."}</span></div>{busy ? <div className="phase8-upload-progress" role="status" aria-live="polite"><div><span>Uploading securely</span><strong>{progress}%</strong></div><progress max="100" value={progress}/><button type="button" onClick={() => uploadRequest.current?.abort()}>Cancel upload</button></div> : null}{error ? <div className="phase7-inline-error" role="alert">{error}</div> : null}<button disabled={busy} type="submit" className="ui-button ui-button--primary">{busy ? "Uploading…" : "Upload resource"}</button></form></aside></div>;
 }
 
 export function ResourceLibrary({ model: serverModel, initialTab = "my", initialAcademicContext, initialCommunityDraft = null }: { model: ResourceLibraryReady; initialTab?: "my" | "shared" | "icai"; initialAcademicContext?: AcademicContext; initialCommunityDraft?: CommunityNoteDraft | null }) {

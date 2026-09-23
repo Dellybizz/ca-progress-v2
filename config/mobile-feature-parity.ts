@@ -83,6 +83,16 @@ const FEATURES: readonly Omit<MobileFeatureParity, "analytics">[] = [
     failureState: "local draft retention and route errors",
   },
   {
+    id: "resources",
+    label: "Resources, PDFs & downloads",
+    href: "/resources",
+    mobileLayout: "touch library and in-app document viewer",
+    offline: "partial",
+    permission: "account",
+    synchronization: "signed R2 access and account-isolated saved files",
+    failureState: "format fallback, cancellable upload and secure retry",
+  },
+  {
     id: "activity",
     label: "Activity",
     href: "/activity",

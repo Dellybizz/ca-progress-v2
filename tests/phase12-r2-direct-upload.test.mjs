@@ -40,7 +40,7 @@ test("abandoned direct uploads have bounded cleanup", () => {
 test("browser resource uploader uses signed PUT then metadata completion", () => {
   const component = read("components/resources/resource-library.tsx");
   assert.match(component, /\/api\/v1\/resources\/upload-url/);
-  assert.match(component, /method: "PUT"/);
+  assert.match(component, /(?:method: "PUT"|request\.open\("PUT", url\))/);
   assert.match(component, /\/api\/v1\/resources\/upload-complete/);
   assert.doesNotMatch(component, /fetch\("\/api\/(?:v1\/)?resources\/upload",/);
 });

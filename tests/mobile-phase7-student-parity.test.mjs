@@ -5,14 +5,14 @@ import { test } from "node:test";
 const root = new URL("../", import.meta.url);
 const read = (path) => readFileSync(new URL(path, root), "utf8");
 
-test("Phase 7 publishes one explicit contract for all 14 student feature families", () => {
+test("Phase 7 retains its 14 feature contracts as later phases extend the registry", () => {
   const contract = read("config/mobile-feature-parity.ts");
   const entries = contract.slice(contract.indexOf("const FEATURES"), contract.indexOf("] as const"));
   const ids = [...entries.matchAll(/id: "([^"]+)"/g)].map((match) => match[1]);
-  assert.equal(ids.length, 14);
-  assert.equal(new Set(ids).size, 14);
+  assert.ok(ids.length >= 14);
+  assert.equal(new Set(ids).size, ids.length);
   for (const field of ["mobileLayout", "offline", "permission", "synchronization", "failureState"])
-    assert.equal((entries.match(new RegExp(`${field}:`, "g")) ?? []).length, 14);
+    assert.equal((entries.match(new RegExp(`${field}:`, "g")) ?? []).length, ids.length);
   assert.match(contract, /analytics: "shared route, API and failure telemetry"/);
   assert.match(read("lib/mobile/api-v1.ts"), /studentFeatureParity: MOBILE_STUDENT_FEATURES/);
 });
