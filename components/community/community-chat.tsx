@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { subscribeToCommunityRealtime } from "@/lib/community/realtime-provider";
+import type { CommunityConnectionState } from "@/lib/community/realtime-provider";
 import type { CommunityChannelModel, CommunityFeedFilter, CommunityMessage, CommunityMessagePage, CommunityReactionEmoji } from "@/lib/community/types";
 import { CommunityChannelList } from "./channel-list";
 
@@ -35,6 +36,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
   const router = useRouter();
   const listRef = useRef<HTMLDivElement | null>(null);
   const realtimeRef = useRef<ReturnType<typeof subscribeToCommunityRealtime> | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [messages, setMessages] = useState(model.messages);
   const [nextCursor, setNextCursor] = useState(model.nextCursor);
   const [body, setBody] = useState("");
@@ -50,6 +52,9 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pinned, setPinned] = useState(model.pinned);
+  const [connection, setConnection] = useState<CommunityConnectionState>("connecting");
+  const [present, setPresent] = useState<Record<string, string>>({});
+  const [typing, setTyping] = useState<Record<string, true>>({});
   const latestSequence = messages.at(-1)?.sequence ?? model.channel.latestSequence ?? 0;
   const isGuest = !model.viewerId;
   const filters = model.feedFilters ?? DEFAULT_FILTERS;
@@ -82,13 +87,40 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       timer = setTimeout(() => void refreshMessages().catch(() => undefined), 120);
     };
     const unsubscribe = subscribeToCommunityRealtime({
-      channelId: model.channel.id, userId: model.viewerId || undefined, channelSlug: model.channel.slug,
+      channelId: model.channel.id, userId: model.viewerId || undefined, userLabel: model.viewerName, channelSlug: model.channel.slug,
       onDataChanged: scheduleRefresh,
       onPinnedChanged: () => { scheduleRefresh(); router.refresh(); },
+      onConnectionChanged: setConnection,
+      onPresenceChanged: (value) => {
+        const event = value as { userId?: unknown; label?: unknown; state?: unknown };
+        if (typeof event.userId !== "string") return;
+        const userId = event.userId;
+        setPresent((current) => {
+          const next = { ...current };
+          if (event.state === "online") next[userId] = typeof event.label === "string" ? event.label : "Student";
+          else delete next[userId];
+          return next;
+        });
+        if (event.state !== "online") setTyping((current) => { const next = { ...current }; delete next[userId]; return next; });
+      },
+      onTypingChanged: (value) => {
+        const event = value as { userId?: unknown; typing?: unknown };
+        if (typeof event.userId !== "string" || typeof event.typing !== "boolean") return;
+        const userId = event.userId;
+        setTyping((current) => { const next = { ...current }; if (event.typing) next[userId] = true; else delete next[userId]; return next; });
+      },
     });
     realtimeRef.current = unsubscribe;
-    return () => { if (timer) clearTimeout(timer); realtimeRef.current = null; unsubscribe(); };
-  }, [model.channel.id, model.channel.slug, model.viewerId, refreshMessages, router]);
+    return () => { if (timer) clearTimeout(timer); if (typingTimerRef.current) clearTimeout(typingTimerRef.current); realtimeRef.current = null; unsubscribe(); };
+  }, [model.channel.id, model.channel.slug, model.viewerId, model.viewerName, refreshMessages, router]);
+
+  const updateBody = (value: string) => {
+    setBody(value);
+    if (!model.viewerId) return;
+    realtimeRef.current?.send({ type: "typing", userId: model.viewerId, typing: Boolean(value.trim()) });
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => realtimeRef.current?.send({ type: "typing", userId: model.viewerId, typing: false }), 1200);
+  };
 
   useEffect(() => {
     const element = listRef.current;
@@ -123,6 +155,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       const payload = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Message could not be sent.");
       setBody(""); setReplyTo(null); setResourceId(""); setMentionUserId("");
+      realtimeRef.current?.send({ type: "typing", userId: model.viewerId, typing: false });
       realtimeRef.current?.send({ type: "refresh", reason: "message" });
       await refreshMessages();
     } catch (err) { setError(err instanceof Error ? err.message : "Message could not be sent."); }
@@ -224,7 +257,7 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
     <aside className="phase10-chat-sidebar"><div className="phase10-chat-sidebar-head"><Link href="/community" className="phase10-back"><Icon name="arrow" size={16}/>Community</Link><strong>Channels</strong></div><CommunityChannelList groups={model.groups} activeSlug={model.channel.slug}/></aside>
     <section className="phase10-chat-panel" aria-label={`${model.channel.title} chat`}>
       <header className="phase10-chat-header">
-        <div><Link href="/community" className="phase10-mobile-back" aria-label="Back to channels">‹</Link><span className={`phase10-channel-icon phase10-channel-icon--${model.channel.kind}`}><Icon name={model.channel.kind === "announcements" ? "bell" : model.channel.kind === "resources" ? "book" : "community"} size={18}/></span><div><h1>{model.channel.title}</h1><p>{model.channel.description}</p></div></div>
+        <div><Link href="/community" className="phase10-mobile-back" aria-label="Back to channels">‹</Link><span className={`phase10-channel-icon phase10-channel-icon--${model.channel.kind}`}><Icon name={model.channel.kind === "announcements" ? "bell" : model.channel.kind === "resources" ? "book" : "community"} size={18}/></span><div><h1>{model.channel.title}</h1><p>{connection === "connected" ? `${Object.keys(present).length + 1} here now` : connection === "offline" ? "Offline — reconnect to refresh" : connection === "fallback" ? "Refreshing automatically" : "Connecting…"}</p></div></div>
         <form onSubmit={search} className="phase10-chat-search"><Icon name="search" size={15}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search messages" maxLength={80}/>{activeQuery ? <button type="button" onClick={() => { setQuery(""); setActiveQuery(""); void refreshMessages("", activeFilter); }} aria-label="Clear search"><Icon name="close" size={14}/></button> : null}</form>
       </header>
 
@@ -259,10 +292,11 @@ export function CommunityChat({ model }: { model: ReadyModel }) {
       </div>
 
       <form className="phase10-composer" onSubmit={send}>
+        {Object.keys(typing).length ? <div className="phase10-typing" role="status">{Object.keys(typing).length === 1 ? `${present[Object.keys(typing)[0]] ?? "Someone"} is typing…` : `${Object.keys(typing).length} students are typing…`}</div> : null}
         {replyTo ? <div className="phase10-composer-context"><span><strong>Replying to {replyTo.authorLabel}</strong>{shortBody(replyTo.body)}</span><button type="button" onClick={() => setReplyTo(null)}><Icon name="close" size={14}/></button></div> : null}
         {mentionLabel ? <div className="phase10-composer-context"><span><strong>Mentioning @{mentionLabel}</strong>The mentioned student will receive a notification.</span><button type="button" onClick={() => setMentionUserId("")}><Icon name="close" size={14}/></button></div> : null}
         <div className="phase10-composer-tools"><select onFocus={() => void loadComposerOptions().catch((err) => setError(err instanceof Error ? err.message : "Composer options could not be loaded."))} value={mentionUserId} onChange={(event) => setMentionUserId(event.target.value)} disabled={!model.channel.canWrite || Boolean(model.activeBlock)}><option value="">@ Mention</option>{members.map((member) => <option key={member.userId} value={member.userId}>@{member.label}</option>)}</select><select onFocus={() => void loadComposerOptions().catch((err) => setError(err instanceof Error ? err.message : "Composer options could not be loaded."))} value={resourceId} onChange={(event) => setResourceId(event.target.value)} disabled={!model.channel.canWrite || Boolean(model.activeBlock)}><option value="">Attach approved resource</option>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title} · {resource.extension.toUpperCase()}</option>)}</select></div>
-        <div className="phase10-composer-row"><textarea onFocus={() => void loadComposerOptions().catch((err) => setError(err instanceof Error ? err.message : "Composer options could not be loaded."))} value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} placeholder={model.activeBlock ? "Chat is temporarily blocked" : model.channel.canWrite ? `Message #${model.channel.title}` : "Sign in to chat"} disabled={!model.channel.canWrite || Boolean(model.activeBlock)} rows={1}/><span>{body.length}/2000</span><button className="ui-button ui-button--primary" disabled={!body.trim() || !model.channel.canWrite || Boolean(model.activeBlock) || busy === "send"}>{busy === "send" ? "Sending…" : model.viewerId ? "Send" : "Sign in to chat"}</button></div>
+        <div className="phase10-composer-row"><textarea onFocus={() => void loadComposerOptions().catch((err) => setError(err instanceof Error ? err.message : "Composer options could not be loaded."))} value={body} onChange={(event) => updateBody(event.target.value)} maxLength={2000} placeholder={model.activeBlock ? "Chat is temporarily blocked" : model.channel.canWrite ? `Message #${model.channel.title}` : "Sign in to chat"} disabled={!model.channel.canWrite || Boolean(model.activeBlock)} rows={1}/><span>{body.length}/2000</span><button className="ui-button ui-button--primary" disabled={!body.trim() || !model.channel.canWrite || Boolean(model.activeBlock) || busy === "send"}>{busy === "send" ? "Sending…" : model.viewerId ? "Send" : "Sign in to chat"}</button></div>
       </form>
     </section>
   </div>;

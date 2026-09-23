@@ -4,11 +4,15 @@ type CommunityRealtimeSubscription = {
   channelId: string;
   channelSlug?: string;
   userId?: string;
+  userLabel?: string;
   onDataChanged: () => void;
   onPinnedChanged: () => void;
   onPresenceChanged?: (payload: unknown) => void;
   onTypingChanged?: (payload: unknown) => void;
+  onConnectionChanged?: (state: CommunityConnectionState) => void;
 };
+
+export type CommunityConnectionState = "connecting" | "connected" | "fallback" | "offline";
 
 type CommunityRealtimeHandle = (() => void) & {
   send: (event: Record<string, unknown>) => void;
@@ -32,7 +36,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
   const noop = (() => undefined) as CommunityRealtimeHandle;
   noop.send = () => undefined;
   if (!input.channelId || !input.channelSlug || typeof window === "undefined" || typeof WebSocket === "undefined") return noop;
-      const SocketCtor = globalThis.WebSocket;
+  const SocketCtor = globalThis.WebSocket;
 
   const presenceId = input.userId || `guest:${crypto.randomUUID()}`;
   let socket: WebSocket | null = null;
@@ -49,6 +53,7 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
     if (document.visibilityState === "visible") input.onPinnedChanged();
   };
   const startFallback = () => {
+    input.onConnectionChanged?.(navigator.onLine ? "fallback" : "offline");
     if (fallbackDataTimer === null) fallbackDataTimer = window.setInterval(refreshData, DATA_REFRESH_MS);
     if (fallbackPinTimer === null) fallbackPinTimer = window.setInterval(refreshPins, PIN_REFRESH_MS);
   };
@@ -65,11 +70,14 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
   };
   const connect = () => {
     if (closed) return;
+    if (!navigator.onLine) { startFallback(); return; }
+    input.onConnectionChanged?.("connecting");
     try { socket = new SocketCtor(realtimeUrl(input.channelSlug!)); } catch { startFallback(); return; }
     socket.addEventListener("open", () => {
       reconnectMs = 500;
       stopFallback();
-      socket?.send(JSON.stringify({ type: "presence", userId: presenceId, state: "online" }));
+      input.onConnectionChanged?.("connected");
+      socket?.send(JSON.stringify({ type: "presence", userId: presenceId, state: "online", label: input.userLabel }));
     });
     socket.addEventListener("message", (event) => {
       if (typeof event.data !== "string") return;
@@ -78,6 +86,8 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
         if (payload.type === "refresh") {
           if (payload.reason === "pin" || payload.reason === "moderation") input.onPinnedChanged();
           input.onDataChanged();
+        } else if (payload.type === "ready") {
+          socket?.send(JSON.stringify({ type: "presence", userId: presenceId, state: "online", label: input.userLabel }));
         } else if (payload.type === "presence") input.onPresenceChanged?.(payload);
         else if (payload.type === "typing") input.onTypingChanged?.(payload);
       } catch { /* malformed ephemeral events are ignored */ }
@@ -93,12 +103,18 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
   };
   connect();
   document.addEventListener("visibilitychange", onVisibility);
+  const onOnline = () => { if (!socket && !closed) connect(); };
+  const onOffline = () => { input.onConnectionChanged?.("offline"); socket?.close(); };
+  window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
 
   const handle = (() => {
     closed = true;
     if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
     stopFallback();
     document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("offline", onOffline);
     if (socket?.readyState === 1) socket.send(JSON.stringify({ type: "presence", userId: presenceId, state: "offline" }));
     socket?.close();
     socket = null;

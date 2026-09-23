@@ -24,6 +24,8 @@ function safeEvent(value: unknown): CoordinatorEvent | null {
 }
 
 export class CommunityChannelCoordinator {
+  private readonly presence = new Map<WebSocket, Extract<CoordinatorEvent, { type: "presence" }>>();
+
   constructor(private readonly state: DurableState) {}
 
   fetch(request: Request) {
@@ -43,12 +45,23 @@ export class CommunityChannelCoordinator {
       try { parsed = JSON.parse(data); } catch { return; }
       const message = safeEvent(parsed);
       if (!message) return;
+      if (message.type === "presence") {
+        if (message.state === "online") this.presence.set(server, message);
+        else this.presence.delete(server);
+      }
       this.broadcast(message, server);
     });
-    server.addEventListener("close", () => undefined);
+    server.addEventListener("close", () => this.leave(server));
     server.addEventListener("error", () => undefined);
     server.send(JSON.stringify({ type: "ready" }));
+    for (const presence of this.presence.values()) server.send(JSON.stringify(presence));
     return new Response(null, { status: 101, webSocket: client } as ResponseInit & { webSocket: WebSocket });
+  }
+
+  private leave(socket: WebSocket) {
+    const presence = this.presence.get(socket);
+    this.presence.delete(socket);
+    if (presence) this.broadcast({ ...presence, state: "offline" }, socket);
   }
 
   private broadcast(event: CoordinatorEvent, sender?: WebSocket) {

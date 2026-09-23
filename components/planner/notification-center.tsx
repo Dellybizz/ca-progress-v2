@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { NotificationPreferences, PlannerNotification } from "@/lib/planner/types";
+import { BrowserPushControls } from "./browser-push-controls";
 
 export function NotificationCenter({ notifications, preferences, compact = false }: { notifications: PlannerNotification[]; preferences: NotificationPreferences; compact?: boolean }) {
   const router = useRouter();
@@ -47,6 +48,7 @@ export function NotificationCenter({ notifications, preferences, compact = false
           <button className="ui-button ui-button--secondary" type="button" disabled={busy} onClick={() => void savePreferences()}>{busy ? "Saving…" : "Save preferences"}</button>
         </div>
       </details> : null}
+      {!compact ? <details className="planner-notification-settings"><summary>App push notifications</summary><BrowserPushControls/></details> : null}
     </CardBody>
   </Card>;
 }

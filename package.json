@@ -19,6 +19,8 @@
     "test:mobile:phase5": "node --test tests/mobile-phase1-foundation.test.mjs tests/mobile-phase2-versioned-api.test.mjs tests/mobile-phase3-unified-auth.test.mjs tests/mobile-phase4-adaptive-shell.test.mjs tests/mobile-phase5-installable-pwa.test.mjs",
     "test:mobile:phase6": "node --test tests/mobile-phase1-foundation.test.mjs tests/mobile-phase2-versioned-api.test.mjs tests/mobile-phase3-unified-auth.test.mjs tests/mobile-phase4-adaptive-shell.test.mjs tests/mobile-phase5-installable-pwa.test.mjs tests/mobile-phase6-offline-sync.test.mjs",
     "test:mobile:phase7": "node --test tests/mobile-phase1-foundation.test.mjs tests/mobile-phase2-versioned-api.test.mjs tests/mobile-phase3-unified-auth.test.mjs tests/mobile-phase4-adaptive-shell.test.mjs tests/mobile-phase5-installable-pwa.test.mjs tests/mobile-phase6-offline-sync.test.mjs tests/mobile-phase7-student-parity.test.mjs",
+    "test:mobile:phase8": "npm run test:mobile:phase7 && node --test tests/mobile-phase8-resources.test.mjs",
+    "test:mobile:phase9": "npm run test:mobile:phase8 && node --test tests/mobile-phase9-community-push.test.mjs",
     "audit:product-consistency:phase0": "node scripts/product-consistency/phase0-audit.mjs",
     "audit:product-consistency:phase10:gate": "node scripts/product-consistency/phase10-critical-gate.mjs",
     "audit:product-consistency:phase12": "node scripts/product-consistency/phase12-certify.mjs",
