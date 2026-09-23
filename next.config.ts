@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // OpenNext does not automatically retain arbitrary GitHub Actions variables at
+  // Worker runtime. Embed the non-secret build SHA so /api/app-config reports the
+  // exact deployment instead of silently falling back to the Phase 0 baseline.
+  env: {
+    DEPLOY_SHA: process.env.DEPLOY_SHA ?? "development",
+  },
   async rewrites() {
     return {
       beforeFiles: [],

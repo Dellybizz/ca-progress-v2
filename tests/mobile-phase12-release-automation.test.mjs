@@ -8,12 +8,14 @@ const read = (path) => readFileSync(join(process.cwd(), path), "utf8");
 test("Phase 12 publishes a hosted release contract with bounded native compatibility", () => {
   const contract = read("config/app-release.ts");
   const gate = read("components/mobile/native-update-gate.tsx");
+  const nextConfig = read("next.config.ts");
   assert.match(contract, /schemaVersion: 2/);
   assert.match(contract, /updateMode: "hosted"/);
   assert.match(contract, /minimumSupported: 1, recommended: 1/);
   assert.match(gate, /App\.addListener\("resume"/);
   assert.match(gate, /status === "required"/);
   assert.match(gate, /aria-modal="true"/);
+  assert.match(nextConfig, /DEPLOY_SHA: process\.env\.DEPLOY_SHA/);
 });
 
 test("account deletion is queued, idempotent and records bounded retention", () => {
