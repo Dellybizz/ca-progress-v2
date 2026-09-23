@@ -20,6 +20,10 @@ export function retainLocalAccount(account: LocalAccount) {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
 }
 
+export function clearLocalAccount() {
+  localStorage.removeItem(ACCOUNT_KEY);
+}
+
 export const localPreview = Object.freeze({
   today: [
     { title: "Continue your next chapter", meta: "Open Progress to choose a chapter", state: "Ready" },

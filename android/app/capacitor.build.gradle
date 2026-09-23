@@ -9,6 +9,7 @@ android {
 
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
+    implementation project(':ca-progress-capacitor-local-database')
     implementation project(':ca-progress-capacitor-secure-session')
     implementation project(':capacitor-app')
     implementation project(':capacitor-keyboard')

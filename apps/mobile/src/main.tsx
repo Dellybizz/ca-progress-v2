@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MOBILE_BUILD } from "./build";
-import { hasRetainedLocalAccount, localPreview, readLocalAccount, retainLocalAccount } from "./repository";
+import { clearLocalAccount, hasRetainedLocalAccount, localPreview, readLocalAccount, retainLocalAccount } from "./repository";
 import { installNativeRuntime, type NativeRoute } from "./runtime";
 import { completeNativeSignIn, logoutNative, readNativeSession, revokeOtherDevices, startNativeSignIn, type NativeSessionSnapshot } from "./native-auth";
+import { openAccountRepository, wipeAllOfflineData, type LocalAccountRepository, type LocalDashboard, type LocalTimer } from "../../../packages/mobile-data/src";
 import "./styles.css";
 
 const navigation: Array<{ route: NativeRoute; label: string; glyph: string }> = [
@@ -29,33 +30,35 @@ function Status({ online, syncing }: { online: boolean; syncing: boolean }) {
   return <span className={`status ${online ? "online" : "offline"}`}>{syncing ? "Updating…" : online ? "Ready" : "Offline · showing saved data"}</span>;
 }
 
-function Today() {
-  return <section className="screen"><header><p className="eyebrow">Tuesday · Local workspace</p><h1>Good afternoon</h1><p>Start with what matters. Your synchronized plan will update here without replacing this screen.</p></header><div className="hero-card"><div><span className="card-label">NEXT UP</span><h2>Build today’s study plan</h2><p>Phase 17 will keep tasks synchronized. The installed layout is already available offline.</p></div><button onClick={() => navigate("planner")}>Open planner</button></div><h2 className="section-title">Today</h2><div className="list">{localPreview.today.map((item) => <article className="row" key={item.title}><span className="check"/><div><strong>{item.title}</strong><small>{item.meta}</small></div><span className="pill">{item.state}</span></article>)}</div></section>;
+function Today({ dashboard }: { dashboard: LocalDashboard }) {
+  return <section className="screen"><header><p className="eyebrow">Tuesday · Local workspace</p><h1>Good afternoon</h1><p>Saved information appears immediately; future synchronization updates it quietly.</p></header><div className="hero-card"><div><span className="card-label">NEXT UP</span><h2>Build today’s study plan</h2><p>The installed layout and local records remain available offline.</p></div><button onClick={() => navigate("planner")}>Open planner</button></div><h2 className="section-title">Today</h2><div className="list">{dashboard.today.map((item) => <article className="row" key={item.title}><span className="check"/><div><strong>{item.title}</strong><small>{item.meta}</small></div><span className="pill">{item.state}</span></article>)}</div></section>;
 }
 
-function Progress() {
-  return <section className="screen"><header><p className="eyebrow">LOCAL SNAPSHOT</p><h1>Progress</h1><p>Your academic structure and completed stages will render from device storage.</p></header><div className="metric-grid"><article><small>Overall progress</small><strong>{localPreview.progress[0].value}</strong><p>{localPreview.progress[0].hint}</p></article><article><small>Study streak</small><strong>0 days</strong><p>Starts after your first synchronized session.</p></article></div><div className="empty"><span>◒</span><h2>Progress is ready for data</h2><p>The screen stays usable offline; secure account synchronization is added in later phases.</p></div></section>;
+function Progress({ dashboard }: { dashboard: LocalDashboard }) {
+  return <section className="screen"><header><p className="eyebrow">LOCAL SNAPSHOT</p><h1>Progress</h1><p>Your academic structure and completed stages render from device storage.</p></header><div className="metric-grid"><article><small>Overall progress</small><strong>{dashboard.progress.value}</strong><p>{dashboard.progress.hint}</p></article><article><small>Study streak</small><strong>0 days</strong><p>Starts after your first synchronized session.</p></article></div><div className="empty"><span>◒</span><h2>Progress is ready for data</h2><p>The screen stays usable offline.</p></div></section>;
 }
 
 function Planner() {
   return <section className="screen"><header><p className="eyebrow">LOCAL PLAN</p><h1>Planner</h1><p>Tasks will appear from the local database first and update quietly in the background.</p></header><div className="date-strip">{["M 21", "T 22", "W 23", "T 24", "F 25"].map((day, index) => <button className={index === 2 ? "selected" : ""} key={day}>{day}</button>)}</div><div className="empty compact"><span>□</span><h2>No local tasks yet</h2><p>This is a stable empty state, not a network loading screen.</p></div></section>;
 }
 
-function Focus() {
-  const [running, setRunning] = useState(false);
-  return <section className="screen focus-screen"><header><p className="eyebrow">DEVICE TIMER</p><h1>Focus</h1><p>The timer interface is bundled and remains available without a connection.</p></header><div className={`timer ${running ? "running" : ""}`}><span>25:00</span><small>{running ? "FOCUSING" : "READY"}</small></div><button className="primary wide" onClick={() => setRunning(!running)}>{running ? "Pause focus" : "Start focus"}</button><p className="note">Phase 16 persists timer state across process death; this foundation intentionally stores no study record yet.</p></section>;
+function Focus({ repository }: { repository: LocalAccountRepository | null }) {
+  const [timer, setTimer] = useState<LocalTimer>({ mode: "focus", status: "idle", startedAt: null, elapsedSeconds: 0, updatedAt: new Date().toISOString() });
+  useEffect(() => { void repository?.readTimer().then(setTimer); }, [repository]);
+  const toggle = async () => { const running=timer.status==="running"; const next={...timer,status:running?"paused" as const:"running" as const,startedAt:running?timer.startedAt:new Date().toISOString(),updatedAt:new Date().toISOString()};setTimer(next);await repository?.saveTimer(next); };
+  return <section className="screen focus-screen"><header><p className="eyebrow">DEVICE TIMER</p><h1>Focus</h1><p>The timer state is stored locally and survives closing or restarting the app.</p></header><div className={`timer ${timer.status === "running" ? "running" : ""}`}><span>25:00</span><small>{timer.status === "running" ? "FOCUSING" : timer.status.toUpperCase()}</small></div><button className="primary wide" onClick={() => void toggle()}>{timer.status === "running" ? "Pause focus" : "Start focus"}</button><p className="note">Timer persistence is account-scoped and does not require a connection.</p></section>;
 }
 
-function Community() {
-  return <section className="screen"><header><p className="eyebrow">RECENT CHANNELS</p><h1>Community</h1><p>Channels and recent messages will open from SQLite before realtime updates arrive.</p></header><div className="list">{localPreview.community.map((item) => <article className="row channel" key={item.channel}><span className="avatar">#</span><div><strong>{item.channel}</strong><small>{item.preview}</small></div><span className="time">{item.time}</span></article>)}</div><div className="stale-banner">No connection is required to keep this frame and saved history visible.</div></section>;
+function Community({ dashboard }: { dashboard: LocalDashboard }) {
+  return <section className="screen"><header><p className="eyebrow">RECENT CHANNELS</p><h1>Community</h1><p>Channels and recent messages open from SQLite before realtime updates arrive.</p></header><div className="list">{dashboard.community.map((item) => <article className="row channel" key={item.channel}><span className="avatar">#</span><div><strong>{item.channel}</strong><small>{item.preview}</small></div><span className="time">{item.time}</span></article>)}</div><div className="stale-banner">No connection is required to keep saved history visible.</div></section>;
 }
 
-function Settings({ authenticated, onLogout }: { authenticated: boolean; onLogout: () => Promise<void> }) {
+function Settings({ authenticated, repository, recovered, onLogout, onRemove, onWipe }: { authenticated: boolean; repository: LocalAccountRepository|null; recovered:boolean; onLogout: () => Promise<void>; onRemove:()=>Promise<void>; onWipe:()=>Promise<void> }) {
   const [message, setMessage] = useState("");
-  return <section className="screen"><header><p className="eyebrow">THIS DEVICE</p><h1>Settings</h1><p>Secure sessions are revocable and shared with the same CA Progress cloud account.</p></header><div className="settings-list"><button><span>Account on this device</span><small>{authenticated ? "Secure native session" : "Local preview"}</small></button>{authenticated && <button onClick={() => void revokeOtherDevices().then(() => setMessage("Other device sessions were revoked.")).catch((error) => setMessage(error.message))}><span>Revoke other devices</span><small>Keep this phone signed in</small></button>}<button><span>Offline storage</span><small>Shell only · schema {MOBILE_BUILD.localSchemaVersion}</small></button><button><span>Application build</span><small>{MOBILE_BUILD.channel} · {MOBILE_BUILD.build}</small></button>{authenticated && <button onClick={() => void onLogout()}><span>Sign out on this device</span><small>Revokes and removes the secure token</small></button>}</div>{message && <p className="note">{message}</p>}</section>;
+  return <section className="screen"><header><p className="eyebrow">THIS DEVICE</p><h1>Settings</h1><p>Secure sessions and offline records remain explicit and account-scoped.</p></header><div className="settings-list"><button><span>Account on this device</span><small>{authenticated ? "Secure native session" : "Local preview"}</small></button>{authenticated && <button onClick={() => void revokeOtherDevices().then(() => setMessage("Other device sessions were revoked.")).catch((error) => setMessage(error.message))}><span>Revoke other devices</span><small>Keep this phone signed in</small></button>}<button><span>Offline storage</span><small>{repository ? `${recovered ? "Recovered · " : ""}SQLite schema ${MOBILE_BUILD.localSchemaVersion}` : "Preview memory"}</small></button><button><span>Application build</span><small>{MOBILE_BUILD.channel} · {MOBILE_BUILD.build}</small></button>{authenticated && <button onClick={() => void onLogout()}><span>Sign out and lock local data</span><small>Revokes token; saved records remain locked</small></button>}<button onClick={() => void onRemove()}><span>Remove this account from device</span><small>Deletes only this account’s offline records</small></button><button onClick={() => void onWipe()}><span>Wipe all offline data</span><small>Deletes every local account and cache</small></button></div>{message && <p className="note">{message}</p>}</section>;
 }
 
-const screens: Record<Exclude<NativeRoute, "settings">, React.ComponentType> = { today: Today, progress: Progress, planner: Planner, focus: Focus, community: Community };
+const defaultDashboard: LocalDashboard = { today: [...localPreview.today], progress: localPreview.progress[0], community: [...localPreview.community] };
 
 function Bootstrap({ onContinue }: { onContinue: () => void }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
@@ -70,6 +73,8 @@ function AppShell() {
   const [account, setAccount] = useState(readLocalAccount);
   const [authenticated, setAuthenticated] = useState(false);
   const [selected, setSelected] = useState(hasRetainedLocalAccount);
+  const [repository, setRepository] = useState<LocalAccountRepository|null>(null);
+  const [dashboard, setDashboard] = useState<LocalDashboard>(defaultDashboard);
   const applySession = (value: NativeSessionSnapshot | null) => { if (!value?.authenticated) return; const next = { id: value.user?.applicationUserId || "cloud-account", displayName: value.user?.displayName || value.user?.email || "CA Progress student", subtitle: value.user?.email || "Cloud account" }; setAccount(next); retainLocalAccount(next); setAuthenticated(true); setSelected(true); };
 
   useEffect(() => {
@@ -81,14 +86,18 @@ function AppShell() {
     addEventListener("online", connected);
     addEventListener("offline", disconnected);
     const removeNative = installNativeRuntime(navigate, resume, (url) => { void completeNativeSignIn(url).then(applySession).catch(() => setSelected(false)); });
-    void readNativeSession().then((value) => { if (value) applySession(value); }).catch(() => undefined);
+    const retainedAccountId=readLocalAccount().id;
+    void readNativeSession().then((value) => { if (value) applySession(value); else if (retainedAccountId !== "local-preview") { clearLocalAccount(); setSelected(false); } }).catch(() => { if (retainedAccountId !== "local-preview") { clearLocalAccount(); setSelected(false); } });
     // Network compatibility checks begin after the bundled shell has painted.
     requestAnimationFrame(() => document.documentElement.dataset.shellReady = "true");
     return () => { removeEventListener("popstate", changed); removeEventListener("online", connected); removeEventListener("offline", disconnected); removeNative(); };
   }, []);
 
+  useEffect(() => { if(!selected||(account.id!=="local-preview"&&!authenticated))return; let active=true;let remove:()=>void=()=>{};void openAccountRepository(account,authenticated).then(async(value)=>{if(!active||!value)return;setRepository(value);setDashboard(await value.readDashboard());remove=value.subscribe(()=>{void value.readDashboard().then(setDashboard);});}).catch(()=>setRepository(null));return()=>{active=false;remove();}; }, [selected,account,authenticated]);
+
   if (!selected) return <Bootstrap onContinue={() => { retainLocalAccount(account); setSelected(true); }} />;
-  const content = route === "settings" ? <Settings authenticated={authenticated} onLogout={async () => { await logoutNative(); setAuthenticated(false); setSelected(false); }} /> : React.createElement(screens[route]);
+  const reset=()=>{clearLocalAccount();setRepository(null);setAuthenticated(false);setSelected(false);};
+  const content = route === "settings" ? <Settings authenticated={authenticated} repository={repository} recovered={Boolean(repository?.database.recovered)} onLogout={async()=>{await repository?.lock();await logoutNative();reset();}} onRemove={async()=>{await repository?.removeFromDevice();reset();}} onWipe={async()=>{await wipeAllOfflineData();reset();}} /> : route === "today" ? <Today dashboard={dashboard}/> : route === "progress" ? <Progress dashboard={dashboard}/> : route === "focus" ? <Focus repository={repository}/> : route === "community" ? <Community dashboard={dashboard}/> : <Planner/>;
   return <div className="app-shell"><aside><div className="brand"><span>CA</span><div><strong>CA Progress</strong><small>Native workspace</small></div></div><nav>{navigation.map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i>{item.label}</button>)}</nav><div className="account"><span>Z</span><div><strong>{account.displayName}</strong><small>{account.subtitle}</small></div></div></aside><main><div className="topbar"><div className="mobile-brand"><span>CA</span><strong>CA Progress</strong></div><Status online={online} syncing={syncing}/></div>{content}</main><nav className="bottom-nav">{navigation.slice(0, 5).map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i><span>{item.label}</span></button>)}<button className={route === "settings" ? "active" : ""} onClick={() => navigate("settings")}><i>◇</i><span>More</span></button></nav></div>;
 }
 

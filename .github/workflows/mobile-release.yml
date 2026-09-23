@@ -9,6 +9,8 @@ on:
       - native-shell/**
       - apps/mobile/**
       - packages/capacitor-secure-session/**
+      - packages/capacitor-local-database/**
+      - packages/mobile-data/**
       - app/api/v1/native-auth/**
       - lib/auth/**
       - d1/migrations/0064_mobile_phase15_native_auth.sql
@@ -49,7 +51,7 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
-      - run: npm run test:mobile:phase15
+      - run: npm run test:mobile:phase16
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
