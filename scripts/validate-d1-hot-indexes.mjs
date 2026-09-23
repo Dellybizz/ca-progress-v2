@@ -19,6 +19,9 @@ const seededSourceIds = [
 function run(args) {
   return execFileSync(wrangler, [...base, ...args], {
     cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+    // Wrangler prints the complete migration table for every retained migration.
+    // Keep the validator deterministic as that history grows beyond Node's 1 MiB default.
+    maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, CI: "1", NO_D1_WARNING: "true" },
   });
 }

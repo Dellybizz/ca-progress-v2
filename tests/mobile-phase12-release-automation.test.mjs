@@ -40,6 +40,19 @@ test("signed builds fail closed and never auto-submit production", () => {
   assert.match(validator, /Missing.*release secrets/);
 });
 
+test("every mobile branch push produces a downloadable debug APK", () => {
+  const workflow = read(".github/workflows/mobile-release.yml");
+  const packageJson = read("package.json");
+  assert.match(workflow, /branches: \[mobile-phase7-student-parity\]/);
+  assert.match(workflow, /android-debug:/);
+  assert.match(workflow, /github\.event_name == 'push'/);
+  assert.match(workflow, /ca-progress-debug-apk-/);
+  assert.match(workflow, /app-debug\.apk/);
+  assert.match(packageJson, /native:build:android:debug/);
+  assert.match(packageJson, /assembleDebug/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch'.*inputs\.platform/);
+});
+
 test("native store assets are branded and submission evidence is explicit", () => {
   for (const path of [
     "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png",

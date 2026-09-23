@@ -1,6 +1,20 @@
 name: Mobile signed release
 
 on:
+  push:
+    branches: [mobile-phase7-student-parity]
+    paths:
+      - android/**
+      - ios/**
+      - native-shell/**
+      - components/mobile/**
+      - config/app-release.ts
+      - scripts/mobile/**
+      - tests/mobile-*.test.mjs
+      - capacitor.config.ts
+      - package.json
+      - package-lock.json
+      - .github/workflows/mobile-release.yml
   workflow_dispatch:
     inputs:
       platform:
@@ -18,7 +32,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-release-${{ github.ref }}-${{ inputs.platform }}
+  group: mobile-release-${{ github.ref }}-${{ github.event_name }}-${{ inputs.platform || 'debug' }}
   cancel-in-progress: false
 
 jobs:
@@ -35,9 +49,29 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  android-debug:
+    needs: verify
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run native:build:android:debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ca-progress-debug-apk-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
   android:
     needs: verify
-    if: inputs.platform == 'android' || inputs.platform == 'both'
+    if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'android' || inputs.platform == 'both')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment: mobile-${{ inputs.channel }}
@@ -73,7 +107,7 @@ jobs:
 
   ios:
     needs: verify
-    if: inputs.platform == 'ios' || inputs.platform == 'both'
+    if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'ios' || inputs.platform == 'both')
     runs-on: macos-15
     timeout-minutes: 45
     environment: mobile-${{ inputs.channel }}

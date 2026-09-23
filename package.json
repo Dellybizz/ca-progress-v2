@@ -28,6 +28,7 @@
     "native:add:ios": "CAPACITOR_PLATFORM=ios cap add ios",
     "native:sync:android": "CAPACITOR_PLATFORM=android cap sync android",
     "native:sync:ios": "CAPACITOR_PLATFORM=ios cap sync ios",
+    "native:build:android:debug": "npm run native:sync:android && cd android && ./gradlew assembleDebug",
     "native:open:android": "cap open android",
     "native:open:ios": "cap open ios",
     "audit:product-consistency:phase0": "node scripts/product-consistency/phase0-audit.mjs",
