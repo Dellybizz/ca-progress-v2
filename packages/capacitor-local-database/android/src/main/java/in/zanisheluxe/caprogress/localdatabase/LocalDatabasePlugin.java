@@ -11,6 +11,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.nio.file.Files;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @CapacitorPlugin(name = "LocalDatabase")
 public class LocalDatabasePlugin extends Plugin {
@@ -20,7 +22,7 @@ public class LocalDatabasePlugin extends Plugin {
     private File backup() { return new File(file().getPath() + ".recovery"); }
     private void closeDatabase() { if (database != null && database.isOpen()) database.close(); database = null; }
     private SQLiteDatabase db() { if (database == null || !database.isOpen()) database = SQLiteDatabase.openOrCreateDatabase(file(), null); return database; }
-    private Object[] values(JSArray input) throws Exception { Object[] output = new Object[input.length()]; for (int i=0;i<input.length();i++) { Object value=input.get(i); output[i]=value==JSObject.NULL?null:value; } return output; }
+    private Object[] values(JSONArray input) throws Exception { Object[] output = new Object[input.length()]; for (int i=0;i<input.length();i++) { Object value=input.get(i); output[i]=value==JSONObject.NULL?null:value; } return output; }
 
     @PluginMethod public void open(PluginCall call) {
         boolean recovered = false;
@@ -43,7 +45,7 @@ public class LocalDatabasePlugin extends Plugin {
 
     @PluginMethod public void transaction(PluginCall call) {
         JSArray statements=call.getArray("statements",new JSArray()); SQLiteDatabase target=db(); target.beginTransaction();
-        try { for(int i=0;i<statements.length();i++){JSObject item=statements.getJSObject(i);target.execSQL(item.getString("sql"),values(item.getJSArray("args")));} target.setTransactionSuccessful(); call.resolve(); }
+        try { for(int i=0;i<statements.length();i++){JSONObject item=statements.getJSONObject(i);JSONArray args=item.optJSONArray("args");target.execSQL(item.getString("sql"),values(args == null ? new JSONArray() : args));} target.setTransactionSuccessful(); call.resolve(); }
         catch(Exception error){call.reject("Local database transaction failed.",error);} finally {target.endTransaction();}
     }
 
