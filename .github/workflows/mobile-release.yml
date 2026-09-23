@@ -76,6 +76,20 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  ios-simulator:
+    needs: verify
+    if: github.event_name == 'push'
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run native:sync:ios
+      - name: Compile unsigned iOS Simulator application
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+
   android:
     needs: verify
     if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'android' || inputs.platform == 'both')

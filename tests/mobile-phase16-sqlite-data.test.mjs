@@ -29,3 +29,8 @@ test("large files remain native paths rather than SQLite blobs and logout polici
   assert.match(schema,/native_path TEXT NOT NULL/);assert.doesNotMatch(schema,/file_blob|content_blob/i);
   assert.match(main,/Sign out and lock local data/);assert.match(main,/Remove this account from device/);assert.match(main,/Wipe all offline data/);
 });
+
+test("release workflow compiles both Android and iOS native adapters",async()=>{
+  const workflow=await read(".github/workflows/mobile-release.yml");
+  assert.match(workflow,/android-debug:/);assert.match(workflow,/ios-simulator:/);assert.match(workflow,/sdk iphonesimulator/);assert.match(workflow,/CODE_SIGNING_ALLOWED=NO/);
+});
