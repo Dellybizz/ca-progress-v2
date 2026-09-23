@@ -163,6 +163,16 @@ const FEATURES: readonly Omit<MobileFeatureParity, "analytics">[] = [
     failureState: "unsupported, blocked, unconfigured, loading, empty and retry states",
   },
   {
+    id: "billing",
+    label: "Plans & billing",
+    href: "/pricing",
+    mobileLayout: "store-aware plan cards and read-only entitlement status",
+    offline: "online",
+    permission: "account",
+    synchronization: "server-owned entitlements with platform-specific purchase providers",
+    failureState: "native checkout remains disabled until approved store products and bridge exist",
+  },
+  {
     id: "feature-tour",
     label: "Feature Tour",
     href: "/feature-tour",
