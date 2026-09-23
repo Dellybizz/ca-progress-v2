@@ -177,6 +177,12 @@ export const shellNavigation: Record<ShellArea, readonly ShellNavSection[]> = {
           href: "/settings",
           icon: "settings",
         },
+        {
+          label: "Delete account",
+          description: "Request account and study-data deletion",
+          href: "/account-deletion",
+          icon: "shield",
+        },
       ],
     },
   ],

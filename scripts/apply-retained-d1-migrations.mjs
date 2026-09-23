@@ -54,6 +54,7 @@ const migrations = [
   ["0059", "d1/migrations/0059_mobile_phase3_session_devices.sql"],
   ["0060", "d1/migrations/0060_mobile_phase7_feature_tour.sql"],
   ["0061", "d1/migrations/0061_mobile_phase9_web_push.sql"],
+  ["0062", "d1/migrations/0062_mobile_phase11_account_deletion.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
@@ -74,6 +75,8 @@ const mobileAuthLedger = query("SELECT version FROM _ca_schema_migrations WHERE 
 for (const row of mobileAuthLedger?.[0]?.results ?? []) applied.add(String(row.version));
 const mobilePushLedger = query("SELECT version FROM _ca_schema_migrations WHERE version='0061';");
 for (const row of mobilePushLedger?.[0]?.results ?? []) applied.add(String(row.version));
+const mobileDeletionLedger = query("SELECT version FROM _ca_schema_migrations WHERE version='0062';");
+for (const row of mobileDeletionLedger?.[0]?.results ?? []) applied.add(String(row.version));
 for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }
   console.log(`[retained-d1] applying ${version} from ${file}`); wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${file}`]);

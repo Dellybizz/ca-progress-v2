@@ -22,6 +22,13 @@
     "test:mobile:phase8": "npm run test:mobile:phase7 && node --test tests/mobile-phase8-resources.test.mjs",
     "test:mobile:phase9": "npm run test:mobile:phase8 && node --test tests/mobile-phase9-community-push.test.mjs",
     "test:mobile:phase10": "npm run test:mobile:phase9 && node --test tests/mobile-phase10-store-billing.test.mjs",
+    "test:mobile:phase11": "npm run test:mobile:phase10 && node --test tests/mobile-phase11-native-packaging.test.mjs",
+    "native:add:android": "CAPACITOR_PLATFORM=android cap add android",
+    "native:add:ios": "CAPACITOR_PLATFORM=ios cap add ios",
+    "native:sync:android": "CAPACITOR_PLATFORM=android cap sync android",
+    "native:sync:ios": "CAPACITOR_PLATFORM=ios cap sync ios",
+    "native:open:android": "cap open android",
+    "native:open:ios": "cap open ios",
     "audit:product-consistency:phase0": "node scripts/product-consistency/phase0-audit.mjs",
     "audit:product-consistency:phase10:gate": "node scripts/product-consistency/phase10-critical-gate.mjs",
     "audit:product-consistency:phase12": "node scripts/product-consistency/phase12-certify.mjs",
@@ -56,6 +63,11 @@
     "cf:smoke": "node scripts/smoke-cloudflare-runtime.mjs"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/keyboard": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -63,6 +75,9 @@
     "unpdf": "1.8.1"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@opennextjs/cloudflare": "1.20.4",
     "@types/node": "^22.18.0",
     "@types/react": "^19.2.0",
