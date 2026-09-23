@@ -4,11 +4,12 @@ name: Cloudflare V2 Deploy
 on:
   workflow_dispatch:
   push:
-    branches: [phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d]
+    branches: [phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d, mobile-phase7-student-parity]
     paths:
       - .github/workflows/deploy-staging.yml
       - app/**
       - components/**
+      - config/**
       - d1/**
       - lib/**
       - server/**
@@ -27,6 +28,7 @@ on:
       - .github/workflows/deploy-staging.yml
       - app/**
       - components/**
+      - config/**
       - d1/**
       - lib/**
       - server/**
@@ -48,7 +50,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name != 'pull_request' || (github.head_ref == 'phase-12-operations-admin-platform' && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || ((github.head_ref == 'phase-12-operations-admin-platform' || github.head_ref == 'mobile-phase7-student-parity') && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: v2-staging
     timeout-minutes: 55

@@ -45,3 +45,8 @@
 
 /* Chapter Hub has two attachable resource sources: keep both tabs evenly aligned. */
 .chapter-hub-resource-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Native release gates sit above the hosted shell and never expose stale controls. */
+.native-update-gate{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;background:var(--background,#fff)}
+.native-update-gate>.ui-card{width:min(100%,440px);padding:24px}
+.native-update-notice{position:fixed;z-index:9999;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(76px,calc(env(safe-area-inset-bottom) + 64px));display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card);box-shadow:var(--shadow-lg)}
+.native-update-notice span{flex:1}.native-update-notice button{border:0;background:none;font-size:20px;color:inherit}

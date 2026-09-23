@@ -12,4 +12,4 @@
 - Data safety: declare account/profile, study activity, uploaded content, app interactions, diagnostics and purchase history exactly as production collects them; do not copy this checklist as the final legal declaration without verifying deployed telemetry.
 - Release path: signed Android App Bundle → internal testing → closed testing if required → production staged rollout.
 
-Do not submit until the upload key and Play App Signing are configured, branded icon/feature graphic/screenshots are supplied, the Data safety form is verified, reviewer access is documented, and real-device tests pass.
+The branded launcher icon is present. Do not submit until the upload key and Play App Signing are configured, feature graphic/screenshots are supplied, the Data safety form is verified, reviewer access is documented, and real-device tests pass.

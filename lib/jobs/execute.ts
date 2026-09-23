@@ -6,6 +6,7 @@ import { failIcaiSyncSource, finalizeIcaiSyncContinuation, runIcaiSyncSource, st
 import { runIcaiPhase5ReviewProbe } from "@/lib/icai/phase5";
 import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
 import { enqueueBackgroundJob, type BackgroundJob } from "./queue";
+import { enqueueDueAccountDeletions, processAccountDeletion } from "@/lib/account-deletion/processor";
 
 function db(): HotD1Database { return getHotD1Database(); }
 function json(value: unknown) { return JSON.stringify(value ?? {}); }
@@ -103,6 +104,12 @@ export async function executeBackgroundJob(job: BackgroundJob) {
       await db().prepare("INSERT INTO attachment_processing_jobs(id,resource_id,user_id,status,attempts,updated_at) VALUES(?1,?2,?3,'ready',1,CURRENT_TIMESTAMP) ON CONFLICT(resource_id) DO UPDATE SET status='ready',attempts=attachment_processing_jobs.attempts+1,last_error=NULL,updated_at=CURRENT_TIMESTAMP")
         .bind(crypto.randomUUID(), resourceId, userId).run();
       return { resourceId, status: "ready" };
+    }
+    case "account-deletion-scan":
+      return enqueueDueAccountDeletions();
+    case "account-deletion-process": {
+      const requestId = typeof job.payload.requestId === "string" ? job.payload.requestId : "";
+      return processAccountDeletion(requestId);
     }
     case "cleanup": {
       const days = Math.max(1, Math.min(90, Number(job.payload.retentionDays ?? 30)));

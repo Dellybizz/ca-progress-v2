@@ -14,7 +14,7 @@ type WorkerContext = { waitUntil(promise: Promise<unknown>): void };
 type ScheduledController = { scheduledTime: number; cron: string };
 type QueueMessage<T> = { id: string; attempts: number; body: T; ack(): void; retry(options?: { delaySeconds?: number }): void };
 type QueueBatch<T> = { messages: QueueMessage<T>[] };
-type JobType = "icai-sync" | "icai-phase5-review-probe" | "notification-fanout" | "analytics-aggregate" | "attachment-process" | "cleanup" | "ai-plan-generation";
+type JobType = "icai-sync" | "icai-phase5-review-probe" | "notification-fanout" | "analytics-aggregate" | "attachment-process" | "account-deletion-scan" | "account-deletion-process" | "cleanup" | "ai-plan-generation";
 type BackgroundJob = { id: string; type: JobType; idempotencyKey: string; payload: Record<string, unknown>; createdBy?: string | null };
 type LegacyIcaiJob = { type: "icai-sync"; idempotencyKey: string; scheduledTime: number };
 
@@ -189,7 +189,7 @@ function scheduledJob(controller: ScheduledController): BackgroundJob {
 function normalizeJob(value: unknown): BackgroundJob | null {
   if (!value || typeof value !== "object") return null;
   const input = value as Partial<BackgroundJob> & Partial<LegacyIcaiJob>;
-  if (input.type !== "icai-sync" && input.type !== "icai-phase5-review-probe" && input.type !== "notification-fanout" && input.type !== "analytics-aggregate" && input.type !== "attachment-process" && input.type !== "cleanup" && input.type !== "ai-plan-generation") return null;
+  if (input.type !== "icai-sync" && input.type !== "icai-phase5-review-probe" && input.type !== "notification-fanout" && input.type !== "analytics-aggregate" && input.type !== "attachment-process" && input.type !== "account-deletion-scan" && input.type !== "account-deletion-process" && input.type !== "cleanup" && input.type !== "ai-plan-generation") return null;
   if (typeof input.idempotencyKey !== "string" || !input.idempotencyKey) return null;
   return {
     id: typeof input.id === "string" ? input.id : crypto.randomUUID(),
@@ -340,6 +340,7 @@ const worker = {
       ? [
           { id: crypto.randomUUID(), type: "analytics-aggregate", idempotencyKey: `analytics-aggregate:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { date: new Date(controller.scheduledTime).toISOString().slice(0, 10) } },
           { id: crypto.randomUUID(), type: "cleanup", idempotencyKey: `cleanup:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: { retentionDays: 30 } },
+          { id: crypto.randomUUID(), type: "account-deletion-scan", idempotencyKey: `account-deletion-scan:${new Date(controller.scheduledTime).toISOString().slice(0, 13)}`, payload: {} },
         ]
       : [scheduledJob(controller)];
     ctx.waitUntil(Promise.all(jobs.map((job) => env.BACKGROUND_JOBS!.send(job))).then(() => undefined));

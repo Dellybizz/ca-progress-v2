@@ -8,6 +8,8 @@ export type BackgroundJobType =
   | "notification-fanout"
   | "analytics-aggregate"
   | "attachment-process"
+  | "account-deletion-scan"
+  | "account-deletion-process"
   | "cleanup"
   | "ai-plan-generation";
 

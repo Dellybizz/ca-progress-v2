@@ -13,4 +13,4 @@
 - Associated domains: requires `APPLE_TEAM_ID` in Cloudflare and the Associated Domains entitlement on the signed identifier.
 - Build requirement: archive and validate using the current supported macOS and Xcode toolchain. This Linux workspace cannot produce or notarize the iOS archive.
 
-Do not submit until the branded 1024×1024 App Store icon, screenshots, review account, privacy nutrition labels, support contact, Apple team association and native device regression pass are complete.
+The branded 1024×1024 icon is present. Do not submit until screenshots, review account, privacy nutrition labels, support contact, Apple team association and native device regression pass are complete.

@@ -22,4 +22,4 @@ Ordinary hosted UI, API and study-feature updates deploy once to Cloudflare and 
 
 The repository cannot create developer accounts, accept store agreements, invent Team IDs/signing fingerprints, create approved subscription products, supply reviewer credentials, sign release artifacts, or submit listings. Android can be compiled in a compatible JDK/SDK environment; iOS archive/signing requires macOS and Xcode.
 
-Phase 12 owns signed release automation, complete deletion processing, device matrices, store screenshots/assets, TestFlight/Play testing tracks and staged rollout. Run `npm run test:mobile:phase11` and full CI before hand-off.
+Phase 12 adds signed-build automation, complete deletion processing, branded native assets, device matrices, TestFlight/Play testing gates and staged-rollout/rollback records. Final store screenshots, credentials, review and promotion remain external approvals. Run `npm run test:mobile:phase11` and full CI before hand-off.

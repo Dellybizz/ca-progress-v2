@@ -1,0 +1,115 @@
+name: Mobile signed release
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform artifact to build
+        required: true
+        type: choice
+        options: [android, ios, both]
+      channel:
+        description: Controlled rollout target recorded with the artifact
+        required: true
+        type: choice
+        options: [internal, closed, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-release-${{ github.ref }}-${{ inputs.platform }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:mobile:phase12
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+
+  android:
+    needs: verify
+    if: inputs.platform == 'android' || inputs.platform == 'both'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: mobile-${{ inputs.channel }}
+    env:
+      CA_ANDROID_KEYSTORE_BASE64: ${{ secrets.CA_ANDROID_KEYSTORE_BASE64 }}
+      CA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.CA_ANDROID_KEYSTORE_PASSWORD }}
+      CA_ANDROID_KEY_ALIAS: ${{ secrets.CA_ANDROID_KEY_ALIAS }}
+      CA_ANDROID_KEY_PASSWORD: ${{ secrets.CA_ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/mobile/validate-release-env.mjs android
+      - name: Decode signing key
+        shell: bash
+        run: |
+          umask 077
+          printf '%s' "$CA_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/ca-progress-upload.jks"
+          echo "CA_ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/ca-progress-upload.jks" >> "$GITHUB_ENV"
+      - run: npm run native:sync:android
+      - name: Build signed Android App Bundle
+        working-directory: android
+        run: ./gradlew bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ca-progress-android-${{ inputs.channel }}-${{ github.sha }}
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+  ios:
+    needs: verify
+    if: inputs.platform == 'ios' || inputs.platform == 'both'
+    runs-on: macos-15
+    timeout-minutes: 45
+    environment: mobile-${{ inputs.channel }}
+    env:
+      CA_APPLE_CERTIFICATE_BASE64: ${{ secrets.CA_APPLE_CERTIFICATE_BASE64 }}
+      CA_APPLE_CERTIFICATE_PASSWORD: ${{ secrets.CA_APPLE_CERTIFICATE_PASSWORD }}
+      CA_APPLE_PROVISION_PROFILE_BASE64: ${{ secrets.CA_APPLE_PROVISION_PROFILE_BASE64 }}
+      CA_APPLE_TEAM_ID: ${{ secrets.CA_APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: node scripts/mobile/validate-release-env.mjs ios
+      - name: Install signing identity and profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/ca-progress.keychain-db"
+          password="$(openssl rand -hex 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$CA_APPLE_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$CA_APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security list-keychain -d user -s "$keychain"
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          printf '%s' "$CA_APPLE_PROVISION_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/ca-progress.mobileprovision"
+      - run: npm run native:sync:ios
+      - name: Archive signed iOS application
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -archivePath "$RUNNER_TEMP/CAProgress.xcarchive" DEVELOPMENT_TEAM="$CA_APPLE_TEAM_ID" CODE_SIGN_STYLE=Manual archive
+      - name: Package archive evidence
+        run: ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/CAProgress.xcarchive" "$RUNNER_TEMP/CAProgress.xcarchive.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ca-progress-ios-${{ inputs.channel }}-${{ github.sha }}
+          path: ${{ runner.temp }}/CAProgress.xcarchive.zip
+          if-no-files-found: error
+          retention-days: 30

@@ -3,6 +3,7 @@ import "./globals.css";
 import { PwaRuntime } from "@/components/pwa/pwa-runtime";
 import { APP_RELEASE_CONTRACT } from "@/config/app-release";
 import { NativeRuntime } from "@/components/mobile/native-runtime";
+import { NativeUpdateGate } from "@/components/mobile/native-update-gate";
 
 const appearanceBootScript = `(()=>{try{const k='ca-progress:appearance';const d={theme:'system',accent:'indigo',density:'comfortable',reduceMotion:false};const p={...d,...JSON.parse(localStorage.getItem(k)||'{}')};const dark=p.theme==='dark'||(p.theme==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);const r=document.documentElement;r.dataset.theme=dark?'dark':'light';r.dataset.themePreference=p.theme;r.dataset.accent=['indigo','violet','emerald','rose'].includes(p.accent)?p.accent:'indigo';r.dataset.density=p.density==='compact'?'compact':'comfortable';r.dataset.reduceMotion=p.reduceMotion?'true':'false'}catch{}})()`;
 
@@ -32,5 +33,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" data-accent="indigo" data-density="comfortable" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: appearanceBootScript }}/></head><body>{children}<NativeRuntime/><PwaRuntime releaseVersion={APP_RELEASE_CONTRACT.web.version}/></body></html>;
+  return <html lang="en" data-accent="indigo" data-density="comfortable" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: appearanceBootScript }}/></head><body>{children}<NativeRuntime/><NativeUpdateGate/><PwaRuntime releaseVersion={APP_RELEASE_CONTRACT.web.version}/></body></html>;
 }
