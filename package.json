@@ -24,6 +24,8 @@
     "test:mobile:phase10": "npm run test:mobile:phase9 && node --test tests/mobile-phase10-store-billing.test.mjs",
     "test:mobile:phase11": "npm run test:mobile:phase10 && node --test tests/mobile-phase11-native-packaging.test.mjs",
     "test:mobile:phase12": "npm run test:mobile:phase11 && node --test tests/mobile-phase12-release-automation.test.mjs",
+    "audit:mobile:boundaries": "node scripts/mobile/validate-local-first-boundaries.mjs",
+    "test:mobile:phase13": "npm run test:mobile:phase12 && npm run audit:mobile:boundaries && node --test tests/mobile-phase13-architecture.test.mjs",
     "native:add:android": "CAPACITOR_PLATFORM=android cap add android",
     "native:add:ios": "CAPACITOR_PLATFORM=ios cap add ios",
     "native:sync:android": "CAPACITOR_PLATFORM=android cap sync android",
