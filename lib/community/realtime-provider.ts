@@ -10,6 +10,7 @@ type CommunityRealtimeSubscription = {
   onPresenceChanged?: (payload: unknown) => void;
   onTypingChanged?: (payload: unknown) => void;
   onConnectionChanged?: (state: CommunityConnectionState) => void;
+  onEvent?: (event: import("./realtime-events").CommunityRealtimeEvent) => void;
 };
 
 export type CommunityConnectionState = "connecting" | "connected" | "fallback" | "offline";
@@ -79,17 +80,19 @@ export function subscribeToCommunityRealtime(input: CommunityRealtimeSubscriptio
       input.onConnectionChanged?.("connected");
       socket?.send(JSON.stringify({ type: "presence", userId: presenceId, state: "online", label: input.userLabel }));
     });
-    socket.addEventListener("message", (event) => {
+    socket.addEventListener("message", async (event) => {
       if (typeof event.data !== "string") return;
       try {
         const payload = JSON.parse(event.data) as { type?: string; reason?: string };
+        const typed = (await import("./realtime-events")).parseCommunityRealtimeEvent(payload);
+        if (typed) input.onEvent?.(typed);
         if (payload.type === "refresh") {
           if (payload.reason === "pin" || payload.reason === "moderation") input.onPinnedChanged();
           input.onDataChanged();
         } else if (payload.type === "ready") {
           socket?.send(JSON.stringify({ type: "presence", userId: presenceId, state: "online", label: input.userLabel }));
-        } else if (payload.type === "presence") input.onPresenceChanged?.(payload);
-        else if (payload.type === "typing") input.onTypingChanged?.(payload);
+        } else if (payload.type === "presence" || payload.type === "presence.changed") input.onPresenceChanged?.(payload);
+        else if (payload.type === "typing" || payload.type === "typing.changed") input.onTypingChanged?.(payload);
       } catch { /* malformed ephemeral events are ignored */ }
     });
     socket.addEventListener("close", () => {

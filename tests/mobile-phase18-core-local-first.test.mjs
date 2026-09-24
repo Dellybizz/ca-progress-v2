@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 const read=path=>readFile(new URL(`../${path}`,import.meta.url),"utf8");
 
-test("Phase 18 local schema covers every core projection",async()=>{const schema=await read("packages/mobile-data/src/schema.ts");for(const table of ["academic_catalog","dashboard_projection","progress_records","planner_items","study_sessions","timer_state","notes","profile_projection","activity_projection","leaderboard_projection","study_buddy_projection"])assert.match(schema,new RegExp(table));assert.match(schema,/LOCAL_SCHEMA_VERSION = 3/);});
+test("Phase 18 local schema covers every core projection",async()=>{const schema=await read("packages/mobile-data/src/schema.ts");for(const table of ["academic_catalog","dashboard_projection","progress_records","planner_items","study_sessions","timer_state","notes","profile_projection","activity_projection","leaderboard_projection","study_buddy_projection"])assert.match(schema,new RegExp(table));assert.match(schema,/LOCAL_SCHEMA_VERSION = [3-9]/);});
 
 test("all daily student screens query the account-scoped SQLite repository",async()=>{const [main,repository]=await Promise.all([read("apps/mobile/src/main.tsx"),read("packages/mobile-data/src/repository.ts")]);for(const screen of ["Today","Progress","Syllabus","Planner","Focus","Notes","Profile","Activity","Buddy"])assert.match(main,new RegExp(`function ${screen}\\(`));for(const table of ["academic_catalog","progress_records","planner_items","notes","profile_projection","activity_projection","leaderboard_projection","study_buddy_projection"])assert.match(repository,new RegExp(`FROM ${table} WHERE account_id=\\?`));assert.doesNotMatch(main,/fetch\(/);});
 
@@ -17,4 +17,4 @@ test("slow, intermittent and absent network preserve the last local frame",async
 
 test("bootstrap refresh converges web data without overwriting pending native edits",async()=>{const [sync,bootstrap]=await Promise.all([read("packages/mobile-data/src/sync.ts"),read("app/api/v1/sync/bootstrap/route.ts")]);assert.match(sync,/transport\("\/api\/v1\/sync\/bootstrap"\)/);for(const table of ["progress_records","planner_items","notes","study_sessions"])assert.match(sync,new RegExp(`WHERE ${table}\\.local_state='synced'`));for(const type of ["academic_subject","academic_chapter","attempt","profile","activity","leaderboard","study_buddy"])assert.match(bootstrap,new RegExp(`'${type}' AS entity_type`));});
 
-test("Phase 19 community realtime is not started",async()=>{const status=await read("docs/mobile-local-first/PHASE_18_STATUS.md");assert.match(status,/Phase 19 has not been started/);});
+test("Phase 18 status preserves its original Phase 19 boundary",async()=>{const status=await read("docs/mobile-local-first/PHASE_18_STATUS.md");assert.match(status,/At Phase 18 completion, Phase 19 had not been started/);});

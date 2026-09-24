@@ -8,4 +8,4 @@ Planner tasks, progress stages, notes and focus-session completions are optimist
 
 Compact bootstrap projections refresh canonical website data into SQLite. Repository subscriptions update only the affected React state without route reload, scroll reset or browser-style blocking loaders. Tests cover slow, intermittent and absent networks, process-safe outbox persistence, cached-frame retention and web/native convergence.
 
-Phase 19 has not been started.
+At Phase 18 completion, Phase 19 had not been started. See `PHASE_19_STATUS.md` for the subsequent Community implementation.

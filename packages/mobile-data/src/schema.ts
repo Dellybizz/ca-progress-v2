@@ -3,7 +3,7 @@ export type SqlStatement = { sql: string; args?: unknown[] };
 const syncColumns = `local_id TEXT PRIMARY KEY, server_id TEXT, server_version INTEGER NOT NULL DEFAULT 0, account_id TEXT NOT NULL, academic_context_key TEXT, local_state TEXT NOT NULL DEFAULT 'synced' CHECK(local_state IN ('synced','pending','conflict','failed')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT`;
 const entity = (table: string, extra: string) => `CREATE TABLE IF NOT EXISTS ${table} (${syncColumns}, ${extra}, FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)`;
 
-export const LOCAL_SCHEMA_VERSION = 3;
+export const LOCAL_SCHEMA_VERSION = 4;
 export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlStatement[] }> = [{
   version: 1,
   statements: [
@@ -57,5 +57,26 @@ export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlS
     { sql: "CREATE INDEX IF NOT EXISTS idx_activity_account_time ON activity_projection(account_id,occurred_at DESC)" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_buddy_account_state ON study_buddy_projection(account_id,relationship_state,updated_at DESC)" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_catalog_account_type ON academic_catalog(account_id,entity_type,parent_server_id)" },
+  ],
+}, {
+  version: 4,
+  statements: [
+    { sql: "ALTER TABLE community_channels ADD COLUMN latest_sequence INTEGER NOT NULL DEFAULT 0" },
+    { sql: "ALTER TABLE community_channels ADD COLUMN unread_count INTEGER NOT NULL DEFAULT 0" },
+    { sql: "ALTER TABLE community_channels ADD COLUMN draft_text TEXT NOT NULL DEFAULT ''" },
+    { sql: "ALTER TABLE community_messages ADD COLUMN sequence_id INTEGER" },
+    { sql: "ALTER TABLE community_messages ADD COLUMN client_message_id TEXT" },
+    { sql: "ALTER TABLE community_messages ADD COLUMN delivery_state TEXT NOT NULL DEFAULT 'sent' CHECK(delivery_state IN ('sending','sent','failed','retrying'))" },
+    { sql: "ALTER TABLE community_messages ADD COLUMN moderation_status TEXT NOT NULL DEFAULT 'active'" },
+    { sql: "ALTER TABLE community_messages ADD COLUMN reply_to_server_id TEXT" },
+    { sql: "ALTER TABLE community_messages ADD COLUMN attachment_json TEXT" },
+    { sql: "ALTER TABLE community_read_state ADD COLUMN last_read_sequence INTEGER NOT NULL DEFAULT 0" },
+    { sql: "ALTER TABLE community_read_state ADD COLUMN server_version INTEGER NOT NULL DEFAULT 0" },
+    { sql: "CREATE TABLE IF NOT EXISTS community_pins (account_id TEXT NOT NULL, channel_key TEXT NOT NULL, message_server_id TEXT NOT NULL, sequence_id INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(account_id,channel_key,message_server_id), FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)" },
+    { sql: "CREATE TABLE IF NOT EXISTS community_event_log (account_id TEXT NOT NULL, channel_key TEXT NOT NULL, sequence_id INTEGER NOT NULL, event_type TEXT NOT NULL, entity_id TEXT NOT NULL, entity_version INTEGER NOT NULL, received_at TEXT NOT NULL, PRIMARY KEY(account_id,channel_key,sequence_id), FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)" },
+    { sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_community_message_server ON community_messages(account_id,server_id) WHERE server_id IS NOT NULL" },
+    { sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_community_message_client ON community_messages(account_id,client_message_id) WHERE client_message_id IS NOT NULL" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_community_message_sequence ON community_messages(account_id,channel_key,sequence_id DESC)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_community_event_sequence ON community_event_log(account_id,channel_key,sequence_id DESC)" },
   ],
 }];

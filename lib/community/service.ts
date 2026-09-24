@@ -298,7 +298,7 @@ export async function getCommunityChannelModel(channelSlug: string): Promise<Com
   };
 }
 
-export async function createCommunityMessage(input: { channelSlug: string; body: string; replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[] }) {
+export async function createCommunityMessage(input: { channelSlug: string; body: string; replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[]; clientMessageId?: string | null }) {
   const identity = (await getRequestAuthContext()).identity;
   if (!identity) throw new Error("Sign in to send a message.");
   const profile = await getProfileForUser(identity.id);
@@ -310,6 +310,7 @@ export async function createCommunityMessage(input: { channelSlug: string; body:
     replyToId: input.replyToId ?? null,
     resourceId: input.resourceId ?? null,
     mentionUserIds: input.mentionUserIds ?? [],
+    clientMessageId: input.clientMessageId ?? null,
   });
 }
 

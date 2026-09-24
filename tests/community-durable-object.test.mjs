@@ -12,9 +12,9 @@ test("Community uses a per-channel Durable Object coordinator for ephemeral stat
   const provider = read("lib/community/realtime-provider.ts");
   assert.match(coordinator, /class CommunityChannelCoordinator/);
   assert.match(coordinator, /getWebSockets/);
-  assert.match(coordinator, /type: "presence"/);
-  assert.match(coordinator, /type: "typing"/);
-  assert.match(coordinator, /type: "refresh"/);
+  assert.match(coordinator, /type:"presence\.changed"/);
+  assert.match(coordinator, /type:"typing\.changed"/);
+  assert.match(coordinator, /webSocketMessage/);
   assert.match(config, /COMMUNITY_COORDINATORS/);
   assert.match(config, /CommunityChannelCoordinator/);
   assert.match(provider, /SocketCtor/);
@@ -30,7 +30,7 @@ test("Community realtime is authorized before the Durable Object is reached", ()
   assert.match(route, /namespace\.get\(id\)\.fetch/);
 });
 
-test("Community chat keeps D1 pagination and broadcasts only refresh signals", () => {
+test("Community chat keeps D1 pagination while typed deltas replace refresh-only delivery", () => {
   const messages = read("app/api/community/channels/[channel]/messages/route.ts");
   const phase7 = read("lib/community/phase7.ts");
   const chat = read("components/community/community-chat.tsx");
@@ -44,6 +44,7 @@ test("Community chat keeps D1 pagination and broadcasts only refresh signals", (
   assert.match(chat, /type: "refresh", reason: "reaction"/);
   assert.match(chat, /nextCursor/);
   assert.match(chat, /loadOlder/);
+  assert.match(read("lib/community/realtime-events.ts"), /message\.created/);
 });
 
 test("Durable Object events cannot write messages or bypass Community authorization", () => {

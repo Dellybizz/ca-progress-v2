@@ -211,7 +211,7 @@ async function visibleCommunityMessage(messageId: string, userId: string, db: Ho
 
 export async function createHotCommunityMessage(input: {
   channelSlug: string; userId: string; authorLabel: string; body: string;
-  replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[];
+  replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[]; clientMessageId?: string | null;
 }, db: HotD1Database = getHotD1Database()) {
   const channel = await visibleCommunityChannel(input.channelSlug, input.userId, db);
   if (!["members", "all"].includes(channel.write_policy)) communityError("You cannot write in this channel.");
@@ -219,6 +219,8 @@ export async function createHotCommunityMessage(input: {
   if (blocked) communityError("You are temporarily blocked from this channel.");
   const body = input.body.trim().replace(/\s+/g, " ");
   if (body.length < 1 || body.length > 2000) communityError("Message must be between 1 and 2000 characters.");
+  const clientMessageId=input.clientMessageId?.trim()||null;
+  if(clientMessageId){const existing=await db.prepare(`SELECT id,sequence_id FROM community_messages WHERE user_id=?1 AND client_message_id=?2 LIMIT 1`).bind(input.userId,clientMessageId).first<{id:string;sequence_id:number}>();if(existing)return{id:existing.id,sequence:Number(existing.sequence_id)};}
   const recent = await db.prepare(`SELECT COUNT(*) AS count FROM community_messages WHERE user_id=?1 AND created_at>=datetime('now','-60 seconds')`).bind(input.userId).first<{ count: number }>();
   if (Number(recent?.count ?? 0) >= 12) communityError("Message rate limit exceeded.");
   const duplicate = await db.prepare(`SELECT 1 AS duplicate FROM community_messages WHERE channel_id=?1 AND user_id=?2 AND body=?3 AND created_at>=datetime('now','-90 seconds') LIMIT 1`).bind(channel.id, input.userId, body).first<{ duplicate: number }>();
@@ -235,8 +237,8 @@ export async function createHotCommunityMessage(input: {
   const sequence = await db.prepare(`SELECT COALESCE(MAX(sequence_id),0)+1 AS next_sequence FROM community_messages WHERE channel_id=?1`).bind(channel.id).first<{ next_sequence: number }>();
   const mentionIds = [...new Set((input.mentionUserIds ?? []).filter(Boolean))].slice(0, 10);
   const statements = [
-    db.prepare(`INSERT INTO community_messages (id,sequence_id,channel_id,user_id,author_label,body,reply_to_message_id,attached_resource_id,moderation_status)
-      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'active')`).bind(id, Number(sequence?.next_sequence ?? 1), channel.id, input.userId, input.authorLabel || "Student", body, input.replyToId ?? null, input.resourceId ?? null),
+    db.prepare(`INSERT INTO community_messages (id,sequence_id,channel_id,user_id,author_label,body,reply_to_message_id,attached_resource_id,moderation_status,client_message_id)
+      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'active',?9)`).bind(id, Number(sequence?.next_sequence ?? 1), channel.id, input.userId, input.authorLabel || "Student", body, input.replyToId ?? null, input.resourceId ?? null,clientMessageId),
   ];
   for (const mentionedUserId of mentionIds) {
     statements.push(db.prepare(`INSERT OR IGNORE INTO community_message_mentions (message_id,user_id) VALUES (?1,?2)`).bind(id, mentionedUserId));
