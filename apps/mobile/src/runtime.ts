@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 
 export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "https://ca-progress-v2.habeebaasif622.workers.dev"]);
 export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|planner(?:\/.*)?|progress|study|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
+const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
 
 export type NativeRoute = "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings";
 
@@ -24,11 +25,34 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
 export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onResume: () => void, onAuthCallback: (url: string) => void) {
   if (!Capacitor.isNativePlatform()) return () => undefined;
   document.documentElement.dataset.nativePlatform = Capacitor.getPlatform();
+
+  // Android may recreate the activity when the browser returns from OAuth. In
+  // that cold-launch path appUrlOpen can fire before the web bundle has added
+  // its listener, so recover the launch URL as well as listening for live URLs.
+  // Keep one callback URL one-use locally because the server exchange is also
+  // one-use and a URL can occasionally be observed through both Capacitor APIs.
+  const handledAuthCallbacks = new Set<string>();
+  const handleIncomingUrl = (url: string) => {
+    if (url.startsWith(NATIVE_AUTH_CALLBACK)) {
+      if (handledAuthCallbacks.has(url)) return;
+      handledAuthCallbacks.add(url);
+      onAuthCallback(url);
+      return;
+    }
+    const route = routeFromDeepLink(url);
+    if (route) onRoute(route);
+  };
+
   const handles = [
-    App.addListener("appUrlOpen", ({ url }) => { if (url.startsWith("ca-progress://auth/complete")) onAuthCallback(url); else { const route = routeFromDeepLink(url); if (route) onRoute(route); } }),
+    App.addListener("appUrlOpen", ({ url }) => handleIncomingUrl(url)),
     App.addListener("resume", onResume),
     App.addListener("backButton", ({ canGoBack }) => { if (canGoBack) history.back(); else void App.minimizeApp(); }),
   ];
+
+  // getLaunchUrl is required for OAuth callbacks that launched/re-launched the
+  // native activity before appUrlOpen registration completed.
+  void App.getLaunchUrl().then((launch) => { if (launch?.url) handleIncomingUrl(launch.url); });
+
   return () => { for (const handle of handles) void handle.then((listener) => listener.remove()); };
 }
 
