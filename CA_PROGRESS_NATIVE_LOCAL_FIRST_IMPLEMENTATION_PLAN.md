@@ -21,6 +21,12 @@ Replace the current production-hosted Capacitor WebView with a bundled, local-fi
 
 The finished application must open from installed assets, render previously synchronized data immediately from the device, and synchronize changes in the background. Community channels and recent messages must already be present locally and receive incremental updates like a modern messaging application.
 
+## Visual and functional parity gate
+
+The installed app must use the **mobile website as the design and behavior reference**. The current simplified bundled screens are implementation scaffolding, not a finished mobile product. Preserve the mobile site's information hierarchy, navigation, typography, spacing, cards, controls, states and interactions for every student route. Share presentational components and design tokens with the website where practical; adapt data access behind those components to the account-isolated SQLite repository and synchronization layer. Do not replace the bundled interface with a remote WebView to achieve visual parity.
+
+For each screen, compare authenticated website and native phone screenshots at matching viewport sizes and matching account data, then verify navigation, edits, loading, empty, error, dark mode and offline states. A screen passes only when it offers the website's features with the same visual layout and interactions, cached data appears immediately, edits commit locally before background synchronization, and reconnect does not replace the screen with a loading page. Record route-by-route evidence. Do not count the current Phase 20 screens or its test count as certification of this parity gate.
+
 The target flow is:
 
 ```text
