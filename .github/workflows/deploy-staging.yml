@@ -228,7 +228,7 @@ jobs:
             remote_head="$(git ls-remote origin "refs/heads/$DEPLOY_BRANCH" | awk '{print $1}')"
             if [ "$remote_head" = "$DEPLOY_SHA" ]; then
               npx wrangler rollback --name ca-progress-v2-icai-sync --message "Automated rollback after failed ICAI Phase 5 live proof" || true
-              npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after failed ICAI Phase 5 live proof" || true
+              echo "::warning::ICAI Phase 5 proof failed; the isolated ICAI service was rolled back. The independently verified web runtime remains deployed."
             else
               echo "::warning::Skipping stale Phase 5 rollback for $DEPLOY_SHA; current branch head is $remote_head."
             fi
@@ -245,7 +245,7 @@ jobs:
             remote_head="$(git ls-remote origin "refs/heads/$DEPLOY_BRANCH" | awk '{print $1}')"
             if [ "$remote_head" = "$DEPLOY_SHA" ]; then
               npx wrangler rollback --name ca-progress-v2-icai-sync --message "Automated rollback after failed ICAI Phase 2 incremental proof" || true
-              npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after failed ICAI Phase 2 incremental proof" || true
+              echo "::warning::ICAI Phase 2 proof failed; the isolated ICAI service was rolled back. The independently verified web runtime remains deployed."
             else
               echo "::warning::Skipping stale Phase 2 rollback for $DEPLOY_SHA; current branch head is $remote_head."
             fi
