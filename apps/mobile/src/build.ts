@@ -1,9 +1,9 @@
 export const MOBILE_BUILD = Object.freeze({
   applicationId: "in.zanisheluxe.caprogress",
-  build: 5,
+  build: 6,
   apiVersion: 1,
   academicContextVersion: 1,
-  localSchemaVersion: 2,
+  localSchemaVersion: 3,
   channel: "internal",
 });
 

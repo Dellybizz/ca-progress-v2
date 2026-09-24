@@ -8,4 +8,4 @@ The native coordinator hydrates SQLite before network work, resumes bootstrap sa
 
 Verification covers process interruption/cursor safety, network failure, duplicate mutation IDs, dependency/reordered results, stale baselines, tombstones, account/context switching, bounded indexed queries and all required conflict-policy declarations.
 
-Phase 18 has not been started.
+Phase 18 is recorded separately in `PHASE_18_STATUS.md`.

@@ -31,7 +31,7 @@ test("duplicate requests, dependency conflicts and stale baselines cannot duplic
 test("client cursor commit is atomic and interruption/reordered pages remain safe",async()=>{
   const source=await read("packages/mobile-data/src/sync.ts");
   assert.match(source,/statements\.push\(\{sql:"INSERT INTO sync_cursors/);assert.match(source,/await transaction\(statements\)/);
-  assert.match(source,/while\(more\)/);assert.match(source,/delta\.academicContextKey!==contextKey/);assert.match(source,/ORDER BY created_at LIMIT 50/);
+  assert.match(source,/while\(more\)/);assert.match(source,/delta\.academicContextKey!==contextKey/);assert.match(source,/ORDER BY created_at,rowid LIMIT 50/);
   assert.match(source,/Math\.pow\(2,attempts\)/);assert.match(source,/Math\.random/);assert.match(source,/status='conflict'/);assert.match(source,/dependency_conflict/);
 });
 

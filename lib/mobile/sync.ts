@@ -9,6 +9,7 @@ export const SYNC_DOMAINS = Object.freeze({
   "/api/planner/tasks": "planner_task",
   "/api/notes": "note",
   "/api/study/timer": "focus_session",
+  "/api/study/reflection": "session_review",
 } as const);
 
 export type SyncDomain = typeof SYNC_DOMAINS[keyof typeof SYNC_DOMAINS];
@@ -25,6 +26,7 @@ export function entityIdentity(url: keyof typeof SYNC_DOMAINS, body: Record<stri
   if (url === "/api/progress") return String(body.chapterId || "");
   if (url === "/api/planner/tasks") return String(body.action === "create" ? body.clientId : body.id || "");
   if (url === "/api/notes") return String(body.id || body.clientId || "");
+  if (url === "/api/study/reflection") return String(body.sessionId || "");
   return "timer";
 }
 

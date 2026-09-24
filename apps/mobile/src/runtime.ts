@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "https://ca-progress-v2.habeebaasif622.workers.dev"]);
 export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|planner(?:\/.*)?|progress|study|community(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
 
-export type NativeRoute = "today" | "progress" | "planner" | "focus" | "community" | "settings";
+export type NativeRoute = "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "profile" | "settings";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {

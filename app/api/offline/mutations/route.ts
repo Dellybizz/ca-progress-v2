@@ -9,10 +9,11 @@ import { POST as progress } from "@/app/api/progress/route";
 import { POST as tasks } from "@/app/api/planner/tasks/route";
 import { POST as notes } from "@/app/api/notes/route";
 import { POST as timer } from "@/app/api/study/timer/route";
+import { POST as reflection } from "@/app/api/study/reflection/route";
 import { syncJournalStatements, SYNC_DOMAINS } from "@/lib/mobile/sync";
 
 export const dynamic = "force-dynamic";
-const handlers = { "/api/progress": progress, "/api/planner/tasks": tasks, "/api/notes": notes, "/api/study/timer": timer };
+const handlers = { "/api/progress": progress, "/api/planner/tasks": tasks, "/api/notes": notes, "/api/study/timer": timer, "/api/study/reflection": reflection };
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 const conflict = (error: string, expected: Record<string, unknown> | null, current: Record<string, unknown> | null, local: Record<string, unknown>) => json({ error, conflict: { expected, current, local } }, 409);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -50,9 +51,12 @@ export async function POST(request: Request) {
     } else if (input.url === "/api/notes") {
       table = "notes"; where = "user_id=? AND id=?"; values = [context.userId, body.id || body.clientId];
       columns = ["title", "body_html", "subject_id", "chapter_id", "visibility", "updated_at"];
-    } else {
+    } else if(input.url === "/api/study/timer") {
       table = "study_timer_state"; where = "user_id=?"; values = [context.userId];
       columns = ["status", "started_at", "elapsed_seconds", "running_since", "paused_at", "last_interaction_at"];
+    } else {
+      table = "study_session_phase3"; where = "user_id=? AND session_id=?"; values = [context.userId, body.sessionId];
+      columns = ["understanding_score", "focus_rating", "reflection_saved_at", "updated_at"];
     }
     if (values.some(value => typeof value !== "string" || !value)) return json({ error: "Missing edit identity." }, 400);
     const query = `SELECT json_object(${columns.map(c => `'${c}',${c}`).join(",")}) AS value FROM ${table} WHERE ${where} LIMIT 1`;

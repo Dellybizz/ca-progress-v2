@@ -30,6 +30,7 @@
     "test:mobile:phase15": "npm run test:mobile:phase14 && node --test tests/mobile-phase15-native-auth.test.mjs",
     "test:mobile:phase16": "npm run test:mobile:phase15 && node --test tests/mobile-phase16-sqlite-data.test.mjs",
     "test:mobile:phase17": "npm run test:mobile:phase16 && node --test tests/mobile-phase17-sync-engine.test.mjs",
+    "test:mobile:phase18": "npm run test:mobile:phase17 && node --test tests/mobile-phase18-core-local-first.test.mjs",
     "native:bundle": "node scripts/mobile/build-native-shell.mjs",
     "native:add:android": "npm run native:bundle && CAPACITOR_PLATFORM=android cap add android",
     "native:add:ios": "npm run native:bundle && CAPACITOR_PLATFORM=ios cap add ios",

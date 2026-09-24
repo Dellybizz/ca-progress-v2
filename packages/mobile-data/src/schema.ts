@@ -3,7 +3,7 @@ export type SqlStatement = { sql: string; args?: unknown[] };
 const syncColumns = `local_id TEXT PRIMARY KEY, server_id TEXT, server_version INTEGER NOT NULL DEFAULT 0, account_id TEXT NOT NULL, academic_context_key TEXT, local_state TEXT NOT NULL DEFAULT 'synced' CHECK(local_state IN ('synced','pending','conflict','failed')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT`;
 const entity = (table: string, extra: string) => `CREATE TABLE IF NOT EXISTS ${table} (${syncColumns}, ${extra}, FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)`;
 
-export const LOCAL_SCHEMA_VERSION = 2;
+export const LOCAL_SCHEMA_VERSION = 3;
 export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlStatement[] }> = [{
   version: 1,
   statements: [
@@ -46,5 +46,16 @@ export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlS
     { sql: "CREATE INDEX IF NOT EXISTS idx_outbox_retry ON mutation_outbox(account_id,status,next_attempt_at,created_at)" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_conflicts_open ON conflicts(account_id,resolved_at,created_at)" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_tombstones_account_type ON tombstones(account_id,entity_type,deleted_at)" },
+  ],
+}, {
+  version: 3,
+  statements: [
+    { sql: entity("profile_projection", "display_name TEXT NOT NULL, level_code TEXT, attempt_key TEXT, timezone TEXT, daily_target_minutes INTEGER, payload_json TEXT NOT NULL DEFAULT '{}'") },
+    { sql: entity("activity_projection", "activity_kind TEXT NOT NULL, title TEXT NOT NULL, occurred_at TEXT NOT NULL, xp_amount INTEGER NOT NULL DEFAULT 0, payload_json TEXT NOT NULL DEFAULT '{}'") },
+    { sql: entity("leaderboard_projection", "category TEXT NOT NULL, rank INTEGER, score INTEGER NOT NULL DEFAULT 0, public_alias TEXT, payload_json TEXT NOT NULL DEFAULT '{}'") },
+    { sql: entity("study_buddy_projection", "relationship_id TEXT, buddy_name TEXT NOT NULL, relationship_state TEXT NOT NULL, payload_json TEXT NOT NULL DEFAULT '{}'") },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_activity_account_time ON activity_projection(account_id,occurred_at DESC)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_buddy_account_state ON study_buddy_projection(account_id,relationship_state,updated_at DESC)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_catalog_account_type ON academic_catalog(account_id,entity_type,parent_server_id)" },
   ],
 }];
