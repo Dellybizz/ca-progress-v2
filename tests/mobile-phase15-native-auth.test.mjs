@@ -38,3 +38,12 @@ test("verified callback routes and device revocation are wired", async () => {
   assert.match(runtime, /handledAuthCallbacks\.has\(url\)/);
   assert.match(session, /revoke_others/);
 });
+
+test("offline session stays bound to one account and transient fetch failures do not delete it",async()=>{
+  const [client,main]=await Promise.all([read("apps/mobile/src/native-auth.ts"),read("apps/mobile/src/main.tsx")]);
+  assert.match(client,/readOfflineSessionAccountId/);
+  assert.match(client,/JSON\.stringify\(\{ token: session\.accessToken, accountId: session\.applicationUserId \}/);
+  assert.match(client,/error instanceof NativeRequestError && error\.status === 401/);
+  assert.match(main,/id === readLocalAccount\(\)\.id && hasRetainedLocalAccount\(\)/);
+  assert.match(main,/cause instanceof NativeRequestError && cause\.status === 401/);
+});
