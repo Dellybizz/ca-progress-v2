@@ -32,6 +32,7 @@
     "test:mobile:phase17": "npm run test:mobile:phase16 && node --test tests/mobile-phase17-sync-engine.test.mjs",
     "test:mobile:phase18": "npm run test:mobile:phase17 && node --test tests/mobile-phase18-core-local-first.test.mjs",
     "test:mobile:phase19": "npm run test:mobile:phase18 && node --test tests/mobile-phase19-community-realtime.test.mjs",
+    "test:mobile:phase20": "npm run test:mobile:phase19 && node --test tests/mobile-phase20-files-notifications.test.mjs",
     "native:bundle": "node scripts/mobile/build-native-shell.mjs",
     "native:add:android": "npm run native:bundle && CAPACITOR_PLATFORM=android cap add android",
     "native:add:ios": "npm run native:bundle && CAPACITOR_PLATFORM=ios cap add ios",
@@ -75,6 +76,7 @@
   },
   "dependencies": {
     "@ca-progress/capacitor-local-database": "file:packages/capacitor-local-database",
+    "@ca-progress/capacitor-file-vault": "file:packages/capacitor-file-vault",
     "@ca-progress/capacitor-secure-session": "file:packages/capacitor-secure-session",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.2",

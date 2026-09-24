@@ -2,9 +2,9 @@ import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
 export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "https://ca-progress-v2.habeebaasif622.workers.dev"]);
-export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|planner(?:\/.*)?|progress|study|community(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
+export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|planner(?:\/.*)?|progress|study|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
 
-export type NativeRoute = "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "profile" | "settings";
+export type NativeRoute = "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {
@@ -14,6 +14,8 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
     if (url.pathname.startsWith("/planner")) return "planner";
     if (url.pathname.startsWith("/study")) return "focus";
     if (url.pathname.startsWith("/community")) return "community";
+    if (url.pathname.startsWith("/resources")) return "resources";
+    if (url.pathname.startsWith("/notifications")) return "notifications";
     if (url.pathname.startsWith("/settings")) return "settings";
     return "today";
   } catch { return null; }

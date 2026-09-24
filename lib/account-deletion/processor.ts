@@ -14,6 +14,7 @@ const USER_DELETE_STATEMENTS = [
   "DELETE FROM notification_outbox WHERE user_id=?1",
   "DELETE FROM in_app_notifications WHERE user_id=?1",
   "DELETE FROM notification_preferences WHERE user_id=?1",
+  "DELETE FROM native_push_devices WHERE user_id=?1",
   "DELETE FROM community_saved_messages WHERE user_id=?1",
   "DELETE FROM community_follows WHERE user_id=?1 OR followed_user_id=?1",
   "DELETE FROM community_messages WHERE user_id=?1",

@@ -60,7 +60,7 @@ test("Phase 14 workflow builds the bundle and certifies the phase", () => {
   const workflow = read(".github/workflows/mobile-release.yml");
   const packageJson = read("package.json");
   assert.match(workflow, /apps\/mobile\/\*\*/);
-  assert.match(workflow, /test:mobile:phase1[4-9]/);
+  assert.match(workflow, /test:mobile:phase(?:1[4-9]|[2-9][0-9])/);
   assert.match(packageJson, /native:bundle/);
   assert.match(packageJson, /native:sync:android.*native:bundle/);
   assert.match(read("docs/mobile-local-first/PHASE_14_STATUS.md"), /Status: Complete/);

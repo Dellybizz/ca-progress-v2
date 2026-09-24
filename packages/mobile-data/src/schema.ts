@@ -3,7 +3,7 @@ export type SqlStatement = { sql: string; args?: unknown[] };
 const syncColumns = `local_id TEXT PRIMARY KEY, server_id TEXT, server_version INTEGER NOT NULL DEFAULT 0, account_id TEXT NOT NULL, academic_context_key TEXT, local_state TEXT NOT NULL DEFAULT 'synced' CHECK(local_state IN ('synced','pending','conflict','failed')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT`;
 const entity = (table: string, extra: string) => `CREATE TABLE IF NOT EXISTS ${table} (${syncColumns}, ${extra}, FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)`;
 
-export const LOCAL_SCHEMA_VERSION = 4;
+export const LOCAL_SCHEMA_VERSION = 5;
 export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlStatement[] }> = [{
   version: 1,
   statements: [
@@ -78,5 +78,19 @@ export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlS
     { sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_community_message_client ON community_messages(account_id,client_message_id) WHERE client_message_id IS NOT NULL" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_community_message_sequence ON community_messages(account_id,channel_key,sequence_id DESC)" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_community_event_sequence ON community_event_log(account_id,channel_key,sequence_id DESC)" },
+  ],
+}, {
+  version: 5,
+  statements: [
+    { sql: "ALTER TABLE resource_metadata ADD COLUMN owner_id TEXT" },
+    { sql: "ALTER TABLE resource_metadata ADD COLUMN mime_type TEXT" },
+    { sql: "ALTER TABLE resource_metadata ADD COLUMN checksum TEXT" },
+    { sql: "ALTER TABLE resource_metadata ADD COLUMN sync_state TEXT NOT NULL DEFAULT 'metadata' CHECK(sync_state IN ('metadata','downloading','available','uploading','failed'))" },
+    { sql: "ALTER TABLE resource_metadata ADD COLUMN thumbnail_file_id TEXT" },
+    { sql: "CREATE TABLE IF NOT EXISTS file_transfers (transfer_id TEXT PRIMARY KEY,account_id TEXT NOT NULL,resource_local_id TEXT NOT NULL,direction TEXT NOT NULL CHECK(direction IN ('download','upload')),state TEXT NOT NULL CHECK(state IN ('queued','running','paused','failed','completed','cancelled')),bytes_complete INTEGER NOT NULL DEFAULT 0,total_bytes INTEGER NOT NULL DEFAULT 0,resume_token TEXT,idempotency_key TEXT NOT NULL UNIQUE,attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at TEXT,last_error TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL,FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)" },
+    { sql: "CREATE TABLE IF NOT EXISTS native_push_devices (device_id TEXT PRIMARY KEY,account_id TEXT NOT NULL,platform TEXT NOT NULL,push_token_hash TEXT NOT NULL,registered_at TEXT NOT NULL,last_seen_at TEXT NOT NULL,revoked_at TEXT,FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_resource_owner_state ON resource_metadata(account_id,sync_state,updated_at DESC)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_transfer_recovery ON file_transfers(account_id,state,next_attempt_at,created_at)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_notifications_account_time ON notifications(account_id,created_at DESC)" },
   ],
 }];

@@ -5,6 +5,9 @@ project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/
 include ':ca-progress-capacitor-local-database'
 project(':ca-progress-capacitor-local-database').projectDir = new File('../packages/capacitor-local-database/android')
 
+include ':ca-progress-capacitor-file-vault'
+project(':ca-progress-capacitor-file-vault').projectDir = new File('../packages/capacitor-file-vault/android')
+
 include ':ca-progress-capacitor-secure-session'
 project(':ca-progress-capacitor-secure-session').projectDir = new File('../packages/capacitor-secure-session/android')
 

@@ -1,0 +1,12 @@
+import Foundation
+import CryptoKit
+import Capacitor
+@objc(FileVaultPlugin) public class FileVaultPlugin:CAPPlugin,CAPBridgedPlugin{
+ public let identifier="FileVaultPlugin";public let jsName="FileVault";public let pluginMethods=[CAPPluginMethod(name:"write",returnType:CAPPluginReturnPromise),CAPPluginMethod(name:"read",returnType:CAPPluginReturnPromise),CAPPluginMethod(name:"remove",returnType:CAPPluginReturnPromise),CAPPluginMethod(name:"wipeAccount",returnType:CAPPluginReturnPromise)]
+ private func root(_ account:String)throws->URL{guard account.range(of:"^[A-Za-z0-9:_-]{1,160}$",options:.regularExpression) != nil else{throw NSError(domain:"FileVault",code:1)};let base=FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("ca-progress-files").appendingPathComponent(account);try FileManager.default.createDirectory(at:base,withIntermediateDirectories:true);return base}
+ private func url(_ call:CAPPluginCall)throws->URL{guard let account=call.getString("accountId"),let id=call.getString("fileId"),id.range(of:"^[A-Za-z0-9_-]{1,160}$",options:.regularExpression) != nil else{throw NSError(domain:"FileVault",code:2)};return try root(account).appendingPathComponent(id)}
+ @objc func write(_ call:CAPPluginCall){do{guard let value=call.getString("base64"),let data=Data(base64Encoded:value)else{throw NSError(domain:"FileVault",code:3)};let target=try url(call);try data.write(to:target,options:.atomic);let checksum=SHA256.hash(data:data).map{String(format:"%02x",$0)}.joined();call.resolve(["fileId":call.getString("fileId")!,"nativePath":target.path,"byteSize":data.count,"checksum":checksum])}catch{call.reject("File could not be saved.",nil,error)}}
+ @objc func read(_ call:CAPPluginCall){do{let data=try Data(contentsOf:url(call));call.resolve(["base64":data.base64EncodedString(),"byteSize":data.count])}catch{call.reject("Offline file unavailable.",nil,error)}}
+ @objc func remove(_ call:CAPPluginCall){do{try? FileManager.default.removeItem(at:url(call));call.resolve()}catch{call.reject("Offline file could not be removed.",nil,error)}}
+ @objc func wipeAccount(_ call:CAPPluginCall){do{guard let account=call.getString("accountId")else{throw NSError(domain:"FileVault",code:4)};try? FileManager.default.removeItem(at:root(account));call.resolve()}catch{call.reject("Account files could not be removed.",nil,error)}}
+}

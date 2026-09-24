@@ -10,12 +10,19 @@ on:
       - apps/mobile/**
       - packages/capacitor-secure-session/**
       - packages/capacitor-local-database/**
+      - packages/capacitor-file-vault/**
       - packages/mobile-data/**
       - app/api/v1/native-auth/**
       - lib/auth/**
       - d1/migrations/0064_mobile_phase15_native_auth.sql
       - d1/migrations/0065_mobile_phase17_sync.sql
+      - d1/migrations/0066_mobile_phase19_community.sql
+      - d1/migrations/0067_mobile_phase20_native_push.sql
       - app/api/v1/sync/**
+      - app/api/v1/community/**
+      - app/api/v1/resources/**
+      - app/api/v1/notifications/**
+      - app/api/v1/push/**
       - lib/mobile/**
       - components/mobile/**
       - config/app-release.ts
@@ -54,7 +61,7 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
-      - run: npm run test:mobile:phase19
+      - run: npm run test:mobile:phase20
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
