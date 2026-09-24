@@ -31,7 +31,7 @@ export async function startNativeSignIn(provider: "google" | "linkedin_oidc") {
 
 export async function completeNativeSignIn(value: string) {
   const url = new URL(value);
-  if (url.protocol !== "ca-progress:" || url.host !== "auth" || url.pathname !== "/complete") throw new Error("The sign-in callback is invalid.");
+  if (url.protocol !== "ca-progress:" || url.host !== "auth" || url.pathname !== "/complete") throw new Error(`The sign-in callback is invalid (${url.protocol}//${url.host}${url.pathname}).`);
   const pendingRaw = await secureGet("pkce");
   const pending = pendingRaw ? JSON.parse(pendingRaw) as { transactionId: string; verifier: string; expiresAt: string } : null;
   const transactionId = url.searchParams.get("transaction"); const exchangeCode = url.searchParams.get("code");
