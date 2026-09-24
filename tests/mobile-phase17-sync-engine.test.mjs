@@ -43,3 +43,20 @@ test("lifecycle triggers cover login, launch, resume, reconnect, refresh, invali
 });
 
 test("all required domain conflict policies are explicit",async()=>{const source=await read("packages/mobile-data/src/sync.ts");for(const policy of ["merge-independent-stages","field-review","retain-both","immutable-client-id","greatest-sequence","monotonic-read","explicit-review"])assert.match(source,new RegExp(policy));});
+
+test("every local sync insert has one value per declared column",async()=>{
+  const source=await read("packages/mobile-data/src/sync.ts");
+  const inserts=[...source.matchAll(/INSERT INTO ([a-z_]+)\(([^)]+)\) VALUES\(([^)]+)\)/g)];
+  assert.ok(inserts.length>=10);
+  for(const [,table,columns,values] of inserts)assert.equal(values.split(",").length,columns.split(",").length,`${table} INSERT column/value mismatch`);
+});
+
+test("bootstrap cannot merge another account and committed pages refresh local readers",async()=>{
+  const [sync,repository,main,bootstrap]=await Promise.all([read("packages/mobile-data/src/sync.ts"),read("packages/mobile-data/src/repository.ts"),read("apps/mobile/src/main.tsx"),read("app/api/v1/sync/bootstrap/route.ts")]);
+  assert.match(sync,/bootstrap\.accountId!==input\.accountId/);
+  assert.match(sync,/await transaction\(statements\);\s*notifyLocalAccountChanged\(accountId\)/);
+  assert.match(repository,/export const notifyLocalAccountChanged/);
+  assert.match(main,/if \(!value\.user\?\.applicationUserId\) throw/);
+  assert.match(main,/role="alert" className="sync-error"/);
+  assert.match(bootstrap,/ACADEMIC_SETUP_REQUIRED/);
+});
