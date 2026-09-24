@@ -10,7 +10,8 @@ export const OPTIONS = (request: NextRequest) => nativeOptions(request);
 
 export async function GET(request: NextRequest) {
   const context=await getStudentContext();
-  if(context.mode!=="ready"||!context.userId)return json(request,{error:{code:"AUTH_REQUIRED",message:"Sign in to synchronize.",retryable:false}},401);
+  if(!context.userId)return json(request,{error:{code:"AUTH_REQUIRED",message:"Sign in to synchronize.",retryable:false}},401);
+  if(context.mode!=="ready")return json(request,{error:{code:context.mode==="setup"?"ACADEMIC_SETUP_REQUIRED":"ACADEMIC_CONTEXT_INVALID",message:context.mode==="setup"?"Complete your CA level and attempt setup on the website to synchronize this device.":context.issue||"Review your CA level and attempt on the website before synchronizing.",retryable:false}},409);
   const requested=request.nextUrl.searchParams.get("context");
   if(requested&&requested!==context.contextKey)return json(request,{error:{code:"CONTEXT_CHANGED",message:"Academic context changed.",retryable:false}},409);
   const db=getD1RuntimeDatabase();
