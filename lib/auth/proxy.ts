@@ -4,10 +4,20 @@ const GUEST_ID_COOKIE = "ca_guest_id";
 const API_VERSION = "1";
 const MAX_API_BODY_BYTES = 1_000_000;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{8,180}$/;
+const NATIVE_ORIGINS = new Set(["capacitor://localhost", "http://localhost", "https://localhost"]);
+const NATIVE_APP_ID = "in.zanisheluxe.caprogress";
+
+function isTrustedNativeApiRequest(request: NextRequest) {
+  const origin = request.headers.get("origin") || "";
+  return request.nextUrl.pathname.startsWith("/api/v1/")
+    && NATIVE_ORIGINS.has(origin)
+    && request.headers.get("x-ca-native-app") === NATIVE_APP_ID;
+}
 
 function rejectCrossSiteUnsafeRequest(request: NextRequest) {
   const method = request.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
+  if (isTrustedNativeApiRequest(request)) return null;
 
   const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase();
   if (fetchSite === "cross-site") {

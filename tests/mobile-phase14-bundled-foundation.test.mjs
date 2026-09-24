@@ -20,7 +20,7 @@ test("bundled React shell includes every initial route frame", () => {
   assert.match(source, /createRoot/);
   assert.match(source, /readLocalAccount/);
   assert.match(source, /function Bootstrap/);
-  assert.match(source, /Continue on this device|Open local preview/);
+  assert.match(source, /Continue with Google/);
   assert.match(source, /requestAnimationFrame\(\(\) => document\.documentElement\.dataset\.shellReady/);
   assert.doesNotMatch(source, /\bfetch\s*\(/);
 });

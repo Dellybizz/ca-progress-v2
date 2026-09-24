@@ -14,7 +14,7 @@ async function secureRemove(key: "session" | "pkce") { if (Capacitor.isNativePla
 function base64Url(bytes: Uint8Array) { return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function jsonRequest(path: string, init: RequestInit = {}, authenticated = false) {
   const token = authenticated ? await secureGet("session") : null;
-  const response = await fetch(`${API_ORIGIN}${path}`, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers } });
+  const response = await fetch(`${API_ORIGIN}${path}`, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", "X-CA-API-Version": String(MOBILE_BUILD.apiVersion), "X-CA-App-Build": String(MOBILE_BUILD.build), "X-CA-Native-App": MOBILE_BUILD.applicationId, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers } });
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new Error(body?.error?.message || "The request could not be completed.");
   return body;

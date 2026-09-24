@@ -8,7 +8,7 @@ export function nativeCorsHeaders(request: Request): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Authorization,Content-Type,Idempotency-Key,X-CA-API-Version,X-CA-App-Build",
+    "Access-Control-Allow-Headers": "Authorization,Content-Type,Idempotency-Key,X-CA-API-Version,X-CA-App-Build,X-CA-Native-App",
     "Access-Control-Max-Age": "600",
     Vary: "Origin",
   };
