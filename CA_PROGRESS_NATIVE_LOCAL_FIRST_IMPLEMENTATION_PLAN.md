@@ -1,11 +1,22 @@
 # CA Progress — Native Local-First Application Implementation Plan
 
-Status: Planned  
+Status: Foundations implemented through Phase 20; native product parity and real-device certification incomplete (25 September 2026)  
 Repository: `Dellybizz/ca-progress-v2`  
 Working branch: `mobile-phase7-student-parity`  
 Production origin: `https://caprogress.zanisheluxe.in`  
 Native application ID: `in.zanisheluxe.caprogress`  
 Plan starts after completed Mobile Phases 0–12.
+
+## Current implementation and evidence — 25 September 2026
+
+- Android and iOS bundled projects, account-isolated SQLite, native authentication, versioned sync, Community, files, notifications and background foundations exist on `mobile-phase7-student-parity`. Automated mobile builds and V2 CI pass at `8ab6d29f`; the subsequent `e9264d49` plan-only commit also passes V2 CI. This is evidence of compilation and tests, not real-phone feature parity.
+- Google sign-in has returned to the installed application on a phone. Its final account/session and all-data synchronization path is not yet certified. The screenshots at 01:32–01:33 on 25 September show an installed shell with `Update paused`, `Not selected` academic context, and empty Today, Progress and Syllabus. The local sync insert arity defects for profile and Study Buddy were fixed at `8ab6d29f`, but that APK has not yet been verified on the same account and device.
+- The current bundled React UI is a separate simplified prototype. It does not reproduce the mobile website's route structure, layout, controls or full feature set. Screenshots of the current APK are evidence of the gap, not proof of completion. Do not describe Phases 18–20 as product-complete based on automated tests alone.
+- The Cloudflare rollout at `cf324c7e` passed; this does not establish that the subsequent mobile sync fix or the visual parity work is working on a phone. `main` has not been merged as part of this programme.
+
+### Acceptance target
+
+The installed app must present the **same mobile CA Progress product** as the website: information architecture, navigation, visual hierarchy, content, controls, states and interactions. Its interface must be bundled locally, render previously synchronized account data from SQLite immediately, queue supported edits locally, and reconcile with the existing Cloudflare backend. Online-only operations may require connectivity, but must retain the website's screen and explain that requirement in context. The existing app is an internal prototype until this target is verified.
 
 ---
 
@@ -20,12 +31,6 @@ Replace the current production-hosted Capacitor WebView with a bundled, local-fi
 - one account and one authoritative server data model across website, Android and iOS.
 
 The finished application must open from installed assets, render previously synchronized data immediately from the device, and synchronize changes in the background. Community channels and recent messages must already be present locally and receive incremental updates like a modern messaging application.
-
-## Visual and functional parity gate
-
-The installed app must use the **mobile website as the design and behavior reference**. The current simplified bundled screens are implementation scaffolding, not a finished mobile product. Preserve the mobile site's information hierarchy, navigation, typography, spacing, cards, controls, states and interactions for every student route. Share presentational components and design tokens with the website where practical; adapt data access behind those components to the account-isolated SQLite repository and synchronization layer. Do not replace the bundled interface with a remote WebView to achieve visual parity.
-
-For each screen, compare authenticated website and native phone screenshots at matching viewport sizes and matching account data, then verify navigation, edits, loading, empty, error, dark mode and offline states. A screen passes only when it offers the website's features with the same visual layout and interactions, cached data appears immediately, edits commit locally before background synchronization, and reconnect does not replace the screen with a loading page. Record route-by-route evidence. Do not count the current Phase 20 screens or its test count as certification of this parity gate.
 
 The target flow is:
 
@@ -62,7 +67,9 @@ Installed React/Capacitor interface
 
 ---
 
-## 3. Current-state truth
+## 3. Pre-Phase-13 baseline (historical)
+
+The following inventory describes the starting state before the bundled native work. Use the dated implementation evidence above for the current state.
 
 ### Present and reusable
 
@@ -566,6 +573,74 @@ Storage pressure, interrupted transfer, token expiry and account-switch tests pa
 
 ---
 
+# Phase 20A — Authenticated Data and Sync Recovery (required before parity implementation)
+
+Status: Open. The `8ab6d29f` SQLite insert fix has passed CI and Android compilation; real-device verification remains open.
+
+## Work
+
+1. On the same established account, prove OAuth callback, bearer session, application user ID, academic selection, and bootstrap context agree. Never silently substitute a demo account or a `cloud-account` placeholder for a missing server ID.
+2. Prove `/api/v1/sync/bootstrap` and pull return authorized profile, attempts, subjects, chapters, progress, tasks and other existing account data. Diagnose non-ready academic context explicitly; preserve any pending local edits.
+3. Execute the returned entities through real SQLite transactions, including profile and Study Buddy projections. Check SQL column/value/binding arity for every entity, and verify cursor advancement only after the transaction commits.
+4. Show the exact safe sync failure category and a retry action in the app. Never expose bearer tokens, OAuth codes, note/message bodies or signed file URLs in diagnostics.
+5. Verify restart, offline launch, reconnect, account switch, context switch and a second no-op sync on a phone. Confirm the website still shows the same account data.
+
+## Definition of done
+
+- The phone shows the user's actual profile, chosen CA level and attempt, academic catalog, progress and planner data after sign-in; no `Not selected` caused by sync failure and no misleading `Update paused` without an actionable reason.
+- After one successful sync, the same data is visible in airplane mode and after process death. Another account cannot read it. Local edits reach the same website account exactly once after reconnecting.
+- Real-device evidence records the tested APK SHA, Worker deployment, account identity correlation (redacted), SQLite migration version, bootstrap response shape and sync result. Automated tests alone do not close this gate.
+
+Do not move to Phase 20B or claim the app usable while this gate is open.
+
+---
+
+# Phase 20B — Shared Mobile Shell and Parity Inventory
+
+Status: Not started.
+
+## Work
+
+- Record the current authenticated mobile website on representative narrow and wide phones, light and dark mode, with the same account and data as the app. Capture navigation, overlays, empty/loading/error states, keyboard, scrolling and safe areas. Keep these references versioned with the website commit.
+- Build a route-and-interaction inventory from the website navigation contract, not the prototype's route list. Include Home/Dashboard, Today, Focus, Progress and More; every More section; deep links; search, attempt switcher, notifications, back behavior and account controls. Mark each route local read/write, cached read with online actions, or online-only with a stable local screen.
+- Move shareable design tokens, icons and pure visual components into a framework-neutral package. Adapt website routing and data dependencies behind interfaces usable by both Next.js and Capacitor. Preserve website behavior and avoid importing server modules into the native bundle.
+- Replace the prototype app bar, bottom navigation, More menu, typography and page container with the website's mobile shell and interaction patterns. Preserve native safe areas, hardware back and keyboard behavior. Keep the bundled entry fully functional in airplane mode.
+
+## Definition of done
+
+- At matched phone viewport, the shell's labels, order, iconography, spacing, active states, sheets, app bar and navigation behavior match the current mobile website, allowing only documented platform conventions.
+- Each website student route has an owner, data policy and test case. No route is silently replaced with a placeholder. The app still launches from bundled assets without network.
+
+---
+
+# Phase 20C — Core Screen Visual and Functional Parity
+
+Status: Not started.
+
+Port in a dependency-safe sequence: Dashboard and countdown; Today; Focus and session review; Progress and Chapter Hub; Syllabus and attempt context; Planner, calendar, goals and revision; Notes. For each screen, reuse or adapt website UI components and preserve its content density, controls, state transitions, responsive layout and dark mode. Bind reads to account-isolated SQLite, make supported edits locally atomic with outbox entries, and reconcile from Cloudflare without resetting scroll or transient UI state.
+
+## Definition of done
+
+- Screen-by-screen screenshots at matching viewport, theme, account and data demonstrate layout parity. Interaction checks cover every visible action, including add/edit/delete, filters, dialogs, date/attempt changes and back navigation.
+- Cached content renders before network requests; edits survive process death; pending/conflict/error states are clear; reconnection converges with the mobile website. No screen passes solely because it has a similar title and a generic card.
+
+---
+
+# Phase 20D — Remaining Student Features and Cross-Route Parity
+
+Status: Not started.
+
+Complete Community and Study Buddy; Resources, ICAI resources and updates; Activity, XP and leaderboards; Search; Notifications; Profile and every Settings section; Analytics, Forecast and Tests; Pricing, Billing, Feature Tour and account deletion. Include chapter/resource detail routes and all website mobile overlays. Keep server-authoritative billing, entitlements and destructive account operations online, but render their cached context and safe offline state locally. Preserve file vault, message ordering, push and native security boundaries.
+
+## Definition of done
+
+- The route inventory from Phase 20B has no unexplained missing student route, control or interaction. Each online-only action says why connectivity is required and safely resumes or retries according to its contract.
+- Full parity checks pass on Android and iOS phones at matched website data, plus airplane-mode, reconnect, account-switch, theme and accessibility checks. All previous mobile and website regression gates remain green.
+
+Do not start Phase 21 or treat the Phase 20 test count as completion until Phases 20A–20D pass their real-device gates.
+
+---
+
 # Phase 21 — Migration, Observability and Reliability Certification
 
 ## Objective
@@ -755,6 +830,7 @@ Ship the certified local-first application through controlled Android and iOS ch
 The programme is complete only when:
 
 - the production mobile build contains its own interface;
+- that interface has passed Phases 20B–20D against the current authenticated mobile website for every student route, visual state and interaction;
 - the app opens and navigates without network access;
 - cached data appears before synchronization;
 - synchronization is incremental, transactional and idempotent;
@@ -767,3 +843,18 @@ The programme is complete only when:
 - no unresolved critical/high privacy, identity, entitlement, payment or data-loss issue remains.
 
 Until those conditions pass, describe the app truthfully as an internal local-first release candidate, not a completed store application.
+
+## Completion record
+
+| Milestone | Current assessment (25 September 2026) | Remaining evidence |
+| --- | --- | --- |
+| Phases 13–17 foundations | Implemented in branch; automated suites/builds passed | Native session and sync correctness on a real phone |
+| Phase 18 core local screens | Prototype code exists; product acceptance reopened | Website UI/feature parity and populated offline account screens |
+| Phase 19 Community | Local and incremental foundation exists | Real account channels, message ordering, moderation/interaction parity, offline/reconnect |
+| Phase 20 resources/notifications | Native foundation exists; build passes | Real-device file, push and website parity checks |
+| Phase 20A sync recovery | SQL arity fix at `8ab6d29f`; CI and Android build passed | Same-account phone proof; actionable sync diagnostics |
+| Phases 20B–20D UI and feature parity | Not started | Route inventory, matched screenshots, interactions and offline behavior |
+| Phase 21 reliability | Not started | Migration, observability and interruption matrix |
+| Phase 22 signed store release | Not started | Signing, store testing and controlled rollout |
+
+Record each passed gate with website commit, app commit/APK digest, backend deployment, device/OS, account context and redacted test evidence. Do not mark a milestone complete using screenshots of empty prototype screens or CI success alone.
