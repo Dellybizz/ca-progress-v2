@@ -29,7 +29,12 @@ test("native client keeps bearer and PKCE proof in platform secure storage", asy
 test("verified callback routes and device revocation are wired", async () => {
   const [manifest, plist, runtime, session] = await Promise.all([read("android/app/src/main/AndroidManifest.xml"), read("ios/App/App/Info.plist"), read("apps/mobile/src/runtime.ts"), read("app/api/v1/session/route.ts")]);
   assert.match(manifest, /android:scheme="ca-progress"/);
+  assert.match(manifest, /android:host="auth" android:pathPrefix="\/complete"/);
   assert.match(plist, /<string>ca-progress<\/string>/);
   assert.match(runtime, /ca-progress:\/\/auth\/complete/);
+  assert.match(runtime, /App\.addListener\("appUrlOpen"/);
+  assert.match(runtime, /App\.getLaunchUrl\(\)/);
+  assert.match(runtime, /handledAuthCallbacks = new Set<string>\(\)/);
+  assert.match(runtime, /handledAuthCallbacks\.has\(url\)/);
   assert.match(session, /revoke_others/);
 });
