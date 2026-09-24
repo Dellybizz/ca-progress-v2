@@ -6,6 +6,15 @@ const API_ORIGIN = "https://ca-progress-v2.habeebaasif622.workers.dev";
 const SecureSession = registerPlugin<{ set(input: { key: "session" | "pkce"; value: string }): Promise<void>; get(input: { key: "session" | "pkce" }): Promise<{ value: string | null }>; remove(input: { key: "session" | "pkce" }): Promise<void> }>("SecureSession");
 const browserMemory: Record<string, string | undefined> = {};
 
+type StoredSession = { token: string; accountId: string };
+function decodeSession(value: string | null): { token: string; accountId: string | null } | null {
+  if (!value) return null;
+  try { const parsed = JSON.parse(value) as Partial<StoredSession>; if (typeof parsed.token === "string" && typeof parsed.accountId === "string") return { token: parsed.token, accountId: parsed.accountId }; } catch { /* Legacy debug builds stored only the token. */ }
+  return { token: value, accountId: null };
+}
+export async function readOfflineSessionAccountId() { return decodeSession(await secureGet("session"))?.accountId ?? null; }
+export class NativeRequestError extends Error { constructor(message: string, readonly status: number, readonly code: string) { super(message); this.name = "NativeRequestError"; } }
+
 export type NativeSessionSnapshot = { authenticated: boolean; user?: { applicationUserId?: string; displayName?: string | null; email?: string | null; avatarUrl?: string | null }; session?: { rotateRecommended?: boolean } };
 
 async function secureSet(key: "session" | "pkce", value: string) { if (Capacitor.isNativePlatform()) await SecureSession.set({ key, value }); else browserMemory[key] = value; }
@@ -13,10 +22,10 @@ async function secureGet(key: "session" | "pkce") { return Capacitor.isNativePla
 async function secureRemove(key: "session" | "pkce") { if (Capacitor.isNativePlatform()) await SecureSession.remove({ key }); else delete browserMemory[key]; }
 function base64Url(bytes: Uint8Array) { return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function jsonRequest(path: string, init: RequestInit = {}, authenticated = false) {
-  const token = authenticated ? await secureGet("session") : null;
+  const token = authenticated ? decodeSession(await secureGet("session"))?.token : null;
   const response = await fetch(`${API_ORIGIN}${path}`, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", "X-CA-API-Version": String(MOBILE_BUILD.apiVersion), "X-CA-App-Build": String(MOBILE_BUILD.build), "X-CA-Native-App": MOBILE_BUILD.applicationId, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers } });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error?.message || "The request could not be completed.");
+  if (!response.ok) throw new NativeRequestError(body?.error?.message || "The request could not be completed.", response.status, body?.error?.code || "REQUEST_FAILED");
   return body;
 }
 export async function nativeApiRequest(path:string,init:RequestInit={}){return jsonRequest(path,init,true);}
@@ -37,18 +46,22 @@ export async function completeNativeSignIn(value: string) {
   const transactionId = url.searchParams.get("transaction"); const exchangeCode = url.searchParams.get("code");
   if (!pending || transactionId !== pending.transactionId || !exchangeCode || Date.parse(pending.expiresAt) <= Date.now()) throw new Error("This sign-in attempt has expired. Please try again.");
   const session = await jsonRequest("/api/v1/native-auth/exchange", { method: "POST", body: JSON.stringify({ transactionId, exchangeCode, verifier: pending.verifier }) });
-  await secureSet("session", session.accessToken); await secureRemove("pkce");
+  if (!session.accessToken || !session.applicationUserId) throw new Error("The sign-in exchange did not return a complete device session.");
+  await secureSet("session", JSON.stringify({ token: session.accessToken, accountId: session.applicationUserId } satisfies StoredSession)); await secureRemove("pkce");
   return readNativeSession();
 }
 
-async function rotateNativeSession() { const session = await jsonRequest("/api/v1/native-auth/rotate", { method: "POST", body: "{}" }, true); await secureSet("session", session.accessToken); }
+async function rotateNativeSession(accountId: string) { const session = await jsonRequest("/api/v1/native-auth/rotate", { method: "POST", body: "{}" }, true); await secureSet("session", JSON.stringify({ token: session.accessToken, accountId } satisfies StoredSession)); }
 export async function readNativeSession(): Promise<NativeSessionSnapshot | null> {
-  const token = await secureGet("session"); if (!token) return null;
+  const stored = decodeSession(await secureGet("session")); if (!stored) return null;
   try {
     let snapshot = await jsonRequest("/api/v1/session", {}, true) as NativeSessionSnapshot;
-    if (snapshot.session?.rotateRecommended) { await rotateNativeSession(); snapshot = await jsonRequest("/api/v1/session", {}, true); }
+    const accountId = snapshot.user?.applicationUserId;
+    if (!snapshot.authenticated || !accountId || (stored.accountId && stored.accountId !== accountId)) { await secureRemove("session"); throw new Error("The device session does not match this account."); }
+    if (snapshot.session?.rotateRecommended) { await rotateNativeSession(accountId); snapshot = await jsonRequest("/api/v1/session", {}, true); }
+    await secureSet("session", JSON.stringify({ token: (decodeSession(await secureGet("session")) ?? stored).token, accountId } satisfies StoredSession));
     return snapshot;
-  } catch (error) { await secureRemove("session"); throw error; }
+  } catch (error) { if (error instanceof NativeRequestError && error.status === 401) await secureRemove("session"); throw error; }
 }
 export async function revokeOtherDevices() { return jsonRequest("/api/v1/session", { method: "POST", body: JSON.stringify({ action: "revoke_others" }) }, true); }
 export async function logoutNative() { try { await jsonRequest("/api/v1/native-auth/revoke", { method: "POST", body: "{}" }, true); } finally { await Promise.all([secureRemove("session"), secureRemove("pkce")]); } }
