@@ -14,6 +14,9 @@ on:
       - app/api/v1/native-auth/**
       - lib/auth/**
       - d1/migrations/0064_mobile_phase15_native_auth.sql
+      - d1/migrations/0065_mobile_phase17_sync.sql
+      - app/api/v1/sync/**
+      - lib/mobile/**
       - components/mobile/**
       - config/app-release.ts
       - scripts/mobile/**
@@ -51,7 +54,7 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
-      - run: npm run test:mobile:phase16
+      - run: npm run test:mobile:phase17
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build

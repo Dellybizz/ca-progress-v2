@@ -19,6 +19,7 @@ async function jsonRequest(path: string, init: RequestInit = {}, authenticated =
   if (!response.ok) throw new Error(body?.error?.message || "The request could not be completed.");
   return body;
 }
+export async function nativeApiRequest(path:string,init:RequestInit={}){return jsonRequest(path,init,true);}
 
 export async function startNativeSignIn(provider: "google" | "linkedin_oidc") {
   const verifier = base64Url(crypto.getRandomValues(new Uint8Array(64)));

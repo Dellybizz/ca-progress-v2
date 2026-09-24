@@ -3,8 +3,8 @@ import { createRoot } from "react-dom/client";
 import { MOBILE_BUILD } from "./build";
 import { clearLocalAccount, hasRetainedLocalAccount, localPreview, readLocalAccount, retainLocalAccount } from "./repository";
 import { installNativeRuntime, type NativeRoute } from "./runtime";
-import { completeNativeSignIn, logoutNative, readNativeSession, revokeOtherDevices, startNativeSignIn, type NativeSessionSnapshot } from "./native-auth";
-import { openAccountRepository, wipeAllOfflineData, type LocalAccountRepository, type LocalDashboard, type LocalTimer } from "../../../packages/mobile-data/src";
+import { completeNativeSignIn, logoutNative, nativeApiRequest, readNativeSession, revokeOtherDevices, startNativeSignIn, type NativeSessionSnapshot } from "./native-auth";
+import { createSyncCoordinator, openAccountRepository, wipeAllOfflineData, type LocalAccountRepository, type LocalDashboard, type LocalTimer, type SyncVisualState } from "../../../packages/mobile-data/src";
 import "./styles.css";
 
 const navigation: Array<{ route: NativeRoute; label: string; glyph: string }> = [
@@ -26,8 +26,9 @@ function navigate(route: NativeRoute) {
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
-function Status({ online, syncing }: { online: boolean; syncing: boolean }) {
-  return <span className={`status ${online ? "online" : "offline"}`}>{syncing ? "Updating…" : online ? "Ready" : "Offline · showing saved data"}</span>;
+function Status({ online, state, refresh }: { online: boolean; state:SyncVisualState; refresh:()=>void }) {
+  const text=state==="updating"?"Updating…":!online||state==="offline"?"Offline · showing saved data":state==="pending"?"Pending edits":state==="conflict"?"Review conflict":state==="failed"?"Update paused":"Ready";
+  return <button className={`status ${online ? "online" : "offline"}`} onClick={refresh}>{text}</button>;
 }
 
 function Today({ dashboard }: { dashboard: LocalDashboard }) {
@@ -69,7 +70,7 @@ function Bootstrap({ onContinue }: { onContinue: () => void }) {
 function AppShell() {
   const [route, setRoute] = useState<NativeRoute>(routeFromHash);
   const [online, setOnline] = useState(navigator.onLine);
-  const [syncing, setSyncing] = useState(false);
+  const [syncState, setSyncState] = useState<SyncVisualState>("idle");
   const [account, setAccount] = useState(readLocalAccount);
   const [authenticated, setAuthenticated] = useState(false);
   const [selected, setSelected] = useState(hasRetainedLocalAccount);
@@ -79,9 +80,9 @@ function AppShell() {
 
   useEffect(() => {
     const changed = () => setRoute(routeFromHash());
-    const connected = () => setOnline(true);
+    const connected = () => {setOnline(true);window.dispatchEvent(new Event("ca-sync"));};
     const disconnected = () => setOnline(false);
-    const resume = () => { setSyncing(true); window.setTimeout(() => setSyncing(false), 500); };
+    const resume = () => window.dispatchEvent(new Event("ca-sync"));
     addEventListener("popstate", changed);
     addEventListener("online", connected);
     addEventListener("offline", disconnected);
@@ -95,10 +96,12 @@ function AppShell() {
 
   useEffect(() => { if(!selected||(account.id!=="local-preview"&&!authenticated))return; let active=true;let remove:()=>void=()=>{};void openAccountRepository(account,authenticated).then(async(value)=>{if(!active||!value)return;setRepository(value);setDashboard(await value.readDashboard());remove=value.subscribe(()=>{void value.readDashboard().then(setDashboard);});}).catch(()=>setRepository(null));return()=>{active=false;remove();}; }, [selected,account,authenticated]);
 
+  useEffect(()=>{if(!authenticated||!repository)return;const coordinator=createSyncCoordinator({accountId:account.id,transport:nativeApiRequest,onState:setSyncState});const sync=()=>{void coordinator.synchronize().catch(()=>undefined);};window.addEventListener("ca-sync",sync);window.addEventListener("ca-realtime-invalidation",sync);const periodic=window.setInterval(sync,15*60*1000);sync();return()=>{coordinator.stop();window.clearInterval(periodic);window.removeEventListener("ca-sync",sync);window.removeEventListener("ca-realtime-invalidation",sync);};},[authenticated,repository,account.id]);
+
   if (!selected) return <Bootstrap onContinue={() => { retainLocalAccount(account); setSelected(true); }} />;
   const reset=()=>{clearLocalAccount();setRepository(null);setAuthenticated(false);setSelected(false);};
   const content = route === "settings" ? <Settings authenticated={authenticated} repository={repository} recovered={Boolean(repository?.database.recovered)} onLogout={async()=>{await repository?.lock();await logoutNative();reset();}} onRemove={async()=>{await repository?.removeFromDevice();reset();}} onWipe={async()=>{await wipeAllOfflineData();reset();}} /> : route === "today" ? <Today dashboard={dashboard}/> : route === "progress" ? <Progress dashboard={dashboard}/> : route === "focus" ? <Focus repository={repository}/> : route === "community" ? <Community dashboard={dashboard}/> : <Planner/>;
-  return <div className="app-shell"><aside><div className="brand"><span>CA</span><div><strong>CA Progress</strong><small>Native workspace</small></div></div><nav>{navigation.map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i>{item.label}</button>)}</nav><div className="account"><span>Z</span><div><strong>{account.displayName}</strong><small>{account.subtitle}</small></div></div></aside><main><div className="topbar"><div className="mobile-brand"><span>CA</span><strong>CA Progress</strong></div><Status online={online} syncing={syncing}/></div>{content}</main><nav className="bottom-nav">{navigation.slice(0, 5).map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i><span>{item.label}</span></button>)}<button className={route === "settings" ? "active" : ""} onClick={() => navigate("settings")}><i>◇</i><span>More</span></button></nav></div>;
+  return <div className="app-shell"><aside><div className="brand"><span>CA</span><div><strong>CA Progress</strong><small>Native workspace</small></div></div><nav>{navigation.map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i>{item.label}</button>)}</nav><div className="account"><span>Z</span><div><strong>{account.displayName}</strong><small>{account.subtitle}</small></div></div></aside><main><div className="topbar"><div className="mobile-brand"><span>CA</span><strong>CA Progress</strong></div><Status online={online} state={syncState} refresh={()=>window.dispatchEvent(new Event("ca-sync"))}/></div>{content}</main><nav className="bottom-nav">{navigation.slice(0, 5).map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i><span>{item.label}</span></button>)}<button className={route === "settings" ? "active" : ""} onClick={() => navigate("settings")}><i>◇</i><span>More</span></button></nav></div>;
 }
 
 const root = document.getElementById("root");

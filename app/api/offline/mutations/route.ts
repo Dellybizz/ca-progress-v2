@@ -9,6 +9,7 @@ import { POST as progress } from "@/app/api/progress/route";
 import { POST as tasks } from "@/app/api/planner/tasks/route";
 import { POST as notes } from "@/app/api/notes/route";
 import { POST as timer } from "@/app/api/study/timer/route";
+import { syncJournalStatements, SYNC_DOMAINS } from "@/lib/mobile/sync";
 
 export const dynamic = "force-dynamic";
 const handlers = { "/api/progress": progress, "/api/planner/tasks": tasks, "/api/notes": notes, "/api/study/timer": timer };
@@ -77,8 +78,10 @@ export async function POST(request: Request) {
       VALUES (?,?,?,?,?,?,CASE WHEN COALESCE((${query}),'null')=? THEN 1 ELSE 0 END)`)
       .bind(context.userId, key, hash, responseText, response.status, entity, ...values, current);
     // Uniqueness or a concurrent entity edit aborts the entire batch, including domain events.
+    const syncStatements = syncJournalStatements(db, { userId: context.userId, contextKey: context.contextKey, mutationId: key, requestHash: hash, url: input.url, body, responseJson: responseText, responseStatus: response.status });
     await db.batch([insert, ...staged.writes,
       db.prepare(`UPDATE offline_mutation_receipts SET entity_after_json=COALESCE((${query}),'null'),response_json=json_set(response_json,'$._offlineBaseline',json(COALESCE((${query}),'null'))) WHERE user_id=? AND mutation_id=?`).bind(...values, ...values, context.userId, key),
+      ...syncStatements,
     ]);
     for (const callback of afterCommit) await callback();
     return replay((await receipt())!);
@@ -89,3 +92,5 @@ export async function POST(request: Request) {
     return json({ error: "Synchronization is temporarily unavailable. Your edit remains on this device." }, 503);
   }
 }
+
+export { SYNC_DOMAINS };

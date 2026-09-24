@@ -99,6 +99,7 @@ test("offline endpoint deduplicates replay, detects stale records, and chains de
     "@/lib/offline/transaction-context": { offlineTransaction: transaction },
     "@/lib/offline/atomic": { stageOfflineWrites },
     "@/lib/offline/projection": projection,
+    "@/lib/mobile/sync": { SYNC_DOMAINS: {}, syncJournalStatements: () => [] },
     ...Object.fromEntries(["progress", "planner/tasks", "notes", "study/timer"].map(route => [`@/app/api/${route}/route`, { POST: handler }])),
   });
   const id = crypto.randomUUID(), first = crypto.randomUUID();

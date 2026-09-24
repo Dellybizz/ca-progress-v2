@@ -14,4 +14,4 @@ The timer and initial dashboard projection render from SQLite and survive proces
 
 Phase 16 stores no bearer credentials in SQLite; those remain in Keystore/Keychain from Phase 15. The database is app-sandboxed and iOS receives platform data protection. SQLCipher is not enabled in this build because it adds a separate native cryptographic dependency and key-migration lifecycle. Before a public store release containing private note or community bodies, add SQLCipher with a Keystore/Keychain-wrapped database key, migration/rotation tests, and backup compatibility. This is a store-hardening obligation, not a reason to mix tokens into SQLite.
 
-Phase 17 synchronization has not been started.
+Phase 17 synchronization is recorded separately in `PHASE_17_STATUS.md`.
