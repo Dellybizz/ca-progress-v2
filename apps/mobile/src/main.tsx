@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { MOBILE_BUILD } from "./build";
 import { clearLocalAccount, hasRetainedLocalAccount, localPreview, readLocalAccount, retainLocalAccount } from "./repository";
 import { installNativeRuntime, type NativeRoute } from "./runtime";
-import { completeNativeSignIn, logoutNative, nativeApiRequest, readNativeSession, revokeOtherDevices, startNativeSignIn, type NativeSessionSnapshot } from "./native-auth";
+import { completeNativeSignIn, logoutNative, nativeApiRequest, readNativeSession, readOfflineSessionAccountId, NativeRequestError, revokeOtherDevices, startNativeSignIn, type NativeSessionSnapshot } from "./native-auth";
 import { createSyncCoordinator, openAccountRepository, wipeAllOfflineData, readCommunitySnapshot, queueCommunityMessage, saveCommunityDraft, markCommunityReadLocal, readResources, readNotifications, markNotificationReadLocal, removeLocalFile, type CommunitySnapshot, type LocalResource, type LocalNotification, type LocalAccountRepository, type LocalDashboard, type LocalTimer, type LocalWorkspace, type SyncVisualState } from "../../../packages/mobile-data/src";
 import {createNativeCommunityCoordinator} from "./community-sync";
 import {downloadResource,FileVault,openOfflineResource,uploadResource} from "./files";
@@ -146,14 +146,25 @@ function AppShell() {
         setSelected(false);
       });
     });
-    void readNativeSession().then((value) => {
+    let savedSessionAccountId: string | null = null;
+    void readOfflineSessionAccountId().then((id) => {
+      savedSessionAccountId = id;
+      if (!callbackStarted.current && id && id === readLocalAccount().id && hasRetainedLocalAccount()) { setAuthenticated(true); setSelected(true); }
+      return readNativeSession();
+    }).then((value) => {
       if (callbackStarted.current) return;
       if (value?.authenticated) applySession(value);
-      else { clearLocalAccount(); setSelected(false); }
+      else { clearLocalAccount(); setAuthenticated(false); setSelected(false); }
     }).catch((cause) => {
       if (callbackStarted.current) return;
-      setAuthError(cause instanceof Error ? cause.message : "Could not restore the session.");
-      clearLocalAccount(); setSelected(false);
+      if (cause instanceof NativeRequestError && cause.status === 401) {
+        clearLocalAccount(); setAuthenticated(false); setSelected(false); setAuthError("Your session expired. Sign in again to unlock saved data.");
+      } else if (savedSessionAccountId && savedSessionAccountId === readLocalAccount().id) {
+        setSyncError("Offline or server unavailable. Showing saved data; retry when connected.");
+      } else {
+        clearLocalAccount(); setAuthenticated(false); setSelected(false);
+        setAuthError(cause instanceof Error ? cause.message : "Could not restore the session.");
+      }
     });
     // Network compatibility checks begin after the bundled shell has painted.
     requestAnimationFrame(() => document.documentElement.dataset.shellReady = "true");
