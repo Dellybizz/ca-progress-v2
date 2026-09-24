@@ -2,7 +2,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 import { MOBILE_BUILD } from "./build";
 import { openExternalSafely } from "./runtime";
 
-const API_ORIGIN = "https://caprogress.zanisheluxe.in";
+const API_ORIGIN = "https://ca-progress-v2.habeebaasif622.workers.dev";
 const SecureSession = registerPlugin<{ set(input: { key: "session" | "pkce"; value: string }): Promise<void>; get(input: { key: "session" | "pkce" }): Promise<{ value: string | null }>; remove(input: { key: "session" | "pkce" }): Promise<void> }>("SecureSession");
 const browserMemory: Record<string, string | undefined> = {};
 

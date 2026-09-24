@@ -18,6 +18,8 @@ test("native client keeps bearer and PKCE proof in platform secure storage", asy
   const [client, android, ios] = await Promise.all([read("apps/mobile/src/native-auth.ts"), read("packages/capacitor-secure-session/android/src/main/java/in/zanisheluxe/caprogress/securesession/SecureSessionPlugin.java"), read("packages/capacitor-secure-session/ios/Sources/SecureSessionPlugin/SecureSessionPlugin.swift")]);
   assert.match(client, /crypto\.subtle\.digest\("SHA-256"/);
   assert.match(client, /Authorization: `Bearer/);
+  assert.match(client, /const API_ORIGIN = "https:\/\/ca-progress-v2\.habeebaasif622\.workers\.dev";/);
+  assert.doesNotMatch(client, /const API_ORIGIN = "https:\/\/caprogress\.zanisheluxe\.in";/);
   assert.doesNotMatch(client, /localStorage|sessionStorage|console\./);
   assert.match(android, /AndroidKeyStore/);
   assert.match(android, /AES\/GCM\/NoPadding/);
