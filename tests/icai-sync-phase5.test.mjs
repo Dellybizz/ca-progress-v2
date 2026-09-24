@@ -104,7 +104,8 @@ test("Phase 5 is a permanent focused gate in CI, retirement closure and deployme
   assert.match(deployment, /ICAI Phase 5 live pipeline proof/);
   assert.match(deployment, /verify-icai-phase5-live\.mjs/);
   assert.match(deployment, /rollback --name ca-progress-v2-icai-sync/);
-  assert.match(deployment, /independently verified web runtime remains deployed/);\n  assert.doesNotMatch(deployment, /rollback --name ca-progress-v2 --message "Automated rollback after failed ICAI Phase [25]/);
+  assert.match(deployment, /independently verified web runtime remains deployed/);
+  assert.doesNotMatch(deployment, /rollback --name ca-progress-v2 --message "Automated rollback after failed ICAI Phase [25]/);
 });
 
 test("Phase 5 queue sync is bounded into sequential per-source continuation jobs", () => {

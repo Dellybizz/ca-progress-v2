@@ -1,6 +1,7 @@
 name: Cloudflare V2 Deploy
 
 # Canonical web Worker configuration: wrangler.jsonc
+# Web runtime rollback is independent from isolated ICAI live-proof rollback.
 on:
   workflow_dispatch:
   push:
