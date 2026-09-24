@@ -105,10 +105,10 @@ function Settings({ authenticated, repository, recovered, onLogout, onRemove, on
 const defaultDashboard: LocalDashboard = { today: [...localPreview.today], progress: localPreview.progress[0], community: [...localPreview.community] };
 const defaultWorkspace:LocalWorkspace={academic:{contextKey:null,level:"Not selected",attempt:"Not selected",subjects:[],lastUpdatedAt:null},dashboard:defaultDashboard,progress:[],planner:[],notes:[],profile:{displayName:"CA Progress student",level:null,attempt:null,timezone:null,dailyTargetMinutes:null},activity:[],leaderboard:{rank:null,score:0,category:"overall"},buddies:[],pending:0,conflicts:0,lastSyncedAt:null};
 
-function Bootstrap() {
+function Bootstrap({ callbackError }: { callbackError: string }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   const signIn = (provider: "google" | "linkedin_oidc") => { setBusy(true); setError(""); void startNativeSignIn(provider).catch((cause) => { setBusy(false); setError(cause.message); }); };
-  return <div className="bootstrap"><div className="bootstrap-card"><span className="bootstrap-logo">CA</span><p className="eyebrow">INSTALLED WORKSPACE</p><h1>CA Progress is ready</h1><p>The application interface is stored on this device. Sign in securely to use the same account and cloud data as the website.</p><button className="primary" disabled={busy} onClick={() => signIn("google")}>Continue with Google</button><button className="secondary" disabled={busy} onClick={() => signIn("linkedin_oidc")}>Continue with LinkedIn</button>{error && <small className="auth-error">{error}</small>}<small>Your password and session token never pass through this screen.</small></div></div>;
+  return <div className="bootstrap"><div className="bootstrap-card"><span className="bootstrap-logo">CA</span><p className="eyebrow">INSTALLED WORKSPACE</p><h1>CA Progress is ready</h1><p>The application interface is stored on this device. Sign in securely to use the same account and cloud data as the website.</p><button className="primary" disabled={busy} onClick={() => signIn("google")}>Continue with Google</button><button className="secondary" disabled={busy} onClick={() => signIn("linkedin_oidc")}>Continue with LinkedIn</button>{(error || callbackError) && <small className="auth-error" role="alert">{error || callbackError}</small>}<small>Your password and session token never pass through this screen.</small></div></div>;
 }
 
 function AppShell() {
@@ -117,6 +117,8 @@ function AppShell() {
   const [syncState, setSyncState] = useState<SyncVisualState>("idle");
   const [account, setAccount] = useState(readLocalAccount);
   const [authenticated, setAuthenticated] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const callbackStarted = useRef(false);
   const [selected, setSelected] = useState(hasRetainedLocalAccount);
   const [repository, setRepository] = useState<LocalAccountRepository|null>(null);
   const [dashboard, setDashboard] = useState<LocalDashboard>(defaultDashboard);
@@ -131,8 +133,27 @@ function AppShell() {
     addEventListener("popstate", changed);
     addEventListener("online", connected);
     addEventListener("offline", disconnected);
-    const removeNative = installNativeRuntime(navigate, resume, (url) => { void completeNativeSignIn(url).then(applySession).catch(() => setSelected(false)); });
-    void readNativeSession().then((value) => { if (value) applySession(value); else { clearLocalAccount(); setSelected(false); } }).catch(() => { clearLocalAccount(); setSelected(false); });
+    const removeNative = installNativeRuntime(navigate, resume, (url) => {
+      if (callbackStarted.current) return;
+      callbackStarted.current = true;
+      setAuthError("");
+      void completeNativeSignIn(url).then((value) => {
+        if (!value?.authenticated) throw new Error("Google sign-in returned without an authenticated session.");
+        applySession(value);
+      }).catch((cause) => {
+        setAuthError(cause instanceof Error ? cause.message : "Sign-in could not be completed. Please try again.");
+        setSelected(false);
+      });
+    });
+    void readNativeSession().then((value) => {
+      if (callbackStarted.current) return;
+      if (value?.authenticated) applySession(value);
+      else { clearLocalAccount(); setSelected(false); }
+    }).catch((cause) => {
+      if (callbackStarted.current) return;
+      setAuthError(cause instanceof Error ? cause.message : "Could not restore the session.");
+      clearLocalAccount(); setSelected(false);
+    });
     // Network compatibility checks begin after the bundled shell has painted.
     requestAnimationFrame(() => document.documentElement.dataset.shellReady = "true");
     return () => { removeEventListener("popstate", changed); removeEventListener("online", connected); removeEventListener("offline", disconnected); removeNative(); };
@@ -143,7 +164,7 @@ function AppShell() {
   useEffect(()=>{if(!authenticated||!repository)return;const coordinator=createSyncCoordinator({accountId:account.id,transport:nativeApiRequest,onState:setSyncState});const sync=()=>{void coordinator.synchronize().catch(()=>undefined);};window.addEventListener("ca-sync",sync);window.addEventListener("ca-realtime-invalidation",sync);const periodic=window.setInterval(sync,15*60*1000);sync();return()=>{coordinator.stop();window.clearInterval(periodic);window.removeEventListener("ca-sync",sync);window.removeEventListener("ca-realtime-invalidation",sync);};},[authenticated,repository,account.id]);
   useEffect(()=>{if(!authenticated||!repository)return;const background=createBoundedBackgroundRecovery({accountId:account.id,transport:nativeApiRequest,onChanged:()=>window.dispatchEvent(new Event("ca-local-data"))});const recover=()=>void background.recover();window.addEventListener("ca-background-recover",recover);void registerNativePush(account.id,nativeApiRequest);return()=>{background.stop();window.removeEventListener("ca-background-recover",recover);};},[authenticated,repository,account.id]);
 
-  if (!selected) return <Bootstrap />;
+  if (!selected) return <Bootstrap callbackError={authError} />;
   const reset=()=>{clearLocalAccount();setRepository(null);setAuthenticated(false);setSelected(false);};
   const content = route === "settings" ? <Settings authenticated={authenticated} repository={repository} recovered={Boolean(repository?.database.recovered)} onLogout={async()=>{await revokeNativePush(nativeApiRequest);await repository?.lock();await logoutNative();reset();}} onRemove={async()=>{if(repository)await FileVault.wipeAccount({accountId:repository.accountId}).catch(()=>undefined);await repository?.removeFromDevice();reset();}} onWipe={async()=>{if(repository)await FileVault.wipeAccount({accountId:repository.accountId}).catch(()=>undefined);await wipeAllOfflineData();reset();}} /> : route === "today" ? <Today workspace={workspace} repository={repository}/> : route === "progress" ? <Progress workspace={workspace} repository={repository}/> : route === "syllabus"?<Syllabus workspace={workspace}/>:route === "focus" ? <Focus repository={repository}/> : route === "community" ? <Community dashboard={dashboard} repository={repository} authenticated={authenticated} account={account}/> : route==="resources"?<Resources repository={repository} authenticated={authenticated}/>:route==="notifications"?<Notifications repository={repository}/>:route==="notes"?<Notes workspace={workspace} repository={repository}/>:route==="activity"?<Activity workspace={workspace}/>:route==="buddy"?<Buddy workspace={workspace}/>:route==="profile"?<Profile workspace={workspace}/>:<Planner workspace={workspace} repository={repository}/>;
   const primary=navigation.filter(item=>["today","progress","planner","focus","community"].includes(item.route));
