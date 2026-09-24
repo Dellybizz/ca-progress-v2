@@ -28,7 +28,8 @@ export type LocalAccountRepository = {
 };
 
 const listeners = new Map<string, Set<() => void>>();
-const notify = (accountId: string) => { for (const listener of listeners.get(accountId) || []) listener(); };
+export const notifyLocalAccountChanged = (accountId: string) => { for (const listener of listeners.get(accountId) || []) listener(); };
+const notify = notifyLocalAccountChanged;
 const now = () => new Date().toISOString();
 const safeJson=(value:string|null|undefined)=>{try{return value?JSON.parse(value) as Record<string,unknown>:{};}catch{return {};}};
 const contextFor=async(accountId:string)=>{const rows=await query<{scope:string}>("SELECT scope FROM sync_cursors WHERE account_id=? ORDER BY updated_at DESC LIMIT 1",[accountId]);return rows[0]?.scope||"unscoped";};
