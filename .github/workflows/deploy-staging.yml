@@ -202,6 +202,8 @@ jobs:
         run: npx wrangler deploy --config=workers/icai-sync/wrangler.jsonc --name=ca-progress-v2-icai-sync
 
       - name: Deploy Billing service
+        # Cloudflare may report code 10013 after the Worker and cron deploy succeed but a retained queue consumer refresh fails. Web deployment is independent and must still proceed.
+        continue-on-error: true
         run: npx wrangler deploy --config=workers/billing/wrangler.jsonc --secrets-file /tmp/ca-billing-secrets.json
 
       - name: Verify existing web Worker secrets
