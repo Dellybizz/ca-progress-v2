@@ -615,7 +615,7 @@ Status: Not started.
 
 # Phase 20C — Core Screen Visual and Functional Parity
 
-Status: Not started.
+Status: In progress. Dashboard and Today native screen layout and local task interactions started on `2f3ed48a`; 20C definition of done remains open. Focus, Progress/Chapter Hub, Syllabus, Planner/Calendar/Goals/Revision, Notes, matched screenshots, interaction matrix, and real-device offline/reconnect proof remain outstanding.
 
 Port in a dependency-safe sequence: Dashboard and countdown; Today; Focus and session review; Progress and Chapter Hub; Syllabus and attempt context; Planner, calendar, goals and revision; Notes. For each screen, reuse or adapt website UI components and preserve its content density, controls, state transitions, responsive layout and dark mode. Bind reads to account-isolated SQLite, make supported edits locally atomic with outbox entries, and reconcile from Cloudflare without resetting scroll or transient UI state.
 
