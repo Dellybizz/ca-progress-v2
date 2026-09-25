@@ -30,12 +30,24 @@ jobs:
         with:
           node-version: 22.13.0
           cache: npm
-      - name: Repair patcher typo and syntax-check
+      - name: Repair P3 patcher and syntax-check
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('scripts/mobile/apply-p3-daily-workspace.mjs')
-          p.write_text(p.read_text().replace("',$\n'  readTimer()", "',\n'  readTimer()"))
+          s=p.read_text().replace("',$\n'  readTimer()", "',\n'  readTimer()")
+          if 'function mountExamCountdown(file)' not in s:
+              marker='// Local repository: verified attempt dates, goals, and revision settings use the existing local DB + outbox transaction model.'
+              helper='''function mountExamCountdown(file){\n  const source=read(file);\n  if(source.includes("<ExamCountdown workspace={workspace}/>"))return;\n  const dashboard=source.indexOf("function Dashboard");\n  const phrase=source.indexOf("Countdown coming soon",dashboard);\n  const start=source.lastIndexOf('<section className="dashboard-a1-exam"',phrase);\n  const close="</section>";\n  const end=source.indexOf(close,phrase);\n  if(dashboard<0||phrase<0||start<dashboard||end<0)throw new Error("P3 patch failed: dashboard countdown mount");\n  write(file,source.slice(0,start)+'<ExamCountdown workspace={workspace}/>'+source.slice(end+close.length));\n}\n\n'''
+              s=s.replace(marker,helper+marker)
+          label=',"dashboard countdown mount");'
+          if label in s:
+              end=s.index(label)+len(label)
+              start=s.rfind('replaceOnce(main,',0,end)
+              if start < 0:
+                  raise SystemExit('Could not locate dashboard countdown mount block')
+              s=s[:start]+'mountExamCountdown(main);'+s[end:]
+          p.write_text(s)
           PY
           node --check scripts/mobile/apply-p3-daily-workspace.mjs
       - name: Apply P3 implementation
@@ -57,7 +69,7 @@ jobs:
         run: |
           if ! npm run typecheck; then
             echo '--- generated apps/mobile/src/main.tsx around TypeScript failure ---'
-            nl -ba apps/mobile/src/main.tsx | sed -n '34,58p'
+            nl -ba apps/mobile/src/main.tsx | sed -n '34,80p'
             exit 1
           fi
       - name: Native bundle gate
