@@ -30,65 +30,25 @@ jobs:
           node-version: 22.13.0
           cache: npm
       - name: Repair patcher typo and syntax-check
-        shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('scripts/mobile/apply-p3-daily-workspace.mjs')
-          s=p.read_text().replace("',$\n'  readTimer()", "',\n'  readTimer()")
-          p.write_text(s)
+          p.write_text(p.read_text().replace("',$\n'  readTimer()", "',\n'  readTimer()"))
           PY
           node --check scripts/mobile/apply-p3-daily-workspace.mjs
       - name: Apply P3 implementation
         run: node scripts/mobile/apply-p3-daily-workspace.mjs
-      - name: Harden P3 generated source and gate
-        shell: bash
+      - name: Harden generated P3 source and gate
+        env:
+          P3_TEST_B64: aW1wb3J0IHRlc3QgZnJvbSAibm9kZTp0ZXN0IjsKaW1wb3J0IGFzc2VydCBmcm9tICJub2RlOmFzc2VydC9zdHJpY3QiOwppbXBvcnQgZnMgZnJvbSAibm9kZTpmcyI7CmNvbnN0IG1haW49ZnMucmVhZEZpbGVTeW5jKCJhcHBzL21vYmlsZS9zcmMvbWFpbi50c3giLCJ1dGY4Iik7CmNvbnN0IHJlcG89ZnMucmVhZEZpbGVTeW5jKCJwYWNrYWdlcy9tb2JpbGUtZGF0YS9zcmMvcmVwb3NpdG9yeS50cyIsInV0ZjgiKTsKY29uc3Qgc3luYz1mcy5yZWFkRmlsZVN5bmMoInBhY2thZ2VzL21vYmlsZS1kYXRhL3NyYy9zeW5jLnRzIiwidXRmOCIpOwpjb25zdCBzZXJ2ZXI9ZnMucmVhZEZpbGVTeW5jKCJsaWIvbW9iaWxlL3N5bmMudHMiLCJ1dGY4Iik7CmNvbnN0IG9mZmxpbmU9ZnMucmVhZEZpbGVTeW5jKCJhcHAvYXBpL29mZmxpbmUvbXV0YXRpb25zL3JvdXRlLnRzIiwidXRmOCIpOwpjb25zdCBib290c3RyYXA9ZnMucmVhZEZpbGVTeW5jKCJhcHAvYXBpL3YxL3N5bmMvYm9vdHN0cmFwL3JvdXRlLnRzIiwidXRmOCIpOwpjb25zdCBwaGFzZTg9ZnMucmVhZEZpbGVTeW5jKCJsaWIvcGxhbm5lci9waGFzZTgudHMiLCJ1dGY4Iik7CmNvbnN0IGdvYWxSb3V0ZT1mcy5yZWFkRmlsZVN5bmMoImFwcC9hcGkvcGxhbm5lci9nb2Fscy9yb3V0ZS50cyIsInV0ZjgiKTsKY29uc3QgaGFzPShzb3VyY2UsLi4ucGFydHMpPT5wYXJ0cy5ldmVyeShwYXJ0PT5zb3VyY2UuaW5jbHVkZXMocGFydCkpOwp0ZXN0KCJQMyBkYXNoYm9hcmQgdXNlcyBzeW5jaHJvbml6ZWQgdmVyaWZpZWQgZXhhbSBkYXRlIiwoKT0+ewogIGFzc2VydC5vayhoYXMobWFpbiwiZnVuY3Rpb24gRXhhbUNvdW50ZG93biIsInZlcmlmaWVkX2RhdGUiLCJleGFtRGF0ZSIsIk9wZW4gY2FsZW5kYXIiKSk7CiAgYXNzZXJ0Lm9rKGhhcyhyZXBvLCJwYXlsb2FkLnN0YXJ0RGF0ZSIsInZlcmlmaWNhdGlvblN0YXR1cyIsImV4YW1EYXRlIikpOwogIGFzc2VydC5vayhoYXMoYm9vdHN0cmFwLCJ2ZXJpZmljYXRpb25TdGF0dXMiLCJhLnN0YXJ0X2RhdGUiLCJhLnZlcmlmaWNhdGlvbl9zdGF0dXM9J3ZlcmlmaWVkJyIpKTsKfSk7CnRlc3QoIlAzIFRvZGF5IGtlZXBzIHRhc2stb25seSB0aW1lbGluZSBmaWx0ZXJzIiwoKT0+ewogIGFzc2VydC5vayhoYXMobWFpbiwiVG9kYXkncyB0aW1lbGluZSIsJ1sicGVuZGluZyIsImFsbCIsImNvbXBsZXRlZCJdJywnaXRlbS5raW5kPT09InRhc2siJykpOwp9KTsKdGVzdCgiUDMgRm9jdXMgZXhwb3NlcyBtb2RlcyBhbmQgcmVzdG9yZXMgcGVyc2lzdGVkIHRpbWVyIiwoKT0+ewogIGFzc2VydC5vayhoYXMobWFpbiwnWyJmb2N1cyIsInN0b3B3YXRjaCJdJywncmVwb3NpdG9yeT8ucmVhZFRpbWVyKCkudGhlbihzZXRUaW1lciknLCdGaW5pc2ggc2Vzc2lvbicpKTsKICBhc3NlcnQub2soaGFzKHJlcG8sIklOU0VSVCBJTlRPIHRpbWVyX3N0YXRlIiwnb3V0Ym94U3RhdGVtZW50KGFjY291bnQuaWQse3R5cGU6ImZvY3VzX3Nlc3Npb24iJykpOwp9KTsKdGVzdCgiUDMgZ29hbHMgYW5kIHJldmlzaW9uIHNldHRpbmdzIHVzZSBsb2NhbCB0cmFuc2FjdGlvbiBwbHVzIG91dGJveCIsKCk9PnsKICBhc3NlcnQub2soaGFzKHJlcG8sImFzeW5jIGNyZWF0ZUdvYWwiLCJhc3luYyB0b2dnbGVHb2FsIiwiYXN5bmMgc2F2ZVJldmlzaW9uU2V0dGluZ3MiLCJhd2FpdCB0cmFuc2FjdGlvbihbIiwicGxhbm5lcl9nb2FsIiwicmV2aXNpb25fc2V0dGluZ3MiKSk7CiAgYXNzZXJ0Lm9rKGhhcyhtYWluLCJHb2FscyIsIlJldmlzaW9uIHJoeXRobSIsIlByZWZlcnJlZCBzdHVkeSBkYXlzIiwiU2F2ZSBzZXR0aW5ncyIpKTsKfSk7CnRlc3QoIlAzIHJlY29ubmVjdCBzeW5jIGFjY2VwdHMgZ29hbCBhbmQgcmV2aXNpb24gbXV0YXRpb25zIGVuZCB0byBlbmQiLCgpPT57CiAgZm9yKGNvbnN0IHNvdXJjZSBvZiBbc3luYyxzZXJ2ZXIsb2ZmbGluZV0pewogICAgYXNzZXJ0Lm9rKGhhcyhzb3VyY2UsIi9hcGkvcGxhbm5lci9nb2FscyIsIi9hcGkvcGxhbm5lci9yZXZpc2lvbi1zZXR0aW5ncyIpKTsKICB9CiAgYXNzZXJ0Lm9rKGhhcyhib290c3RyYXAsInBsYW5uZXJfZ29hbCIsInJldmlzaW9uX3NldHRpbmdzIikpOwp9KTsKdGVzdCgiUDMgZ29hbCBjcmVhdGUgaWRlbnRpdHkgaXMgc3RhYmxlIGFjcm9zcyBvZmZsaW5lIHJlcGxheSIsKCk9PnsKICBhc3NlcnQub2soaGFzKHBoYXNlOCwiY3JlYXRlSWQgPz8gY3J5cHRvLnJhbmRvbVVVSUQiLCJTRUxFQ1QgaWQgRlJPTSBnb2FscyBXSEVSRSBpZD0/MSIpKTsKICBhc3NlcnQub2soaGFzKGdvYWxSb3V0ZSwiY2xpZW50SWQ/OiBzdHJpbmciLCJib2R5LmNsaWVudElkIHx8IG51bGwiKSk7Cn0pOwo=
         run: |
           python - <<'PY'
           from pathlib import Path
-          repo=Path('packages/mobile-data/src/repository.ts')
-          s=repo.read_text().replace('description:String(payload.description||"")','description:payload.description?String(payload.description):null')
-          repo.write_text(s)
-          Path('tests/mobile-p3-daily-workspace.test.mjs').write_text(r'''import test from "node:test";
-import assert from "node:assert/strict";
-import fs from "node:fs";
-const main=fs.readFileSync("apps/mobile/src/main.tsx","utf8");
-const repo=fs.readFileSync("packages/mobile-data/src/repository.ts","utf8");
-const sync=fs.readFileSync("packages/mobile-data/src/sync.ts","utf8");
-const server=fs.readFileSync("lib/mobile/sync.ts","utf8");
-const offline=fs.readFileSync("app/api/offline/mutations/route.ts","utf8");
-const bootstrap=fs.readFileSync("app/api/v1/sync/bootstrap/route.ts","utf8");
-const phase8=fs.readFileSync("lib/planner/phase8.ts","utf8");
-const goalRoute=fs.readFileSync("app/api/planner/goals/route.ts","utf8");
-const has=(source,...parts)=>parts.every(part=>source.includes(part));
-test("P3 dashboard uses synchronized verified exam date",()=>{
-  assert.ok(has(main,"function ExamCountdown","verified_date","examDate","Open calendar"));
-  assert.ok(has(repo,"payload.startDate","verificationStatus","examDate"));
-  assert.ok(has(bootstrap,"verificationStatus","a.start_date","a.verification_status='verified'"));
-});
-test("P3 Today keeps task-only timeline filters",()=>{
-  assert.ok(has(main,"Today's timeline",'["pending","all","completed"]','item.kind==="task"'));
-});
-test("P3 Focus exposes modes and restores persisted timer",()=>{
-  assert.ok(has(main,'["focus","stopwatch"]','repository?.readTimer().then(setTimer)','Finish session'));
-  assert.ok(has(repo,"INSERT INTO timer_state",'outboxStatement(account.id,{type:"focus_session"'));
-});
-test("P3 goals and revision settings use local transaction plus outbox",()=>{
-  assert.ok(has(repo,"async createGoal","async toggleGoal","async saveRevisionSettings","await transaction([","planner_goal","revision_settings"));
-  assert.ok(has(main,"Goals","Revision rhythm","Preferred study days","Save settings"));
-});
-test("P3 reconnect sync accepts goal and revision mutations end to end",()=>{
-  for(const source of [sync,server,offline]){
-    assert.ok(has(source,"/api/planner/goals","/api/planner/revision-settings"));
-  }
-  assert.ok(has(bootstrap,"planner_goal","revision_settings"));
-});
-test("P3 goal create identity is stable across offline replay",()=>{
-  assert.ok(has(phase8,"createId ?? crypto.randomUUID","SELECT id FROM goals WHERE id=?1"));
-  assert.ok(has(goalRoute,"clientId?: string","body.clientId || null"));
-});
-''')
+          p=Path('packages/mobile-data/src/repository.ts')
+          p.write_text(p.read_text().replace('description:String(payload.description||"")','description:payload.description?String(payload.description):null'))
           PY
+          printf '%s' "$P3_TEST_B64" | base64 -d > tests/mobile-p3-daily-workspace.test.mjs
           node --check tests/mobile-p3-daily-workspace.test.mjs
       - name: Install dependencies
         run: npm ci --ignore-scripts
@@ -108,7 +68,6 @@ test("P3 goal create identity is stable across offline replay",()=>{
             exit 1
           fi
       - name: Commit certified P3
-        shell: bash
         run: |
           if git diff --quiet && git diff --cached --quiet; then
             echo 'No P3 changes to commit.'
