@@ -162,14 +162,23 @@ test("Phase 4 executes the production run-acquisition SQL and proves overlapping
   );`);
   const statement = db.prepare(sql);
   const startedAt = "2026-09-08T00:00:00.000Z";
-  const first = statement.get("run-1", "manual", "admin-1", "phase8.1", startedAt, 3, "{}");
-  const second = statement.get("run-2", "cron", null, "phase8.1", startedAt, 3, "{}");
+  const bindRun = (id, trigger, requestedBy) => statement.get({
+    "?1": id,
+    "?2": trigger,
+    "?3": requestedBy,
+    "?4": "phase8.1",
+    "?5": startedAt,
+    "?6": 3,
+    "?7": "{}",
+  });
+  const first = bindRun("run-1", "manual", "admin-1");
+  const second = bindRun("run-2", "cron", null);
   assert.equal(first.id, "run-1");
   assert.equal(second, undefined, "a second queued/running sync must not acquire the lock");
   assert.equal(db.prepare("SELECT started_at FROM icai_sync_runs WHERE id='run-1'").get().started_at, startedAt);
 
   db.prepare("UPDATE icai_sync_runs SET status='success' WHERE id='run-1'").run();
-  const third = statement.get("run-3", "cron", null, "phase8.1", startedAt, 3, "{}");
+  const third = bindRun("run-3", "cron", null);
   assert.equal(third.id, "run-3", "the lock must release after the previous run reaches a terminal state");
   db.close();
 });
