@@ -17,7 +17,7 @@ test("P3 dashboard uses synchronized verified exam date",()=>{
   assert.ok(start>=0,"ExamCountdown component missing");
   const countdown=main.slice(start,end>start?end:undefined);
   assert.ok(countdown.includes("examDate"),"countdown is not reading synchronized examDate");
-  assert.ok(countdown.includes("verified_date"),"verified countdown state missing");
+  assert.ok(countdown.includes("Verified exam date")&&countdown.includes("Saved exam date"),"countdown does not distinguish verified and saved dates");
   assert.ok(repo.includes("payload.startDate"),"attempt startDate is not projected locally");
   assert.ok(repo.includes("verificationStatus"),"attempt verification state is not projected locally");
   assert.ok(bootstrap.includes("a.verification_status='verified'"),"bootstrap is not restricted to verified attempts");
