@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor, CapacitorHttp, registerPlugin } from "@capacitor/core";
 import { MOBILE_BUILD } from "./build";
 import { openExternalSafely } from "./runtime";
 
@@ -28,7 +28,40 @@ async function jsonRequest(path: string, init: RequestInit = {}, authenticated =
   if (!response.ok) throw new NativeRequestError(body?.error?.message || "The request could not be completed.", response.status, body?.error?.code || "REQUEST_FAILED");
   return body;
 }
-export async function nativeApiRequest(path:string,init:RequestInit={}){return jsonRequest(path,init,true);}
+export async function nativeApiRequest(path:string,init:RequestInit={}){
+  if(!Capacitor.isNativePlatform())return jsonRequest(path,init,true);
+  const token=decodeSession(await secureGet("session"))?.token;
+  if(!token)throw new NativeRequestError("Sign in again to synchronize this device.",401,"SESSION_MISSING");
+  const headers=new Headers(init.headers);
+  headers.set("Content-Type","application/json");
+  headers.set("X-CA-API-Version",String(MOBILE_BUILD.apiVersion));
+  headers.set("X-CA-App-Build",String(MOBILE_BUILD.build));
+  headers.set("X-CA-Native-App",MOBILE_BUILD.applicationId);
+  headers.set("Authorization",`Bearer ${token}`);
+  let response;
+  try{
+    response=await CapacitorHttp.request({
+      url:`${API_ORIGIN}${path}`,
+      method:init.method||"GET",
+      headers:Object.fromEntries(headers.entries()),
+      ...(typeof init.body==="string"?{data:init.body}:{}),
+      responseType:"json",
+      connectTimeout:15000,
+      readTimeout:60000,
+    });
+  }catch{
+    throw new NativeRequestError(
+      navigator.onLine?"Cannot reach CA Progress. Check the connection and tap Retry.":"Offline · saved data remains available.",
+      0,"NETWORK_UNAVAILABLE"
+    );
+  }
+  const body=typeof response.data==="string"?(()=>{try{return JSON.parse(response.data);}catch{return null;}})():response.data;
+  if(response.status<200||response.status>=300)
+    throw new NativeRequestError(body?.error?.message||`Server returned HTTP ${response.status}. Tap Retry.`,response.status,body?.error?.code||"REQUEST_FAILED");
+  if(body===null||typeof body!=="object")
+    throw new NativeRequestError("The server returned an invalid response. Tap Retry.",response.status,"INVALID_RESPONSE");
+  return body;
+}
 
 export async function startNativeSignIn(provider: "google" | "linkedin_oidc") {
   const verifier = base64Url(crypto.getRandomValues(new Uint8Array(64)));
