@@ -9,7 +9,9 @@ const json = (request: NextRequest, data: unknown, status=200) => NextResponse.j
 export const OPTIONS = (request: NextRequest) => nativeOptions(request);
 
 export async function GET(request: NextRequest) {
-  const context=await getStudentContext();
+  let context;
+  try { context=await getStudentContext(); }
+  catch(error){console.error("Mobile sync academic context failed",error);return json(request,{error:{code:"SYNC_CONTEXT_UNAVAILABLE",message:"Could not load your academic context. Tap Retry.",retryable:true}},503);}
   if(!context.userId)return json(request,{error:{code:"AUTH_REQUIRED",message:"Sign in to synchronize.",retryable:false}},401);
   if(context.mode!=="ready")return json(request,{error:{code:context.mode==="setup"?"ACADEMIC_SETUP_REQUIRED":"ACADEMIC_CONTEXT_INVALID",message:context.mode==="setup"?"Complete your CA level and attempt setup on the website to synchronize this device.":context.issue||"Review your CA level and attempt on the website before synchronizing.",retryable:false}},409);
   const requested=request.nextUrl.searchParams.get("context");
@@ -17,7 +19,7 @@ export async function GET(request: NextRequest) {
   const db=getD1RuntimeDatabase();
   const subjectIds=context.subjectIds;
   const subjectPlaceholders=subjectIds.map((_,index)=>`?${index+1}`).join(",");
-  const [progress,tasks,notes,sessions,profile,subjects,chapters,attempt,activity,leaderboard,buddies,tracked]=await Promise.all([
+  const settled=await Promise.allSettled([
     db.prepare(`SELECT 'progress' AS entity_type,chapter_id AS entity_id,0 AS entity_version,
       json_object('chapterId',chapter_id,'completedAt',completed_at,'revision1At',revision_1_at,'revision2At',revision_2_at,'test1At',test_1_at,'test2At',test_2_at) AS payload_json,
       NULL AS deleted_at,updated_at FROM chapter_progress WHERE user_id=?1 ORDER BY updated_at LIMIT 1500`).bind(context.userId).all(),
@@ -52,6 +54,14 @@ export async function GET(request: NextRequest) {
     db.prepare(`SELECT entity_type,entity_id,entity_version,payload_json,deleted_at,updated_at
       FROM mobile_sync_entities WHERE user_id=?1 AND academic_context_key=?2 ORDER BY entity_type,updated_at,entity_id LIMIT 5000`).bind(context.userId,context.contextKey).all(),
   ]);
+  const labels=["progress","tasks","notes","sessions","profile","subjects","chapters","attempt","activity","leaderboard","study buddies","sync history"] as const;
+  const optional=new Set(["sessions","attempt","activity","leaderboard","study buddies"]);
+  const failed=settled.map((result,index)=>result.status==="rejected"?{label:labels[index],error:result.reason}:null).filter((entry):entry is {label:typeof labels[number];error:unknown}=>Boolean(entry));
+  for(const entry of failed)console.error(`Mobile sync bootstrap ${entry.label} failed`,entry.error);
+  const critical=failed.find(entry=>!optional.has(entry.label));
+  if(critical)return json(request,{error:{code:"SYNC_BOOTSTRAP_DATA_UNAVAILABLE",message:`Could not load ${critical.label} for this account. Tap Retry.`,retryable:true}},503);
+  const loaded=settled.map(result=>result.status==="fulfilled"?result.value as {results?:Record<string,unknown>[]}:{results:[] as Record<string,unknown>[]});
+  const [progress,tasks,notes,sessions,profile,subjects,chapters,attempt,activity,leaderboard,buddies,tracked]=loaded;
   const snapshot=[...(progress.results??[]),...(tasks.results??[]),...(notes.results??[]),...(sessions.results??[]),...(profile.results??[]),...(subjects.results??[]),...(chapters.results??[]),...(attempt.results??[]),...(activity.results??[]),...(leaderboard.results??[]),...(buddies.results??[])];
   const merged=new Map(snapshot.map(entity=>[`${String(entity.entity_type)}:${String(entity.entity_id)}`,entity]));
   for(const entity of tracked.results??[])merged.set(`${String(entity.entity_type)}:${String(entity.entity_id)}`,entity);
