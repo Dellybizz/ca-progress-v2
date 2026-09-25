@@ -5,20 +5,21 @@ export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "
 export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|planner(?:\/.*)?|progress|study|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
 const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
 
-export type NativeRoute = "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings";
+export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {
     const url = new URL(value);
     if (!CANONICAL_ORIGINS.has(url.origin) || !SAFE_DEEP_LINK.test(`${url.pathname}${url.search}${url.hash}`)) return null;
     if (url.pathname.startsWith("/progress")) return "progress";
+    if (url.pathname.startsWith("/planner/today")) return "today";
     if (url.pathname.startsWith("/planner")) return "planner";
     if (url.pathname.startsWith("/study")) return "focus";
     if (url.pathname.startsWith("/community")) return "community";
     if (url.pathname.startsWith("/resources")) return "resources";
     if (url.pathname.startsWith("/notifications")) return "notifications";
     if (url.pathname.startsWith("/settings")) return "settings";
-    return "today";
+    return "dashboard";
   } catch { return null; }
 }
 
