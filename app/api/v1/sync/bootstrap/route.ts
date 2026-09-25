@@ -9,6 +9,7 @@ const json = (request: NextRequest, data: unknown, status=200) => NextResponse.j
 export const OPTIONS = (request: NextRequest) => nativeOptions(request);
 
 export async function GET(request: NextRequest) {
+  try {
   let context;
   try { context=await getStudentContext(); }
   catch(error){console.error("Mobile sync academic context failed",error);return json(request,{error:{code:"SYNC_CONTEXT_UNAVAILABLE",message:"Could not load your academic context. Tap Retry.",retryable:true}},503);}
@@ -69,4 +70,8 @@ export async function GET(request: NextRequest) {
   const high=(await db.prepare("SELECT COALESCE(MAX(sequence),0) AS cursor FROM mobile_sync_changes WHERE user_id=?1 AND academic_context_key=?2")
     .bind(context.userId,context.contextKey).first<{cursor:number}>())?.cursor??0;
   return json(request,{schema:1,accountId:context.userId,academicContextKey:context.contextKey,cursor:String(high),context:{levelId:context.levelId,attemptKey:context.selection?.attemptKey??null,subjectIds:context.subjectIds},entities});
+  } catch(error) {
+    console.error("Mobile sync bootstrap failed",error);
+    return json(request,{error:{code:"SYNC_BOOTSTRAP_UNAVAILABLE",message:"The server could not prepare your saved workspace. Tap Retry.",retryable:true}},503);
+  }
 }
