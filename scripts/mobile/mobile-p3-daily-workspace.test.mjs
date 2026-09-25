@@ -12,9 +12,12 @@ const phase8=fs.readFileSync("lib/planner/phase8.ts","utf8");
 const goalRoute=fs.readFileSync("app/api/planner/goals/route.ts","utf8");
 
 test("P3 dashboard uses synchronized verified exam date",()=>{
-  assert.ok(main.includes("ExamCountdown"),"ExamCountdown component missing");
-  assert.ok(main.includes("selected.examDate"),"countdown is not reading synchronized examDate");
-  assert.ok(main.includes("verified_date"),"verified countdown state missing");
+  const start=main.indexOf("function ExamCountdown");
+  const end=main.indexOf("function Dashboard",start+1);
+  assert.ok(start>=0,"ExamCountdown component missing");
+  const countdown=main.slice(start,end>start?end:undefined);
+  assert.ok(countdown.includes("examDate"),"countdown is not reading synchronized examDate");
+  assert.ok(countdown.includes("verified_date"),"verified countdown state missing");
   assert.ok(repo.includes("payload.startDate"),"attempt startDate is not projected locally");
   assert.ok(repo.includes("verificationStatus"),"attempt verification state is not projected locally");
   assert.ok(bootstrap.includes("a.verification_status='verified'"),"bootstrap is not restricted to verified attempts");
