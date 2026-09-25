@@ -5,7 +5,7 @@ export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "
 export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|progress|study|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
 const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
 
-export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "calendar" | "analytics" | "forecast";
+export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "calendar" | "analytics" | "forecast" | "unsupported";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {
