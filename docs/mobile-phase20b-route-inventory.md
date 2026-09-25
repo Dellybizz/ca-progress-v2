@@ -18,7 +18,7 @@ Source of truth: `components/shell/navigation-contract.ts`, `components/ui/icon.
 | Settings `/settings` | `#/settings` | Device and account actions; content parity pending 20D |
 | Profile `/settings/profile` | `#/profile` | Saved profile; accessible through account navigation later |
 
-The website also exposes Calendar, Revision settings, Analytics, Forecast, Goals, Tests, ICAI updates, ICAI resources, Pricing, Billing, and Delete account. Those entries are shown in the native More sheet as explicitly unavailable, rather than routing to a misleading placeholder or opening a network dependent website. These are 20C/20D route implementation work. Notifications remain a native deep-link destination, outside the website student More groups.
+The website also exposes Calendar, Revision settings, Analytics, Forecast, Goals, Tests, ICAI updates, ICAI resources, Pricing, Billing, and Delete account. As of Phase 20D progress commit `b49ee14a`, those entries show an explicit online handoff that opens the website in the system browser. They require connectivity and may require a separate website sign-in; they do not count as native screen parity. These are 20C/20D route implementation work. Notifications remain a native deep-link destination, outside the website student More groups.
 
 20B shell contract: four website primary items in the same order plus More; shared SVG icons, labels, descriptions and design tokens; mobile app bar with CP mark or Home back action; grouped More sheet; safe area padding and Android system back behavior. Native data remains in the bundled offline SQLite repository.
 
