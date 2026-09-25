@@ -12,7 +12,6 @@ import { Icon } from "../../../components/ui/icon";
 import { accountNavigation, mobileNavigation, shellNavigation, type ShellNavItem } from "../../../components/shell/navigation-contract";
 import "../../../app/styles/tokens.css";
 import "../../../app/styles/dashboard-a1.css";
-import "../../../app/styles/dashboard-a1.css";
 import "./styles.css";
 
 const nativePaths: Record<string, NativeRoute> = {
