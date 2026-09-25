@@ -17,7 +17,7 @@ test("full synchronized chapter catalog is exposed to the offline workspace",()=
 });
 
 test("an untouched catalog chapter can become local progress without a prior server row",()=>{
-  assert.ok(repo.includes('const prefix=`${account.id}:progress:`'));
+  assert.ok(repo.includes('const prefix=account.id+":progress:"'));
   assert.ok(repo.includes("INSERT INTO progress_records(local_id,server_id,server_version,account_id,academic_context_key,local_state"));
   assert.ok(repo.includes("chapterTitle:catalog.title"));
   assert.ok(repo.includes('outboxStatement(account.id,{type:"progress"'));
