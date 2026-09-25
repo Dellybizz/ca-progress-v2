@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const database = "ca-progress-v2-phase4-shadow";
 // Historical certification window retained verbatim: BETWEEN '0012' AND '0048'.
@@ -57,6 +58,9 @@ const migrations = [
   ["0062", "d1/migrations/0062_mobile_phase11_account_deletion.sql"],
   ["0063", "d1/migrations/0063_mobile_phase12_release_operations.sql"],
   ["0064", "d1/migrations/0064_mobile_phase15_native_auth.sql"],
+  ["0065", "d1/migrations/0065_mobile_phase17_sync.sql"],
+  ["0066", "d1/migrations/0066_mobile_phase19_community.sql"],
+  ["0067", "d1/migrations/0067_mobile_phase20_native_push.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
@@ -79,11 +83,23 @@ const mobilePushLedger = query("SELECT version FROM _ca_schema_migrations WHERE 
 for (const row of mobilePushLedger?.[0]?.results ?? []) applied.add(String(row.version));
 const mobileDeletionLedger = query("SELECT version FROM _ca_schema_migrations WHERE version='0062';");
 for (const row of mobileDeletionLedger?.[0]?.results ?? []) applied.add(String(row.version));
-const mobileReleaseLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0063','0064');");
+const mobileReleaseLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0063','0064','0065','0066','0067');");
 for (const row of mobileReleaseLedger?.[0]?.results ?? []) applied.add(String(row.version));
 for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }
-  console.log(`[retained-d1] applying ${version} from ${file}`); wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${file}`]);
+  console.log(`[retained-d1] applying ${version} from ${file}`);
+  if (version === "0066") {
+    const columns = query("PRAGMA table_info(community_messages);")?.[0]?.results ?? [];
+    if (columns.some((column) => column.name === "client_message_id")) {
+      // Older manual runs could apply the ALTER without recording 0066.
+      const alter = "ALTER TABLE community_messages ADD COLUMN client_message_id TEXT;";
+      const sql = readFileSync(file, "utf8");
+      if (!sql.startsWith(alter)) throw new Error("Unexpected 0066 migration layout; refusing partial replay.");
+      wrangler(["d1","execute",database,"--remote",`--config=${config}`,"--command",sql.slice(alter.length)]);
+      continue;
+    }
+  }
+  wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${file}`]);
 }
 const versions=migrations.map(([version])=>`'${version}'`).join(",");
 const verification=query(`SELECT version FROM _ca_schema_migrations WHERE version IN (${versions}) ORDER BY version; PRAGMA foreign_key_check;`);
@@ -91,4 +107,9 @@ const verified=new Set((verification?.[0]?.results??[]).map((row)=>String(row.ve
 const missing=migrations.map(([version])=>version).filter((version)=>!verified.has(version));
 if(missing.length)throw new Error(`Retained D1 migrations missing after apply: ${missing.join(", ")}`);
 const fkViolations=verification?.[1]?.results??[];if(fkViolations.length)throw new Error(`D1 foreign-key verification failed with ${fkViolations.length} violation(s).`);
-console.log(`[retained-d1] PASS: ${migrations.length} required migrations present; foreign keys clean.`);
+const requiredTables=["mobile_sync_entities","mobile_sync_changes","mobile_sync_mutation_receipts","community_sequence_events","native_push_devices"];
+const tableRows=query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('mobile_sync_entities','mobile_sync_changes','mobile_sync_mutation_receipts','community_sequence_events','native_push_devices');")?.[0]?.results??[];
+const present=new Set(tableRows.map((row)=>String(row.name)));
+const absent=requiredTables.filter((name)=>!present.has(name));
+if(absent.length)throw new Error(`Retained D1 mobile tables missing after apply: ${absent.join(", ")}`);
+console.log(`[retained-d1] PASS: ${migrations.length} required migrations present; mobile tables present; foreign keys clean.`);
