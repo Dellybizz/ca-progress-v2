@@ -16,7 +16,7 @@
 
 ## Verification
 
-Mobile workflow `36127533106`: `test:mobile:phase20`, TypeScript, lint, and production build passed in verify job. Android debug and iOS simulator build results/artifacts should be attached after completion. Earlier intermediate commits failed until the route union and effect lint were corrected; use the final SHA only.
+Mobile workflow `36127533106`: `test:mobile:phase20`, TypeScript, lint, and production build passed in verify job. Android debug and iOS simulator jobs passed. Artifact ID `10860132850`; extracted APK SHA-256 `1db071864c4594e8eb90fb20018ae3a5f3c845a45a36397d5a41f53c495bf515` (4,442,403 bytes). Earlier intermediate commits failed until the route union and effect lint were corrected; use the final SHA only.
 
 ## Remaining P1 gate
 
