@@ -30,7 +30,10 @@ test("P3 Today keeps task-only timeline filters",()=>{
 
 test("P3 Focus exposes modes and restores persisted timer",()=>{
   assert.ok(main.includes('["focus","stopwatch"]'));
-  assert.ok(main.includes('repository?.readTimer().then(setTimer)'));
+  assert.ok(main.includes('repository.readTimer()'),"Focus does not restore the persisted timer");
+  assert.ok(main.includes('setTimer(savedTimer)'),"Focus does not apply the restored timer");
+  assert.ok(main.includes('repository.readFocusContext()'),"Focus does not restore persisted session context");
+  assert.ok(main.includes('setContext(savedContext)'),"Focus does not apply the restored session context");
   assert.ok(repo.includes("INSERT INTO timer_state"));
   assert.ok(repo.includes('outboxStatement(account.id,{type:"focus_session"'));
 });
