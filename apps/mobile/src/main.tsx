@@ -24,7 +24,7 @@ const primaryNavigation = mobileNavigation("student");
 const studentNavigation = shellNavigation.student;
 function nativeRouteFor(item: ShellNavItem): NativeRoute | undefined { return nativePaths[item.href]; }
 function routeFromHash(): NativeRoute {
-  const value = location.hash.replace(/^#\\/?/, "");
+  const value = location.hash.replace(/^#\/?/, "");
   return (Object.values(nativePaths) as string[]).includes(value) ? value as NativeRoute : "dashboard";
 }
 function navigate(route: NativeRoute) {
