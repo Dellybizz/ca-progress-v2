@@ -1,0 +1,68 @@
+name: Mobile screenshot parity recovery
+
+on:
+  push:
+    branches: [mobile-phase7-student-parity]
+    paths:
+      - scripts/mobile/apply-parity-recovery.mjs
+      - scripts/mobile/mobile-parity-recovery.test.mjs
+      - .github/workflows/mobile-parity-recovery.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-screenshot-parity-recovery
+  cancel-in-progress: false
+
+jobs:
+  apply-certify-commit:
+    if: ${{ !contains(github.event.head_commit.message || '', '[parity-recovery]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: mobile-phase7-student-parity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - name: Check recovery patcher
+        run: node --check scripts/mobile/apply-parity-recovery.mjs
+      - name: Apply recovery
+        run: node scripts/mobile/apply-parity-recovery.mjs
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Screenshot regression contracts
+        run: |
+          cp scripts/mobile/mobile-parity-recovery.test.mjs tests/mobile-parity-recovery.test.mjs
+          node --test tests/mobile-parity-recovery.test.mjs
+      - name: TypeScript gate
+        run: npm run typecheck
+      - name: Native bundle gate
+        run: npm run native:bundle
+      - name: Retained mobile regression gate
+        run: npm run test:mobile:phase20
+      - name: Repository regression gate
+        run: npm test
+      - name: Diff safety
+        run: |
+          git diff --check
+          if git diff --name-only | grep -E '^wrangler|^workers/|^\.github/workflows/.*deploy' ; then
+            echo 'Parity recovery unexpectedly touched deployment infrastructure.' >&2
+            exit 1
+          fi
+      - name: Commit certified recovery
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo 'No parity recovery changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/mobile-data/src/repository.ts apps/mobile/src/main.tsx tests/mobile-parity-recovery.test.mjs scripts/mobile/apply-parity-recovery.mjs scripts/mobile/mobile-parity-recovery.test.mjs
+          git commit -m 'fix(mobile): complete syllabus progress and focus parity [parity-recovery]'
+          git push origin HEAD:mobile-phase7-student-parity
