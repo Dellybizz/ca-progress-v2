@@ -13,3 +13,6 @@ CREATE TABLE IF NOT EXISTS community_sequence_events (
   FOREIGN KEY(channel_id) REFERENCES community_channels(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_community_sequence_events_delta ON community_sequence_events(channel_id,sequence_id);
+
+INSERT OR IGNORE INTO _ca_schema_migrations(version,description,source_freeze_commit)
+VALUES ('0066','mobile phase 19 community sequence journal','e26fb075');
