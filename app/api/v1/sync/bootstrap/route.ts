@@ -4,6 +4,7 @@ import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { MOBILE_API_HEADERS } from "@/lib/mobile/contract";
 import { nativeCorsHeaders, nativeOptions } from "@/lib/auth/native-cors";
 
+// Academic entities are scoped to the selected subjects before native bootstrap.
 export const dynamic = "force-dynamic";
 const json = (request: NextRequest, data: unknown, status=200) => NextResponse.json(data,{status,headers:{...MOBILE_API_HEADERS,...nativeCorsHeaders(request)}});
 export const OPTIONS = (request: NextRequest) => nativeOptions(request);
