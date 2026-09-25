@@ -23,7 +23,7 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
   } catch { return null; }
 }
 
-export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onResume: () => void, onAuthCallback: (url: string) => void) {
+export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onResume: () => void, onAuthCallback: (url: string) => void, onBack?: () => boolean) {
   if (!Capacitor.isNativePlatform()) return () => undefined;
   document.documentElement.dataset.nativePlatform = Capacitor.getPlatform();
 
@@ -47,7 +47,7 @@ export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onRe
   const handles = [
     App.addListener("appUrlOpen", ({ url }) => handleIncomingUrl(url)),
     App.addListener("resume", onResume),
-    App.addListener("backButton", ({ canGoBack }) => { if (canGoBack) history.back(); else void App.minimizeApp(); }),
+    App.addListener("backButton", ({ canGoBack }) => { if (onBack?.()) return; if (canGoBack) history.back(); else void App.minimizeApp(); }),
   ];
 
   // getLaunchUrl is required for OAuth callbacks that launched/re-launched the
