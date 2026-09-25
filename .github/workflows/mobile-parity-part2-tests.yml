@@ -13,10 +13,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  diagnose:
+  certify:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -32,83 +32,6 @@ jobs:
         run: |
           node scripts/mobile/apply-parity-recovery-v2.mjs
           cp scripts/mobile/mobile-parity-recovery.test.mjs tests/mobile-parity-recovery.test.mjs
-      - name: Repair repository-test runtime adapters
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          icai = Path("tests/icai-sync-phase4.test.mjs")
-          text = icai.read_text()
-          old = '''  const first = statement.get("run-1", "manual", "admin-1", "phase8.1", startedAt, 3, "{}");
-            const second = statement.get("run-2", "cron", null, "phase8.1", startedAt, 3, "{}");'''
-          new = '''  const bindRun = (id, trigger, requestedBy) => statement.get({
-              "?1": id,
-              "?2": trigger,
-              "?3": requestedBy,
-              "?4": "phase8.1",
-              "?5": startedAt,
-              "?6": 3,
-              "?7": "{}",
-            });
-            const first = bindRun("run-1", "manual", "admin-1");
-            const second = bindRun("run-2", "cron", null);'''
-          if old in text:
-              text = text.replace(old, new)
-          elif 'const bindRun = (id, trigger, requestedBy)' not in text:
-              raise SystemExit("ICAI Phase 4 bind contract changed unexpectedly")
-          old_third = '''  const third = statement.get("run-3", "cron", null, "phase8.1", startedAt, 3, "{}");'''
-          if old_third in text:
-              text = text.replace(old_third, '''  const third = bindRun("run-3", "cron", null);''')
-          elif 'const third = bindRun("run-3", "cron", null);' not in text:
-              raise SystemExit("ICAI Phase 4 third bind contract changed unexpectedly")
-          icai.write_text(text)
-
-          schedules = Path("tests/icai-exam-schedules.test.mjs")
-          text = schedules.read_text()
-          helper = '''function sqliteArgs(sql,args) {
-            const indexes=[...sql.matchAll(/\\?(\\d+)/g)].map(match=>Number(match[1]));
-            if(!indexes.length)return args;
-            const max=Math.max(...indexes);
-            return [Object.fromEntries(Array.from({length:max},(_,index)=>[`?${index+1}`,args[index]]))];
-          }
-          '''
-          marker = '''function database() {'''
-          if 'function sqliteArgs(sql,args)' not in text:
-              if marker not in text:
-                  raise SystemExit("ICAI schedule database adapter changed unexpectedly")
-              text = text.replace(marker, helper + marker, 1)
-          text = text.replace('statement.get(...args)??null', 'statement.get(...sqliteArgs(sql,args))??null')
-          text = text.replace('statement.run(...args);return {success:true};', 'statement.run(...sqliteArgs(sql,args));return {success:true};')
-          text = text.replace('sqlite.prepare(sql).get(...args)??null', 'sqlite.prepare(sql).get(...sqliteArgs(sql,args))??null')
-          text = text.replace('sqlite.prepare(sql).all(...args)', 'sqlite.prepare(sql).all(...sqliteArgs(sql,args))')
-          text = text.replace('sqlite.prepare(sql).run(...args);return {success:true};', 'sqlite.prepare(sql).run(...sqliteArgs(sql,args));return {success:true};')
-          if text.count('sqliteArgs(sql,args)') < 7:
-              raise SystemExit("ICAI schedule D1 adapter repair did not cover every runtime operation")
-          schedules.write_text(text)
-
-          phase6 = Path("tests/product-consistency-phase6.test.mjs")
-          text = phase6.read_text()
-          old = '''  function prepare(sql, values = []) {
-              const statement = () => sqlite.prepare(sql);
-              return { bind: (...next) => prepare(sql, next), first: async () => statement().get(...values) ?? null, all: async () => ({ results: statement().all(...values) }), run: async () => statement().run(...values), sql, values };
-            }'''
-          new = '''  function prepare(sql, values = []) {
-              const statement = () => sqlite.prepare(sql);
-              const boundValues = () => {
-                const indexes = [...sql.matchAll(/\\?(\\d+)/g)].map(match => Number(match[1]));
-                if (!indexes.length) return values;
-                const max = Math.max(...indexes);
-                return [Object.fromEntries(Array.from({ length: max }, (_, index) => [`?${index + 1}`, values[index]]))];
-              };
-              return { bind: (...next) => prepare(sql, next), first: async () => statement().get(...boundValues()) ?? null, all: async () => ({ results: statement().all(...boundValues()) }), run: async () => statement().run(...boundValues()), sql, values };
-            }'''
-          if old in text:
-              text = text.replace(old, new)
-          elif 'const boundValues = () =>' not in text:
-              raise SystemExit("Product consistency Phase 6 adapter contract changed unexpectedly")
-          phase6.write_text(text)
-          PY
       - name: Install dependencies
         run: npm ci --ignore-scripts
       - name: Repository-wide tests
@@ -116,17 +39,6 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee part2-npm-test.log
-      - name: Commit verified Part 2 fixes
-        if: success()
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tests/icai-sync-phase4.test.mjs tests/icai-exam-schedules.test.mjs tests/product-consistency-phase6.test.mjs
-          if ! git diff --cached --quiet; then
-            git commit -m "test: repair Node SQLite regression adapters"
-            git push origin HEAD:mobile-phase7-student-parity
-          fi
       - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4
