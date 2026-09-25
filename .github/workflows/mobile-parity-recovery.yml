@@ -4,7 +4,7 @@ on:
   push:
     branches: [mobile-phase7-student-parity]
     paths:
-      - scripts/mobile/apply-parity-recovery.mjs
+      - scripts/mobile/apply-parity-recovery-v2.mjs
       - scripts/mobile/mobile-parity-recovery.test.mjs
       - .github/workflows/mobile-parity-recovery.yml
   workflow_dispatch:
@@ -31,9 +31,9 @@ jobs:
           node-version: 22.13.0
           cache: npm
       - name: Check recovery patcher
-        run: node --check scripts/mobile/apply-parity-recovery.mjs
+        run: node --check scripts/mobile/apply-parity-recovery-v2.mjs
       - name: Apply recovery
-        run: node scripts/mobile/apply-parity-recovery.mjs
+        run: node scripts/mobile/apply-parity-recovery-v2.mjs
       - name: Install dependencies
         run: npm ci --ignore-scripts
       - name: Screenshot regression contracts
@@ -63,6 +63,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add packages/mobile-data/src/repository.ts apps/mobile/src/main.tsx tests/mobile-parity-recovery.test.mjs scripts/mobile/apply-parity-recovery.mjs scripts/mobile/mobile-parity-recovery.test.mjs
+          git add packages/mobile-data/src/repository.ts apps/mobile/src/main.tsx tests/mobile-parity-recovery.test.mjs scripts/mobile/apply-parity-recovery-v2.mjs scripts/mobile/mobile-parity-recovery.test.mjs
           git commit -m 'fix(mobile): complete syllabus progress and focus parity [parity-recovery]'
           git push origin HEAD:mobile-phase7-student-parity
