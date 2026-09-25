@@ -2,16 +2,19 @@ import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
 export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "https://ca-progress-v2.habeebaasif622.workers.dev"]);
-export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|planner(?:\/.*)?|progress|study|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
+export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|progress|study|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
 const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
 
-export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings";
+export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "calendar" | "analytics" | "forecast";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {
     const url = new URL(value);
     if (!CANONICAL_ORIGINS.has(url.origin) || !SAFE_DEEP_LINK.test(`${url.pathname}${url.search}${url.hash}`)) return null;
     if (url.pathname.startsWith("/progress")) return "progress";
+    if (url.pathname.startsWith("/analytics/forecast")) return "forecast";
+    if (url.pathname.startsWith("/analytics")) return "analytics";
+    if (url.pathname.startsWith("/calendar")) return "calendar";
     if (url.pathname.startsWith("/planner/today")) return "today";
     if (url.pathname.startsWith("/planner")) return "planner";
     if (url.pathname.startsWith("/study")) return "focus";
