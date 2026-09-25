@@ -1,0 +1,43 @@
+name: Mobile parity Part 2 repository tests
+
+on:
+  push:
+    branches: [mobile-phase7-student-parity]
+    paths:
+      - .github/workflows/mobile-parity-part2-tests.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: mobile-phase7-student-parity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - name: Apply certified parity recovery patch
+        run: |
+          node scripts/mobile/apply-parity-recovery-v2.mjs
+          cp scripts/mobile/mobile-parity-recovery.test.mjs tests/mobile-parity-recovery.test.mjs
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Repository-wide tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee part2-npm-test.log
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-parity-part2-npm-test-log
+          path: part2-npm-test.log
+          if-no-files-found: warn
