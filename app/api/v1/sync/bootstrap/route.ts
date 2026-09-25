@@ -73,6 +73,9 @@ export async function GET(request: NextRequest) {
   const snapshot=[...(progress.results??[]),...(tasks.results??[]),...(notes.results??[]),...(sessions.results??[]),...(profile.results??[]),...(subjects.results??[]),...(chapters.results??[]),...(attempt.results??[]),...(activity.results??[]),...(leaderboard.results??[]),...(buddies.results??[])];
   const merged=new Map(snapshot.map(entity=>[`${String(entity.entity_type)}:${String(entity.entity_id)}`,entity]));
   for(const entity of tracked.results??[])merged.set(`${String(entity.entity_type)}:${String(entity.entity_id)}`,entity);
+  const profileKey=`profile:${context.userId}`;
+  const selectedProfile=merged.get(profileKey);
+  if(selectedProfile&&context.selection){const saved=JSON.parse(String(selectedProfile.payload_json||"{}")) as Record<string,unknown>;merged.set(profileKey,{...selectedProfile,payload_json:JSON.stringify({...saved,level:context.selection.level,group:context.selection.group,attempt:context.selection.attemptKey})});}
   const entities=[...merged.values()];
   const high=(await db.prepare("SELECT COALESCE(MAX(sequence),0) AS cursor FROM mobile_sync_changes WHERE user_id=?1 AND academic_context_key=?2")
     .bind(context.userId,context.contextKey).first<{cursor:number}>())?.cursor??0;
