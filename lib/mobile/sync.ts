@@ -7,6 +7,8 @@ export const SYNC_CHANGE_RETENTION_DAYS = 60;
 export const SYNC_DOMAINS = Object.freeze({
   "/api/progress": "progress",
   "/api/planner/tasks": "planner_task",
+  "/api/planner/goals": "planner_goal",
+  "/api/planner/revision-settings": "revision_settings",
   "/api/notes": "note",
   "/api/study/timer": "focus_session",
   "/api/study/reflection": "session_review",
@@ -25,6 +27,8 @@ export function decodeCursor(value: string | null) {
 export function entityIdentity(url: keyof typeof SYNC_DOMAINS, body: Record<string, unknown>) {
   if (url === "/api/progress") return String(body.chapterId || "");
   if (url === "/api/planner/tasks") return String(body.action === "create" ? body.clientId : body.id || "");
+  if (url === "/api/planner/goals") return String(body.action === "create" ? body.clientId : body.id || "");
+  if (url === "/api/planner/revision-settings") return String(body.clientId || "revision-settings");
   if (url === "/api/notes") return String(body.id || body.clientId || "");
   if (url === "/api/study/reflection") return String(body.sessionId || "");
   return "timer";

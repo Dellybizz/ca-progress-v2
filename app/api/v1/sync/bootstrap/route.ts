@@ -30,6 +30,12 @@ export async function GET(request: NextRequest) {
     db.prepare(`SELECT 'planner_task' AS entity_type,id AS entity_id,0 AS entity_version,
       json_object('id',id,'title',title,'notes',notes,'subjectId',subject_id,'chapterId',chapter_id,'dueAt',due_at,'estimatedMinutes',estimated_minutes,'status',status,'completedAt',completed_at) AS payload_json,
       NULL AS deleted_at,updated_at FROM tasks WHERE user_id=?1 AND (subject_id IS NULL OR subject_id IN (${subjectIds.map((_,index)=>`?${index+2}`).join(",")})) ORDER BY updated_at LIMIT 1500`).bind(context.userId,...subjectIds).all(),
+    db.prepare(`SELECT 'planner_goal' AS entity_type,g.id AS entity_id,0 AS entity_version,
+      json_object('id',g.id,'title',g.title,'description',g.description,'dueDate',g.due_date,'status',g.status,'completedAt',g.completed_at,'goalKind',e.goal_kind,'targetValue',e.target_value,'startsOn',e.starts_on) AS payload_json,
+      NULL AS deleted_at,g.updated_at FROM goals g LEFT JOIN planner_goal_phase8 e ON e.goal_id=g.id AND e.user_id=g.user_id WHERE g.user_id=?1 AND g.status<>'cancelled' ORDER BY g.updated_at DESC LIMIT 500`).bind(context.userId).all(),
+    db.prepare(`SELECT 'revision_settings' AS entity_type,user_id AS entity_id,0 AS entity_version,
+      json_object('intervalDays',json(interval_days),'preferredWeekdays',json(preferred_weekdays),'revisionMinutes',revision_minutes,'newChapterMinutes',new_chapter_minutes,'testMinutes',test_minutes,'updatedAt',updated_at) AS payload_json,
+      NULL AS deleted_at,updated_at FROM revision_rules WHERE user_id=?1 LIMIT 1`).bind(context.userId).all(),
     db.prepare(`SELECT 'note' AS entity_type,id AS entity_id,0 AS entity_version,
       json_object('id',id,'title',title,'body',body_text,'bodyHtml',body_html,'subjectId',subject_id,'chapterId',chapter_id,'visibility',visibility) AS payload_json,
       NULL AS deleted_at,updated_at FROM notes WHERE user_id=?1 AND (subject_id IS NULL OR subject_id IN (${subjectIds.map((_,index)=>`?${index+2}`).join(",")})) ORDER BY updated_at LIMIT 1000`).bind(context.userId,...subjectIds).all(),
@@ -62,15 +68,15 @@ export async function GET(request: NextRequest) {
     db.prepare(`SELECT entity_type,entity_id,entity_version,payload_json,deleted_at,updated_at
       FROM mobile_sync_entities WHERE user_id=?1 AND academic_context_key=?2 ORDER BY entity_type,updated_at,entity_id LIMIT 5000`).bind(context.userId,context.contextKey).all(),
   ]);
-  const labels=["progress","tasks","notes","sessions","profile","subjects","chapters","attempt","activity","leaderboard","study buddies","sync history"] as const;
-  const optional=new Set(["sessions","attempt","activity","leaderboard","study buddies"]);
+  const labels=["progress","tasks","goals","revision settings","notes","sessions","profile","subjects","chapters","attempt","activity","leaderboard","study buddies","sync history"] as const;
+  const optional=new Set(["sessions","attempt","activity","leaderboard","study buddies","revision settings"]);
   const failed=settled.map((result,index)=>result.status==="rejected"?{label:labels[index],error:result.reason}:null).filter((entry):entry is {label:typeof labels[number];error:unknown}=>Boolean(entry));
   for(const entry of failed)console.error(`Mobile sync bootstrap ${entry.label} failed`,entry.error);
   const critical=failed.find(entry=>!optional.has(entry.label));
   if(critical)return json(request,{error:{code:"SYNC_BOOTSTRAP_DATA_UNAVAILABLE",message:`Could not load ${critical.label} for this account. Tap Retry.`,retryable:true}},503);
   const loaded=settled.map(result=>result.status==="fulfilled"?result.value as {results?:Record<string,unknown>[]}:{results:[] as Record<string,unknown>[]});
-  const [progress,tasks,notes,sessions,profile,subjects,chapters,attempt,activity,leaderboard,buddies,tracked]=loaded;
-  const snapshot=[...(progress.results??[]),...(tasks.results??[]),...(notes.results??[]),...(sessions.results??[]),...(profile.results??[]),...(subjects.results??[]),...(chapters.results??[]),...(attempt.results??[]),...(activity.results??[]),...(leaderboard.results??[]),...(buddies.results??[])];
+  const [progress,tasks,goals,revisionSettings,notes,sessions,profile,subjects,chapters,attempt,activity,leaderboard,buddies,tracked]=loaded;
+  const snapshot=[...(progress.results??[]),...(tasks.results??[]),...(goals.results??[]),...(revisionSettings.results??[]),...(notes.results??[]),...(sessions.results??[]),...(profile.results??[]),...(subjects.results??[]),...(chapters.results??[]),...(attempt.results??[]),...(activity.results??[]),...(leaderboard.results??[]),...(buddies.results??[])];
   const merged=new Map(snapshot.map(entity=>[`${String(entity.entity_type)}:${String(entity.entity_id)}`,entity]));
   for(const entity of tracked.results??[])merged.set(`${String(entity.entity_type)}:${String(entity.entity_id)}`,entity);
   const profileKey=`profile:${context.userId}`;

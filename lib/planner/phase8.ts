@@ -129,9 +129,10 @@ function validateGoal(input: { title: string; description: string | null; dueDat
   return { ...input, targetUnit };
 }
 
-export async function createPhase8Goal(userId: string, input: Parameters<typeof validateGoal>[0], db = getD1RuntimeDatabase()) {
+export async function createPhase8Goal(userId: string, input: Parameters<typeof validateGoal>[0], db = getD1RuntimeDatabase(), createId?:string|null) {
   const value = validateGoal(input);
-  const id = crypto.randomUUID();
+  const id = createId ?? crypto.randomUUID();
+  if(createId){const replay=await db.prepare("SELECT id FROM goals WHERE id=?1 AND user_id=?2 LIMIT 1").bind(createId,userId).first<{id:string}>();if(replay)return{id,...value,status:"active",completed_at:null};}
   await db.batch([
     db.prepare("INSERT INTO goals (id,user_id,title,description,due_date,status,completed_at) VALUES (?1,?2,?3,?4,?5,'active',NULL)").bind(id, userId, value.title, value.description, value.dueDate),
     db.prepare("INSERT INTO planner_goal_phase8(goal_id,user_id,goal_kind,target_value,target_unit,starts_on) VALUES(?1,?2,?3,?4,?5,?6)").bind(id, userId, value.goalKind, value.targetValue, value.targetUnit, value.startsOn),

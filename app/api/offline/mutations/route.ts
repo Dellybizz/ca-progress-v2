@@ -7,13 +7,15 @@ import { offlineTransaction } from "@/lib/offline/transaction-context";
 import { stageOfflineWrites } from "@/lib/offline/atomic";
 import { POST as progress } from "@/app/api/progress/route";
 import { POST as tasks } from "@/app/api/planner/tasks/route";
+import { POST as goals } from "@/app/api/planner/goals/route";
+import { POST as revisionSettings } from "@/app/api/planner/revision-settings/route";
 import { POST as notes } from "@/app/api/notes/route";
 import { POST as timer } from "@/app/api/study/timer/route";
 import { POST as reflection } from "@/app/api/study/reflection/route";
 import { syncJournalStatements, SYNC_DOMAINS } from "@/lib/mobile/sync";
 
 export const dynamic = "force-dynamic";
-const handlers = { "/api/progress": progress, "/api/planner/tasks": tasks, "/api/notes": notes, "/api/study/timer": timer, "/api/study/reflection": reflection };
+const handlers = { "/api/progress": progress, "/api/planner/tasks": tasks, "/api/planner/goals": goals, "/api/planner/revision-settings": revisionSettings, "/api/notes": notes, "/api/study/timer": timer, "/api/study/reflection": reflection };
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 const conflict = (error: string, expected: Record<string, unknown> | null, current: Record<string, unknown> | null, local: Record<string, unknown>) => json({ error, conflict: { expected, current, local } }, 409);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,6 +50,12 @@ export async function POST(request: Request) {
     } else if (input.url === "/api/planner/tasks") {
       table = "tasks"; where = "user_id=? AND id=?"; values = [context.userId, body.action === "create" ? body.clientId : body.id];
       columns = ["title", "notes", "status", "subject_id", "chapter_id", "due_at", "estimated_minutes"];
+    } else if (input.url === "/api/planner/goals") {
+      table = "goals"; where = "user_id=? AND id=?"; values = [context.userId, body.action === "create" ? body.clientId : body.id];
+      columns = ["title", "description", "due_date", "status", "completed_at"];
+    } else if (input.url === "/api/planner/revision-settings") {
+      table = "revision_rules"; where = "user_id=?"; values = [context.userId];
+      columns = ["interval_days", "preferred_weekdays", "revision_minutes", "new_chapter_minutes", "test_minutes", "updated_at"];
     } else if (input.url === "/api/notes") {
       table = "notes"; where = "user_id=? AND id=?"; values = [context.userId, body.id || body.clientId];
       columns = ["title", "body_html", "subject_id", "chapter_id", "visibility", "updated_at"];
@@ -69,7 +77,8 @@ export async function POST(request: Request) {
       : null;
     if (input.predecessor && (!predecessor || predecessor.entity_after_json !== current)) return conflict("An earlier edit changed or has not synchronized. Review the pending edits.", input.expected, currentObject, body);
     const emptyProgress = input.url === "/api/progress" && currentObject === null && input.expected && Object.values(input.expected).every(v => v === null);
-    if (!predecessor && !emptyProgress && (input.expected === null ? currentObject !== null : !currentObject || Object.entries(input.expected).some(([name, value]) => !columns.includes(name) || currentObject[name] !== value))) return conflict("This item changed on another device. Your edit has been kept for review.", input.expected, currentObject, body);
+    const lastWriteWins = input.url === "/api/planner/revision-settings";
+    if (!lastWriteWins && !predecessor && !emptyProgress && (input.expected === null ? currentObject !== null : !currentObject || Object.entries(input.expected).some(([name, value]) => !columns.includes(name) || currentObject[name] !== value))) return conflict("This item changed on another device. Your edit has been kept for review.", input.expected, currentObject, body);
     if (input.expected && !Object.keys(input.expected).length) return json({ error: "Missing conflict baseline." }, 409);
     const staged = stageOfflineWrites(db);
     const afterCommit: Array<() => Promise<void>> = [];

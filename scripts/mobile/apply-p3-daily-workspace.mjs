@@ -11,6 +11,18 @@ function replaceOnce(file, search, replacement, label){
 }
 function appendOnce(file, marker, block){const source=read(file);if(!source.includes(marker))write(file,source+block);}
 
+function mountExamCountdown(file){
+  const source=read(file);
+  if(source.includes("<ExamCountdown workspace={workspace}/>"))return;
+  const dashboard=source.indexOf("function Dashboard");
+  const phrase=source.indexOf("Countdown coming soon",dashboard);
+  const start=source.lastIndexOf('<section className="dashboard-a1-exam"',phrase);
+  const close="</section>";
+  const end=source.indexOf(close,phrase);
+  if(dashboard<0||phrase<0||start<dashboard||end<0)throw new Error("P3 patch failed: dashboard countdown mount");
+  write(file,source.slice(0,start)+'<ExamCountdown workspace={workspace}/>'+source.slice(end+close.length));
+}
+
 // Local repository: verified attempt dates, goals, and revision settings use the existing local DB + outbox transaction model.
 const repo="packages/mobile-data/src/repository.ts";
 replaceOnce(repo,
@@ -20,7 +32,7 @@ replaceOnce(repo,
 'export type LocalPlannerItem={localId:string;serverId:string|null;title:string;dueAt:string|null;completedAt:string|null;kind:string;state:LocalSyncState};',
 'export type LocalPlannerItem={localId:string;serverId:string|null;title:string;dueAt:string|null;completedAt:string|null;kind:string;state:LocalSyncState};\nexport type LocalRevisionSettings={intervalDays:number[];preferredWeekdays:number[];revisionMinutes:number;newChapterMinutes:number;testMinutes:number;updatedAt:string|null};',"revision type");
 replaceOnce(repo,
-'  readTimer(): Promise<LocalTimer>;\n  saveTimer(timer: LocalTimer): Promise<void>;\n  createTask(title:string,dueAt:string):Promise<string>;\n  toggleTask(localId:string,done:boolean):Promise<void>;',$
+'  readTimer(): Promise<LocalTimer>;\n  saveTimer(timer: LocalTimer): Promise<void>;\n  createTask(title:string,dueAt:string):Promise<string>;\n  toggleTask(localId:string,done:boolean):Promise<void>;',
 '  readTimer(): Promise<LocalTimer>;\n  readRevisionSettings():Promise<LocalRevisionSettings>;\n  saveTimer(timer: LocalTimer): Promise<void>;\n  saveRevisionSettings(settings:LocalRevisionSettings):Promise<void>;\n  createTask(title:string,dueAt:string):Promise<string>;\n  createGoal(title:string,dueDate:string):Promise<string>;\n  toggleTask(localId:string,done:boolean):Promise<void>;\n  toggleGoal(localId:string,done:boolean):Promise<void>;',"repository contract");
 replaceOnce(repo,
 'attempts:attempts.map(row=>({key:String(safeJson(row.payload_json).attemptKey||row.server_id||""),label:row.title})).filter(row=>row.key)',
@@ -103,7 +115,7 @@ replaceOnce(main,
 'function Dashboard({workspace,accountName}:{workspace:LocalWorkspace;accountName:string}) {',
 'function ExamCountdown({workspace}:{workspace:LocalWorkspace}){const[now,setNow]=useState(()=>Date.now());useEffect(()=>{const handle=window.setInterval(()=>setNow(Date.now()),60000);return()=>window.clearInterval(handle);},[]);const selected=workspace.academic.attempts.find(item=>item.key===workspace.academic.attempt)||workspace.academic.attempts.find(item=>item.examDate&&Date.parse(item.examDate)>now)||workspace.academic.attempts.find(item=>item.examDate);if(!selected?.examDate)return <section className="dashboard-a1-exam" aria-label="Current attempt" data-state="awaiting_verified_date"><header><span><Icon name="clock" size={14}/>Date pending</span><small>{workspace.academic.attempt}</small></header><div className="dashboard-a1-exam__status"><strong>Countdown waiting for verified date</strong></div><p>The countdown starts as soon as a verified ICAI attempt date is synchronized to this device.</p><footer><span>{workspace.academic.level}</span><button onClick={()=>navigate("profile")}>Review attempt <Icon name="arrow" size={13}/></button></footer></section>;const target=Date.parse(`${selected.examDate.slice(0,10)}T00:00:00+05:30`),remaining=Math.max(0,target-now),days=Math.floor(remaining/86400000),hours=Math.floor(remaining%86400000/3600000),started=target<=now;return <section className="dashboard-a1-exam" aria-label="Current attempt" data-state="verified_date"><header><span><Icon name="clock" size={14}/>{selected.verified?"Verified exam date":"Saved exam date"}</span><small>{selected.label}</small></header><div className="dashboard-a1-exam__status"><strong>{started?"Exam window started":`${days}d ${hours}h`}</strong></div><p>{new Date(target).toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric",timeZone:"Asia/Kolkata"})} · synchronized from your academic attempt.</p><footer><span>{workspace.academic.level}</span><button onClick={()=>navigate("calendar")}>Open calendar <Icon name="arrow" size={13}/></button></footer></section>; }\n\nfunction Dashboard({workspace,accountName}:{workspace:LocalWorkspace;accountName:string}) {',"countdown component");
 replaceOnce(main,'const tasks=workspace.planner.filter(item=>!item.completedAt);','const tasks=workspace.planner.filter(item=>item.kind==="task"&&!item.completedAt);',"dashboard task filter");
-replaceOnce(main,/\s*<section className="dashboard-a1-exam" aria-label="Current attempt" data-state="awaiting_verified_date">[\s\S]*?<\/section>\n\s*<nav className="dashboard-a1-pulse"/, '\n      <ExamCountdown workspace={workspace}/>\n      <nav className="dashboard-a1-pulse"',"dashboard countdown mount");
+mountExamCountdown(main);
 replaceOnce(main,'const items=workspace.planner.filter(item=>!item.dueAt||item.dueAt.slice(0,10)<=today);','const items=workspace.planner.filter(item=>item.kind==="task"&&(!item.dueAt||item.dueAt.slice(0,10)<=today));',"today task filter");
 replaceOnce(main,/function Planner\([\s\S]*?\n}\n\nfunction Calendar/,
 `function Planner({workspace,repository}:{workspace:LocalWorkspace;repository:LocalAccountRepository|null}) {
