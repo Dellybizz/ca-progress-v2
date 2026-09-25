@@ -628,7 +628,7 @@ Port in a dependency-safe sequence: Dashboard and countdown; Today; Focus and se
 
 # Phase 20D — Remaining Student Features and Cross-Route Parity
 
-Status: Not started.
+Status: In progress. The `b49ee14a` APK shows online website handoffs for unported routes, reports resource/message errors, and confirms device data removal. Native screen parity, cached billing/context, all Settings sections, detail routes, overlays, real-device comparisons, and 20C prerequisites remain open.
 
 Complete Community and Study Buddy; Resources, ICAI resources and updates; Activity, XP and leaderboards; Search; Notifications; Profile and every Settings section; Analytics, Forecast and Tests; Pricing, Billing, Feature Tour and account deletion. Include chapter/resource detail routes and all website mobile overlays. Keep server-authoritative billing, entitlements and destructive account operations online, but render their cached context and safe offline state locally. Preserve file vault, message ordering, push and native security boundaries.
 
