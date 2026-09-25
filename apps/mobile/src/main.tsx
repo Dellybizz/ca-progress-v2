@@ -8,34 +8,29 @@ import { createSyncCoordinator, openAccountRepository, wipeAllOfflineData, readC
 import {createNativeCommunityCoordinator} from "./community-sync";
 import {downloadResource,FileVault,openOfflineResource,uploadResource} from "./files";
 import {createBoundedBackgroundRecovery,registerNativePush,revokeNativePush} from "./background";
+import { Icon } from "../../../components/ui/icon";
+import { mobileNavigation, shellNavigation, type ShellNavItem } from "../../../components/shell/navigation-contract";
+import "../../../app/styles/tokens.css";
 import "./styles.css";
 
-const navigation: Array<{ route: NativeRoute; label: string; glyph: string }> = [
-  { route: "today", label: "Today", glyph: "●" },
-  { route: "progress", label: "Progress", glyph: "◒" },
-  { route: "syllabus", label: "Syllabus", glyph: "§" },
-  { route: "planner", label: "Planner", glyph: "□" },
-  { route: "focus", label: "Focus", glyph: "◉" },
-  { route: "notes", label: "Notes", glyph: "▤" },
-  { route: "activity", label: "Activity", glyph: "↗" },
-  { route: "buddy", label: "Study Buddy", glyph: "◎" },
-  { route: "profile", label: "Profile", glyph: "◇" },
-  { route: "community", label: "Community", glyph: "◌" },
-  { route: "resources", label: "Resources", glyph: "⇩" },
-  { route: "notifications", label: "Notifications", glyph: "○" },
-  { route: "settings", label: "Settings", glyph: "◇" },
-];
-
+const nativePaths: Record<string, NativeRoute> = {
+  "/dashboard": "dashboard", "/planner/today": "today", "/study": "focus",
+  "/progress": "progress", "/planner": "planner", "/syllabus": "syllabus",
+  "/notes": "notes", "/activity": "activity", "/study-buddy": "buddy",
+  "/community": "community", "/resources": "resources",
+  "/settings": "settings", "/settings/profile": "profile",
+};
+const primaryNavigation = mobileNavigation("student");
+const studentNavigation = shellNavigation.student;
+function nativeRouteFor(item: ShellNavItem): NativeRoute | undefined { return nativePaths[item.href]; }
 function routeFromHash(): NativeRoute {
-  const value = location.hash.replace(/^#\/?/, "");
-  return navigation.some((item) => item.route === value) ? value as NativeRoute : "today";
+  const value = location.hash.replace(/^#\\/?/, "");
+  return (Object.values(nativePaths) as string[]).includes(value) ? value as NativeRoute : "dashboard";
 }
-
 function navigate(route: NativeRoute) {
   history.pushState({ route }, "", `#/${route}`);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
-
 function Status({ online, state, refresh }: { online: boolean; state:SyncVisualState; refresh:()=>void }) {
   const text=state==="updating"?"Updating…":!online||state==="offline"?"Offline · showing saved data":state==="pending"?"Pending edits":state==="conflict"?"Review conflict":state==="failed"?"Update paused":"Ready";
   return <button className={`status ${online ? "online" : "offline"}`} onClick={refresh}>{text}</button>;
@@ -113,6 +108,7 @@ function Bootstrap({ callbackError }: { callbackError: string }) {
 
 function AppShell() {
   const [route, setRoute] = useState<NativeRoute>(routeFromHash);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [syncState, setSyncState] = useState<SyncVisualState>("idle");
   const [syncError, setSyncError] = useState("");
@@ -127,7 +123,7 @@ function AppShell() {
   const applySession = (value: NativeSessionSnapshot | null) => { if (!value?.authenticated) return; if (!value.user?.applicationUserId) throw new Error("The signed-in account did not provide a user ID."); const next = { id: value.user.applicationUserId, displayName: value.user?.displayName || value.user?.email || "CA Progress student", subtitle: value.user?.email || "Cloud account" }; setAccount(next); retainLocalAccount(next); setAuthenticated(true); setSelected(true); };
 
   useEffect(() => {
-    const changed = () => setRoute(routeFromHash());
+    const changed = () => { setRoute(routeFromHash()); setMoreOpen(false); };
     const connected = () => {setOnline(true);window.dispatchEvent(new Event("ca-sync"));};
     const disconnected = () => setOnline(false);
     const resume = () => {window.dispatchEvent(new Event("ca-sync"));window.dispatchEvent(new Event("ca-background-recover"));};
@@ -178,9 +174,10 @@ function AppShell() {
 
   if (!selected) return <Bootstrap callbackError={authError} />;
   const reset=()=>{clearLocalAccount();setRepository(null);setAuthenticated(false);setSelected(false);};
-  const content = route === "settings" ? <Settings authenticated={authenticated} repository={repository} recovered={Boolean(repository?.database.recovered)} onLogout={async()=>{await revokeNativePush(nativeApiRequest);await repository?.lock();await logoutNative();reset();}} onRemove={async()=>{if(repository)await FileVault.wipeAccount({accountId:repository.accountId}).catch(()=>undefined);await repository?.removeFromDevice();reset();}} onWipe={async()=>{if(repository)await FileVault.wipeAccount({accountId:repository.accountId}).catch(()=>undefined);await wipeAllOfflineData();reset();}} /> : route === "today" ? <Today workspace={workspace} repository={repository}/> : route === "progress" ? <Progress workspace={workspace} repository={repository}/> : route === "syllabus"?<Syllabus workspace={workspace}/>:route === "focus" ? <Focus repository={repository}/> : route === "community" ? <Community dashboard={dashboard} repository={repository} authenticated={authenticated} account={account}/> : route==="resources"?<Resources repository={repository} authenticated={authenticated}/>:route==="notifications"?<Notifications repository={repository}/>:route==="notes"?<Notes workspace={workspace} repository={repository}/>:route==="activity"?<Activity workspace={workspace}/>:route==="buddy"?<Buddy workspace={workspace}/>:route==="profile"?<Profile workspace={workspace}/>:<Planner workspace={workspace} repository={repository}/>;
-  const primary=navigation.filter(item=>["today","progress","planner","focus","community"].includes(item.route));
-  return <div className="app-shell"><aside><div className="brand"><span>CA</span><div><strong>CA Progress</strong><small>Native workspace</small></div></div><nav>{navigation.map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i>{item.label}</button>)}</nav><div className="account"><span>Z</span><div><strong>{account.displayName}</strong><small>{account.subtitle}</small></div></div></aside><main><div className="topbar"><div className="mobile-brand"><span>CA</span><strong>CA Progress</strong></div><Status online={online} state={syncState} refresh={()=>window.dispatchEvent(new Event("ca-sync"))}/></div>{syncError && <div role="alert" className="sync-error">{syncError} <button type="button" onClick={()=>window.dispatchEvent(new Event("ca-sync"))}>Retry</button></div>}{content}</main><nav className="bottom-nav">{primary.map((item) => <button className={route === item.route ? "active" : ""} onClick={() => navigate(item.route)} key={item.route}><i>{item.glyph}</i><span>{item.label}</span></button>)}<button className={!primary.some(item=>item.route===route) ? "active" : ""} onClick={() => navigate("settings")}><i>◇</i><span>More</span></button></nav></div>;
+  const content = route === "settings" ? <Settings authenticated={authenticated} repository={repository} recovered={Boolean(repository?.database.recovered)} onLogout={async()=>{await revokeNativePush(nativeApiRequest);await repository?.lock();await logoutNative();reset();}} onRemove={async()=>{if(repository)await FileVault.wipeAccount({accountId:repository.accountId}).catch(()=>undefined);await repository?.removeFromDevice();reset();}} onWipe={async()=>{if(repository)await FileVault.wipeAccount({accountId:repository.accountId}).catch(()=>undefined);await wipeAllOfflineData();reset();}} /> : (route === "today" || route === "dashboard") ? <Today workspace={workspace} repository={repository}/> : route === "progress" ? <Progress workspace={workspace} repository={repository}/> : route === "syllabus"?<Syllabus workspace={workspace}/>:route === "focus" ? <Focus repository={repository}/> : route === "community" ? <Community dashboard={dashboard} repository={repository} authenticated={authenticated} account={account}/> : route==="resources"?<Resources repository={repository} authenticated={authenticated}/>:route==="notifications"?<Notifications repository={repository}/>:route==="notes"?<Notes workspace={workspace} repository={repository}/>:route==="activity"?<Activity workspace={workspace}/>:route==="buddy"?<Buddy workspace={workspace}/>:route==="profile"?<Profile workspace={workspace}/>:<Planner workspace={workspace} repository={repository}/>;
+  const currentLabel = route === "dashboard" ? "Dashboard" : route === "today" ? "Today" : studentNavigation.flatMap(section => section.items).find(item => nativeRouteFor(item) === route)?.label ?? "CA Progress";
+  const openItem = (item: ShellNavItem) => { const target = nativeRouteFor(item); if (target) { setMoreOpen(false); navigate(target); } };
+  return <div className="app-shell"><aside><div className="brand"><span>CP</span><div><strong>CA Progress</strong><small>Student workspace</small></div></div><nav>{studentNavigation.map(section => <div className="side-section" key={section.label}><small>{section.label}</small>{section.items.map(item => <button key={item.href} disabled={!nativeRouteFor(item)} className={nativeRouteFor(item) === route ? "active" : ""} onClick={() => openItem(item)}><Icon name={item.icon} size={18}/>{item.label}</button>)}</div>)}</nav><div className="account"><span>{account.displayName.slice(0,1).toUpperCase()}</span><div><strong>{account.displayName}</strong><small>{account.subtitle}</small></div></div></aside><main><div className="topbar"><div className="mobile-app-bar">{route === "dashboard" ? <span className="mobile-app-bar__mark">CP</span> : <button type="button" className="mobile-app-bar__back" aria-label="Back to Home" onClick={() => navigate("dashboard")}><Icon name="chevron" size={20}/></button>}<span><strong>{currentLabel}</strong><small>Student workspace</small></span></div><Status online={online} state={syncState} refresh={()=>window.dispatchEvent(new Event("ca-sync"))}/></div>{syncError && <div role="alert" className="sync-error">{syncError} <button type="button" onClick={()=>window.dispatchEvent(new Event("ca-sync"))}>Retry</button></div>}{content}</main><nav className="bottom-nav" aria-label="Student mobile navigation">{primaryNavigation.map(item => {const target=nativeRouteFor(item);const active=target===route;return <button key={item.href} type="button" className={active?"active":""} aria-current={active?"page":undefined} onClick={()=>target&&navigate(target)}><Icon name={item.icon} size={19}/><span>{item.shortLabel??item.label}</span></button>;})}<button type="button" className={moreOpen||!primaryNavigation.some(item=>nativeRouteFor(item)===route)?"active":""} onClick={()=>setMoreOpen(true)} aria-haspopup="dialog" aria-expanded={moreOpen}><Icon name="more" size={19}/><span>More</span></button></nav>{moreOpen&&<div className="native-sheet-backdrop" onClick={()=>setMoreOpen(false)}><section className="native-sheet" role="dialog" aria-modal="true" aria-label="Explore CA Progress" onClick={event=>event.stopPropagation()}><header><strong>Explore CA Progress</strong><button type="button" aria-label="Close menu" onClick={()=>setMoreOpen(false)}><Icon name="close" size={20}/></button></header><div className="native-sheet-scroll">{studentNavigation.map(section=><section className="native-menu-group" key={section.label}><h3>{section.label}</h3><div>{section.items.map(item=>{const available=Boolean(nativeRouteFor(item));return <button key={item.href} type="button" disabled={!available} className={nativeRouteFor(item)===route?"active":""} onClick={()=>openItem(item)}><span className="native-menu-icon"><Icon name={item.icon} size={17}/></span><span><strong>{item.label}</strong><small>{available?item.description:"Available in a future app update"}</small></span>{available&&<Icon name="chevron" size={13}/>}</button>;})}</div></section>)}</div></section></div>}</div>;
 }
 
 const root = document.getElementById("root");
