@@ -54,7 +54,12 @@ jobs:
       - name: P3 contract gate
         run: node --test tests/mobile-p3-daily-workspace.test.mjs
       - name: TypeScript gate
-        run: npm run typecheck
+        run: |
+          if ! npm run typecheck; then
+            echo '--- generated apps/mobile/src/main.tsx around TypeScript failure ---'
+            nl -ba apps/mobile/src/main.tsx | sed -n '34,58p'
+            exit 1
+          fi
       - name: Native bundle gate
         run: npm run native:bundle
       - name: Retained mobile regression gate
