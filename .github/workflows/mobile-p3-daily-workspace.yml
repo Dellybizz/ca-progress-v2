@@ -42,6 +42,17 @@ jobs:
           node --check scripts/mobile/apply-p3-daily-workspace.mjs
       - name: Apply P3 implementation
         run: node scripts/mobile/apply-p3-daily-workspace.mjs
+      - name: Repair generated gate assertion
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/mobile-p3-daily-workspace.test.mjs')
+          s=p.read_text()
+          s=s.replace('assert.match(repo,/outboxStatement(account.id,{type:"focus_session"/);', 'assert.ok(repo.includes(\'outboxStatement(account.id,{type:"focus_session"\'));')
+          p.write_text(s)
+          PY
+          node --check tests/mobile-p3-daily-workspace.test.mjs
       - name: Install dependencies
         run: npm ci --ignore-scripts
       - name: P3 contract gate
