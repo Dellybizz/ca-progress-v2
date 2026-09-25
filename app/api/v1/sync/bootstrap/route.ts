@@ -21,9 +21,11 @@ export async function GET(request: NextRequest) {
   const subjectIds=context.subjectIds;
   const subjectPlaceholders=subjectIds.map((_,index)=>`?${index+1}`).join(",");
   const settled=await Promise.allSettled([
-    db.prepare(`SELECT 'progress' AS entity_type,chapter_id AS entity_id,0 AS entity_version,
-      json_object('chapterId',chapter_id,'completedAt',completed_at,'revision1At',revision_1_at,'revision2At',revision_2_at,'test1At',test_1_at,'test2At',test_2_at) AS payload_json,
-      NULL AS deleted_at,updated_at FROM chapter_progress WHERE user_id=?1 ORDER BY updated_at LIMIT 1500`).bind(context.userId).all(),
+    subjectIds.length?db.prepare(`SELECT 'progress' AS entity_type,p.chapter_id AS entity_id,0 AS entity_version,
+      json_object('chapterId',p.chapter_id,'chapterTitle',c.title,'subjectId',sv.subject_id,'completedAt',p.completed_at,'revision1At',p.revision_1_at,'revision2At',p.revision_2_at,'test1At',p.test_1_at,'test2At',p.test_2_at) AS payload_json,
+      NULL AS deleted_at,p.updated_at FROM chapter_progress p JOIN chapters c ON c.id=p.chapter_id
+      JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id WHERE p.user_id=?1
+      AND sv.subject_id IN (${subjectIds.map((_,index)=>`?${index+2}`).join(",")}) ORDER BY p.updated_at LIMIT 1500`).bind(context.userId,...subjectIds).all():Promise.resolve({results:[]}),
     db.prepare(`SELECT 'planner_task' AS entity_type,id AS entity_id,0 AS entity_version,
       json_object('id',id,'title',title,'notes',notes,'subjectId',subject_id,'chapterId',chapter_id,'dueAt',due_at,'estimatedMinutes',estimated_minutes,'status',status,'completedAt',completed_at) AS payload_json,
       NULL AS deleted_at,updated_at FROM tasks WHERE user_id=?1 ORDER BY updated_at LIMIT 1500`).bind(context.userId).all(),
