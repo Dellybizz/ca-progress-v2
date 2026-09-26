@@ -57,12 +57,12 @@ jobs:
           fi
       - name: Commit certified recovery
         run: |
-          if git diff --quiet && git diff --cached --quiet; then
-            echo 'No parity recovery changes to commit.'
+          git add packages/mobile-data/src/repository.ts apps/mobile/src/main.tsx tests/mobile-parity-recovery.test.mjs scripts/mobile/apply-parity-recovery-v2.mjs scripts/mobile/mobile-parity-recovery.test.mjs
+          if git diff --cached --quiet; then
+            echo 'No parity recovery source changes to commit.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add packages/mobile-data/src/repository.ts apps/mobile/src/main.tsx tests/mobile-parity-recovery.test.mjs scripts/mobile/apply-parity-recovery-v2.mjs scripts/mobile/mobile-parity-recovery.test.mjs
           git commit -m 'fix(mobile): complete syllabus progress and focus parity [parity-recovery]'
           git push origin HEAD:mobile-phase7-student-parity
