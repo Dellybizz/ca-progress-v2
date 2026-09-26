@@ -23,9 +23,9 @@ export async function GET(request: NextRequest) {
   const subjectPlaceholders=subjectIds.map((_,index)=>`?${index+1}`).join(",");
   const settled=await Promise.allSettled([
     subjectIds.length?db.prepare(`SELECT 'progress' AS entity_type,p.chapter_id AS entity_id,0 AS entity_version,
-      json_object('chapterId',p.chapter_id,'chapterTitle',c.title,'subjectId',sv.subject_id,'completedAt',p.completed_at,'revision1At',p.revision_1_at,'revision2At',p.revision_2_at,'test1At',p.test_1_at,'test2At',p.test_2_at) AS payload_json,
+      json_object('chapterId',p.chapter_id,'chapterTitle',c.title,'subjectId',sv.subject_id,'completedAt',p.completed_at,'revision1At',p.revision_1_at,'revision2At',p.revision_2_at,'test1At',p.test_1_at,'test2At',p.test_2_at,'understanding',wp.understanding_level) AS payload_json,
       NULL AS deleted_at,p.updated_at FROM chapter_progress p JOIN chapters c ON c.id=p.chapter_id
-      JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id WHERE p.user_id=?1
+      JOIN syllabus_versions sv ON sv.id=c.syllabus_version_id LEFT JOIN chapter_workspace_preferences wp ON wp.user_id=p.user_id AND wp.chapter_id=p.chapter_id WHERE p.user_id=?1
       AND sv.subject_id IN (${subjectIds.map((_,index)=>`?${index+2}`).join(",")}) ORDER BY p.updated_at LIMIT 1500`).bind(context.userId,...subjectIds).all():Promise.resolve({results:[]}),
     db.prepare(`SELECT 'planner_task' AS entity_type,id AS entity_id,0 AS entity_version,
       json_object('id',id,'title',title,'notes',notes,'subjectId',subject_id,'chapterId',chapter_id,'dueAt',due_at,'estimatedMinutes',estimated_minutes,'status',status,'completedAt',completed_at) AS payload_json,
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       json_object('intervalDays',json(interval_days),'preferredWeekdays',json(preferred_weekdays),'revisionMinutes',revision_minutes,'newChapterMinutes',new_chapter_minutes,'testMinutes',test_minutes,'updatedAt',updated_at) AS payload_json,
       NULL AS deleted_at,updated_at FROM revision_rules WHERE user_id=?1 LIMIT 1`).bind(context.userId).all(),
     db.prepare(`SELECT 'note' AS entity_type,id AS entity_id,0 AS entity_version,
-      json_object('id',id,'title',title,'body',body_text,'bodyHtml',body_html,'subjectId',subject_id,'chapterId',chapter_id,'visibility',visibility) AS payload_json,
+      json_object('id',id,'title',title,'body',body_text,'bodyHtml',body_html,'subjectId',subject_id,'chapterId',chapter_id,'visibility',visibility,'updatedAt',updated_at) AS payload_json,
       NULL AS deleted_at,updated_at FROM notes WHERE user_id=?1 AND (subject_id IS NULL OR subject_id IN (${subjectIds.map((_,index)=>`?${index+2}`).join(",")})) ORDER BY updated_at LIMIT 1000`).bind(context.userId,...subjectIds).all(),
     db.prepare(`SELECT 'focus_session' AS entity_type,id AS entity_id,0 AS entity_version,
       json_object('id',id,'subjectId',subject_id,'chapterId',chapter_id,'mode',mode,'startedAt',started_at,'endedAt',ended_at,'durationSeconds',duration_seconds) AS payload_json,

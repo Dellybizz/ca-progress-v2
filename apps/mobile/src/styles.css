@@ -40,3 +40,6 @@ aside nav{overflow-y:auto}.status{border:0;cursor:pointer}.check{padding:0;backg
 
 /* The stopwatch has no progress ring because it has no target duration. */
 .focus-parity .timer.is-stopwatch{width:auto;height:auto;border:0;border-radius:0;min-height:140px;max-width:100%;margin-block:18px 24px}.focus-parity .timer.is-stopwatch.running{transform:none}
+
+/* Academic P4 detail controls */
+.progress-stage-row{grid-template-columns:auto minmax(0,1fr) auto;gap:12px}.progress-stage-row .secondary{padding:8px 12px}.note-open{width:100%;font:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);background:#fff}.resource-title{display:block;border:0;background:none;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.resource-title:hover{text-decoration:underline}.resource-detail{margin-top:16px}.resource-detail .button-row{justify-content:flex-start}.resource-detail progress{width:100%}

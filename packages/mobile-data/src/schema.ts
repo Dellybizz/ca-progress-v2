@@ -3,7 +3,7 @@ export type SqlStatement = { sql: string; args?: unknown[] };
 const syncColumns = `local_id TEXT PRIMARY KEY, server_id TEXT, server_version INTEGER NOT NULL DEFAULT 0, account_id TEXT NOT NULL, academic_context_key TEXT, local_state TEXT NOT NULL DEFAULT 'synced' CHECK(local_state IN ('synced','pending','conflict','failed')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT`;
 const entity = (table: string, extra: string) => `CREATE TABLE IF NOT EXISTS ${table} (${syncColumns}, ${extra}, FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)`;
 
-export const LOCAL_SCHEMA_VERSION = 5;
+export const LOCAL_SCHEMA_VERSION = 6;
 export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlStatement[] }> = [{
   version: 1,
   statements: [
@@ -92,5 +92,10 @@ export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlS
     { sql: "CREATE INDEX IF NOT EXISTS idx_resource_owner_state ON resource_metadata(account_id,sync_state,updated_at DESC)" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_transfer_recovery ON file_transfers(account_id,state,next_attempt_at,created_at)" },
     { sql: "CREATE INDEX IF NOT EXISTS idx_notifications_account_time ON notifications(account_id,created_at DESC)" },
+  ],
+}, {
+  version: 6,
+  statements: [
+    { sql: "ALTER TABLE notes ADD COLUMN baseline_json TEXT" },
   ],
 }];
