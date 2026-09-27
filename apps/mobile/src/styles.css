@@ -41,6 +41,28 @@ aside nav{overflow-y:auto}.status{border:0;cursor:pointer}.check{padding:0;backg
 /* The stopwatch has no progress ring because it has no target duration. */
 .focus-parity .timer.is-stopwatch{width:auto;height:auto;border:0;border-radius:0;min-height:140px;max-width:100%;margin-block:18px 24px}.focus-parity .timer.is-stopwatch.running{transform:none}
 
+/* Phase 1: keep the native app chrome and every final action clear of system bars. */
+.native-status-line{position:relative;top:auto;right:auto;z-index:auto;min-height:28px;display:flex;justify-content:flex-end;align-items:center;padding:2px 16px;background:var(--color-bg)}
+.native-status-line .status{box-shadow:none;min-height:24px}
+.focus-context-card{display:grid;gap:16px;width:min(100%,520px);margin-inline:auto;text-align:left}
+.focus-context-card>div:first-child{display:grid;gap:12px}
+.focus-context-card label{display:grid;gap:7px;font-size:13px;font-weight:650;color:var(--color-text)}
+.focus-context-card select{display:block;width:100%;min-width:0;min-height:48px;padding:10px 38px 10px 12px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface);color:var(--color-text);font:inherit;font-size:14px}
+.focus-context-card select:focus-visible,.focus-parity button:focus-visible{outline:2px solid var(--color-brand);outline-offset:2px}
+.focus-context-card .settings-label{font-size:13px;margin:0 0 8px}
+.focus-parity .focus-modes button,.focus-parity .focus-presets button{min-height:44px;min-width:44px;padding:9px 12px;font-size:13px}
+.focus-parity .focus-presets{flex-wrap:wrap;gap:5px}
+@media(max-width:760px){
+  .app-shell{--mobile-bar-height:calc(60px + var(--safe-top));--mobile-nav-height:calc(60px + var(--safe-bottom))}
+  .app-shell main{padding-top:var(--mobile-bar-height);padding-bottom:calc(var(--mobile-nav-height) + 24px)}
+  .app-shell .topbar{position:fixed;top:0;left:0;right:0;z-index:8;min-height:var(--mobile-bar-height);height:var(--mobile-bar-height);box-sizing:border-box}
+  .app-shell .bottom-nav{height:var(--mobile-nav-height);min-height:var(--mobile-nav-height)}
+  .app-shell .screen,.app-shell .core-screen{padding-bottom:calc(var(--mobile-nav-height) + 24px)}
+  .native-status-line{padding-inline:max(12px,env(safe-area-inset-right));min-height:28px}
+}
+@media(max-width:760px) and (orientation:landscape) and (max-height:520px){.focus-parity .timer{width:150px;height:150px}.focus-context-card{gap:8px}}
+@media(max-width:760px){html[data-keyboard="open"] .app-shell main{padding-bottom:var(--safe-bottom)}html[data-keyboard="open"] .app-shell .screen,html[data-keyboard="open"] .app-shell .core-screen{padding-bottom:calc(24px + var(--safe-bottom))}}
+
 /* Academic P4 detail controls */
 .progress-stage-row{grid-template-columns:auto minmax(0,1fr) auto;gap:12px}.progress-stage-row .secondary{padding:8px 12px}.note-open{width:100%;font:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);background:#fff}.resource-title{display:block;border:0;background:none;padding:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.resource-title:hover{text-decoration:underline}.resource-detail{margin-top:16px}.resource-detail .button-row{justify-content:flex-start}.resource-detail progress{width:100%}
 
