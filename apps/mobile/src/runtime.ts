@@ -2,10 +2,10 @@ import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
 export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "https://ca-progress-v2.habeebaasif622.workers.dev"]);
-export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|progress|study|tests|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?)(?:[/?#]|$)/;
+export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|progress|study|tests|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?|pricing|billing|feature-tour|account-deletion)(?:[/?#]|$)/;
 const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
 
-export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "calendar" | "analytics" | "forecast" | "tests" | "unsupported";
+export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "calendar" | "analytics" | "forecast" | "tests" | "pricing" | "billing" | "tour" | "deletion" | "unsupported";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {
@@ -22,6 +22,11 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
     if (url.pathname.startsWith("/community")) return "community";
     if (url.pathname.startsWith("/resources")) return "resources";
     if (url.pathname.startsWith("/notifications")) return "notifications";
+    if (url.pathname.startsWith("/pricing")) return "pricing";
+    if (url.pathname.startsWith("/billing")) return "billing";
+    if (url.pathname.startsWith("/feature-tour")) return "tour";
+    if (url.pathname.startsWith("/account-deletion")) return "deletion";
+    if (url.pathname.startsWith("/settings/profile")) return "profile";
     if (url.pathname.startsWith("/settings")) return "settings";
     return "dashboard";
   } catch { return null; }

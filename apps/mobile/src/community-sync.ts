@@ -8,7 +8,7 @@ const POLL_MS=5000;
 export function createNativeCommunityCoordinator(input:{accountId:string;transport:Transport;onChanged:()=>void}){
   let stopped=false,timer:number|null=null,socket:WebSocket|null=null,activeChannel:string|null=null,lastSequence=0;
   const syncedRead=new Map<string,number>();
-  const schedule=()=>{if(!stopped){if(timer!==null)window.clearTimeout(timer);timer=window.setTimeout(()=>void reconcile(),POLL_MS);}};
+  const schedule=()=>{if(!stopped){if(timer!==null)window.clearTimeout(timer);timer=window.setTimeout(()=>void reconcile().catch(()=>undefined),POLL_MS);}};
   async function channels(){const result=await input.transport("/api/v1/community/channels") as {channels:Array<{key:string;title:string;latestSequence:number|null;unreadCount:number;latestAt:string|null;latestBody:string|null}>};await storeCommunityChannels(input.accountId,result.channels||[]);input.onChanged();return result.channels||[];}
   async function deliver(channel:string,clientMessageId:string,body:string){await retryCommunityMessage(input.accountId,clientMessageId);const result=await input.transport(`/api/v1/community/channels/${encodeURIComponent(channel)}/messages`,{method:"POST",body:JSON.stringify({body,clientMessageId})}) as {message:RemoteCommunityMessage};await acknowledgeCommunityMessage(input.accountId,clientMessageId,result.message);lastSequence=Math.max(lastSequence,result.message.sequence||0);}
   async function drain(){for(const item of await pendingCommunityMessages(input.accountId)){try{await deliver(item.channelKey,item.clientMessageId,item.body);}catch{await failCommunityMessage(input.accountId,item.clientMessageId);}}}

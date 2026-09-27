@@ -1,9 +1,12 @@
 import { query, transaction } from "./database";
 
+export type BuddySharing = { shareProfile: boolean; shareProgress: boolean; shareStreak: boolean; shareGoals: boolean; shareStudyStatus: boolean };
 export type BuddyDashboard = {
   incomingRequests: Array<{ relationshipId: string; userId: string; displayName: string; requestedAt: string }>;
   outgoingRequests: Array<{ relationshipId: string; userId: string; displayName: string; requestedAt: string }>;
-  buddies: Array<{ relationshipId: string; userId: string; displayName: string; muted: boolean }>;
+  buddies: Array<{ relationshipId: string; userId: string; displayName: string; muted: boolean; mySharing: BuddySharing; buddySharing: BuddySharing; accountability: { publicBio?: string; caLevel?: string; attemptKey?: string; weekStudyMinutes?: number; currentStreakDays?: number } }>;
+  recentNudges: Array<{ id: string; sender_display_name: string | null; message: string; created_at: string }>;
+  nudgeLimitPer24Hours: number;
 };
 export type InsightsSnapshot = {
   summary: { totalXp: number; level: { name: string; progressPercent: number; nextMinXp: number | null }; streak: { current: number; best: number }; achievements: Array<{ key: string; title: string; description: string; unlockedAt: string }> };
@@ -11,7 +14,15 @@ export type InsightsSnapshot = {
   leaderboard: { category: string; period: string; entries: Array<{ rank: number; displayName: string; totalXp: number; levelName: string }> };
 };
 export type TestArchiveSnapshot = { attempts: Array<{ id: string; subjectTitle: string; chapterTitle: string; stage: string; attemptNumber: number; marksScored: number; marksTotal: number; percentage: number; completedAt: string; mistakes: Array<{ category: string; note?: string | null }> }>; journal: Array<{ id: string; category: string; chapterTitle: string }> };
-export type PeopleSnapshotKey = "buddy" | "insights_overall" | "insights_foundation" | "insights_intermediate" | "insights_final" | "analytics" | "tests";
+export type AccountSnapshot = {
+  fetchedAt: string;
+  billing: { mode: string; currentPlan?: { id: string; name: string; tier_key: string; tagline: string; billing_cycle: string }; currentSubscription?: { status: string; starts_at: string; ends_at: string | null } | null; payments?: Array<{ id: string; amount_subunits: number; currency: string; status: string; created_at: string }> };
+  pricing: { plans: Array<{ id: string; name: string; tagline: string; tier_key: string; billing_cycle: string; price_subunits: number | null; currency: string }>; currentPlanId: string | null };
+  recurring: { mode: string; subscription: { status: string; financialState: string; chargeAt: string | null; paidThroughAt: string | null; cancelAtPeriodEnd: boolean } | null; charges: Array<{ paymentId: string; amountSubunits: number; currency: string; status: string; createdAt: string | null }> };
+  tour: { step: number; completedAt: string | null };
+  deletion: { status: string; scheduled_for: string | null } | null;
+};
+export type PeopleSnapshotKey = "buddy" | "insights_overall" | "insights_foundation" | "insights_intermediate" | "insights_final" | "analytics" | "tests" | "account";
 
 const keyFor = (kind: PeopleSnapshotKey) => `people_p5_${kind}`;
 
