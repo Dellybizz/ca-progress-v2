@@ -125,12 +125,15 @@ aside nav{overflow-y:auto}.status{border:0;cursor:pointer}.check{padding:0;backg
 .mobile-context-row{display:none}
 @media(max-width:760px){
   .app-shell{--mobile-bar-height:calc(108px + var(--safe-top))}
-  .app-shell .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:48px 42px;align-content:end;column-gap:4px;height:var(--mobile-bar-height);padding:calc(6px + var(--safe-top)) 12px 4px}
+  .app-shell .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:48px 44px;align-content:end;column-gap:4px;height:var(--mobile-bar-height);padding:calc(6px + var(--safe-top)) 12px 4px}
   .native-topbar-actions .native-explore-trigger{display:none}
   .mobile-context-row{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;min-width:0;border-top:1px solid var(--color-border)}
-  .mobile-context-row button{display:flex;align-items:center;gap:5px;min-width:0;min-height:40px;border:0;background:transparent;color:var(--color-text-soft);font-size:11px}
+  .mobile-context-row button{display:flex;align-items:center;gap:5px;min-width:0;min-height:44px;border:0;background:transparent;color:var(--color-text-soft);font-size:11px}
+  .native-icon-button,.native-account-trigger{width:44px;height:44px;flex-basis:44px}
+  .mobile-app-bar__back{width:44px;margin-left:0}
+  .mobile-app-bar strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mobile-attempt-trigger{max-width:calc(100% - 95px)}.mobile-attempt-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mobile-explore-trigger{font-weight:700;color:var(--color-brand-strong)!important}
-  .native-status-line{top:calc(var(--mobile-bar-height) + 2px)}
+  .native-status-line{top:0}
   .study-destinations{grid-template-columns:1fr}.study-destinations button{min-height:52px}
 }

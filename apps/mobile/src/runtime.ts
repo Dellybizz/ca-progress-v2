@@ -12,7 +12,8 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
     const url = new URL(value);
     if (!CANONICAL_ORIGINS.has(url.origin) || !SAFE_DEEP_LINK.test(`${url.pathname}${url.search}${url.hash}`)) return null;
     if (url.pathname.startsWith("/subjects/") && url.pathname.endsWith("/progress")) return "progress";
-    if (url.pathname.startsWith("/subjects/") || url.pathname.startsWith("/chapters/") || url.pathname.startsWith("/syllabus")) return "syllabus";
+    if (url.pathname.startsWith("/chapters/")) return "progress";
+    if (url.pathname.startsWith("/subjects/") || url.pathname.startsWith("/syllabus")) return "syllabus";
     if (url.pathname.startsWith("/notes")) return "notes";
     if (url.pathname.startsWith("/activity")) return "activity";
     if (url.pathname.startsWith("/study-buddy")) return "buddy";
@@ -45,7 +46,7 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
   } catch { return null; }
 }
 
-export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onResume: () => void, onAuthCallback: (url: string) => void, onBack?: () => boolean) {
+export function installNativeRuntime(onRoute: (route: NativeRoute, url: string) => void, onResume: () => void, onAuthCallback: (url: string) => void, onBack?: () => boolean) {
   if (!Capacitor.isNativePlatform()) return () => undefined;
   document.documentElement.dataset.nativePlatform = Capacitor.getPlatform();
 
@@ -63,7 +64,7 @@ export function installNativeRuntime(onRoute: (route: NativeRoute) => void, onRe
       return;
     }
     const route = routeFromDeepLink(url);
-    if (route) onRoute(route);
+    if (route) onRoute(route, url);
   };
 
   const handles = [
