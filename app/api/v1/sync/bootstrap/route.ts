@@ -19,6 +19,10 @@ export async function GET(request: NextRequest) {
   const requested=request.nextUrl.searchParams.get("context");
   if(requested&&requested!==context.contextKey)return json(request,{error:{code:"CONTEXT_CHANGED",message:"Academic context changed.",retryable:false}},409);
   const db=getD1RuntimeDatabase();
+  // Capture the journal boundary before reading the snapshot. A mutation that
+  // lands during the snapshot is then replayed by pull instead of being lost.
+  const high=(await db.prepare("SELECT COALESCE(MAX(sequence),0) AS cursor FROM mobile_sync_changes WHERE user_id=?1 AND academic_context_key=?2")
+    .bind(context.userId,context.contextKey).first<{cursor:number}>())?.cursor??0;
   const subjectIds=context.subjectIds;
   const subjectPlaceholders=subjectIds.map((_,index)=>`?${index+1}`).join(",");
   const settled=await Promise.allSettled([
@@ -83,8 +87,6 @@ export async function GET(request: NextRequest) {
   const selectedProfile=merged.get(profileKey);
   if(selectedProfile&&context.selection){const saved=JSON.parse(String(selectedProfile.payload_json||"{}")) as Record<string,unknown>;merged.set(profileKey,{...selectedProfile,payload_json:JSON.stringify({...saved,level:context.selection.level,group:context.selection.group,attempt:context.selection.attemptKey})});}
   const entities=[...merged.values()];
-  const high=(await db.prepare("SELECT COALESCE(MAX(sequence),0) AS cursor FROM mobile_sync_changes WHERE user_id=?1 AND academic_context_key=?2")
-    .bind(context.userId,context.contextKey).first<{cursor:number}>())?.cursor??0;
   return json(request,{schema:1,accountId:context.userId,academicContextKey:context.contextKey,cursor:String(high),context:{levelId:context.levelId,attemptKey:context.selection?.attemptKey??null,subjectIds:context.subjectIds},entities});
   } catch(error) {
     console.error("Mobile sync bootstrap failed",error);

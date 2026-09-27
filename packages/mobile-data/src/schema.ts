@@ -3,7 +3,7 @@ export type SqlStatement = { sql: string; args?: unknown[] };
 const syncColumns = `local_id TEXT PRIMARY KEY, server_id TEXT, server_version INTEGER NOT NULL DEFAULT 0, account_id TEXT NOT NULL, academic_context_key TEXT, local_state TEXT NOT NULL DEFAULT 'synced' CHECK(local_state IN ('synced','pending','conflict','failed')), created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT`;
 const entity = (table: string, extra: string) => `CREATE TABLE IF NOT EXISTS ${table} (${syncColumns}, ${extra}, FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)`;
 
-export const LOCAL_SCHEMA_VERSION = 6;
+export const LOCAL_SCHEMA_VERSION = 7;
 export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlStatement[] }> = [{
   version: 1,
   statements: [
@@ -97,5 +97,12 @@ export const LOCAL_MIGRATIONS: ReadonlyArray<{ version: number; statements: SqlS
   version: 6,
   statements: [
     { sql: "ALTER TABLE notes ADD COLUMN baseline_json TEXT" },
+  ],
+}, {
+  version: 7,
+  statements: [
+    { sql: "CREATE TABLE IF NOT EXISTS local_test_attempts (local_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, academic_context_key TEXT NOT NULL, server_id TEXT, chapter_id TEXT NOT NULL, stage TEXT NOT NULL CHECK(stage IN ('test_1','test_2')), marks_scored REAL NOT NULL, marks_total REAL NOT NULL, duration_minutes INTEGER NOT NULL, completed_on TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, attempt_number INTEGER, state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','synced')), last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY(account_id) REFERENCES local_accounts(account_id) ON DELETE CASCADE)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_local_tests_pending ON local_test_attempts(account_id,state,created_at)" },
+    { sql: "CREATE INDEX IF NOT EXISTS idx_local_tests_context ON local_test_attempts(account_id,academic_context_key,completed_on DESC)" },
   ],
 }];

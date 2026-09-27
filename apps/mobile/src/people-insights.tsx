@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { nativeApiRequest } from "./native-auth";
-import { readPeopleSnapshot, storePeopleSnapshot, type BuddyDashboard, type BuddySharing, type InsightsSnapshot, type LocalAccountRepository, type LocalWorkspace, type PeopleSnapshotKey, type TestArchiveSnapshot } from "../../../packages/mobile-data/src";
+import { readPeopleSnapshot, storePeopleSnapshot, recordLocalTestAttempt, readLocalTestAttempts, type LocalTestAttempt, type BuddyDashboard, type BuddySharing, type InsightsSnapshot, type LocalAccountRepository, type LocalWorkspace, type PeopleSnapshotKey, type TestArchiveSnapshot } from "../../../packages/mobile-data/src";
 
 function useSavedSnapshot<T>(repository: LocalAccountRepository | null, kind: PeopleSnapshotKey, path: string, field: string) {
   const [snapshot, setSnapshot] = useState<{ key: string; value: T } | null>(null);
@@ -74,22 +74,24 @@ export function NativeActivity({ repository, workspace }: { repository: LocalAcc
 
 export function NativeTests({ repository, workspace }: { repository: LocalAccountRepository | null; workspace: LocalWorkspace }) {
   const { value, error, refresh } = useSavedSnapshot<TestArchiveSnapshot>(repository, "tests", "/api/v1/test-archive", "archive");
+  const [localAttempts,setLocalAttempts]=useState<LocalTestAttempt[]>([]);
+  useEffect(()=>{if(!repository||!workspace.academic.contextKey)return;let live=true;const read=()=>void readLocalTestAttempts(repository.accountId,workspace.academic.contextKey!).then(rows=>{if(live)setLocalAttempts(rows);});read();const unsubscribe=repository.subscribe(read);return()=>{live=false;unsubscribe();};},[repository,workspace.academic.contextKey]);
   const [chapterId, setChapterId] = useState(""); const [stage, setStage] = useState<"test_1" | "test_2">("test_1");
   const [scored, setScored] = useState(""); const [total, setTotal] = useState(""); const [minutes, setMinutes] = useState("");
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [key, setKey] = useState(() => crypto.randomUUID()); const [busy, setBusy] = useState(false); const [saveError, setSaveError] = useState("");
+  const [busy, setBusy] = useState(false); const [saveError, setSaveError] = useState("");
   const save = async () => {
-    if (!navigator.onLine) { setSaveError("Connect to record a test attempt."); return; }
+    if (!repository||!workspace.academic.contextKey) { setSaveError("Download your academic context before recording a test."); return; }
     setBusy(true); setSaveError("");
     try {
-      await nativeApiRequest("/api/v1/test-archive", { method: "POST", body: JSON.stringify({ chapterId, stage, marksScored: Number(scored), marksTotal: Number(total), durationMinutes: Number(minutes), completedOn: date, idempotencyKey: key }) });
-      setKey(crypto.randomUUID()); setScored(""); await refresh(); window.dispatchEvent(new Event("ca-sync"));
+      await recordLocalTestAttempt(repository.accountId,workspace.academic.contextKey,{chapterId,stage,marksScored:Number(scored),marksTotal:Number(total),durationMinutes:Number(minutes),completedOn:date});
+      setScored("");window.dispatchEvent(new Event("ca-sync"));
     } catch (cause) { setSaveError(cause instanceof Error ? cause.message : "Test attempt could not be saved."); }
     finally { setBusy(false); }
   };
-  return <section className="screen people-p5"><header><p className="eyebrow">TEST HISTORY</p><h1>Tests</h1><p>Every attempt is permanent history. Scores and progress milestones come from the server.</p></header>
+  return <section className="screen people-p5"><header><p className="eyebrow">TEST HISTORY</p><h1>Tests</h1><p>Attempts save on this device first. The server confirms scores and progress milestones when connected.</p></header>
     {error && <p className="core-error" role="alert">{error} <button onClick={() => void refresh()}>Retry</button></p>}
-    <p className="note">Recording a new test requires a connection. Saved attempts remain available offline.</p>
+    <p className="note">Saved attempts remain available offline. Pending attempts upload automatically when connected.</p>
     <form className="p5-test-form" onSubmit={event => { event.preventDefault(); void save(); }}><h2>Record a test attempt</h2>
       <label>Chapter<select value={chapterId} onChange={event => setChapterId(event.target.value)} required><option value="">Choose chapter</option>{workspace.academic.chapters.map(chapter => <option value={chapter.id} key={chapter.id}>{chapter.title}</option>)}</select></label>
       <label>Stage<select value={stage} onChange={event => setStage(event.target.value as "test_1" | "test_2")}><option value="test_1">Test 1</option><option value="test_2">Test 2</option></select></label>
@@ -97,9 +99,9 @@ export function NativeTests({ repository, workspace }: { repository: LocalAccoun
       <label>Total marks<input type="number" min="0.01" max="1000" step="0.01" required value={total} onChange={event => setTotal(event.target.value)}/></label>
       <label>Duration in minutes<input type="number" min="1" max="1440" required value={minutes} onChange={event => setMinutes(event.target.value)}/></label>
       <label>Completed on<input type="date" required max={new Date().toISOString().slice(0, 10)} value={date} onChange={event => setDate(event.target.value)}/></label>
-      <button className="primary" disabled={busy || !navigator.onLine || !chapterId || !scored || !total || !minutes}>{busy ? "Saving…" : "Save attempt"}</button>
+      <button className="primary" disabled={busy || !repository || !workspace.academic.contextKey || !chapterId || !scored || !total || !minutes}>{busy ? "Saving…" : "Save on device"}</button>
     </form>{saveError && <p className="core-error" role="alert">{saveError}</p>}
-    <div className="list section-list">{value?.attempts.length ? value.attempts.map(item => <article className="row" key={item.id}><span className="avatar">{Math.round(item.percentage)}%</span><div><strong>{item.chapterTitle}</strong><small>{item.subjectTitle} · {item.stage === "test_1" ? "Test 1" : "Test 2"} · Attempt {item.attemptNumber}</small><small>{item.marksScored}/{item.marksTotal} · {new Date(item.completedAt).toLocaleDateString("en-IN")}</small></div></article>) : <p>No test attempts saved on this device.</p>}</div>
+    <div className="list section-list">{localAttempts.map(item=><article className="row" key={item.localId}><span className="avatar">{Math.round(item.marksScored/item.marksTotal*100)}%</span><div><strong>{workspace.academic.chapters.find(chapter=>chapter.id===item.chapterId)?.title||"Saved chapter"}</strong><small>{item.stage==="test_1"?"Test 1":"Test 2"} · {item.state==="pending"?"Waiting to sync":`Attempt ${item.attemptNumber??"saved"}`}</small><small>{item.marksScored}/{item.marksTotal} · {item.completedOn}</small>{item.lastError&&<small role="status">Sync paused: {item.lastError}</small>}</div></article>)}{value?.attempts.filter(item=>!localAttempts.some(local=>local.serverId===item.id)).map(item => <article className="row" key={item.id}><span className="avatar">{Math.round(item.percentage)}%</span><div><strong>{item.chapterTitle}</strong><small>{item.subjectTitle} · {item.stage === "test_1" ? "Test 1" : "Test 2"} · Attempt {item.attemptNumber}</small><small>{item.marksScored}/{item.marksTotal} · {new Date(item.completedAt).toLocaleDateString("en-IN")}</small></div></article>)}{!localAttempts.length&&!value?.attempts.length&&<p>No test attempts saved on this device.</p>}</div>
   </section>;
 }
 

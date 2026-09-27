@@ -2,20 +2,27 @@ import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
 export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "https://ca-progress-v2.habeebaasif622.workers.dev"]);
-export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|progress|study|tests|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?|pricing|billing|feature-tour|account-deletion)(?:[/?#]|$)/;
+export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard(?:\/.*)?|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|goals|progress|syllabus|subjects(?:\/.*)?|chapters(?:\/.*)?|study|tests|notes(?:\/.*)?|activity|study-buddy|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?|pricing|billing|feature-tour|account-deletion)(?:[/?#]|$)/;
 const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
 
-export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "appearance" | "focusSettings" | "security" | "exports" | "offlineStorage" | "privacy" | "calendar" | "analytics" | "forecast" | "tests" | "pricing" | "billing" | "tour" | "deletion" | "unsupported";
+export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "goals" | "revisionSettings" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "appearance" | "focusSettings" | "security" | "exports" | "offlineStorage" | "privacy" | "calendar" | "analytics" | "forecast" | "tests" | "pricing" | "billing" | "tour" | "deletion" | "unsupported";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {
     const url = new URL(value);
     if (!CANONICAL_ORIGINS.has(url.origin) || !SAFE_DEEP_LINK.test(`${url.pathname}${url.search}${url.hash}`)) return null;
+    if (url.pathname.startsWith("/subjects/") && url.pathname.endsWith("/progress")) return "progress";
+    if (url.pathname.startsWith("/subjects/") || url.pathname.startsWith("/chapters/") || url.pathname.startsWith("/syllabus")) return "syllabus";
+    if (url.pathname.startsWith("/notes")) return "notes";
+    if (url.pathname.startsWith("/activity")) return "activity";
+    if (url.pathname.startsWith("/study-buddy")) return "buddy";
+    if (url.pathname.startsWith("/goals")) return "goals";
     if (url.pathname.startsWith("/progress")) return "progress";
     if (url.pathname.startsWith("/analytics/forecast")) return "forecast";
     if (url.pathname.startsWith("/analytics")) return "analytics";
     if (url.pathname.startsWith("/calendar")) return "calendar";
     if (url.pathname.startsWith("/planner/today")) return "today";
+    if (url.pathname.startsWith("/planner/revision-settings")) return "revisionSettings";
     if (url.pathname.startsWith("/planner")) return "planner";
     if (url.pathname.startsWith("/study")) return "focus";
     if (url.pathname.startsWith("/tests")) return "tests";
