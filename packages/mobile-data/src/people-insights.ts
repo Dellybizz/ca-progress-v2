@@ -20,9 +20,11 @@ export type AccountSnapshot = {
   pricing: { plans: Array<{ id: string; name: string; tagline: string; tier_key: string; billing_cycle: string; price_subunits: number | null; currency: string }>; currentPlanId: string | null };
   recurring: { mode: string; subscription: { status: string; financialState: string; chargeAt: string | null; paidThroughAt: string | null; cancelAtPeriodEnd: boolean } | null; charges: Array<{ paymentId: string; amountSubunits: number; currency: string; status: string; createdAt: string | null }> };
   tour: { step: number; completedAt: string | null };
+  tourPending?: boolean;
   deletion: { status: string; scheduled_for: string | null } | null;
 };
-export type PeopleSnapshotKey = "buddy" | "insights_overall" | "insights_foundation" | "insights_intermediate" | "insights_final" | "analytics" | "tests" | "account";
+export type StudyProfilePrivacy = { publicBio: string; profileVisibility: "private" | "buddies" | "public"; progressVisibility: "private" | "buddies" | "public"; streakVisibility: "private" | "buddies" | "public"; showLevel: boolean; showAttempt: boolean; buddyUserIds: string[] };
+export type PeopleSnapshotKey = "buddy" | "insights_overall" | "insights_foundation" | "insights_intermediate" | "insights_final" | "analytics" | "tests" | "account" | "privacy";
 
 const keyFor = (kind: PeopleSnapshotKey) => `people_p5_${kind}`;
 

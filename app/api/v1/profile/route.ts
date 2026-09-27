@@ -15,6 +15,13 @@ const json = (request: NextRequest, body: unknown, status = 200) => NextResponse
 });
 export const OPTIONS = (request: NextRequest) => nativeOptions(request);
 
+export async function GET(request: NextRequest) {
+  const user = await optionalUser();
+  if (!user) return json(request, { error: { message: "Sign in to view your profile options." } }, 401);
+  try { return json(request, { attempts: await loadAttemptOptions() }); }
+  catch { return json(request, { error: { message: "Attempt options could not refresh." } }, 503); }
+}
+
 export async function POST(request: NextRequest) {
   if (!request.headers.get("authorization")?.startsWith("Bearer ")) {
     try { assertSameOriginMutation(request); } catch { return json(request, { error: { message: "Cross-site profile request rejected." } }, 403); }

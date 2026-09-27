@@ -5,7 +5,7 @@ export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "
 export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|progress|study|tests|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?|pricing|billing|feature-tour|account-deletion)(?:[/?#]|$)/;
 const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
 
-export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "calendar" | "analytics" | "forecast" | "tests" | "pricing" | "billing" | "tour" | "deletion" | "unsupported";
+export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "appearance" | "focusSettings" | "security" | "exports" | "offlineStorage" | "privacy" | "calendar" | "analytics" | "forecast" | "tests" | "pricing" | "billing" | "tour" | "deletion" | "unsupported";
 
 export function routeFromDeepLink(value: string): NativeRoute | null {
   try {
@@ -27,6 +27,12 @@ export function routeFromDeepLink(value: string): NativeRoute | null {
     if (url.pathname.startsWith("/feature-tour")) return "tour";
     if (url.pathname.startsWith("/account-deletion")) return "deletion";
     if (url.pathname.startsWith("/settings/profile")) return "profile";
+    if (url.pathname.startsWith("/settings/appearance")) return "appearance";
+    if (url.pathname.startsWith("/settings/focus")) return "focusSettings";
+    if (url.pathname.startsWith("/settings/security")) return "security";
+    if (url.pathname.startsWith("/settings/exports")) return "exports";
+    if (url.pathname.startsWith("/settings/offline")) return "offlineStorage";
+    if (url.pathname.startsWith("/settings/privacy")) return "privacy";
     if (url.pathname.startsWith("/settings")) return "settings";
     return "dashboard";
   } catch { return null; }
