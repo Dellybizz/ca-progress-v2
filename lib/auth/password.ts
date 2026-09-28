@@ -1,5 +1,7 @@
 import "server-only";
 
+import { pbkdf2 } from "@noble/hashes/pbkdf2";
+import { sha256 } from "@noble/hashes/sha256";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { issueSession } from "./cloudflare";
 
@@ -20,8 +22,9 @@ function db(): Database {
 }
 
 async function passwordHash(password: string, salt: Uint8Array, iterations = ITERATIONS) {
-  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  return hex(new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations }, key, 256)));
+  // Workers Web Crypto caps PBKDF2 at 100,000 rounds. This pure JS KDF
+  // retains the existing 310,000-round PBKDF2-SHA256 credential format.
+  return hex(pbkdf2(sha256, encoder.encode(password), salt, { c: iterations, dkLen: 32 }));
 }
 
 export async function verifyPassword(password: string, credential: { salt: string; password_hash: string; iterations: number } | null) {
