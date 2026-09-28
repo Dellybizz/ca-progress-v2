@@ -8,6 +8,8 @@ type Statement = { bind(...values: unknown[]): Statement; first<T>(): Promise<T 
 type Database = { prepare(sql: string): Statement; batch(statements: Statement[]): Promise<unknown> };
 const ITERATIONS = 310000;
 const USERNAME = /^[a-z][a-z0-9._]{2,29}$/;
+export const normalizeAccountUsername = (value: string) => value.trim().toLowerCase();
+export const validAccountUsername = (value: string) => USERNAME.test(value);
 const encoder = new TextEncoder();
 const hex = (bytes: Uint8Array) => Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
 const fromHex = (value: string) => new Uint8Array(value.match(/.{2}/g)?.map(part => parseInt(part, 16)) || []);
@@ -21,6 +23,12 @@ function db(): Database {
 async function passwordHash(password: string, salt: Uint8Array, iterations = ITERATIONS) {
   const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
   return hex(new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations }, key, 256)));
+}
+
+export async function createPasswordHash(password: string) {
+  if (password.length < 12 || password.length > 128) throw new PasswordAuthError("INVALID_INPUT", "Use a password of 12–128 characters.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return { salt: hex(salt), hash: await passwordHash(password, salt), iterations: ITERATIONS };
 }
 
 function equalHex(left: string, right: string) {

@@ -16,6 +16,7 @@ import {
   ensureCloudflareUserBootstrap,
 } from "./cloudflare-profile";
 import { getCloudflareRequestAuth } from "./cloudflare";
+import { getAccountSetupState } from "./account-setup";
 import { loginPathFor, sanitizeReturnPath } from "./navigation";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -201,8 +202,12 @@ export async function resolvePostAuthDestination(next: string) {
   const safeNext = sanitizeReturnPath(next);
   if (!user) return loginPathFor(safeNext);
   const profile = await getProfileForUser(user.id);
-  if (!profile?.onboarding_completed_at)
-    return `/onboarding?next=${encodeURIComponent(safeNext)}`;
+  if (!profile?.onboarding_completed_at) {
+    const pending = (await getAccountSetupState())?.eligible;
+    return `/onboarding?next=${encodeURIComponent(pending ? `/account/setup?next=${encodeURIComponent(safeNext)}` : safeNext)}`;
+  }
+  if (!safeNext.startsWith("/account/setup") && (await getAccountSetupState())?.eligible)
+    return `/account/setup?next=${encodeURIComponent(safeNext)}`;
   return safeNext;
 }
 
