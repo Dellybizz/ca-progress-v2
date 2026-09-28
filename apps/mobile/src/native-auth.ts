@@ -71,6 +71,13 @@ export async function startNativeSignIn(provider: "google" | "linkedin_oidc") {
   openExternalSafely(body.authorizationUrl);
 }
 
+export async function passwordNativeSignIn(action: "login" | "register", username: string, password: string) {
+  const result = await jsonRequest("/api/v1/password-auth", { method: "POST", body: JSON.stringify({ action, username, password }) });
+  if (!result.accessToken || !result.applicationUserId) throw new Error("The sign-in response was incomplete.");
+  await secureSet("session", JSON.stringify({ token: result.accessToken, accountId: result.applicationUserId } satisfies StoredSession));
+  return readNativeSession();
+}
+
 export async function completeNativeSignIn(value: string) {
   const url = new URL(value);
   if (!/^ca-progress:\/\/auth\/complete\/?(?:[?#]|$)/.test(value)) throw new Error(`The sign-in callback is invalid (${url.protocol}//${url.host}${url.pathname}).`);

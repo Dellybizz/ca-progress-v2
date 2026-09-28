@@ -468,7 +468,7 @@ export async function revokeCurrentNativeSession() {
   await writeOptionalSessionEvent(db.prepare("INSERT INTO auth_session_events(id,session_id,application_user_id,event_type,detail_json) VALUES(?1,?2,?3,'revoked','{\"clientKind\":\"mobile\"}')").bind(crypto.randomUUID(), row.session_id, row.application_user_id));
 }
 
-async function issueSession(input: {
+export async function issueSession(input: {
   applicationUserId: string;
   identityId: string | null;
   remember: boolean;
@@ -533,7 +533,7 @@ async function currentSessionRow(rawToken: string) {
   const db = getDb();
   const selectMobileSession = () => db.prepare(
     `SELECT s.session_id,s.application_user_id,s.auth_identity_id,s.remember_device,s.expires_at,s.absolute_expires_at,s.last_seen_at,s.client_kind,s.device_label,
-            u.role,u.account_state,i.email,i.phone,i.display_name,i.avatar_url,
+            u.role,u.account_state,i.email,i.phone,COALESCE(i.display_name,pc.username) AS display_name,i.avatar_url,
             COALESCE((
               SELECT group_concat(pe.feature_key)
                 FROM user_subscriptions us
@@ -547,6 +547,7 @@ async function currentSessionRow(rawToken: string) {
        FROM sessions s
        JOIN app_users u ON u.user_id=s.application_user_id
        LEFT JOIN auth_identities i ON i.identity_id=s.auth_identity_id
+       LEFT JOIN password_credentials pc ON pc.user_id=s.application_user_id
       WHERE s.token_hash=?1 AND s.revoked_at IS NULL
         AND s.expires_at > CURRENT_TIMESTAMP
         AND s.absolute_expires_at > CURRENT_TIMESTAMP
@@ -558,7 +559,7 @@ async function currentSessionRow(rawToken: string) {
     if (!isMobileSessionSchemaUnavailable(error)) throw error;
     return db.prepare(
       `SELECT s.session_id,s.application_user_id,s.auth_identity_id,s.remember_device,s.expires_at,s.absolute_expires_at,s.last_seen_at,
-              u.role,u.account_state,i.email,i.phone,i.display_name,i.avatar_url,
+              u.role,u.account_state,i.email,i.phone,COALESCE(i.display_name,pc.username) AS display_name,i.avatar_url,
               COALESCE((
                 SELECT group_concat(pe.feature_key)
                   FROM user_subscriptions us
@@ -572,6 +573,7 @@ async function currentSessionRow(rawToken: string) {
          FROM sessions s
          JOIN app_users u ON u.user_id=s.application_user_id
          LEFT JOIN auth_identities i ON i.identity_id=s.auth_identity_id
+         LEFT JOIN password_credentials pc ON pc.user_id=s.application_user_id
         WHERE s.token_hash=?1 AND s.revoked_at IS NULL
           AND s.expires_at > CURRENT_TIMESTAMP
           AND s.absolute_expires_at > CURRENT_TIMESTAMP

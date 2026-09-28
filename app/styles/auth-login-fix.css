@@ -28,6 +28,13 @@
   max-width: 440px;
 }
 
+.auth-password-form { display: grid; gap: 12px; margin: 12px 0 18px; }
+.auth-password-form h3 { margin: 0; font-size: 1rem; }
+.auth-password-form label { display: grid; gap: 6px; font-weight: 650; }
+.auth-password-form input { width: 100%; min-height: 44px; padding: 10px 12px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); }
+.auth-password-form small { color: var(--color-text-soft); line-height: 1.5; }
+.auth-switch { min-height: 40px; background: none; border: 0; color: var(--color-brand); font: inherit; font-weight: 700; cursor: pointer; }
+
 @media (min-width: 900px) {
   .public-content:has(.auth-v2-layout) {
     padding-left: clamp(28px, 3vw, 56px);

@@ -13,11 +13,13 @@ on:
       - packages/capacitor-file-vault/**
       - packages/mobile-data/**
       - app/api/v1/native-auth/**
+      - app/api/v1/password-auth/**
       - lib/auth/**
       - d1/migrations/0064_mobile_phase15_native_auth.sql
       - d1/migrations/0065_mobile_phase17_sync.sql
       - d1/migrations/0066_mobile_phase19_community.sql
       - d1/migrations/0067_mobile_phase20_native_push.sql
+      - d1/migrations/0068_username_password_accounts.sql
       - app/api/v1/sync/**
       - app/api/v1/community/**
       - app/api/v1/resources/**
