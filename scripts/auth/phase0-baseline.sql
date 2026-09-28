@@ -23,3 +23,8 @@ SELECT 'orphaned_sessions' AS finding, COUNT(*) AS value FROM sessions s LEFT JO
 SELECT 'duplicate_provider_subjects' AS finding, COUNT(*) AS value FROM (SELECT provider,provider_user_id FROM auth_identities GROUP BY provider,provider_user_id HAVING COUNT(*)>1);
 SELECT 'duplicate_app_user_ids' AS finding, COUNT(*) AS value FROM (SELECT user_id FROM app_users GROUP BY user_id HAVING COUNT(*)>1);
 SELECT 'password_migration_applied' AS metric, COUNT(*) AS value FROM _ca_schema_migrations WHERE version='0068';
+SELECT 'password_credentials' AS metric, COUNT(*) AS value FROM password_credentials;
+SELECT 'legacy_provider_subjects' AS metric, COUNT(*) AS value FROM app_users WHERE provider_subject IS NOT NULL;
+SELECT 'users_without_identity_or_password' AS metric, COUNT(*) AS value FROM app_users u WHERE NOT EXISTS (SELECT 1 FROM auth_identities i WHERE i.application_user_id=u.user_id) AND NOT EXISTS (SELECT 1 FROM password_credentials pc WHERE pc.user_id=u.user_id);
+SELECT 'users_with_sessions' AS metric, COUNT(DISTINCT application_user_id) AS value FROM sessions;
+SELECT auth_provider AS provider_cohort, COUNT(*) AS value FROM app_users GROUP BY auth_provider ORDER BY auth_provider;

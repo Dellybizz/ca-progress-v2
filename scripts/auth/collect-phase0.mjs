@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 const source = readFileSync("scripts/auth/phase0-baseline.sql", "utf8")
   .split("\n").filter(line => !line.trim().startsWith("--")).join("\n");
 const statements = source.split(";").map(part => part.trim()).filter(Boolean);
-if (statements.length !== 22 || statements.some(sql => !/^(PRAGMA foreign_key_check|SELECT\b)/i.test(sql))) {
+if (statements.length !== 27 || statements.some(sql => !/^(PRAGMA foreign_key_check|SELECT\b)/i.test(sql))) {
   throw new Error("Unexpected statement in read-only audit");
 }
 
