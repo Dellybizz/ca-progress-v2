@@ -71,8 +71,8 @@ export async function startNativeSignIn(provider: "google" | "linkedin_oidc") {
   openExternalSafely(body.authorizationUrl);
 }
 
-export async function passwordNativeSignIn(action: "login" | "register", username: string, password: string) {
-  const result = await jsonRequest("/api/v1/password-auth", { method: "POST", body: JSON.stringify({ action, username, password }) });
+export async function passwordNativeSignIn(username: string, password: string) {
+  const result = await jsonRequest("/api/v1/password-auth", { method: "POST", body: JSON.stringify({ action: "login", username, password }) });
   if (!result.accessToken || !result.applicationUserId) throw new Error("The sign-in response was incomplete.");
   await secureSet("session", JSON.stringify({ token: result.accessToken, accountId: result.applicationUserId } satisfies StoredSession));
   return readNativeSession();

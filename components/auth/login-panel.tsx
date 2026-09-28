@@ -17,7 +17,6 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
   const [status, setStatus] = useState<Status>(initialError ? { tone: "danger", message: initialError } : null);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [create, setCreate] = useState(false);
   const googleHref = useMemo(() => `/auth/google?next=${encodeURIComponent(next)}&remember=${remember ? "true" : "false"}`, [next, remember]);
   const linkedinHref = useMemo(() => `/auth/linkedin?next=${encodeURIComponent(next)}&remember=${remember ? "true" : "false"}`, [next, remember]);
 
@@ -34,7 +33,7 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
     event.preventDefault();
     setLoading("password"); setStatus(null);
     try {
-      const response = await fetch("/api/v1/password-auth", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: create ? "register" : "login", username, password, remember }) });
+      const response = await fetch("/api/v1/password-auth", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", username, password, remember }) });
       const result = await response.json() as { error?: { message?: string } };
       if (!response.ok) throw new Error(result.error?.message || "Sign-in failed.");
       setPassword(""); router.push(next); router.refresh();
@@ -66,12 +65,11 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
           {status ? <div className={`auth-status auth-status--${status.tone}`} role="status" aria-live="polite">{status.message}</div> : null}
 
           <form onSubmit={event => void submitPassword(event)} className="auth-password-form">
-            <h3>{create ? "Create an account" : "Sign in with username"}</h3>
+            <h3>Sign in with username</h3>
             <label>Username<input autoComplete="username" required minLength={3} maxLength={30} pattern="[A-Za-z][A-Za-z0-9._]{2,29}" value={username} onChange={event => setUsername(event.target.value)} /></label>
-            <label>Password<input type="password" autoComplete={create ? "new-password" : "current-password"} required minLength={create ? 12 : 1} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} /></label>
-            {create && <small>Use at least 12 characters. Password recovery is not available yet; save your password securely.</small>}
-            <Button size="lg" isLoading={loading === "password"} type="submit">{create ? "Create account" : "Sign in"}</Button>
-            <button type="button" className="auth-switch" onClick={() => { setCreate(!create); setStatus(null); setPassword(""); }}>{create ? "Already have an account? Sign in" : "Create a username account"}</button>
+            <label>Password<input type="password" autoComplete="current-password" required minLength={1} maxLength={128} value={password} onChange={event => setPassword(event.target.value)} /></label>
+            <Button size="lg" isLoading={loading === "password"} type="submit">Sign in</Button>
+            <small>New here? Continue with Google or LinkedIn to verify your account, then choose your username and password.</small>
           </form>
 
           <div className="auth-divider"><span>or sign in with</span></div>

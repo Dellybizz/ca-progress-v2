@@ -17,12 +17,12 @@ export async function POST(request: NextRequest) {
   }
   if (Number(request.headers.get("content-length") || 0) > 2048) return json(request, { error: { code: "INVALID_INPUT", message: "The request is too large." } }, 413);
   const input = await request.json().catch(() => null) as { action?: string; username?: string; password?: string; remember?: boolean } | null;
-  if (!input || !["register", "login"].includes(input.action || "") || typeof input.username !== "string" || typeof input.password !== "string") return json(request, { error: { code: "INVALID_INPUT", message: "Enter a username and password." } }, 400);
+  if (!input || input.action !== "login" || typeof input.username !== "string" || typeof input.password !== "string") return json(request, { error: { code: "INVALID_INPUT", message: "Sign in with a username and password, or continue with Google or LinkedIn to create an account." } }, 400);
   try {
-    const result = await passwordAccount(request, { action: input.action as "register" | "login", username: input.username, password: input.password, native, remember: native || input.remember !== false });
-    return json(request, result, input.action === "register" ? 201 : 200);
+    const result = await passwordAccount(request, { username: input.username, password: input.password, native, remember: native || input.remember !== false });
+    return json(request, result);
   } catch (error) {
-    if (error instanceof PasswordAuthError) return json(request, { error: { code: error.code, message: error.message } }, error.code === "RATE_LIMITED" ? 429 : error.code === "USERNAME_TAKEN" ? 409 : 401);
+    if (error instanceof PasswordAuthError) return json(request, { error: { code: error.code, message: error.message } }, error.code === "RATE_LIMITED" ? 429 : error.code === "INVALID_INPUT" ? 400 : 401);
     return json(request, { error: { code: "AUTH_UNAVAILABLE", message: "Sign-in is temporarily unavailable." } }, 503);
   }
 }
