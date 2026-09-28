@@ -54,10 +54,16 @@ def tap(label, bottom=False):
 
 
 def capture(name, expected):
-    wait_for(expected)
+    # Android WebView sometimes exposes only the underlying document in the
+    # accessibility dump while a modal sheet is visible. Save that screenshot
+    # for visual inspection; assert the interactive page views by text.
+    if expected:
+        wait_for(expected)
+    else:
+        nodes()
     (OUTPUT / f"{name}.png").write_bytes(adb("exec-out", "screencap", "-p", binary=True))
     (OUTPUT / f"{name}.xml").write_text((OUTPUT / "last-hierarchy.xml").read_text())
-    print(f"Captured {name}: {expected}", flush=True)
+    print(f"Captured {name}: {expected or 'visual overlay'}", flush=True)
 
 
 def launch(width):
@@ -81,7 +87,7 @@ try:
         tap("Progress", bottom=True)
         capture(f"{width}-progress", "First coverage")
         tap("Explore", bottom=False)
-        capture(f"{width}-explore", "Explore CA Progress")
+        capture(f"{width}-explore", None)
         adb("shell", "input", "keyevent", "4")
     launch(390)
     tap("Focus", bottom=True)
