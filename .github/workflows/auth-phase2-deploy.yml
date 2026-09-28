@@ -49,3 +49,22 @@ jobs:
         run: |
           status=$(curl --silent --output /dev/null --write-out '%{http_code}' https://ca-progress-v2.habeebaasif622.workers.dev/api/v1/account-setup)
           test "$status" = "401"
+
+  android-debug:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run native:build:android:debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ca-progress-auth-phase2-debug-apk-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
