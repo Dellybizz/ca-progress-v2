@@ -92,6 +92,23 @@ html[data-native-platform="android"]{--safe-bottom:max(env(safe-area-inset-botto
   .focus-parity .timer span{font-size:clamp(32px,9vw,46px)}
   .focus-parity .button-row{margin-top:8px}
 }
+
+@media(max-width:760px){
+  .planner-p3 .revision-settings>header{margin:0 0 8px}
+  .planner-p3 .revision-settings .weekday-picker{gap:5px}
+  .planner-p3 .revision-settings .weekday-picker button{min-width:44px;min-height:44px;padding:8px 6px}
+  .planner-p3 .revision-settings .revision-save{display:grid;gap:8px;margin-top:20px}
+  .planner-p3 .revision-settings .revision-save button{min-height:48px}
+  .planner-p3 .revision-settings .revision-save .note{margin:0}
+  .core-screen .dashboard-a1-header h1{font-size:clamp(24px,6.5vw,30px);line-height:1.1;overflow-wrap:anywhere}
+  .core-screen .dashboard-a1-focus__index strong{writing-mode:vertical-rl;transform:rotate(180deg);font-size:20px;line-height:1;letter-spacing:0;align-self:center}
+  .progress-parity .progress-chapter-row{grid-template-columns:28px minmax(0,1fr) auto;align-items:start;gap:8px;padding:12px}
+  .progress-parity .progress-chapter-row>div{min-width:0;overflow-wrap:anywhere}
+  .progress-parity .progress-chapter-row .check{margin-top:8px}
+  .progress-parity .progress-chapter-row .secondary{min-width:54px;min-height:44px;padding:8px 10px}
+  .progress-parity .progress-chapter-row .pill{grid-column:2/-1;justify-self:start}
+}
+@media(min-width:360px) and (max-width:760px){.planner-p3 .revision-duration-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.planner-p3 .revision-duration-grid label:last-child{grid-column:1/-1}}
 @media(max-width:760px){.progress-parity .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.progress-parity .metric-grid article{min-width:0;padding:12px}.progress-parity .metric-grid strong{font-size:23px;line-height:1.2}.progress-parity .metric-grid p{font-size:11px;line-height:1.35}.progress-parity .progress-subject-picker{margin:12px 0}.planner-p3 [id^="planner-"]{scroll-margin-top:calc(96px + var(--safe-top))}.bottom-nav .focus-action{min-height:58px}}
 
 /* Academic P4 detail controls */
