@@ -479,6 +479,13 @@ export async function issueSession(input: {
   setCookie?: boolean;
 }) {
   const db = getDb();
+  let deviceLabel = input.deviceLabel || null;
+  if (!deviceLabel && input.clientKind !== "mobile") {
+    const agent = (await headers()).get("user-agent") || "";
+    const browser = /Edg\//.test(agent) ? "Edge" : /Firefox\//.test(agent) ? "Firefox" : /(?:Chrome|CriOS)\//.test(agent) ? "Chrome" : /Safari\//.test(agent) ? "Safari" : "Web browser";
+    const system = /Windows/.test(agent) ? "Windows" : /Android/.test(agent) ? "Android" : /iPhone|iPad/.test(agent) ? "iOS" : /Macintosh/.test(agent) ? "macOS" : /Linux/.test(agent) ? "Linux" : "Unknown device";
+    deviceLabel = `${browser} on ${system}`;
+  }
   const rawToken = randomToken(32);
   const tokenHash = await sha256Base64Url(rawToken);
   const sessionId = crypto.randomUUID();
@@ -490,7 +497,7 @@ export async function issueSession(input: {
   try {
     await db.batch([
       db.prepare("INSERT INTO sessions(session_id,application_user_id,auth_identity_id,token_hash,remember_device,expires_at,absolute_expires_at,rotated_from_session_id,client_kind,device_label,last_rotated_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,CURRENT_TIMESTAMP)")
-        .bind(sessionId, input.applicationUserId, input.identityId, tokenHash, input.remember ? 1 : 0, expiresAt, absoluteExpiresAt, input.rotatedFromSessionId || null, input.clientKind || "web", input.deviceLabel || null),
+        .bind(sessionId, input.applicationUserId, input.identityId, tokenHash, input.remember ? 1 : 0, expiresAt, absoluteExpiresAt, input.rotatedFromSessionId || null, input.clientKind || "web", deviceLabel),
       db.prepare("INSERT INTO auth_session_events(id,session_id,application_user_id,event_type,detail_json) VALUES(?1,?2,?3,?4,?5)")
         .bind(crypto.randomUUID(), sessionId, input.applicationUserId, input.rotatedFromSessionId ? "rotated" : "issued", JSON.stringify({ clientKind: input.clientKind || "web", rotatedFrom: input.rotatedFromSessionId || null })),
     ]);
