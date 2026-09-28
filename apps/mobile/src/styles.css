@@ -71,6 +71,27 @@ aside nav{overflow-y:auto}.status{border:0;cursor:pointer}.check{padding:0;backg
 @media(max-width:760px){.bottom-nav .focus-action svg{box-sizing:content-box;padding:9px;border-radius:50%;background:var(--color-brand);color:var(--color-brand-contrast);box-shadow:0 3px 10px #1112}.bottom-nav .focus-action.active svg{box-shadow:0 0 0 3px var(--color-brand-soft),0 3px 10px #1112}}
 /* Android WebView can report zero for the gesture inset while the system bar overlays the page. */
 html[data-native-platform="android"]{--safe-bottom:max(env(safe-area-inset-bottom,0px),24px)}
+
+/* Keep the primary actions visible on narrow installed screens. */
+@media(max-width:760px){
+  .planner-p3 .planner-p3-grid{gap:12px}
+  .planner-p3 .planner-p3-card{min-width:0;padding:16px}
+  .planner-p3 .empty.compact{min-height:0;margin:10px 0 0;padding:18px 12px;border-radius:12px}
+  .planner-p3 .empty.compact>span{font-size:20px}
+  .planner-p3 .empty.compact h2{font-size:16px;margin:5px 0}
+  .planner-p3 .empty.compact p{font-size:12px;line-height:1.4;margin:4px 0}
+  .planner-p3 .revision-settings>header{gap:8px;margin:0 0 14px}
+  .planner-p3 .revision-settings>header .primary{min-height:44px}
+  .planner-p3 .revision-settings label{margin-top:10px}
+  .planner-p3 .revision-settings .revision-duration-grid{gap:4px}
+  .focus-parity .focus-options{width:min(100%,520px);margin:8px auto 0;border:1px solid var(--color-border);border-radius:12px;background:var(--color-surface)}
+  .focus-parity .focus-options summary{cursor:pointer;min-height:48px;padding:10px 14px;font-size:13px;font-weight:700;color:var(--color-text)}
+  .focus-parity .focus-options summary span{display:block;margin:3px 0 0;color:var(--color-text-soft);font-weight:400;font-size:11px}
+  .focus-parity .focus-options .focus-context-card{padding:0 14px 14px}
+  .focus-parity .timer{width:min(180px,55vw);height:min(180px,55vw);margin:10px auto 12px}
+  .focus-parity .timer span{font-size:clamp(32px,9vw,46px)}
+  .focus-parity .button-row{margin-top:8px}
+}
 @media(max-width:760px){.progress-parity .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.progress-parity .metric-grid article{min-width:0;padding:12px}.progress-parity .metric-grid strong{font-size:23px;line-height:1.2}.progress-parity .metric-grid p{font-size:11px;line-height:1.35}.progress-parity .progress-subject-picker{margin:12px 0}.planner-p3 [id^="planner-"]{scroll-margin-top:calc(96px + var(--safe-top))}.bottom-nav .focus-action{min-height:58px}}
 
 /* Academic P4 detail controls */
