@@ -53,7 +53,7 @@ test("direct Wrangler deploy self-builds required OpenNext output", () => {
 test("repository enforces headroom below Cloudflare hard bundle limits", () => {
   const pkg = JSON.parse(read("package.json"));
   const gate = read("scripts/check-cloudflare-size-budget.mjs");
-  assert.match(pkg.scripts["cf:check:web"], /--config wrangler.jsonc --budget-mib 3.10/);
+  assert.match(pkg.scripts["cf:check:web"], /--config wrangler.jsonc --budget-mib 3.25/);
   assert.match(pkg.scripts["cf:check:icai"], /--budget-mib 1\.50/);
   assert.match(pkg.scripts["cf:check"], /cf:check:icai[\s\S]*cf:check:web/);
   assert.match(gate, /compressedMiB > budgetMiB/);

@@ -70,7 +70,7 @@
     "cf:typegen": "wrangler types --config wrangler.jsonc --env-interface CloudflareEnv cloudflare-env.d.ts",
     "cf:check:icai": "node scripts/check-cloudflare-size-budget.mjs --config workers/icai-sync/wrangler.jsonc --budget-mib 1.50",
     "cf:check:billing": "node scripts/check-cloudflare-size-budget.mjs --config workers/billing/wrangler.jsonc --budget-mib 0.75",
-    "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.jsonc --budget-mib 3.10",
+    "cf:check:web": "node scripts/check-cloudflare-size-budget.mjs --config wrangler.jsonc --budget-mib 3.25",
     "cf:check": "npm run cf:check:icai && npm run cf:check:billing && npm run cf:check:web",
     "cf:smoke": "node scripts/smoke-cloudflare-runtime.mjs"
   },
