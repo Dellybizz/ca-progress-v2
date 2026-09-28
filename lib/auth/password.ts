@@ -47,6 +47,10 @@ export class PasswordAuthError extends Error {
   constructor(readonly code: "INVALID_INPUT" | "INVALID_CREDENTIALS" | "RATE_LIMITED", message: string) { super(message); }
 }
 
+export class PasswordInfrastructureError extends Error {
+  constructor(readonly code: "AUTH_LIMIT_STORAGE" | "AUTH_CREDENTIAL_STORAGE" | "AUTH_PASSWORD_CRYPTO" | "AUTH_SESSION_STORAGE") { super("Authentication is temporarily unavailable."); }
+}
+
 async function limited(request: Request, username: string) {
   const address = request.headers.get("cf-connecting-ip") || "unknown";
   const digest = hex(new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(address))));
@@ -65,11 +69,22 @@ export async function passwordAccount(request: Request, input: { username: strin
   if (!USERNAME.test(username) || typeof input.password !== "string" || !input.password.length || input.password.length > 128) {
     throw new PasswordAuthError("INVALID_INPUT", "Enter a valid username and password.");
   }
-  await limited(request, username);
+  try { await limited(request, username); }
+  catch (error) {
+    if (error instanceof PasswordAuthError) throw error;
+    throw new PasswordInfrastructureError("AUTH_LIMIT_STORAGE");
+  }
   const database = db();
-  const credential = await database.prepare("SELECT pc.user_id,pc.salt,pc.password_hash,pc.iterations FROM password_credentials pc JOIN app_users u ON u.user_id=pc.user_id WHERE pc.username=?1 AND u.account_state='active' LIMIT 1").bind(username).first<{ user_id: string; salt: string; password_hash: string; iterations: number }>();
-  if (!credential || !await verifyPassword(input.password, credential)) throw new PasswordAuthError("INVALID_CREDENTIALS", "Username or password is incorrect.");
+  let credential: { user_id: string; salt: string; password_hash: string; iterations: number } | null;
+  try { credential = await database.prepare("SELECT pc.user_id,pc.salt,pc.password_hash,pc.iterations FROM password_credentials pc JOIN app_users u ON u.user_id=pc.user_id WHERE pc.username=?1 AND u.account_state='active' LIMIT 1").bind(username).first<{ user_id: string; salt: string; password_hash: string; iterations: number }>(); }
+  catch { throw new PasswordInfrastructureError("AUTH_CREDENTIAL_STORAGE"); }
+  let valid = false;
+  try { valid = await verifyPassword(input.password, credential); }
+  catch { throw new PasswordInfrastructureError("AUTH_PASSWORD_CRYPTO"); }
+  if (!credential || !valid) throw new PasswordAuthError("INVALID_CREDENTIALS", "Username or password is incorrect.");
   const userId = credential.user_id;
-  const session = await issueSession({ applicationUserId: userId, identityId: null, remember: input.remember, clientKind: input.native ? "mobile" : "web", deviceLabel: input.native ? "CA Progress phone" : null, setCookie: !input.native });
+  let session: Awaited<ReturnType<typeof issueSession>>;
+  try { session = await issueSession({ applicationUserId: userId, identityId: null, remember: input.remember, clientKind: input.native ? "mobile" : "web", deviceLabel: input.native ? "CA Progress phone" : null, setCookie: !input.native }); }
+  catch { throw new PasswordInfrastructureError("AUTH_SESSION_STORAGE"); }
   return input.native ? { authenticated: true, applicationUserId: userId, accessToken: session.rawToken, expiresAt: session.expiresAt } : { authenticated: true, applicationUserId: userId };
 }

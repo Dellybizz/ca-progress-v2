@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { assertSameOriginMutation } from "@/lib/auth/csrf";
 import { nativeCorsHeaders, nativeOptions } from "@/lib/auth/native-cors";
-import { PasswordAuthError, passwordAccount } from "@/lib/auth/password";
+import { PasswordAuthError, PasswordInfrastructureError, passwordAccount } from "@/lib/auth/password";
 import { MOBILE_API_HEADERS } from "@/lib/mobile/contract";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     return json(request, result);
   } catch (error) {
     if (error instanceof PasswordAuthError) return json(request, { error: { code: error.code, message: error.message } }, error.code === "RATE_LIMITED" ? 429 : error.code === "INVALID_INPUT" ? 400 : 401);
+    if (error instanceof PasswordInfrastructureError) return json(request, { error: { code: error.code, message: "Sign-in is temporarily unavailable." } }, 503);
     return json(request, { error: { code: "AUTH_UNAVAILABLE", message: "Sign-in is temporarily unavailable." } }, 503);
   }
 }
