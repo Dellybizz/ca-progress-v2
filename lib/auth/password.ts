@@ -24,6 +24,13 @@ async function passwordHash(password: string, salt: Uint8Array, iterations = ITE
   return hex(new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations }, key, 256)));
 }
 
+export async function verifyPassword(password: string, credential: { salt: string; password_hash: string; iterations: number } | null) {
+  if (!password || password.length > 128) return false;
+  const salt = credential?.salt && /^[0-9a-f]{32}$/.test(credential.salt) ? fromHex(credential.salt) : new Uint8Array(16);
+  const hash = await passwordHash(password, salt, credential?.iterations || ITERATIONS);
+  return Boolean(credential && equalHex(hash, credential.password_hash));
+}
+
 export async function createPasswordHash(password: string) {
   if (password.length < 12 || password.length > 128) throw new PasswordAuthError("INVALID_INPUT", "Use a password of 12–128 characters.");
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -61,9 +68,7 @@ export async function passwordAccount(request: Request, input: { username: strin
   await limited(request, username);
   const database = db();
   const credential = await database.prepare("SELECT pc.user_id,pc.salt,pc.password_hash,pc.iterations FROM password_credentials pc JOIN app_users u ON u.user_id=pc.user_id WHERE pc.username=?1 AND u.account_state='active' LIMIT 1").bind(username).first<{ user_id: string; salt: string; password_hash: string; iterations: number }>();
-  const salt = credential?.salt && /^[0-9a-f]{32}$/.test(credential.salt) ? fromHex(credential.salt) : new Uint8Array(16);
-  const hash = await passwordHash(input.password, salt, credential?.iterations || ITERATIONS);
-  if (!credential || !equalHex(hash, credential.password_hash)) throw new PasswordAuthError("INVALID_CREDENTIALS", "Username or password is incorrect.");
+  if (!credential || !await verifyPassword(input.password, credential)) throw new PasswordAuthError("INVALID_CREDENTIALS", "Username or password is incorrect.");
   const userId = credential.user_id;
   const session = await issueSession({ applicationUserId: userId, identityId: null, remember: input.remember, clientKind: input.native ? "mobile" : "web", deviceLabel: input.native ? "CA Progress phone" : null, setCookie: !input.native });
   return input.native ? { authenticated: true, applicationUserId: userId, accessToken: session.rawToken, expiresAt: session.expiresAt } : { authenticated: true, applicationUserId: userId };

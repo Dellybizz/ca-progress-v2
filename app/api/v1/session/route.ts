@@ -3,6 +3,7 @@ import { assertSameOriginMutation } from "@/lib/auth/csrf";
 import { getCloudflareApplicationSession, listCloudflareSessions, revokeOtherCloudflareSessions, rotateCloudflareSession, signOutAllCloudflareSessions } from "@/lib/auth/cloudflare";
 import { MOBILE_API_HEADERS } from "@/lib/mobile/contract";
 import { nativeCorsHeaders, nativeOptions } from "@/lib/auth/native-cors";
+import { authenticatedPassword, AccountSecurityError } from "@/lib/auth/account-security";
 
 export const dynamic = "force-dynamic";
 const json = (request: NextRequest, data: unknown, status = 200) => NextResponse.json(data, { status, headers: { ...MOBILE_API_HEADERS, ...nativeCorsHeaders(request) } });
@@ -24,13 +25,14 @@ export async function POST(request: NextRequest) {
   if (!request.headers.get("authorization")?.startsWith("Bearer ")) {
     try { assertSameOriginMutation(request); } catch { return json(request, { error: { code: "ORIGIN_REJECTED", message: "Cross-site session request rejected.", retryable: false } }, 403); }
   }
-  const body = await request.json().catch(() => null) as { action?: string } | null;
+  const body = await request.json().catch(() => null) as { action?: string; currentPassword?: string } | null;
   try {
     if (body?.action === "rotate") { await rotateCloudflareSession(); return json(request, { ok: true, rotated: true }); }
-    if (body?.action === "revoke_others") { await revokeOtherCloudflareSessions(); return json(request, { ok: true, revokedOthers: true }); }
-    if (body?.action === "revoke_all") { await signOutAllCloudflareSessions(); return json(request, { ok: true, signedOut: true }); }
+    if (body?.action === "revoke_others") { await authenticatedPassword(body.currentPassword || ""); await revokeOtherCloudflareSessions(); return json(request, { ok: true, revokedOthers: true }); }
+    if (body?.action === "revoke_all") { await authenticatedPassword(body.currentPassword || ""); await signOutAllCloudflareSessions(); return json(request, { ok: true, signedOut: true }); }
     return json(request, { error: { code: "SESSION_ACTION_UNSUPPORTED", message: "Unsupported session action.", retryable: false } }, 400);
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountSecurityError) return json(request, { error: { code: "PASSWORD_REQUIRED", message: error.message } }, error.status);
     return json(request, { error: { code: "SESSION_ACTION_FAILED", message: "Session action failed.", retryable: false } }, 401);
   }
 }
