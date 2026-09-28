@@ -33,9 +33,7 @@ jobs:
           npx wrangler d1 time-travel info ca-progress-v2-phase4-shadow --config=wrangler.jsonc --json > deployment-evidence/auth-phase0-bookmark.json
           grep -q 'bookmark' deployment-evidence/auth-phase0-bookmark.json
       - name: Capture read-only counts and integrity findings
-        run: |
-          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --file=scripts/auth/phase0-baseline.sql > deployment-evidence/auth-phase0-counts.json
-          test -s deployment-evidence/auth-phase0-counts.json
+        run: node scripts/auth/collect-phase0.mjs
       - name: Verify complete and consistent baseline
         run: node scripts/auth/verify-phase0.mjs deployment-evidence/auth-phase0-bookmark.json deployment-evidence/auth-phase0-counts.json
       - name: Retain recovery evidence
