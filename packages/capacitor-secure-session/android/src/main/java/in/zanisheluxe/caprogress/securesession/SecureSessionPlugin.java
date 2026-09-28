@@ -55,7 +55,7 @@ public class SecureSessionPlugin extends Plugin {
             String[] parts = payload.split("\\.", 2); Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, Base64.decode(parts[0], Base64.NO_WRAP)));
             result.put("value", new String(cipher.doFinal(Base64.decode(parts[1], Base64.NO_WRAP)), StandardCharsets.UTF_8)); call.resolve(result);
-        } catch (Exception error) { preferences().edit().remove(storageKey).apply(); call.reject("Secure session could not be read.", error); }
+        } catch (Exception error) { preferences().edit().remove(storageKey).apply(); result.put("value", JSObject.NULL); call.resolve(result); }
     }
 
     @PluginMethod public void remove(PluginCall call) {
