@@ -125,7 +125,7 @@ aside nav{overflow-y:auto}.status{border:0;cursor:pointer}.check{padding:0;backg
 .mobile-context-row{display:none}
 @media(max-width:760px){
   .app-shell{--mobile-bar-height:calc(108px + var(--safe-top))}
-  .app-shell .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:48px 44px;align-content:end;column-gap:4px;height:var(--mobile-bar-height);padding:calc(6px + var(--safe-top)) 12px 4px}
+  .app-shell .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:48px 44px;align-content:end;column-gap:4px;width:100vw;max-width:100vw;height:var(--mobile-bar-height);padding:calc(6px + var(--safe-top)) 12px 4px}
   .native-topbar-actions .native-explore-trigger{display:none}
   .mobile-context-row{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;min-width:0;border-top:1px solid var(--color-border)}
   .mobile-context-row button{display:flex;align-items:center;gap:5px;min-width:0;min-height:44px;border:0;background:transparent;color:var(--color-text-soft);font-size:11px}
@@ -136,4 +136,8 @@ aside nav{overflow-y:auto}.status{border:0;cursor:pointer}.check{padding:0;backg
   .mobile-explore-trigger{font-weight:700;color:var(--color-brand-strong)!important}
   .native-status-line{top:0}
   .study-destinations{grid-template-columns:1fr}.study-destinations button{min-height:52px}
+  .today-plan-layout{grid-template-columns:minmax(0,1fr)}
+  .today-plan-list-card,.today-plan-list-card>header{min-width:0}
+  .today-plan-list-card>header .core-filters{min-width:0;max-width:100%;overflow-x:auto}
 }
+@media(max-width:380px){.today-plan-list-card>header{flex-wrap:wrap}.today-plan-list-card>header .core-filters{width:100%;margin:0}}

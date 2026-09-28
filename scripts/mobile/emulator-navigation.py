@@ -43,6 +43,7 @@ def wait_for(label, timeout=25):
             return find(label)
         except (AssertionError, ET.ParseError, subprocess.CalledProcessError):
             time.sleep(1)
+    (OUTPUT / f"failure-{re.sub('[^a-z0-9]+', '-', label.lower()).strip('-')}.png").write_bytes(adb("exec-out", "screencap", "-p", binary=True))
     raise AssertionError(f"'{label}' did not appear after app launch")
 
 

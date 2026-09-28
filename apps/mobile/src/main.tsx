@@ -263,9 +263,11 @@ function AppShell() {
     addEventListener("offline", disconnected);
     const openSearch=(event:KeyboardEvent)=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();surfaceRef.current="search";setSearchOpen(true);setNotificationsOpen(false);setAccountOpen(false);}};
     addEventListener("keydown",openSearch);
-    const initialHeight=window.visualViewport?.height||window.innerHeight;
-    const trackKeyboard=()=>{document.documentElement.dataset.keyboard=(window.visualViewport?.height||window.innerHeight)<initialHeight-120?"open":"closed";};
+    let expandedHeight=window.visualViewport?.height||window.innerHeight;
+    const trackKeyboard=()=>{const height=window.visualViewport?.height||window.innerHeight;const active=document.activeElement;const editing=active instanceof HTMLElement&&(active.matches("input,textarea,[contenteditable='true']"));if(!editing)expandedHeight=Math.max(expandedHeight,height);document.documentElement.dataset.keyboard=editing&&height<expandedHeight-120?"open":"closed";};
     window.visualViewport?.addEventListener("resize",trackKeyboard);
+    const afterBlur=()=>requestAnimationFrame(trackKeyboard);
+    document.addEventListener("focusin",trackKeyboard);document.addEventListener("focusout",afterBlur);
     const removeNative = installNativeRuntime((route,url) => {const destination=destinationFromWebsiteLink(url,routeFromDeepLink);navigate(destination?.route??route,destination?.context);}, resume, (url) => {
       if (callbackStarted.current) return;
       callbackStarted.current = true;
@@ -300,7 +302,7 @@ function AppShell() {
     });
     // Network compatibility checks begin after the bundled shell has painted.
     requestAnimationFrame(() => document.documentElement.dataset.shellReady = "true");
-    return () => { removeEventListener("popstate", changed); removeEventListener("online", connected); removeEventListener("offline", disconnected);removeEventListener("keydown",openSearch);window.visualViewport?.removeEventListener("resize",trackKeyboard); removeNative(); };
+    return () => { removeEventListener("popstate", changed); removeEventListener("online", connected); removeEventListener("offline", disconnected);removeEventListener("keydown",openSearch);window.visualViewport?.removeEventListener("resize",trackKeyboard);document.removeEventListener("focusin",trackKeyboard);document.removeEventListener("focusout",afterBlur); removeNative(); };
   }, []);
 
   useEffect(() => { if(fixture||!selected||(account.id!=="local-preview"&&!authenticated))return; let active=true;let remove:()=>void=()=>{};void openAccountRepository(account,authenticated).then(async(value)=>{if(!active||!value)return;setRepository(value);const snapshot=await value.readWorkspace();if(!active)return;setWorkspace(snapshot);setDashboard(snapshot.dashboard);remove=value.subscribe(()=>{void value.readWorkspace().then(next=>{if(!active)return;setWorkspace(next);setDashboard(next.dashboard);});});}).catch(()=>setRepository(null));return()=>{active=false;remove();}; }, [selected,account,authenticated]);
