@@ -31,3 +31,9 @@ Status: **partial implementation; device/site parity not certified**. Date: 28 S
 - The browser available here cannot connect to the local bundled shell, and this workspace has no Android emulator, attached device or iOS simulator. No visual/device results have been inferred from compilation. Same-account paired site/native captures and installed tap, large-text, safe-area and back/keyboard checks are still required to close the phase.
 
 This partial Phase 2 build is for testing. It does not certify site fidelity, offline completeness or store readiness.
+
+## Automated installed-app evidence job
+
+The push workflow now builds a separate **disposable emulator fixture** and installs it in an Android API 35 emulator. It captures Dashboard, Today, Study, Progress and Explore at 320, 360, 390 and 430 CSS px, plus Focus, Plan, subject/chapter navigation and a large-text Study capture. The job uploads PNGs and accessibility hierarchies; failure to find an expected control fails the job. The fixture uses invented study records, makes no authenticated API calls and is eliminated from the normal bundled APK by a compile-time flag. Its APK is not published. The real Android debug artifact still builds independently without this flag.
+
+This job checks an installed shell with deterministic data. It cannot replace same-account website/native captures, signed-in data checks, Android hardware safe areas, iOS interaction tests, or offline mutation/reconnection proof. Its first run and any findings must be inspected before treating its screen evidence as passed.

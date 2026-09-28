@@ -18,6 +18,7 @@ await build({
   platform: "browser",
   target: ["chrome120", "safari17"],
   jsx: "automatic",
+  define: { __CA_EMULATOR_FIXTURE__: process.env.CA_MOBILE_EMULATOR_FIXTURE === "1" ? "true" : "false" },
   legalComments: "none",
   loader: { ".css": "css" },
 });

@@ -18,9 +18,13 @@ import { Icon } from "../../../components/ui/icon";
 import { accountNavigation, shellNavigation, type ShellNavItem } from "../../../components/shell/navigation-contract";
 import { activeStudentTab, studentTabs } from "./student-navigation";
 import { destinationFromWebsiteLink } from "./deep-link-destination";
+import { emulatorWorkspace } from "./emulator-fixture";
 import "../../../app/styles/tokens.css";
 import "../../../app/styles/dashboard-a1.css";
 import "./styles.css";
+
+declare const __CA_EMULATOR_FIXTURE__: boolean;
+const fixture = __CA_EMULATOR_FIXTURE__ ? emulatorWorkspace : null;
 
 const nativePaths: Record<string, NativeRoute> = {
   "/dashboard": "dashboard", "/planner/today": "today", "/study": "focus",
@@ -243,10 +247,10 @@ function AppShell() {
   const [authenticated, setAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
   const callbackStarted = useRef(false);
-  const [selected, setSelected] = useState(hasRetainedLocalAccount);
+  const [selected, setSelected] = useState(()=>Boolean(fixture)||hasRetainedLocalAccount());
   const [repository, setRepository] = useState<LocalAccountRepository|null>(null);
   const [dashboard, setDashboard] = useState<LocalDashboard>(defaultDashboard);
-  const [workspace,setWorkspace]=useState<LocalWorkspace>(defaultWorkspace);
+  const [workspace,setWorkspace]=useState<LocalWorkspace>(()=>fixture??defaultWorkspace);
   const applySession = (value: NativeSessionSnapshot | null) => { if (!value?.authenticated) return; if (!value.user?.applicationUserId) throw new Error("The signed-in account did not provide a user ID."); const next = { id: value.user.applicationUserId, displayName: value.user?.displayName || value.user?.email || "CA Progress student", subtitle: value.user?.email || "Cloud account" }; if (readLocalAccount().id !== next.id) { setRepository(null); setWorkspace(defaultWorkspace); setDashboard(defaultDashboard); } setAccount(next); retainLocalAccount(next); setAuthenticated(true); setSelected(true); };
 
   useEffect(() => {
@@ -275,7 +279,7 @@ function AppShell() {
       });
     }, () => { if(reviewConflictsRef.current){reviewConflictsRef.current=false;setReviewConflicts(false);return true;} if(onlineDestinationRef.current){onlineDestinationRef.current=false;setOnlineDestination(null);return true;} if(surfaceRef.current){surfaceRef.current=null;setSearchOpen(false);setNotificationsOpen(false);setAccountOpen(false);return true;} if (!moreOpenRef.current) return false; moreOpenRef.current = false; setMoreOpen(false); return true; });
     let savedSessionAccountId: string | null = null;
-    void readOfflineSessionAccountId().then((id) => {
+    if(!fixture)void readOfflineSessionAccountId().then((id) => {
       savedSessionAccountId = id;
       if (!callbackStarted.current && id && id === readLocalAccount().id && hasRetainedLocalAccount()) { setAuthenticated(true); setSelected(true); }
       return readNativeSession();
@@ -299,7 +303,7 @@ function AppShell() {
     return () => { removeEventListener("popstate", changed); removeEventListener("online", connected); removeEventListener("offline", disconnected);removeEventListener("keydown",openSearch);window.visualViewport?.removeEventListener("resize",trackKeyboard); removeNative(); };
   }, []);
 
-  useEffect(() => { if(!selected||(account.id!=="local-preview"&&!authenticated))return; let active=true;let remove:()=>void=()=>{};void openAccountRepository(account,authenticated).then(async(value)=>{if(!active||!value)return;setRepository(value);const snapshot=await value.readWorkspace();if(!active)return;setWorkspace(snapshot);setDashboard(snapshot.dashboard);remove=value.subscribe(()=>{void value.readWorkspace().then(next=>{if(!active)return;setWorkspace(next);setDashboard(next.dashboard);});});}).catch(()=>setRepository(null));return()=>{active=false;remove();}; }, [selected,account,authenticated]);
+  useEffect(() => { if(fixture||!selected||(account.id!=="local-preview"&&!authenticated))return; let active=true;let remove:()=>void=()=>{};void openAccountRepository(account,authenticated).then(async(value)=>{if(!active||!value)return;setRepository(value);const snapshot=await value.readWorkspace();if(!active)return;setWorkspace(snapshot);setDashboard(snapshot.dashboard);remove=value.subscribe(()=>{void value.readWorkspace().then(next=>{if(!active)return;setWorkspace(next);setDashboard(next.dashboard);});});}).catch(()=>setRepository(null));return()=>{active=false;remove();}; }, [selected,account,authenticated]);
 
   useEffect(()=>{if(!authenticated||!repository)return;const coordinator=createSyncCoordinator({accountId:account.id,transport:nativeApiRequest,onState:setSyncState});const sync=()=>{void coordinator.synchronize().then(async()=>{const current=await repository.readWorkspace();if(current.academic.contextKey)await flushLocalTestAttempts(account.id,current.academic.contextKey,body=>nativeApiRequest("/api/v1/test-archive",{method:"POST",body:JSON.stringify(body)}) as Promise<{attempt:{id:string;attemptNumber?:number}}>);setSyncError("");}).catch((cause:unknown)=>setSyncError(cause instanceof Error ? cause.message : "The update failed. Tap Update paused to retry."));};window.addEventListener("ca-sync",sync);window.addEventListener("ca-realtime-invalidation",sync);const periodic=window.setInterval(sync,15*60*1000);sync();return()=>{coordinator.stop();window.clearInterval(periodic);window.removeEventListener("ca-sync",sync);window.removeEventListener("ca-realtime-invalidation",sync);};},[authenticated,repository,account.id]);
   useEffect(()=>{if(!authenticated||!repository)return;const background=createBoundedBackgroundRecovery({accountId:account.id,transport:nativeApiRequest,onChanged:()=>window.dispatchEvent(new Event("ca-local-data"))});const recover=()=>void background.recover();window.addEventListener("ca-background-recover",recover);void registerNativePush(account.id,nativeApiRequest);return()=>{background.stop();window.removeEventListener("ca-background-recover",recover);};},[authenticated,repository,account.id]);
