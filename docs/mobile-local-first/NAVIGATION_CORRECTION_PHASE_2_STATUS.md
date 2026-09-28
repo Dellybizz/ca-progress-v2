@@ -24,11 +24,11 @@ Status: **partial implementation; device/site parity not certified**. Date: 28 S
 
 ## Remaining Phase 2 acceptance
 
-- No same-account website/native paired captures at 320, 360, 390 and 430px; no Android/iOS installed-device tap/large-text/screen-reader proof. The current generated concept image is not a device screenshot.
+- No same-account website/native paired captures at 320, 360, 390 and 430px. Android installed-app fixture captures now cover those widths and a large-text Study view, but signed-in Android/iOS device, screen-reader and offline data proof remain outstanding.
 - Native subject/chapter history remains hash/state based. The website subject slug and chapter ID can now enter through canonical native links, but direct hash URLs are still not equivalent website URLs. Return and scroll restoration need device proof; unmatched resources and notes need a dedicated missing-record state after the initial sync.
 - Some website navigation entries remain explicit handoffs or narrower native screens, notably ICAI updates/resources and full Chapter Hub. The existing Phase 5 release blockers and offline history/sync gaps remain open.
-- Explore and the header are implemented but their visual fit, tap targets, safe areas and keyboard overlap must be checked on actual narrow devices before declaring the shell complete.
-- The browser available here cannot connect to the local bundled shell, and this workspace has no Android emulator, attached device or iOS simulator. No visual/device results have been inferred from compilation. Same-account paired site/native captures and installed tap, large-text, safe-area and back/keyboard checks are still required to close the phase.
+- Explore and the header fit in the Android emulator captures. Hardware safe areas, screen-reader behavior and real keyboard interaction still need installed-device checks.
+- The GitHub Actions Android emulator and iOS simulator now build and run the available automated checks. The Android fixture is deterministic, so same-account paired site/native captures, signed-in taps, offline mutations and reconnection still require authenticated test access to close the phase.
 
 This partial Phase 2 build is for testing. It does not certify site fidelity, offline completeness or store readiness.
 
@@ -42,4 +42,6 @@ The first installed run (`36360715532`) captured the 320px Dashboard and Today. 
 
 The next run (`36361466799`) captured 320px Dashboard, Today, Study and Progress successfully. Visual inspection showed the Today bar and card now fit. Explore opened visibly in the failure screenshot, but Android's UIAutomator hierarchy exposed the underlying Progress page while the modal was open, so its text assertion failed. The capture script now treats modal sheets as screenshot evidence requiring visual inspection.
 
-The third run (`36362023750`) passed the full Android fixture matrix and uploaded 25 installed-app screen captures plus accessibility hierarchies. Inspection of those captures found that the Android gesture indicator crossed the bottom navigation labels when WebView returned a zero CSS safe-area inset. A native Android minimum bottom inset was added; the follow-up matrix must pass before this visual fix is accepted. This fixture evidence does not establish signed-in data, website parity or offline sync behavior.
+The third run (`36362023750`) passed the full Android fixture matrix and uploaded 25 installed-app screen captures plus accessibility hierarchies. Inspection found that the Android gesture indicator crossed the bottom navigation labels when WebView returned a zero CSS safe-area inset. A native Android minimum bottom inset was added.
+
+The fourth run (`36362721215`, commit `9db4ade`) passed verification, the Android debug APK build, the Android emulator matrix and the iOS simulator build. Inspection of 390px Study and 320px large-text Study captures confirmed the bottom labels clear the gesture indicator. This fixture evidence does not establish signed-in data, website parity or offline sync behavior.
