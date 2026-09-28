@@ -63,8 +63,10 @@ tap("Continue as guest on this device")
 wait_for("Guest · device only")
 capture("guest-dashboard")
 tap("Plan", bottom=True)
-wait_for("Add a study task")
-tap("Add a study task")
+# WebView placeholders are drawn but omitted from Android's accessibility tree.
+# Locate the visible submit button and focus the input immediately above it.
+button_x, button_y = wait_for("Add task")
+adb("shell", "input", "tap", str(button_x), str(button_y - 55))
 adb("shell", "input", "text", "GuestOfflineTask")
 tap("Add task")
 wait_for("GuestOfflineTask")
