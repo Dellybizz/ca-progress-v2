@@ -60,7 +60,7 @@ export function LoginPanel({ next, initialError }: { next: string; initialError?
           <div className="auth-v2-card__heading">
             <span className="eyebrow">Welcome</span>
             <h2>Continue to CA Progress</h2>
-            <p>Choose Google or LinkedIn to sign in to your synced account.</p>
+            <p>Use your username, Google, or LinkedIn to access your synced account.</p>
           </div>
 
           {status ? <div className={`auth-status auth-status--${status.tone}`} role="status" aria-live="polite">{status.message}</div> : null}
