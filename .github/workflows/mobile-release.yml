@@ -112,7 +112,10 @@ jobs:
           target: google_apis
           arch: x86_64
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
-          script: python3 scripts/mobile/emulator-navigation.py
+          script: |
+            python3 scripts/mobile/emulator-navigation.py
+            npm run native:build:android:debug
+            python3 scripts/mobile/emulator-guest.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

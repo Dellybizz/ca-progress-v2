@@ -2,6 +2,14 @@ export type LocalAccount = { id: string; displayName: string; subtitle: string }
 
 const ACCOUNT_KEY = "ca.mobile.shell.account.v1";
 const DEFAULT_ACCOUNT: LocalAccount = { id: "local-preview", displayName: "Your study space", subtitle: "Local preview · sign in when ready" };
+export const isLocalGuest = (id: string) => /^guest-local:[0-9a-f-]{36}$/i.test(id);
+export function createLocalGuest(): LocalAccount {
+  const saved = readLocalAccount();
+  if (isLocalGuest(saved.id)) return saved;
+  const account = { id: `guest-local:${crypto.randomUUID()}`, displayName: "Guest", subtitle: "Saved on this device only" };
+  retainLocalAccount(account);
+  return account;
+}
 
 export function readLocalAccount(): LocalAccount {
   try {
