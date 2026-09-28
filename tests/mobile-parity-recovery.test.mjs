@@ -26,7 +26,8 @@ test("an untouched catalog chapter can become local progress without a prior ser
 });
 
 test("Syllabus drills from subjects into saved chapters",()=>{
-  assert.ok(main.includes("const[selectedSubject,setSelectedSubject]"));
+  assert.ok(main.includes("history.state?.subjectId"));
+  assert.ok(main.includes('navigate("syllabus",{subjectId:item.id})'));
   assert.ok(main.includes("All subjects"));
   assert.ok(main.includes("syllabus-chapter-row"));
   assert.ok(main.includes("chapters.length"));
