@@ -12,6 +12,7 @@ function fixture(){
  sql.exec(migration.match(/CREATE TABLE IF NOT EXISTS razorpay_subscriptions \([\s\S]*?\n\);/)[0]);
  sql.exec('ALTER TABLE razorpay_subscriptions ADD COLUMN campaign_claim_id TEXT;ALTER TABLE razorpay_subscriptions ADD COLUMN provider_offer_id TEXT;');
  sql.exec(readFileSync(new URL('../d1/migrations/0070_payment_system_p2_checkout.sql',import.meta.url),'utf8'));
+ sql.exec(readFileSync(new URL('../d1/migrations/0071_payment_system_p3_renewals.sql',import.meta.url),'utf8'));
  let failBatch=false;
  const db={prepare(query){return {values:[],bind(...values){this.values=values;return this;},async first(){return sql.prepare(query).get(...this.values)??null;},async run(){return {success:true,meta:{changes:Number(sql.prepare(query).run(...this.values).changes)}};}};},async batch(statements){if(failBatch){failBatch=false;throw new Error('D1 interrupted');}sql.exec('BEGIN');try{const result=[];for(const statement of statements)result.push(await statement.run());sql.exec('COMMIT');return result;}catch(error){sql.exec('ROLLBACK');throw error;}}};
  const provider=new Map();let posts=0,releaseCount=0,mode='ok';

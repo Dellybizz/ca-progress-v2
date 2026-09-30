@@ -31,7 +31,10 @@ test("Phase 3 creates intro subscriptions on the stable recurring plan with an O
 
 test("Phase 3 reconciles the discounted first cycle without treating it as a plan mismatch",()=>{
   const worker=read("workers/billing/p3.ts");
-  assert.match(worker,/offerBound&&previousPaid<introCycles\?Number\(local\.initial_price_subunits/);
+  assert.match(worker,/renewalEvidence/);
+  const engine=read("lib/billing/renewal-engine.mjs");
+  assert.match(engine,/number<=discountCycles\?first:regular/);
+  assert.match(engine,/invoice\.cycleNumber/);
   assert.match(worker,/provider_offer_mismatch/);
   assert.match(worker,/offer_id:value\.offer_id/);
 });

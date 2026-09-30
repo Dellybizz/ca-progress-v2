@@ -1,3 +1,4 @@
+import {mandateSchedule} from "../../lib/billing/mandate-schedule.mjs";
 import previous from "./payment-p1";
 import {ensurePlan,resolveCommercial,requireIntroOffer} from "./p3";
 import {reserveCampaign} from "./p4-final";
@@ -19,8 +20,8 @@ function dependencies(env:Env,userId:string):Dependencies{
       const mapping=await ensurePlan(env,terms,'recurring',terms.recurringPrice);
       const campaign=input.paymentMethod==='upi'&&terms.introPrice===null?await reserveCampaign(db,{userId,planId:input.planId,requestId:input.requestId,policyVersionId:terms.policyVersionId,base:terms.recurringPrice,promoCode:input.promoCode}):null;
       const offerId=campaign?.campaign.providerOfferId??requireIntroOffer(terms);
-      const totalCount=Math.max(1,Math.floor((terms.billingCycle==='monthly'?1200:100)/terms.durationValue));
-      const contract={...terms,providerPlanId:mapping.providerPlanId,initialAmount:campaign?.final??terms.introPrice??terms.recurringPrice,totalCount,providerOfferId:offerId,campaignClaimId:campaign?.claimId??null,promoCode:campaign?.campaign.promoCode??null,expectedCampaignPrice:campaign?.final??null};
+      const schedule=mandateSchedule(terms),totalCount=schedule.totalCount;
+      const contract={...terms,paymentMethod:input.paymentMethod,mandateScheduleVersion:schedule.scheduleVersion,providerPlanId:mapping.providerPlanId,initialAmount:campaign?.final??terms.introPrice??terms.recurringPrice,totalCount,providerOfferId:offerId,campaignClaimId:campaign?.claimId??null,promoCode:campaign?.campaign.promoCode??null,expectedCampaignPrice:campaign?.final??null};
       const payload:Record<string,unknown>={plan_id:mapping.providerPlanId,total_count:totalCount,quantity:1,customer_notify:true,notes:{ca_progress_user_id:userId,ca_progress_plan_id:terms.planId,ca_progress_policy_version_id:terms.policyVersionId,checkout_key:input.requestId,...(campaign?{ca_progress_campaign_version_id:campaign.campaign.id}:{})}};
       if(offerId)payload.offer_id=offerId;
       const paid=await db.prepare("SELECT ends_at FROM user_subscriptions WHERE user_id=?1 AND ends_at>?2 AND status IN ('active','cancelled','paused') ORDER BY ends_at DESC LIMIT 1").bind(userId,new Date().toISOString()).first<{ends_at:string}>();
@@ -37,8 +38,8 @@ function dependencies(env:Env,userId:string):Dependencies{
     async releaseCampaign(user,key){await db.prepare("UPDATE billing_campaign_claims SET state='failed',failed_at=?1 WHERE user_id=?2 AND claim_key=?3 AND state='reserved' AND provider_subscription_id IS NULL").bind(new Date().toISOString(),user,`checkout_${user}_${key}`.slice(0,160)).run();},
     async reconcile(subscriptionId,user){
       const response=await previous.fetch(new Request('https://billing.internal/subscription-action',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':user,'content-type':'application/json'},body:JSON.stringify({subscriptionId,action:'sync',requestId:crypto.randomUUID()})}),env);
-      const result=await response.json() as {reconciliation?:{mismatch?:boolean}};
-      if(!response.ok||result.reconciliation?.mismatch)throw new CheckoutError('Payment is awaiting verified reconciliation.','checkout_reconciliation_pending',503);
+      const result=await response.json() as {reconciliation?:{mismatch?:boolean;pending?:boolean}};
+      if(!response.ok||result.reconciliation?.mismatch||result.reconciliation?.pending)throw new CheckoutError('Payment is awaiting verified reconciliation.','checkout_reconciliation_pending',503);
     },
   };
 }

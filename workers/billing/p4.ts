@@ -117,7 +117,7 @@ async function adminAction(request:Request,env:Env){
 async function scheduleReconciliation(env:Env,triggerKind:"scheduled"|"admin"="scheduled"){
   const db=database(env),runId=uuid(),started=now();
   const rows=(await db.prepare(`SELECT * FROM razorpay_subscriptions WHERE status IN ('created','authenticated','active','pending','halted','paused')
-    AND (last_reconciled_at IS NULL OR last_reconciled_at<datetime('now','-2 hours') OR financial_state IN ('mismatch','failed','disputed'))
+    AND (last_reconciled_at IS NULL OR datetime(last_reconciled_at)<datetime('now','-2 hours') OR financial_state IN ('mismatch','failed','disputed'))
     ORDER BY CASE financial_state WHEN 'mismatch' THEN 0 WHEN 'disputed' THEN 1 WHEN 'failed' THEN 2 ELSE 3 END,COALESCE(last_reconciled_at,created_at) ASC LIMIT 75`).all<Row>()).results??[];
   await db.prepare("INSERT INTO billing_reconciliation_runs(id,trigger_kind,state,scanned_count,started_at) VALUES(?1,?2,'running',?3,?4)").bind(runId,triggerKind,rows.length,started).run();
   let queued=0,errors=0;
