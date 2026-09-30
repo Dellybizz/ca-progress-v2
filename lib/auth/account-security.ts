@@ -40,11 +40,14 @@ export async function changeAccountCredentials(input: { currentPassword: string;
     const username = normalizeAccountUsername(input.username);
     if (!validAccountUsername(username)) throw new AccountSecurityError("Use a valid username of 3–30 characters.", 400);
     try {
-      const result = await database.prepare(`UPDATE password_credentials SET username=?1 WHERE user_id=?2
-        AND EXISTS(SELECT 1 FROM sessions s WHERE s.session_id=?3 AND s.application_user_id=password_credentials.user_id
-        AND s.revoked_at IS NULL AND s.expires_at>CURRENT_TIMESTAMP AND s.absolute_expires_at>CURRENT_TIMESTAMP)`)
-        .bind(username, session.applicationUserId, session.sessionId).run();
-      if (result.meta?.changes !== 1) throw new AccountSecurityError("Sign in again to change your username.", 401);
+      // D1 meta.changes is backed by sqlite3_total_changes(), so it can include trigger work.
+      // RETURNING proves that this credential row matched the still-active current session.
+      const updated = await database.prepare(`UPDATE password_credentials SET username=?1,updated_at=CURRENT_TIMESTAMP WHERE user_id=?2
+        AND EXISTS(SELECT 1 FROM sessions s WHERE s.session_id=?3 AND s.application_user_id=?2
+        AND s.revoked_at IS NULL AND s.expires_at>CURRENT_TIMESTAMP AND s.absolute_expires_at>CURRENT_TIMESTAMP)
+        RETURNING user_id`)
+        .bind(username, session.applicationUserId, session.sessionId).first<{ user_id: string }>();
+      if (updated?.user_id !== session.applicationUserId) throw new AccountSecurityError("Sign in again to change your username.", 401);
     } catch (error) {
       if (/UNIQUE constraint failed/i.test(String(error))) throw new AccountSecurityError("This username is unavailable.", 409);
       throw error;
@@ -52,11 +55,12 @@ export async function changeAccountCredentials(input: { currentPassword: string;
     return { username, applicationUserId: session.applicationUserId };
   }
   const credential = await createPasswordHash(input.newPassword!);
-  const result = await database.prepare(`UPDATE password_credentials SET salt=?1,password_hash=?2,iterations=?3 WHERE user_id=?4
-    AND EXISTS(SELECT 1 FROM sessions s WHERE s.session_id=?5 AND s.application_user_id=password_credentials.user_id
-    AND s.revoked_at IS NULL AND s.expires_at>CURRENT_TIMESTAMP AND s.absolute_expires_at>CURRENT_TIMESTAMP)`)
-    .bind(credential.salt, credential.hash, credential.iterations, session.applicationUserId, session.sessionId).run();
-  if (result.meta?.changes !== 1) throw new AccountSecurityError("Sign in again to change your password.", 401);
+  const updated = await database.prepare(`UPDATE password_credentials SET salt=?1,password_hash=?2,iterations=?3,updated_at=CURRENT_TIMESTAMP WHERE user_id=?4
+    AND EXISTS(SELECT 1 FROM sessions s WHERE s.session_id=?5 AND s.application_user_id=?4
+    AND s.revoked_at IS NULL AND s.expires_at>CURRENT_TIMESTAMP AND s.absolute_expires_at>CURRENT_TIMESTAMP)
+    RETURNING user_id`)
+    .bind(credential.salt, credential.hash, credential.iterations, session.applicationUserId, session.sessionId).first<{ user_id: string }>();
+  if (updated?.user_id !== session.applicationUserId) throw new AccountSecurityError("Sign in again to change your password.", 401);
   // Existing sessions are no longer trusted after a password change, except this session.
   await database.prepare("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE application_user_id=?1 AND session_id<>?2 AND revoked_at IS NULL")
     .bind(session.applicationUserId, session.sessionId).run();
