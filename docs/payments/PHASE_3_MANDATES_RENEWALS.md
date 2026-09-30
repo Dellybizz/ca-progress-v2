@@ -26,7 +26,11 @@ For an eligible Basic UPI test account, the required live evidence is ₹25 capt
 
 ## Release record
 
-Implementation and live-schema release verification are in progress. Bank authorization and first/next-cycle certification remain unobserved until the read-only collector reports them.
+Implementation deployed successfully from commit `3f0ee92f5532e5ebfdf1afc5724c26ca5ebac5c2` on 30 September 2026 UTC (1 October IST). Release: https://github.com/Dellybizz/ca-progress-v2/actions/runs/36756700392.
+
+All 963 tests, repository CI and Cloudflare runtime build passed. Migration 0071 was applied before deployment. Billing version: `78184cd1-e4fd-4cc9-a50c-13f93e7b7617`; web version: `e3afc523-d1be-4325-908a-62ad9e26b02b`. Live renewal-schema checks and 12 finite-mandate quote checks passed. Private checkout/recovery authentication checks passed, with zero duplicate access rows.
+
+Certification remains `awaiting_real_authorization_and_renewal_proof`: zero real first-and-next-cycle paths were proven. The read-only collector performed zero live mutations. Bank-authorized first and subsequent captured service invoices for every launched method are still required for full Phase 3 completion.
 
 ## Official implementation references
 
