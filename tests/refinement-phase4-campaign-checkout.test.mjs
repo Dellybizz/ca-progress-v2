@@ -6,7 +6,7 @@ const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),"utf8");
 test("P4 campaign checkout keeps pricing and Razorpay offer authority server-side",()=>{
   const client=read("components/billing/pricing-client.tsx");
   const worker=read("workers/billing/p4-final.ts");
-  assert.match(client,/promoCode:promoCode\.trim\(\)\|\|undefined/);
+  assert.match(client,/promoCode:promoCode\.trim\(\)\.toUpperCase\(\)/);
   assert.doesNotMatch(client,/providerOfferId|offer_id|discountValue.*JSON\.stringify/);
   assert.match(worker,/provider_offer_id/);
   assert.match(worker,/offer_id:campaign\.campaign\.providerOfferId/);
@@ -50,11 +50,12 @@ test("P4 campaign provider failures release reserved inventory and cancel orphan
 test("billing deployment enters through the P4 closure worker and retains the final campaign worker",()=>{
   const config=read("workers/billing/wrangler.jsonc");
   const closure=read("workers/billing/p4-closure.ts");
-  assert.match(config,/"main": "\.\/payment-p1\.ts"/);
+  assert.match(config,/"main": "\.\/payment-p2\.ts"/);
   assert.match(closure,/import p4FinalWorker from "\.\/p4-final"/);
   assert.match(closure,/p4FinalWorker\.fetch/);
   assert.match(closure,/p4FinalWorker\.queue/);
   assert.match(closure,/p4FinalWorker\.scheduled/);
+  assert.match(read("workers/billing/payment-p2.ts"),/import previous from "\.\/payment-p1"/);
   assert.match(read("workers/billing/payment-p1.ts"),/import previous from "\.\/p4-closure"/);
   assert.match(config,/ca-progress-v2-billing-ops/);
   assert.match(config,/15 \* \* \* \*/);

@@ -1,0 +1,15 @@
+import {readFile,mkdir,writeFile} from 'node:fs/promises';
+const config=JSON.parse((await readFile('wrangler.jsonc','utf8')).replace(/\/\/[^\n]*/g,''));
+const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN,database=config.d1_databases[0].database_id;
+if(!account||!token)throw new Error('Live database verification requires deployment credentials.');
+async function query(sql){if(!sql.startsWith('SELECT ')||sql.includes(';'))throw new Error('Only read-only checks are permitted.');const response=await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${database}/query`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({sql,params:[]}),signal:AbortSignal.timeout(30000)});const body=await response.json();if(!response.ok||!body.success||!body.result?.[0]?.success)throw new Error('Live checkout schema check failed.');return body.result[0].results;}
+const schema=await query("SELECT name,type FROM sqlite_master WHERE name IN ('payment_checkout_attempts','checkout_one_unresolved_per_user','checkout_provider_identity','subscription_access_provider_unique') ORDER BY name");
+if(schema.length!==4)throw new Error('Durable checkout table or unique indexes are missing.');
+const migrations=await query("SELECT COUNT(*) n FROM _ca_schema_migrations WHERE version='0070'");if(migrations[0].n!==1)throw new Error('Checkout migration is not recorded.');
+const duplicateAccess=await query('SELECT COUNT(*) n FROM (SELECT provider_subscription_id FROM user_subscriptions WHERE provider_subscription_id IS NOT NULL GROUP BY provider_subscription_id HAVING COUNT(*)>1)');if(duplicateAccess[0].n!==0)throw new Error('Duplicate provider access exists.');
+const states=await query('SELECT state,COUNT(*) attempt_count FROM payment_checkout_attempts GROUP BY state');
+const base='https://ca-progress-v2.habeebaasif622.workers.dev';
+const endpoints=[];
+for(const [path,method] of [['/api/v1/payments/checkout/status','GET'],['/api/v1/payments/checkout/recover','POST']]){const response=await fetch(base+path,{method,headers:{'content-type':'application/json','cache-control':'no-cache'},...(method==='POST'?{body:'{}'}:{}),signal:AbortSignal.timeout(30000)});if(response.status!==401||!response.headers.get('cache-control')?.includes('no-store'))throw new Error('Checkout authentication or private caching boundary failed.');endpoints.push({path,status:response.status,private:true});}
+const evidence={phase:2,checked_at:new Date().toISOString(),deployment_sha:process.env.DEPLOY_SHA??null,schema,indexes_verified:3,duplicate_access_rows:0,states,endpoints,coverage:{production_schema_and_auth_boundaries:true,recovery_failure_scenarios:'SQLite integration tests with a deterministic provider',live_customer_checkouts_created:0,real_bank_authorization_tested:false}};
+await mkdir('deployment-evidence/payment-system-p2',{recursive:true});await writeFile('deployment-evidence/payment-system-p2/live-checkout.json',JSON.stringify(evidence,null,2));console.log(JSON.stringify({checkout_schema:'pass',auth_boundaries:'pass',duplicate_access_rows:0}));

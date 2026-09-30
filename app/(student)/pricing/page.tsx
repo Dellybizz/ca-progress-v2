@@ -18,5 +18,5 @@ export default async function PricingPage() {
     headers(),
   ]);
   const commercePolicy = commercePolicyFromUserAgent(requestHeaders.get("user-agent"));
-  return <div className="phase11-page"><PageHeader preview={false} eyebrow="Plans" title="Free, Pro or Premium — choose only what you need." description="Prices and access are resolved by the server, not trusted from the browser. Checkout snapshots the exact commercial terms before any payment is created." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link><Link href="/settings">Settings</Link></div>}/><PricingClient {...model} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
+  return <div className="phase11-page"><PageHeader preview={false} eyebrow="Plans" title="Free, Basic or Pro — choose only what you need." description="Prices and access are resolved by the server, not trusted from the browser. Checkout snapshots the exact commercial terms before any payment is created." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link><Link href="/settings">Settings</Link></div>}/><PricingClient {...model} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
 }

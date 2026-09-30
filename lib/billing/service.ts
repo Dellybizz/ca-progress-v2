@@ -164,7 +164,7 @@ export async function createResourceMetadataWithinQuota(input: { userId: string;
 
 export async function getPricingModel() {
   const [plans, entitlements, identity] = await Promise.all([listPlans(), listPlanEntitlements(), optionalUser()]);
-  return { plans, entitlements, authenticated: Boolean(identity), currentPlanId: identity ? await currentPlanId(identity.id) : null };
+  return { plans, entitlements, authenticated: Boolean(identity), viewerId: identity?.id ?? null, currentPlanId: identity ? await currentPlanId(identity.id) : null };
 }
 
 export async function getBillingModel(): Promise<BillingModel> {

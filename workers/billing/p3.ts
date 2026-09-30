@@ -32,7 +32,7 @@ async function rp<T>(path:string,p:Provider,init:RequestInit={}):Promise<T>{cons
 const getSubscription=(id:string,p:Provider)=>rp<ProviderSubscription>(`subscriptions/${encodeURIComponent(id)}`,p);
 const getPayment=(id:string,p:Provider)=>rp<ProviderPayment>(`payments/${encodeURIComponent(id)}`,p);
 
-async function resolveCommercial(db:D1Database,planId:string,userId:string):Promise<Commercial>{
+export async function resolveCommercial(db:D1Database,planId:string,userId:string):Promise<Commercial>{
   const now=nowIso();
   const row=await db.prepare(`SELECT sp.id plan_id,sp.tier_key,sp.billing_cycle,pv.name,pv.id policy_version_id,pv.price_subunits,pv.currency,pv.billing_duration_value,pv.billing_duration_unit,pv.trial_days,pv.grace_days,ot.intro_price_subunits,COALESCE(ot.intro_billing_cycles,0) intro_billing_cycles,ot.provider_offer_id,ot.provider_offer_verified_at,COALESCE(ot.cancellation_mode,'period_end') cancellation_mode
     FROM subscription_plans sp JOIN plan_policy_versions pv ON pv.plan_id=sp.id LEFT JOIN plan_policy_offer_terms ot ON ot.policy_version_id=pv.id
@@ -68,7 +68,7 @@ export async function ensurePlan(env:Env,terms:Commercial,kind:"recurring"|"intr
   }catch(error){await db.prepare("UPDATE razorpay_plan_mappings SET state='failed',last_error=?1,sync_token=NULL,lease_until=NULL,updated_at=?2 WHERE id=?3 AND sync_token=?4").bind(error instanceof Error?error.message.slice(0,500):"provider_plan_failed",nowIso(),row.id,token).run();throw error;}
 }
 
-function requireIntroOffer(terms:Commercial){
+export function requireIntroOffer(terms:Commercial){
   // Razorpay validates the dashboard-created Subscription Offer on the real subscription create request.
   if(terms.introPrice===null)return null;
   const offerId=String(terms.introProviderOfferId??"").trim();

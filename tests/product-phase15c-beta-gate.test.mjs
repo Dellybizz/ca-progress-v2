@@ -46,10 +46,10 @@ test("Phase 15C comparison locks canonical Free, Pro and Premium product values"
   assert.equal(planComparisonValue(storage, "pro"), "15 GB");
 });
 
-test("pricing UX is comparison-first and never exposes internal Basic/Pro naming as product identity", () => {
+test("pricing UX is comparison-first and uses the Phase 1 commercial product names", () => {
   const page = read("app/(student)/pricing/page.tsx");
   const client = read("components/billing/pricing-client.tsx");
-  assert.match(page, /Free, Pro or Premium/);
+  assert.match(page, /Free, Basic or Pro/);
   assert.match(page, /server, not trusted from the browser/);
   assert.match(client, /PLAN_COMPARISON_COLUMNS/);
   assert.match(client, /PLAN_COMPARISON_ROWS/);

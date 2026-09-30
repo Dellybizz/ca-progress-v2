@@ -53,7 +53,7 @@ async function providerSubscriptionSnapshot(subscriptionId: string, env: Env) {
   return await response.json() as ProviderSubscriptionSnapshot;
 }
 
-async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
+export async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
   if (request.method !== "POST" || new URL(request.url).pathname !== "/create-subscription") return null;
   if (request.headers.get("x-ca-progress-internal") !== "ca-progress-v2-web") return null;
   const userId = clean(request.headers.get("x-ca-progress-user-id"), 128);
@@ -165,7 +165,7 @@ async function releaseFailedCheckoutReservation(request: Request, response: Resp
     .bind(stamp, claimKey, userId).run();
 }
 
-function safeAuthorizationUrl(value: unknown) {
+export function safeAuthorizationUrl(value: unknown) {
   const raw = clean(value, 500);
   if (!raw) return null;
   try {
@@ -209,7 +209,8 @@ async function sweepCampaignLifecycle(env: Env) {
   const released = await db.prepare(`UPDATE billing_campaign_claims
     SET state='failed',failed_at=?1,metadata_json=json_set(metadata_json,'$.failure','stale_checkout_reservation')
     WHERE state='reserved' AND provider_subscription_id IS NULL
-      AND datetime(reserved_at)<datetime('now','-30 minutes')`)
+      AND datetime(reserved_at)<datetime('now','-30 minutes')
+      AND NOT EXISTS(SELECT 1 FROM payment_checkout_attempts a WHERE a.user_id=billing_campaign_claims.user_id AND json_extract(a.contract_json,'$.campaignClaimId')=billing_campaign_claims.id AND a.state IN ('reserved','preparing','dispatching','uncertain','provider_created','ready','pending'))`)
     .bind(stamp).run();
   const retired = await db.prepare(`UPDATE billing_campaign_versions
     SET state='retired',retired_at=COALESCE(retired_at,?1)
