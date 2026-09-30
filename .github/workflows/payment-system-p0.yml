@@ -1,0 +1,51 @@
+name: Payment System P0 Read-only Baseline
+on:
+  push:
+    branches: [payment-system-p0]
+    paths:
+      - .github/workflows/payment-system-p0.yml
+      - scripts/payments/**
+      - tests/payment-system-p0.test.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: payment-system-p0
+  cancel-in-progress: false
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      CA_PAYMENT_PHASE0_EVIDENCE_PATH: deployment-evidence/payment-system-p0/truth-map.json
+      CA_BILLING_INVENTORY_EVIDENCE_PATH: deployment-evidence/payment-system-p0/subscription-inventory.json
+      CA_BILLING_PHASE2_EVIDENCE_PATH: deployment-evidence/payment-system-p0/plan-offer.json
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - name: Verify read-only collectors
+        run: node --test tests/payment-system-p0.test.mjs tests/payment-phase0-truth-map.test.mjs tests/billing-subscription-inventory-phase1.test.mjs tests/billing-subscription-plan-offer-phase2.test.mjs
+      - name: Read historical commercial and operations inventory
+        continue-on-error: true
+        run: node scripts/audit-payment-phase0.mjs
+      - name: Compare stored subscriptions with Razorpay
+        continue-on-error: true
+        run: node scripts/inventory-billing-subscriptions.mjs
+      - name: Compare provider plans and offers
+        continue-on-error: true
+        run: node scripts/audit-billing-plan-offer-phase2.mjs
+      - name: Collect effective policies, live deployments and coverage
+        run: node scripts/payments/collect-p0.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: payment-system-p0-${{ github.sha }}
+          path: deployment-evidence/payment-system-p0/public-summary.json
+          if-no-files-found: error
+          retention-days: 30
