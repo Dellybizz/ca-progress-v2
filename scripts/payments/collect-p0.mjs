@@ -60,6 +60,7 @@ export function publicSummary(output) {
     contract_counts: scalarCounts(output.observations.contracts),
     access_counts: output.observations.access?.map(row => pick(row, ["source", "status", "row_count", "current_term_count"])) ?? null,
     charge_totals: output.observations.charges?.map(row => pick(row, ["status", "currency", "refund_state", "dispute_state", "row_count", "amount_subunits"])) ?? null,
+    offer_checks: output.offerChecks ?? [], construction_issue_counts: output.constructionIssueCounts ?? {},
     audit_totals: Object.fromEntries(["truth-map", "subscription-inventory", "plan-offer"].map(name => [name, output.observations[name]?.summary ?? null])),
     findings: output.findings, coverage: output.coverage, safety: { ...output.safety, export: "aggregate_counts_and_commercial_terms_only", customer_identifiers_exported: false, transaction_identifiers_exported: false } };
 }
@@ -85,7 +86,7 @@ async function main() {
       if (!res.ok) throw new Error(`D1 read HTTP ${res.status}`);
       const data = await res.json();
       if (!data.success || data.result?.[0]?.success === false) throw new Error(`D1 query failed: ${name}`);
-      return safeRows(data.result[0].results ?? []);
+      return name === "effectivePolicies" ? (data.result[0].results ?? []) : safeRows(data.result[0].results ?? []);
     });
   }
   const deployments = {};
@@ -108,6 +109,15 @@ async function main() {
     });
   }
   const key = required("RAZORPAY_KEY_ID"), secret = required("RAZORPAY_KEY_SECRET");
+  const offerChecks = [];
+  for (const policy of observations.effectivePolicies ?? []) {
+    if (!policy.active || !policy.checkout_enabled || policy.intro_price_subunits == null) continue;
+    const offer = policy.provider_offer_id ? await capture(`razorpay.policy_offer.${policy.tier_key}`, async () => {
+      const value = await readJson(`https://api.razorpay.com/v1/offers/${encodeURIComponent(policy.provider_offer_id)}`, { headers: { authorization: `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}` } });
+      return { active: value.active === true, payment_method: value.payment_method ?? null, discount_type: value.discount_type ?? null, discount_value: value.discount_value ?? null, starts_at: value.starts_at ?? null, ends_at: value.ends_at ?? null };
+    }) : null;
+    offerChecks.push({ tier: policy.tier_key, cycle: policy.billing_cycle, version: policy.version, stored_verified: Boolean(policy.provider_offer_verified_at), independent_read_succeeded: Boolean(offer), provider: offer });
+  }
   const paymentMethods = await capture("razorpay.payment_methods", async () => {
     const data = await readJson("https://api.razorpay.com/v1/methods", { headers: { authorization: `Basic ${Buffer.from(`${key}:${secret}`).toString("base64")}` } });
     return { card: data.card === true, upi: data.upi === true, emandate: data.emandate === true, recurring_capability_proven: false, note: "Gateway method availability does not establish subscription/PSP/mandate support" };
@@ -121,9 +131,14 @@ async function main() {
     const count = Number(observations[query]?.[0]?.row_count ?? 0);
     if (count) findings.push({ code, severity: query === "paidWithoutAccess" ? "critical" : "high", count });
   }
+  const constructionIssueCounts = {};
   for (const name of ["truth-map", "subscription-inventory", "plan-offer"]) {
     observations[name] = await capture(`artifact.${name}`, async () => {
       const data = JSON.parse(await readFile(`${folder}/${name}.json`, "utf8"));
+      if (name === "plan-offer") {
+        const allowed = new Set(["current_plan_mapping_missing", "recurring_plan_mapping_missing", "current_policy_mismatch", "recurring_policy_mismatch", "intro_mapping_without_intro_cycles", "discounted_initial_price_without_intro_plan", "intro_and_recurring_plan_same"]);
+        for (const sub of data.subscriptions ?? []) for (const issue of sub.construction?.issues ?? []) if (allowed.has(issue)) constructionIssueCounts[issue] = (constructionIssueCounts[issue] ?? 0) + 1;
+      }
       return { checked_at: data.checked_at, git_sha: data.git_sha, summary: data.summary };
     });
   }
@@ -131,7 +146,7 @@ async function main() {
     { name: "real recurring mandate and renewal", status: "not_exercised", reason: "Requires controlled authorization and cycle proof in P3/P12" },
     { name: "subscription offers and method capabilities", status: "requires_provider_dashboard_evidence", reason: "Gateway methods and offer GET failures cannot establish recurring offer support" });
   const output = { schema_version: 1, phase: "payment-system-P0", checked_at: new Date().toISOString(), baseline_sha: BASELINE_SHA, audit_sha: process.env.GITHUB_SHA ?? null,
-    status: coverage.some(c => c.status === "blocked") ? "partial_inventory" : "inventory_collected", deployments, gateway_key_mode: key.startsWith("rzp_live_") ? "live" : key.startsWith("rzp_test_") ? "test" : "unknown", paymentMethods, health, observations, findings, coverage,
+    status: coverage.some(c => c.status === "blocked") ? "partial_inventory" : "inventory_collected", deployments, gateway_key_mode: key.startsWith("rzp_live_") ? "live" : key.startsWith("rzp_test_") ? "test" : "unknown", paymentMethods, health, observations, findings, coverage, offerChecks, constructionIssueCounts,
     safety: { live_mutations: false, provider_operations: ["GET"], d1_operations: ["allowlisted SELECT"], deployment_performed: false, qr_status: "owner_reported_fixed_not_retested" } };
   await writeFile(`${folder}/public-summary.json`, JSON.stringify(publicSummary(output), null, 2) + "\n");
   console.log(JSON.stringify({ status: output.status, findings: findings.length, blocked: coverage.filter(c => c.status === "blocked").map(c => c.name) }));

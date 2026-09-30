@@ -33,3 +33,10 @@ test("published evidence uses a whitelist and excludes individual contract and t
   assert.equal(output.commercial_terms[0].price_subunits, 5000);
   assert.equal(output.contract_counts[0].contract_count, 2);
 });
+
+test("supplement retains aggregate issue counts without exporting subscription records", () => {
+  const output = publicSummary({ observations: {}, findings: [], coverage: [], safety: {}, constructionIssueCounts: { current_policy_mismatch: 6 }, offerChecks: [{ tier: "basic", independent_read_succeeded: false }], subscriptions: [{ user_id: "PRIVATE" }] });
+  assert.equal(output.construction_issue_counts.current_policy_mismatch, 6);
+  assert.equal(output.offer_checks[0].independent_read_succeeded, false);
+  assert.doesNotMatch(JSON.stringify(output), /PRIVATE|user_id/);
+});
