@@ -37,6 +37,8 @@ jobs:
         run: npm run cf:deploy:billing
       - name: Deploy web runtime
         run: npm run cf:deploy:web
+      - name: Verify deployed method-aware quotes
+        run: node scripts/payments/verify-p1-quotes.mjs
       - name: Record live commercial inventory
         run: node scripts/payments/collect-p0.mjs
       - uses: actions/upload-artifact@v4
