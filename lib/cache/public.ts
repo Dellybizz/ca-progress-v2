@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPublicRuntimeConfig } from "@/lib/env";
+import {readUserFeatureRevision} from './user-feature-version';
 
 type EdgeCache = {
   match(request: Request): Promise<Response | undefined>;
@@ -126,7 +127,8 @@ export async function getCachedUserFeature<T>(input: { userId: string; featureKe
   const cache = edgeCache();
   if (!cache) return input.load();
   const versionResponse = await cache.match(new Request(userFeatureVersionUrl(input.userId)));
-  const version = versionResponse ? (await versionResponse.text()).trim() || BASE_VERSION : BASE_VERSION;
+  const localVersion = versionResponse ? (await versionResponse.text()).trim() || BASE_VERSION : BASE_VERSION;
+  const version = `${localVersion}:${await readUserFeatureRevision(input.userId)}`;
   const request = new Request(userFeatureCacheUrl(input.userId, input.featureKey, version));
   const hit = await cache.match(request);
   if (hit) {

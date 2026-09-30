@@ -5,8 +5,8 @@ import { invalidateUserFeatureCache } from "@/lib/cache/public";
 import type { AppRole } from "@/lib/authorization/roles";
 
 type BillingService = { fetch(request: Request): Promise<Response> };
-type BillingPath = "/create-order" | "/verify" | "/webhook" | "/entitlement" | "/health" | "/create-subscription" | "/verify-subscription" | "/subscription-action" | "/admin/action" | "/admin/reconcile" | "/admin/validate-policy" | "/checkout/status" | "/checkout/recover";
-type BillingInvoke = { path: BillingPath; method?: "GET" | "POST"; userId?: string | null; actorRole?: AppRole | null; query?: string; body?: string; contentType?: string; razorpaySignature?: string | null; razorpayEventId?: string | null };
+type BillingPath = "/create-order" | "/verify" | "/webhook" | "/entitlement" | "/health" | "/create-subscription" | "/verify-subscription" | "/subscription-action" | "/admin/action" | "/admin/reconcile" | "/admin/replay-event" | "/admin/validate-policy" | "/checkout/status" | "/checkout/recover";
+type BillingInvoke = { path: BillingPath; method?: "GET" | "POST"; userId?: string | null; actorRole?: AppRole | null; query?: string; body?: string | ArrayBuffer; contentType?: string; razorpaySignature?: string | null; razorpayEventId?: string | null };
 
 function binding(): BillingService | null {
   try { const { env } = getCloudflareContext(); const value = (env as unknown as Record<string, unknown>).BILLING_SERVICE; return value && typeof (value as BillingService).fetch === "function" ? value as BillingService : null; } catch { return null; }

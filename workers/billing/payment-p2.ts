@@ -6,7 +6,7 @@ import {freezeUnsafeSubscriptionCreation,safeAuthorizationUrl} from "./p4-closur
 import {CheckoutError,createCheckout,recoverCheckout,latestCheckout,publicCheckout,type Dependencies} from "../../lib/billing/checkout-engine.mjs";
 type Env=Parameters<typeof previous.fetch>[1];
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{"content-type":"application/json","cache-control":"private, no-store"}});
-function dependencies(env:Env,userId:string):Dependencies{
+export function dependencies(env:Env,userId:string):Dependencies{
   const db=env.DB!;
   return {
     keyId:env.RAZORPAY_KEY_ID,

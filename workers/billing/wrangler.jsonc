@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "ca-progress-v2-billing",
-  "main": "./payment-p3.ts",
+  "main": "./payment-p4.ts",
   "minify": true,
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
@@ -16,6 +16,6 @@
     "producers": [{ "binding": "BILLING_OPS_QUEUE", "queue": "ca-progress-v2-billing-ops" }],
     "consumers": [{ "queue": "ca-progress-v2-billing-ops", "max_batch_size": 10, "max_batch_timeout": 5, "max_retries": 3 }]
   },
-  "triggers": { "crons": ["15 * * * *"] },
+  "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true }
 }

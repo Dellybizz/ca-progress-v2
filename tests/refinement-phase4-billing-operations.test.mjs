@@ -29,7 +29,7 @@ test("P4 settlement operations are owner bounded, confirmed, idempotent and prov
 test("P4 offloads signed webhooks and schedules bounded provider reconciliation",()=>{
   const worker=read("workers/billing/p4.ts"),wrangler=read("workers/billing/wrangler.jsonc");
   assert.match(worker,/x-razorpay-signature/);assert.match(worker,/BILLING_OPS_QUEUE\.send/);assert.match(worker,/async queue/);assert.match(worker,/async scheduled/);assert.match(worker,/LIMIT 75/);assert.match(worker,/stale_provider_reconciliation/);
-  assert.match(wrangler,/BILLING_OPS_QUEUE/);assert.match(wrangler,/ca-progress-v2-billing-ops/);assert.match(wrangler,/15 \* \* \* \*/);
+  assert.match(wrangler,/BILLING_OPS_QUEUE/);assert.match(wrangler,/ca-progress-v2-billing-ops/);assert.match(wrangler,/\*\/5 \* \* \* \*/);
 });
 
 test("P4 campaigns are versioned and atomically enforce caps, allowlists and per-user limits",()=>{
