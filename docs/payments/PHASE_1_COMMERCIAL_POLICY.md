@@ -1,5 +1,7 @@
 # Payment System Phase 1 — Commercial policy
 
+Status: **Complete — implemented, deployed and live quote-certified on 30 September 2026.**
+
 Baseline: payment-system-p0 at 8e216f8e8dbabd4873faccb6c58e3fa271c1ed3a.
 
 ## Behavior
@@ -24,3 +26,19 @@ The P1 deployment validates effective mappings and provisions missing recurring 
 ## Verification and status
 
 Local verification and live release results are reported separately. Phase 1 is not certified live until its release workflow, mapping evidence and deployed pricing checks pass. Renewal execution, mandate duration/end-date correction, payment captures and native store billing remain outside this phase.
+
+## Completion record
+
+Deployed implementation SHA: `86c0ed13a09b04b2aed4ce5873b158a4b7c2d1fd`.
+Successful release and live certification: https://github.com/Dellybizz/ca-progress-v2/actions/runs/36730115597.
+
+- 918 repository tests passed; TypeScript, ESLint, retirement verification and production build passed.
+- Billing Worker: 0.024 MiB compressed, below the 0.75 MiB budget.
+- Three executable Worker behavior checks rejected stale policies, unsupported methods and unauthorized admin validation with zero provider calls and zero database mutations.
+- Effective Basic and Pro monthly recurring mappings validated against Razorpay. Pro's previously missing mapping was provisioned in the first successful release.
+- 15 live quote checks passed across UPI, Card and eMandate, including explicitly unavailable annual products.
+- Basic monthly: eligible UPI first charge ₹25, recurring ₹50; Card/eMandate first and recurring charges ₹50.
+- Pro monthly: first and recurring charges ₹150 for all three methods.
+- Aggregate commercial findings: none. Customer subscription mutations during mapping provisioning: zero; policies published by the release script: zero.
+
+This certifies Phase 1's policy, mapping and quote behavior. It does not claim a real customer mandate authorisation, payment capture, renewal, bank-compatibility proof, or correction of the existing long mandate end date. Those remain later-phase verification work.
