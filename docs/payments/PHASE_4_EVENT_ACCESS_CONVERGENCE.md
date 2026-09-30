@@ -24,7 +24,13 @@ Live release verification checks migration 0072, inbox indexes, projection fence
 
 ## Release record
 
-Implementation verification and deployment are in progress. Phase 3 real first-and-next-cycle certification remains separately pending. Phase 4 tests do not claim live bank authorization or automatic renewal proof.
+Phase 4 is Complete. Implementation commit: `a1029c38d90c6bdd1096c65964f20a3f4aee6dbc`. Successful release: https://github.com/Dellybizz/ca-progress-v2/actions/runs/36769006473, deployed 1 October 2026 IST.
+
+All 993 repository tests, type checking, linting, repository CI and Cloudflare build passed. Migration 0072 was applied before deployment. Billing version: `b53a333e-cc14-4516-9a97-5bc3d67f8ff1`; web version: `5140c337-02f8-4754-b574-827ba3bad3f2`.
+
+Live evidence passed for durable signed acknowledgement, unchanged raw bytes, duplicate non-financial delivery and real queue convergence. Invalid signature and unauthenticated replay probes were rejected. The accepted probe was processed once. Duplicate access rows: zero. Live renewal schema and twelve finite-mandate quote checks passed, as did private recovery authentication checks. No provider mutation or paid test was performed.
+
+Phase 3 real first-and-next-cycle certification remains separately pending with zero launched payment paths proven. Phase 4 completion proves event/access convergence within the tested boundaries; it does not claim live bank authorization or automatic renewal proof.
 
 ## References
 
