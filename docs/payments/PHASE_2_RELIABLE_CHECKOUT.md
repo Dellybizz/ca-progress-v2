@@ -16,4 +16,14 @@ The release applies migration 0070 before deploying the private billing worker, 
 
 ## Release status
 
-Implementation and release verification are in progress. Completion requires a successful Phase 2 release workflow and live verification artifacts.
+Phase 2 is complete and deployed as implementation commit `b4ad596529bba5c4dd18bfe283c7f4ac0355baf0`.
+
+Successful release: https://github.com/Dellybizz/ca-progress-v2/actions/runs/36736686214.
+
+- All 937 repository tests passed, including 19 checkout integration and browser-storage scenarios. TypeScript, ESLint, retirement verification, production build and Cloudflare build passed.
+- Migration 0070 was applied before billing deployment. The retained migration ledger and foreign-key checks passed. The live checkout table and all three unique indexes were verified; duplicate provider access rows were zero.
+- Anonymous status and recovery requests returned HTTP 401 with private/no-store caching. All 15 live payment-method quotes passed.
+- Billing version `071d4ec5-718e-43f3-9d9e-53d0844d6bb3` and web version `217d56fa-a5a9-4f55-af2c-9fe543e1e75b` serve 100% of traffic. Billing upload was 116.26 KiB, 29.22 KiB compressed.
+- The release artifact contains aggregate live schema, endpoint and pricing evidence. The broader commercial inventory reported no findings but remains partial: Razorpay Offer/method GET restrictions and absent separate Phase 0 audit exports remain explicit coverage limits.
+
+Failure recovery was exercised with a deterministic provider and real SQLite constraints. This release did not create live customer checkouts or test bank authorization, captured payments or renewal execution. Those proofs remain outside Phase 2.
