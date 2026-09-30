@@ -30,14 +30,14 @@ test("Phase 15C comparison locks canonical Free, Pro and Premium product values"
     storageQuotaMegabytes: column.storageQuotaMegabytes,
   })), [
     { tier: "free", label: "Free", monthlyPriceInr: 0, storageQuotaMegabytes: 250 },
-    { tier: "basic", label: "Pro", monthlyPriceInr: 50, storageQuotaMegabytes: 2560 },
-    { tier: "pro", label: "Premium", monthlyPriceInr: 150, storageQuotaMegabytes: 15360 },
+    { tier: "basic", label: "Basic", monthlyPriceInr: 50, storageQuotaMegabytes: 2560 },
+    { tier: "pro", label: "Pro", monthlyPriceInr: 150, storageQuotaMegabytes: 15360 },
   ]);
   assert.equal(monthlyPriceInr("free"), 0);
   assert.equal(monthlyPriceInr("basic"), 50);
   assert.equal(monthlyPriceInr("pro"), 150);
-  assert.equal(productPlanLabel("basic"), "Pro");
-  assert.equal(productPlanLabel("pro"), "Premium");
+  assert.equal(productPlanLabel("basic"), "Basic");
+  assert.equal(productPlanLabel("pro"), "Pro");
 
   const storage = PLAN_COMPARISON_ROWS.find((row) => row.key === "storage");
   assert.ok(storage);

@@ -35,7 +35,8 @@ test("P4 closure retires expired published campaigns and preserves the establish
 
 test("billing deployment enters through the P4 closure worker",()=>{
   const config=read("workers/billing/wrangler.jsonc");
-  assert.match(config,/"main": "\.\/p4-closure\.ts"/);
+  assert.match(config,/"main": "\.\/payment-p1\.ts"/);
+  assert.match(read("workers/billing/payment-p1.ts"),/import previous from "\.\/p4-closure"/);
   assert.match(config,/ca-progress-v2-billing-ops/);
   assert.match(config,/15 \* \* \* \*/);
 });

@@ -1,4 +1,5 @@
 import "server-only";
+import { mappingMatches } from "./payment-quote.mjs";
 import type { AppRole } from "@/lib/authorization/roles";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
 import { invalidateSharedPublicCache, invalidateUserFeatureCache } from "@/lib/cache/public";
@@ -28,12 +29,13 @@ export async function createPolicyDraft(input:{planId:string;reason:string;actor
     database.prepare("SELECT COALESCE(MAX(version),0)+1 value FROM plan_policy_versions WHERE plan_id=?1").bind(planId).first<{value:number}>(),
     database.prepare("SELECT page_key,enabled FROM plan_policy_pages WHERE policy_version_id=?1").bind(source.id).all<Row>(),
     database.prepare("SELECT * FROM plan_policy_features WHERE policy_version_id=?1").bind(source.id).all<Row>(),
-    database.prepare("SELECT intro_price_subunits,intro_billing_cycles,cancellation_mode,terms_note FROM plan_policy_offer_terms WHERE policy_version_id=?1").bind(source.id).first<Row>(),
+    database.prepare("SELECT intro_price_subunits,intro_billing_cycles,cancellation_mode,terms_note,provider_offer_id,provider_offer_verified_at,provider_offer_snapshot_json FROM plan_policy_offer_terms WHERE policy_version_id=?1").bind(source.id).first<Row>(),
   ]);
   const id=crypto.randomUUID();const statements=[database.prepare(`INSERT INTO plan_policy_versions(id,plan_id,version,state,name,description,price_subunits,currency,billing_duration_value,billing_duration_unit,trial_days,grace_days,effective_at,created_by,change_reason) VALUES(?1,?2,?3,'draft',?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)`).bind(id,planId,Number(next?.value??1),source.name,source.description,source.price_subunits,source.currency,source.billing_duration_value,source.billing_duration_unit,source.trial_days,source.grace_days,null,input.actor.userId,reason)];
   for(const p of pages.results??[])statements.push(database.prepare("INSERT INTO plan_policy_pages(policy_version_id,page_key,enabled) VALUES(?1,?2,?3)").bind(id,p.page_key,p.enabled));
   for(const f of features.results??[])statements.push(database.prepare(`INSERT INTO plan_policy_features(policy_version_id,page_key,feature_key,enabled,quantity_limit,time_limit_minutes,storage_limit_bytes,file_size_limit_bytes,reset_period,retention_days,upgrade_message,dependencies_json) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)`).bind(id,f.page_key,f.feature_key,f.enabled,f.quantity_limit,f.time_limit_minutes,f.storage_limit_bytes,f.file_size_limit_bytes,f.reset_period,f.retention_days,f.upgrade_message,f.dependencies_json));
   statements.push(database.prepare("INSERT INTO plan_policy_offer_terms(policy_version_id,intro_price_subunits,intro_billing_cycles,cancellation_mode,terms_note,updated_by) VALUES(?1,?2,?3,?4,?5,?6)").bind(id,offer?.intro_price_subunits??null,Number(offer?.intro_billing_cycles??0),String(offer?.cancellation_mode??"period_end"),String(offer?.terms_note??""),input.actor.userId));
+  statements.push(database.prepare("UPDATE plan_policy_offer_terms SET provider_offer_id=?1,provider_offer_verified_at=?2,provider_offer_snapshot_json=?3 WHERE policy_version_id=?4").bind(offer?.provider_offer_id??null,offer?.provider_offer_verified_at??null,offer?.provider_offer_snapshot_json??"{}",id));
   statements.push(audit(database,input.actor,"plan.policy.draft",id,reason,source,{id,version:next?.value}));const result=await database.batch(statements);if(result.some(r=>r.success===false))throw new Error("Plan draft could not be created atomically.");return id;
 }
 
@@ -55,6 +57,12 @@ export async function publishPolicy(input:{policyId:string;reason:string;actor:A
   const [plan,offer,features]=await Promise.all([database.prepare("SELECT tier_key,checkout_enabled FROM subscription_plans WHERE id=?1").bind(policy.plan_id).first<Row>(),database.prepare("SELECT * FROM plan_policy_offer_terms WHERE policy_version_id=?1").bind(policyId).first<Row>(),database.prepare("SELECT * FROM plan_policy_features WHERE policy_version_id=?1").bind(policyId).all<Row>()]);if(!plan)throw new Error("Plan was not found.");
   const paid=String(plan.tier_key)!=="free",price=Number(policy.price_subunits??0);if(paid&&(!Number.isInteger(price)||price<100||String(policy.currency)!=="INR"||Number(policy.billing_duration_value)<=0||String(policy.billing_duration_unit)==="lifetime"))throw new Error("Paid plans require a valid INR recurring price and finite billing interval.");
   const intro=offer?.intro_price_subunits==null?null:Number(offer.intro_price_subunits),cycles=Number(offer?.intro_billing_cycles??0);if(intro!==null&&(intro<100||intro>price||cycles<1||cycles>24))throw new Error("Introductory pricing is invalid for this recurring price.");
+  if(paid&&Number(plan.checkout_enabled)===1){
+    const mapping=await database.prepare("SELECT * FROM razorpay_plan_mappings WHERE policy_version_id=?1 AND price_kind='recurring' LIMIT 1").bind(policyId).first<Row>();
+    if(!mappingMatches(policy,mapping))throw new Error("Validate the recurring Razorpay mapping before publishing this policy.");
+    if(intro!==null){const snapshot=JSON.parse(String(offer?.provider_offer_snapshot_json??"{}"));if(Number(snapshot.expected_discount_subunits)!==price-intro||cycles!==1)throw new Error("Offer evidence must match the current single-cycle discount. Review and bind the offer again.");}
+    if(intro!==null&&(!/^offer_[A-Za-z0-9]+$/.test(String(offer?.provider_offer_id))||!offer?.provider_offer_verified_at))throw new Error("Introductory UPI pricing requires verified provider offer evidence before publication.");
+  }
   const enabled=new Set((features.results??[]).filter(f=>Number(f.enabled)===1).map(f=>String(f.feature_key)));for(const f of features.results??[]){if(Number(f.enabled)!==1)continue;for(const dep of JSON.parse(String(f.dependencies_json||"[]")))if(!enabled.has(dep))throw new Error(`${String(f.feature_key)} requires enabled feature ${dep}.`);}
   const effectiveAt=policy.effective_at?String(policy.effective_at):null,scheduled=Boolean(effectiveAt&&Date.parse(effectiveAt)>Date.now());const current=await database.prepare(`SELECT candidate.id FROM plan_policy_versions candidate WHERE candidate.plan_id=?1 AND candidate.state='published' AND candidate.id<>?2 AND (candidate.effective_at IS NULL OR candidate.effective_at<=?3) ${activePolicyOrder}`).bind(policy.plan_id,policyId,now).first<{id:string}>();
   const statements=[database.prepare("UPDATE plan_policy_versions SET state='published',published_at=COALESCE(published_at,?1) WHERE id=?2").bind(now,policyId)];

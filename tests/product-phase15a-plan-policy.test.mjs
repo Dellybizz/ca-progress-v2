@@ -32,10 +32,10 @@ function read(path) {
 }
 
 test("Phase 15A defines one canonical Free/Pro/Premium identity and rank order", () => {
-  assert.deepEqual(PRODUCT_PLAN_LABELS, { free: "Free", basic: "Pro", pro: "Premium" });
+  assert.deepEqual(PRODUCT_PLAN_LABELS, { free: "Free", basic: "Basic", pro: "Pro" });
   assert.equal(productPlanLabel("free"), "Free");
-  assert.equal(productPlanLabel("basic"), "Pro");
-  assert.equal(productPlanLabel("pro"), "Premium");
+  assert.equal(productPlanLabel("basic"), "Basic");
+  assert.equal(productPlanLabel("pro"), "Pro");
   assert.equal(tierRank("free"), 0);
   assert.equal(tierRank("basic"), 1);
   assert.equal(tierRank("pro"), 2);
@@ -106,7 +106,7 @@ test("Phase 14 export behavior is preserved through the Phase 15A policy adapter
   assert.equal(EXPORT_PRODUCT_PLANS, PRODUCT_PLAN_LABELS);
   assert.equal(normalizeExportTier("basic"), "basic");
   assert.equal(normalizeExportTier("unexpected"), "free");
-  assert.equal(exportProductPlanLabel("pro"), "Premium");
+  assert.equal(exportProductPlanLabel("pro"), "Pro");
 
   assert.equal(canUseExport("free", "progress_pdf"), true);
   assert.equal(canUseExport("free", "study_csv"), false);
@@ -123,8 +123,8 @@ test("Phase 14 export behavior is preserved through the Phase 15A policy adapter
   assert.equal(canUseExport("pro", "test_history_csv"), true);
   assert.equal(canUseExport("pro", "full_backup"), true);
 
-  assert.deepEqual(exportRequirement("study_csv"), { tier: "basic", productPlan: "Pro" });
-  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Premium" });
+  assert.deepEqual(exportRequirement("study_csv"), { tier: "basic", productPlan: "Basic" });
+  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Pro" });
   assert.equal(planFeatureRequirement("not_real"), null);
 });
 

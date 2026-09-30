@@ -1,0 +1,50 @@
+name: Payment System P1 Commercial Policy
+on:
+  push:
+    branches: [payment-system-p1]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: payment-system-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 55
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+      NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_APP_NAME: CA Progress
+      DEPLOY_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: {node-version: 22, cache: npm}
+      - run: npm ci --no-audit --no-fund
+      - name: Verify complete repository
+        run: npm run ci
+      - name: Build Cloudflare runtime
+        run: npm run cf:build
+      - name: Validate effective mappings and provision only missing mappings
+        run: node scripts/payments/provision-p1.mjs
+      - name: Deploy private billing service
+        run: npm run cf:deploy:billing
+      - name: Deploy web runtime
+        run: npm run cf:deploy:web
+      - name: Record live commercial inventory
+        run: node scripts/payments/collect-p0.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: payment-system-p1-${{ github.sha }}
+          path: |
+            deployment-evidence/payment-system-p1/provider-mappings.json
+            deployment-evidence/payment-system-p0/public-summary.json
+          if-no-files-found: warn
+          retention-days: 30

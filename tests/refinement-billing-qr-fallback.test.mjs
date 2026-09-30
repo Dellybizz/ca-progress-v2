@@ -13,7 +13,7 @@ test("billing worker exposes only a provider-owned secure authorization fallback
   assert.match(worker,/url\.hostname\.endsWith\("\.razorpay\.com"\)/);
   assert.match(worker,/authorizationUrl/);
   assert.match(worker,/cache-control", "private, no-store"/);
-  assert.match(worker,/JSON\.stringify\(\{ \.\.\.payload, authorizationUrl \}\)/);
+  assert.match(worker,/JSON\.stringify\(\{ \.\.\.payload, authorizationUrl, initialAmount:local\?\.initial_price_subunits, recurringAmount:local\?\.recurring_price_subunits \}\)/);
 });
 
 test("API-created subscriptions authenticate through Razorpay Standard Checkout while preserving the hosted fallback",()=>{

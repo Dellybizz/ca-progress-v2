@@ -58,12 +58,18 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
   if (request.headers.get("x-ca-progress-internal") !== "ca-progress-v2-web") return null;
   const userId = clean(request.headers.get("x-ca-progress-user-id"), 128);
   if (!userId) return null;
-  const body = await request.json().catch(() => null) as { planId?: unknown } | null;
+  const body = await request.json().catch(() => null) as { planId?: unknown; paymentMethod?: unknown; policyVersionId?: unknown } | null;
   const planId = clean(body?.planId, 100);
   if (!planId) return null;
 
   const db = database(env);
-  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status
+  const method = body?.paymentMethod ?? "upi";
+  if (!["upi", "card", "emandate"].includes(String(method))) return json({error:"Choose UPI, Card or eMandate."},400);
+  if (body?.policyVersionId) {
+    const effective = await db.prepare("SELECT id FROM plan_policy_versions WHERE plan_id=?1 AND state='published' AND (effective_at IS NULL OR effective_at<=?2) ORDER BY COALESCE(effective_at,published_at,created_at) DESC,version DESC LIMIT 1").bind(planId,new Date().toISOString()).first<Row>();
+    if (effective?.id !== body.policyVersionId) return json({error:"Pricing changed. Refresh the pricing page before checkout."},409);
+  }
+  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits
     FROM razorpay_subscriptions
     WHERE user_id=?1 AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
     ORDER BY created_at DESC LIMIT 21`).bind(userId).all<Row>();
@@ -73,7 +79,7 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
   }
 
   if (rows.length === 0) {
-    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status
+    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits
       FROM razorpay_subscriptions WHERE user_id=?1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
     if (latest) rows = [latest];
   }
@@ -118,6 +124,7 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
     if (legacySplitPlan) {
       return json({ error: "This checkout uses the retired introductory-plan switching model and must be repaired before retrying. No new subscription was created.", code: "legacy_intro_plan_requires_repair" }, 409);
     }
+    if (samePlan && ((method !== "upi" && current.local.provider_offer_id) || (body?.policyVersionId && body.policyVersionId !== current.local.policy_version_id))) return json({error:"The pending subscription keeps its original offer and policy. Manage it in Billing before changing checkout terms."},409);
     if (samePlan && (current.providerStatus === "created" || current.providerStatus === "authenticated")) {
       const keyId = env.RAZORPAY_KEY_ID?.trim();
       if (!keyId) return json({ error: "Razorpay recurring checkout is not configured." }, 503);
@@ -126,6 +133,7 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
         keyId,
         billingCycle: current.local.billing_cycle,
         recurringAmount: current.local.recurring_price_subunits,
+        initialAmount: current.local.initial_price_subunits,
         policyVersionId: current.local.policy_version_id,
         reused: true,
         providerStatus: current.providerStatus,
@@ -184,11 +192,11 @@ async function enrichCheckoutResponse(method: string, pathname: string, response
   const subscriptionId = clean(payload?.subscriptionId, 100);
   if (!payload || !/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) return response;
   const authorizationUrl = await providerAuthorizationUrl(subscriptionId, env).catch(() => null);
-  if (!authorizationUrl) return response;
+  const local=await database(env).prepare("SELECT initial_price_subunits,recurring_price_subunits FROM razorpay_subscriptions WHERE provider_subscription_id=?1").bind(subscriptionId).first<Row>();
   const headers = new Headers(response.headers);
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "private, no-store");
-  return new Response(JSON.stringify({ ...payload, authorizationUrl }), {
+  return new Response(JSON.stringify({ ...payload, authorizationUrl, initialAmount:local?.initial_price_subunits, recurringAmount:local?.recurring_price_subunits }), {
     status: response.status,
     statusText: response.statusText,
     headers,

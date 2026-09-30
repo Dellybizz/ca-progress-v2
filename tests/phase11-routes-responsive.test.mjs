@@ -41,13 +41,13 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
   assert.match(billing, /Retry payment/);
 });
 
-test("pricing remains configuration-safe and sends only the plan identifier", () => {
+test("pricing remains configuration-safe and sends policy and method identifiers without a client charge amount", () => {
   const pricing = read("components/billing/pricing-client.tsx");
-  assert.match(pricing, /body:JSON\.stringify\(\{planId:plan\.id,requestId:crypto\.randomUUID\(\),promoCode:/);
+  assert.match(pricing, /body:JSON\.stringify\(\{planId:plan\.id,paymentMethod:method,policyVersionId:offer\?\.policyVersionId,requestId:crypto\.randomUUID\(\),promoCode:/);
   assert.doesNotMatch(pricing, /body:JSON\.stringify\(\{[^}]*\b(?:amount|price_subunits)\b[^}]*\}\)/);
   assert.match(pricing, /Checkout not configured/);
   assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
-  assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer\)/);
+  assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer,method\)/);
   assert.match(pricing, /published server policy has a valid price/);
   assert.match(pricing, /payment=\$\{verified\.providerStatus/);
   assert.match(pricing, /\/billing\?payment=pending/);

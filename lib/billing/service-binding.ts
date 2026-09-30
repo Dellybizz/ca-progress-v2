@@ -5,7 +5,7 @@ import { invalidateUserFeatureCache } from "@/lib/cache/public";
 import type { AppRole } from "@/lib/authorization/roles";
 
 type BillingService = { fetch(request: Request): Promise<Response> };
-type BillingPath = "/create-order" | "/verify" | "/webhook" | "/entitlement" | "/health" | "/create-subscription" | "/verify-subscription" | "/subscription-action" | "/admin/action" | "/admin/reconcile";
+type BillingPath = "/create-order" | "/verify" | "/webhook" | "/entitlement" | "/health" | "/create-subscription" | "/verify-subscription" | "/subscription-action" | "/admin/action" | "/admin/reconcile" | "/admin/validate-policy";
 type BillingInvoke = { path: BillingPath; method?: "GET" | "POST"; userId?: string | null; actorRole?: AppRole | null; query?: string; body?: string; contentType?: string; razorpaySignature?: string | null; razorpayEventId?: string | null };
 
 function binding(): BillingService | null {

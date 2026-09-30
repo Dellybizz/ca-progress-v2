@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import {quoteForMethod,paymentMethod,mappingMatches} from '../lib/billing/payment-quote.mjs';
+import {assertProviderPlan} from '../scripts/payments/provision-p1.mjs';
+const terms={recurring:5000,intro:2500,eligible:true};
+test('UPI intro is never quoted for Card or eMandate',()=>{assert.equal(quoteForMethod(terms,'upi').dueTodaySubunits,2500);for(const method of ['card','emandate']){const quote=quoteForMethod(terms,method);assert.equal(quote.dueTodaySubunits,5000);assert.equal(quote.introApplied,false);assert.equal(quote.recurringPriceSubunits,5000);}});
+test('returning customers and trials preserve regular future charge',()=>{assert.equal(quoteForMethod({...terms,eligible:false},'upi').dueTodaySubunits,5000);assert.equal(quoteForMethod({...terms,trialDays:7},'upi').dueTodaySubunits,0);assert.equal(quoteForMethod({...terms,trialDays:7},'upi').firstChargeSubunits,2500);});
+test('untrusted payment methods and impossible policy amounts fail closed',()=>{for(const value of [null,'cash','wallet',{}])assert.throws(()=>paymentMethod(value));for(const recurring of [-1,0.5,Infinity])assert.throws(()=>quoteForMethod({...terms,recurring},'upi'));});
+const policy={price_subunits:15000,currency:'INR',billing_duration_value:1,billing_duration_unit:'month'},mapping={state:'ready',provider_plan_id:'plan_ABC',amount_subunits:15000,currency:'INR',period:'monthly',interval_value:1};
+test('policy gate rejects mapping drift in price currency interval or state',()=>{assert.equal(mappingMatches(policy,mapping),true);for(const diff of [{amount_subunits:5000},{currency:'USD'},{interval_value:12},{period:'yearly'},{state:'creating'},{provider_plan_id:'invalid'}])assert.equal(mappingMatches(policy,{...mapping,...diff}),false);});
+test('live provisioning verifies actual provider terms before mapping publication',()=>{const plan={id:'plan_ABC',period:'monthly',interval:1,item:{amount:15000,currency:'INR'}};assert.doesNotThrow(()=>assertProviderPlan(policy,plan));assert.throws(()=>assertProviderPlan(policy,{...plan,item:{amount:5000,currency:'INR'}}));});
+test('pending checkout rejects a different method or commercial version without cancelling subscriptions',()=>{const source=readFileSync('workers/billing/p4-closure.ts','utf8');assert.match(source,/method !== "upi" && current.local.provider_offer_id/);assert.match(source,/body.policyVersionId !== current.local.policy_version_id/);assert.match(source,/Pricing changed/);});
+test('operator validation remains private and requires plan configuration authority',()=>{const source=readFileSync('workers/billing/payment-p1.ts','utf8');assert.match(source,/x-ca-progress-internal/);assert.match(source,/hasAdminCapability/);assert.match(source,/plan.policy.provider.validate/);});
