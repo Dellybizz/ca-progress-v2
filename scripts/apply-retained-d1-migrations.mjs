@@ -1,3 +1,4 @@
+import {verifyP5MigrationLayout,p5SchemaNames} from './payments/p5-migration-layout.mjs';
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -94,6 +95,19 @@ for (const row of mobileReleaseLedger?.[0]?.results ?? []) applied.add(String(ro
 for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }
   console.log(`[retained-d1] applying ${version} from ${file}`);
+  if (version === "0073") {
+    const columns=query("PRAGMA table_info(razorpay_subscriptions);")?.[0]?.results??[];
+    if(columns.some(column=>column.name==='failure_paid_through_at')){
+      // The initial P5 import completed but omitted its ledger INSERT. Recover
+      // only an exact complete schema; never replay ALTER or guess partial state.
+      const sql=readFileSync(file,"utf8"),objects=query(`SELECT name,type,sql FROM sqlite_master WHERE name IN (${p5SchemaNames.map(name=>`'${name}'`).join(',')});`)?.[0]?.results??[];
+      verifyP5MigrationLayout(sql,objects,columns);
+      const ledger=sql.match(/INSERT OR IGNORE INTO _ca_schema_migrations[\s\S]*?;/)?.[0];
+      if(!ledger)throw new Error("Phase 5 migration has no completion ledger entry.");
+      wrangler(["d1","execute",database,"--remote",`--config=${config}`,"--command",ledger]);
+      continue;
+    }
+  }
   if (version === "0066") {
     const columns = query("PRAGMA table_info(community_messages);")?.[0]?.results ?? [];
     if (columns.some((column) => column.name === "client_message_id")) {

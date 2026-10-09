@@ -39,3 +39,5 @@ WHEN NEW.financial_state IN ('refunded','disputed','mismatch') OR NEW.cancel_at_
  UPDATE billing_notifications SET suppressed_at=NEW.updated_at WHERE provider_subscription_id=NEW.provider_subscription_id AND suppressed_at IS NULL AND (NEW.financial_state IN ('refunded','disputed','mismatch') OR notification_type='billing_renewal_due');
 END;
 UPDATE razorpay_subscriptions SET status=status WHERE status IN ('pending','halted') AND paid_through_at IS NOT NULL;
+INSERT OR IGNORE INTO _ca_schema_migrations(version,description,source_freeze_commit)
+VALUES('0073','payment system P5 fixed failure grace and durable customer recovery notices','payment-system-p5');
