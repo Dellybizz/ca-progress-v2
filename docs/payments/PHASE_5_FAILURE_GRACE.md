@@ -26,4 +26,19 @@ Provider reference checked 9 October 2026: https://razorpay.com/docs/payments/su
 
 ## Release evidence
 
-Implementation checks and deployment are in progress. Final deployment identifiers and aggregate live results will be recorded after the release workflow succeeds.
+Software implementation and deployment completed on 9 October 2026. Real bank-cycle certification remains pending.
+
+- Deployed implementation: `d06edb3e0e46bc51155c53f9d7a084918d1ddf4d`, branch `payment-system-p5`.
+- Successful release: https://github.com/Dellybizz/ca-progress-v2/actions/runs/37996968245
+- Billing version: `900a47e8-9ff2-4f0c-ac27-808d3d4730a3`.
+- Web version: `60a2290e-0dbb-47fa-908a-1be32b6b267a`.
+- All 1,013 tests passed, including 20 Phase 5 recovery/export checks. Type checking, zero-warning lint, production Next build and Cloudflare runtime build passed.
+- Migration 0073 is recorded; all 62 retained migrations are present and foreign keys are clean. Both deployment steps and all retained Phase 1–4 live checks passed.
+- Live Phase 5 checks passed: zero invalid grace anchors, zero duplicate reminders and zero overdue access projections. Notification and account-data export authentication boundaries reject unauthenticated access.
+- The signed non-financial webhook probe converged through the deployed queue with zero duplicate recurring access rows. No provider mutation or paid test was performed.
+- The retained renewal collector checked 12 finite-mandate quotes and reported zero real paths proven, `awaiting_real_authorization_and_renewal_proof`.
+
+The release artifact `payment-system-p5-d06edb3e0e46bc51155c53f9d7a084918d1ddf4d` contains aggregate live recovery results and retained commercial, checkout, renewal and queue evidence. Actual email/SMS delivery and real bank failure/recovery are not certified by these checks.
+
+Migration recovery note: the first import applied the complete schema without its completion-ledger entry, and the release gate stopped before deploying a new runtime. The runner now validates all five created schema objects and the anchor column against the expected migration before recording a missing ledger. Missing or changed layouts fail closed. The successful release recovered the ledger and subsequently verified normal migration skipping without replaying the ALTER.
+
