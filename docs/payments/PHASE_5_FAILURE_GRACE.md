@@ -41,4 +41,3 @@ Software implementation and deployment completed on 9 October 2026. Real bank-cy
 The release artifact `payment-system-p5-d06edb3e0e46bc51155c53f9d7a084918d1ddf4d` contains aggregate live recovery results and retained commercial, checkout, renewal and queue evidence. Actual email/SMS delivery and real bank failure/recovery are not certified by these checks.
 
 Migration recovery note: the first import applied the complete schema without its completion-ledger entry, and the release gate stopped before deploying a new runtime. The runner now validates all five created schema objects and the anchor column against the expected migration before recording a missing ledger. Missing or changed layouts fail closed. The successful release recovered the ledger and subsequently verified normal migration skipping without replaying the ALTER.
-
