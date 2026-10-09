@@ -273,7 +273,7 @@ async function refreshNotifications(userId: string, timezone: string, goals: Pla
 export async function getPhase8NotificationCenter(userId: string, timezone: string, goals?: PlannerGoal[], db = getD1RuntimeDatabase()) {
   const goalRows = goals ?? await getPhase8GoalSummaries(userId, timezone, db);
   const preferences = await refreshNotifications(userId, timezone, goalRows, db);
-  const rows = (await db.prepare("SELECT id,notification_type,title,body,action_href,read_at,created_at FROM in_app_notifications WHERE user_id=?1 ORDER BY created_at DESC LIMIT 30").bind(userId).all<NotificationRow>()).results ?? [];
+  const rows = (await db.prepare("SELECT id,notification_type,title,body,action_href,read_at,created_at FROM in_app_notifications WHERE user_id=?1 UNION ALL SELECT id,notification_type,title,body,action_href,read_at,created_at FROM billing_notifications WHERE user_id=?1 AND suppressed_at IS NULL ORDER BY created_at DESC LIMIT 30").bind(userId).all<NotificationRow>()).results ?? [];
   const notifications: PlannerNotification[] = rows.map((row) => ({ id: row.id, notificationType: row.notification_type, title: row.title, body: row.body, actionHref: row.action_href, readAt: row.read_at, createdAt: row.created_at }));
   return { preferences, notifications };
 }
@@ -281,6 +281,8 @@ export async function getPhase8NotificationCenter(userId: string, timezone: stri
 export async function markPhase8NotificationRead(userId: string, id: string | null, db = getD1RuntimeDatabase()) {
   if (id) await db.prepare("UPDATE in_app_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE id=?1 AND user_id=?2").bind(id, userId).run();
   else await db.prepare("UPDATE in_app_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE user_id=?1 AND read_at IS NULL").bind(userId).run();
+  if (id) await db.prepare("UPDATE billing_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE id=?1 AND user_id=?2 AND suppressed_at IS NULL").bind(id, userId).run();
+  else await db.prepare("UPDATE billing_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE user_id=?1 AND read_at IS NULL AND suppressed_at IS NULL").bind(userId).run();
   return { ok: true };
 }
 

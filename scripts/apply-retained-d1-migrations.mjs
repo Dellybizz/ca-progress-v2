@@ -66,6 +66,7 @@ const migrations = [
   ["0070", "d1/migrations/0070_payment_system_p2_checkout.sql"],
   ["0071", "d1/migrations/0071_payment_system_p3_renewals.sql"],
   ["0072", "d1/migrations/0072_payment_system_p4_convergence.sql"],
+  ["0073", "d1/migrations/0073_payment_system_p5_recovery.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
@@ -88,7 +89,7 @@ const mobilePushLedger = query("SELECT version FROM _ca_schema_migrations WHERE 
 for (const row of mobilePushLedger?.[0]?.results ?? []) applied.add(String(row.version));
 const mobileDeletionLedger = query("SELECT version FROM _ca_schema_migrations WHERE version='0062';");
 for (const row of mobileDeletionLedger?.[0]?.results ?? []) applied.add(String(row.version));
-const mobileReleaseLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0063','0064','0065','0066','0067','0068','0069','0070','0071','0072');");
+const mobileReleaseLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0063','0064','0065','0066','0067','0068','0069','0070','0071','0072','0073');");
 for (const row of mobileReleaseLedger?.[0]?.results ?? []) applied.add(String(row.version));
 for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }

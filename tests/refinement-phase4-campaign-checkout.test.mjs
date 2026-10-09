@@ -52,7 +52,8 @@ test("P4 campaign provider failures release reserved inventory and cancel orphan
 test("billing deployment enters through the P4 closure worker and retains the final campaign worker",()=>{
   const config=read("workers/billing/wrangler.jsonc");
   const closure=read("workers/billing/p4-closure.ts");
-  assert.match(config,/"main": "\.\/payment-p4\.ts"/);
+  assert.match(read("workers/billing/payment-p5.ts"),/import previous from '\.\/payment-p4'/);
+  assert.match(config,/"main": "\.\/payment-p5\.ts"/);
   assert.match(closure,/import p4FinalWorker from "\.\/p4-final"/);
   assert.match(closure,/p4FinalWorker\.fetch/);
   assert.match(closure,/p4FinalWorker\.queue/);

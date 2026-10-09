@@ -8,7 +8,7 @@ export async function withSubscriptionLease<T>(db:Database,id:string,run:(token:
  try{return await run(token);}finally{await db.prepare('DELETE FROM billing_subscription_leases WHERE provider_subscription_id=?1 AND token=?2').bind(id,token).run();}
 }
 export async function commitAccessProjection(db:Database,input:{local:Row;token:string;metadata:Statement;planId:string;policyId:string;status:string;starts:string|null;ends:string|null;paymentId:string|null;eventType:string;providerStatus:string}){
- const {local,token,metadata,planId,policyId,status,starts,ends,paymentId,eventType,providerStatus}=input,stamp=new Date().toISOString();
+ const {local,token,metadata,planId,policyId,status,starts,ends,paymentId,eventType}=input,stamp=new Date().toISOString();
  const existing=await db.prepare('SELECT * FROM user_subscriptions WHERE provider_subscription_id=?1 LIMIT 1').bind(local.provider_subscription_id).first<Row>();
  const writes=[db.prepare('INSERT INTO billing_projection_guards(token,subscription_id,expected_version) VALUES(?1,?2,?3)').bind(token,local.id,Number(local.projection_version??0)),metadata];
  const valid=Boolean(ends&&Date.parse(ends)>Date.now());
@@ -19,7 +19,10 @@ export async function commitAccessProjection(db:Database,input:{local:Row;token:
   writes.push(db.prepare(`INSERT INTO subscription_policy_contracts(subscription_id,policy_version_id,grandfathered,decision_reason) VALUES(?1,?2,1,'Verified recurring invoice projection') ON CONFLICT(subscription_id) DO UPDATE SET policy_version_id=excluded.policy_version_id,decision_reason=excluded.decision_reason`).bind(id,policyId));
   if(!existing||existing.plan_id!==planId||existing.status!==status||existing.starts_at!==begin||existing.ends_at!==ends)writes.push(db.prepare("INSERT INTO subscription_events(id,subscription_id,user_id,plan_id,payment_event_id,event_type,source,starts_at,ends_at,metadata,created_at) VALUES(?1,?2,?3,?4,NULL,?5,'razorpay_subscription',?6,?7,?8,?9)").bind(crypto.randomUUID(),id,local.user_id,planId,existing?(existing.status!==status?(status==='paused'?'paused':status==='cancelled'?'cancelled':'resumed'):'extended'):'granted',begin,ends,JSON.stringify({provider_subscription_id:local.provider_subscription_id,provider_event:eventType}),stamp));
   writes.push(db.prepare('UPDATE razorpay_subscriptions SET linked_access_subscription_id=?1 WHERE id=?2').bind(id,local.id));
- }else if(existing&&['cancelled','completed','expired'].includes(providerStatus))writes.push(db.prepare("UPDATE user_subscriptions SET status='expired',updated_at=?1 WHERE id=?2").bind(stamp,existing.id));
+  }else if(existing&&ends&&Date.parse(ends)<=Date.now()){
+  if(existing.status!=='expired')writes.push(db.prepare("INSERT INTO subscription_events(id,subscription_id,user_id,plan_id,event_type,source,starts_at,ends_at,metadata,created_at) VALUES(?1,?2,?3,?4,'expired','razorpay_subscription',?5,?6,?7,?8)").bind(crypto.randomUUID(),existing.id,local.user_id,existing.plan_id,existing.starts_at,ends,JSON.stringify({provider_subscription_id:local.provider_subscription_id,provider_event:eventType,reason:'verified_access_boundary'}),stamp));
+  writes.push(db.prepare("UPDATE user_subscriptions SET status='expired',updated_at=?1 WHERE id=?2 AND status<>'expired'").bind(stamp,existing.id));
+ }
  writes.push(db.prepare('UPDATE razorpay_subscriptions SET projection_version=projection_version+1 WHERE id=?1').bind(local.id),db.prepare('DELETE FROM billing_projection_guards WHERE token=?1').bind(token));
  const result=await db.batch(writes);if(result.some(r=>r.success===false))throw new Error('Access projection could not be committed.');
 }
