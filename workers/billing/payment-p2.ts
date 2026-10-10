@@ -1,3 +1,4 @@
+import {providerFetch} from "./provider-http";
 import {mandateSchedule} from "../../lib/billing/mandate-schedule.mjs";
 import previous from "./payment-p1";
 import {ensurePlan,resolveCommercial,requireIntroOffer} from "./p3";
@@ -11,6 +12,7 @@ export function dependencies(env:Env,userId:string):Dependencies{
   return {
     keyId:env.RAZORPAY_KEY_ID,
     authorizationUrl:safeAuthorizationUrl,
+    knownUndispatched(row){const c=JSON.parse(String(row.contract_json)),payload=JSON.parse(String(row.payload_json));return c.mandateScheduleVersion==='p3-one-year-v1'&&!c.providerTransportVersion&&payload.notes?.checkout_key===row.request_key&&payload.notes?.ca_progress_user_id===row.user_id;},
     preflight:input=>freezeUnsafeSubscriptionCreation(new Request('https://billing.internal/create-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':userId,'content-type':'application/json'},body:JSON.stringify(input)}),env),
     async prepare(input){
       const resolved=await resolveCommercial(db,input.planId,userId);
@@ -21,7 +23,7 @@ export function dependencies(env:Env,userId:string):Dependencies{
       const campaign=input.paymentMethod==='upi'&&terms.introPrice===null?await reserveCampaign(db,{userId,planId:input.planId,requestId:input.requestId,policyVersionId:terms.policyVersionId,base:terms.recurringPrice,promoCode:input.promoCode}):null;
       const offerId=campaign?.campaign.providerOfferId??requireIntroOffer(terms);
       const schedule=mandateSchedule(terms),totalCount=schedule.totalCount;
-      const contract={...terms,paymentMethod:input.paymentMethod,mandateScheduleVersion:schedule.scheduleVersion,providerPlanId:mapping.providerPlanId,initialAmount:campaign?.final??terms.introPrice??terms.recurringPrice,totalCount,providerOfferId:offerId,campaignClaimId:campaign?.claimId??null,promoCode:campaign?.campaign.promoCode??null,expectedCampaignPrice:campaign?.final??null};
+      const contract={...terms,providerTransportVersion:"manual-v1",paymentMethod:input.paymentMethod,mandateScheduleVersion:schedule.scheduleVersion,providerPlanId:mapping.providerPlanId,initialAmount:campaign?.final??terms.introPrice??terms.recurringPrice,totalCount,providerOfferId:offerId,campaignClaimId:campaign?.claimId??null,promoCode:campaign?.campaign.promoCode??null,expectedCampaignPrice:campaign?.final??null};
       const payload:Record<string,unknown>={plan_id:mapping.providerPlanId,total_count:totalCount,quantity:1,customer_notify:true,notes:{ca_progress_user_id:userId,ca_progress_plan_id:terms.planId,ca_progress_policy_version_id:terms.policyVersionId,checkout_key:input.requestId,...(campaign?{ca_progress_campaign_version_id:campaign.campaign.id}:{})}};
       if(offerId)payload.offer_id=offerId;
       const paid=await db.prepare("SELECT ends_at FROM user_subscriptions WHERE user_id=?1 AND ends_at>?2 AND status IN ('active','cancelled','paused') ORDER BY ends_at DESC LIMIT 1").bind(userId,new Date().toISOString()).first<{ends_at:string}>();
@@ -31,7 +33,7 @@ export function dependencies(env:Env,userId:string):Dependencies{
     },
     async provider(path,init={}){
       if(!env.RAZORPAY_KEY_ID||!env.RAZORPAY_KEY_SECRET)throw new CheckoutError('Checkout is unavailable.','provider_not_configured',503);
-      const response=await fetch(`https://api.razorpay.com/v1/${path}`,{...init,redirect:'error',signal:AbortSignal.timeout(30000),headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,'content-type':'application/json'}});
+      const response=await providerFetch(`https://api.razorpay.com/v1/${path}`,{...init,headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,'content-type':'application/json'}});
       if(!response.ok){const error=Object.assign(new CheckoutError('Provider request could not be completed.','provider_request_failed',502),{definitiveRejection:response.status>=400&&response.status<500&&![408,409,429].includes(response.status)});throw error;}
       return await response.json() as Record<string,unknown>;
     },

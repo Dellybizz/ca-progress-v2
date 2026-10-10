@@ -1,3 +1,4 @@
+import {providerFetch} from "./provider-http";
 import previous from './payment-p3';
 import {dependencies} from './payment-p2';
 import {recoverCheckout} from '../../lib/billing/checkout-engine.mjs';
@@ -13,7 +14,7 @@ const stamp=()=>new Date().toISOString();
 async function digest(bytes:ArrayBuffer){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 async function sign(secret:string,bytes:ArrayBuffer){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);return [...new Uint8Array(await crypto.subtle.sign('HMAC',key,bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');}
 function equal(a:string,b:string){let difference=a.length^b.length;for(let i=0;i<Math.max(a.length,b.length);i++)difference|=(a.charCodeAt(i)||0)^(b.charCodeAt(i)||0);return difference===0;}
-async function provider(env:Env,path:string){if(!env.RAZORPAY_KEY_ID||!env.RAZORPAY_KEY_SECRET)throw new Error('provider_unavailable');const r=await fetch(`https://api.razorpay.com/v1/${path}`,{method:'GET',redirect:'error',signal:AbortSignal.timeout(30000),headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`}});if(!r.ok)throw new Error('provider_read_pending');return await r.json() as Row;}
+async function provider(env:Env,path:string){if(!env.RAZORPAY_KEY_ID||!env.RAZORPAY_KEY_SECRET)throw new Error('provider_unavailable');const r=await providerFetch(`https://api.razorpay.com/v1/${path}`,{method:'GET',headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`}});if(!r.ok)throw new Error('provider_read_pending');return await r.json() as Row;}
 async function ingest(request:Request,env:Env){
  if(!env.DB||!env.RAZORPAY_WEBHOOK_SECRET)return json({error:'Webhook ingestion is unavailable.'},503);
  let bytes:ArrayBuffer;try{bytes=await readWebhookBytes(request);}catch{return json({error:'Webhook payload is too large or unreadable.'},413);}
