@@ -1,3 +1,4 @@
+import {prepaidAccess} from "../../lib/billing/prepaid-access.mjs";
 import {providerFetch} from "./provider-http";
 import {mandateSchedule} from "../../lib/billing/mandate-schedule.mjs";
 import previous from "./payment-p1";
@@ -26,15 +27,15 @@ export function dependencies(env:Env,userId:string):Dependencies{
       const contract={...terms,providerTransportVersion:"manual-v1",paymentMethod:input.paymentMethod,mandateScheduleVersion:schedule.scheduleVersion,providerPlanId:mapping.providerPlanId,initialAmount:campaign?.final??terms.introPrice??terms.recurringPrice,totalCount,providerOfferId:offerId,campaignClaimId:campaign?.claimId??null,promoCode:campaign?.campaign.promoCode??null,expectedCampaignPrice:campaign?.final??null};
       const payload:Record<string,unknown>={plan_id:mapping.providerPlanId,total_count:totalCount,quantity:1,customer_notify:true,notes:{ca_progress_user_id:userId,ca_progress_plan_id:terms.planId,ca_progress_policy_version_id:terms.policyVersionId,checkout_key:input.requestId,...(campaign?{ca_progress_campaign_version_id:campaign.campaign.id}:{})}};
       if(offerId)payload.offer_id=offerId;
-      const paid=await db.prepare("SELECT ends_at FROM user_subscriptions WHERE user_id=?1 AND ends_at>?2 AND status IN ('active','cancelled','paused') ORDER BY ends_at DESC LIMIT 1").bind(userId,new Date().toISOString()).first<{ends_at:string}>();
-      const start=Math.max(terms.trialDays>0?Math.floor(Date.now()/1000+terms.trialDays*86400):0,paid?Math.floor(Date.parse(paid.ends_at)/1000):0);
+      const paid=await prepaidAccess(db,userId);
+      const start=Math.max(terms.trialDays>0?Math.floor(Date.now()/1000+terms.trialDays*86400):0,paid?.ends_at?Math.floor(Date.parse(paid.ends_at)/1000):0);
       if(start>Math.floor(Date.now()/1000)+60)payload.start_at=start;
       return {contract,payload};
     },
     async provider(path,init={}){
       if(!env.RAZORPAY_KEY_ID||!env.RAZORPAY_KEY_SECRET)throw new CheckoutError('Checkout is unavailable.','provider_not_configured',503);
       const response=await providerFetch(`https://api.razorpay.com/v1/${path}`,{...init,headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,'content-type':'application/json'}});
-      if(!response.ok){const error=Object.assign(new CheckoutError('Provider request could not be completed.','provider_request_failed',502),{definitiveRejection:response.status>=400&&response.status<500&&![408,409,429].includes(response.status)});throw error;}
+      if(!response.ok){const detail=await response.json().catch(()=>null) as {error?:{field?:string}}|null;const field=typeof detail?.error?.field==='string'&&/^[a-z_]{1,40}$/.test(detail.error.field)?detail.error.field:null;const error=Object.assign(new CheckoutError(`Razorpay rejected this request (HTTP ${response.status}${field?`; ${field}`:''}).`,'provider_http_'+response.status+(field?'_'+field:''),502),{definitiveRejection:response.status>=400&&response.status<500&&![408,409,429].includes(response.status)});throw error;}
       return await response.json() as Record<string,unknown>;
     },
     async releaseCampaign(user,key){await db.prepare("UPDATE billing_campaign_claims SET state='failed',failed_at=?1 WHERE user_id=?2 AND claim_key=?3 AND state='reserved' AND provider_subscription_id IS NULL").bind(new Date().toISOString(),user,`checkout_${user}_${key}`.slice(0,160)).run();},

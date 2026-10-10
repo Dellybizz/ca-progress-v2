@@ -9,7 +9,7 @@ test('production provider client runs in Workers and refuses redirects without f
  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:result.outputFiles[0].text,compatibilityDate:'2026-08-29',compatibilityFlags:['nodejs_compat'],outboundService:request=>{calls.push({url:request.url,method:request.method,redirect:request.redirect});return new URL(request.url).pathname.endsWith('/redirect')?new Response(null,{status:302,headers:{location:'https://untrusted.example/'}}):Response.json({id:'sub_fixture',status:'created'});}}));
  try{
   for(const method of ['GET','POST']){const response=await mf.dispatchFetch('https://test/',{method});assert.equal((await response.json()).ok,true);}
-  const blocked=await (await mf.dispatchFetch('https://test/redirect')).json();assert.equal(blocked.ok,false);assert.equal(blocked.code,'provider_request_failed');assert.equal(blocked.definitiveRejection,false);
+  const blocked=await (await mf.dispatchFetch('https://test/redirect')).json();assert.equal(blocked.ok,false);assert.equal(blocked.code,'provider_http_302');assert.equal(blocked.definitiveRejection,false);
   assert.equal(calls.length,3);assert.ok(calls.every(call=>call.url.startsWith('https://api.razorpay.com/')));
  }finally{await mf.dispose();}
 });
