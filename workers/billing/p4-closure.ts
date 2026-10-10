@@ -9,7 +9,7 @@ type D1Statement = {
 };
 type D1Database = { prepare(query: string): D1Statement };
 type Row = Record<string, unknown>;
-type ProviderSubscriptionSnapshot = { status?: unknown; short_url?: unknown };
+type ProviderSubscriptionSnapshot = { status?: unknown; short_url?: unknown; total_count?: unknown };
 type BillingJob =
   | { kind: "webhook"; raw: string; signature: string; eventId: string | null }
   | { kind: "reconcile"; subscriptionId: string; userId: string; reason: string; runId: string | null };
@@ -69,7 +69,7 @@ export async function freezeUnsafeSubscriptionCreation(request: Request, env: En
     const effective = await db.prepare("SELECT id FROM plan_policy_versions WHERE plan_id=?1 AND state='published' AND (effective_at IS NULL OR effective_at<=?2) ORDER BY COALESCE(effective_at,published_at,created_at) DESC,version DESC LIMIT 1").bind(planId,new Date().toISOString()).first<Row>();
     if (effective?.id !== body.policyVersionId) return json({error:"Pricing changed. Refresh the pricing page before checkout."},409);
   }
-  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits
+  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits,total_count,billing_duration_value,billing_duration_unit
     FROM razorpay_subscriptions
     WHERE user_id=?1 AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
     ORDER BY created_at DESC LIMIT 21`).bind(userId).all<Row>();
@@ -79,7 +79,7 @@ export async function freezeUnsafeSubscriptionCreation(request: Request, env: En
   }
 
   if (rows.length === 0) {
-    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits
+    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits,total_count,billing_duration_value,billing_duration_unit
       FROM razorpay_subscriptions WHERE user_id=?1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
     if (latest) rows = [latest];
   }
@@ -109,6 +109,9 @@ export async function freezeUnsafeSubscriptionCreation(request: Request, env: En
     const providerTerminal = TERMINAL_SUBSCRIPTION_STATUSES.has(providerStatus);
     if (localTerminal !== providerTerminal) {
       return json({ error: "Checkout is frozen because local and Razorpay subscription states disagree. Reconcile the existing subscription before starting another.", code: "subscription_state_mismatch", localStatus, providerStatus }, 409);
+    }
+    if (["created","authenticated"].includes(providerStatus) && Math.max(Number(local.total_count)||0,Number(providerState.total_count)||0)*Number(local.billing_duration_value||1)*(local.billing_duration_unit==="year"?12:1)>12) {
+      return json({error:"This old mandate exceeds the supported duration. Close the unpaid setup in Billing, then start a fresh checkout.",code:"mandate_schedule_unsupported"},409);
     }
     if (!providerTerminal) {
       verifiedOpen.push({ local, providerStatus, authorizationUrl: safeAuthorizationUrl(providerState.short_url) });

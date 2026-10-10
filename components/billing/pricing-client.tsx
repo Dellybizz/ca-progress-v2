@@ -27,6 +27,7 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     checkoutGuard.current=true;setBusy(created.planId);setNotice(null);
     const finish=()=>{checkoutGuard.current=false;setBusy(null);};
     try{
+      if(created.errorCode==="mandate_schedule_unsupported")throw new Error("This old mandate exceeds the supported duration. Close the unpaid setup in Billing, then start a fresh checkout.");
       if(!created.resumable||!created.subscriptionId||!created.keyId)throw new Error("The original checkout is still being reconciled. Check its status in Billing.");
       setNotice({tone:"info",text:`Original checkout: ${money(created.initialAmount)} first charge, then ${money(created.recurringAmount)} recurring · ${created.paymentMethod}, for up to ${created.totalCount} scheduled charges.`});
       if(!await loadCheckout()||!window.Razorpay)throw new Error("Razorpay could not load. Your original checkout remains saved.");
