@@ -20,5 +20,5 @@ export default async function PricingPage() {
     getRecurringBillingState(),
   ]);
   const commercePolicy = commercePolicyFromUserAgent(requestHeaders.get("user-agent"));
-  return <div className="phase11-page"><PageHeader preview={false} eyebrow="Plans" title="Free, Basic or Pro — choose only what you need." description="Start free. Upgrade for better planning or deeper insights, with clear prices and automatic plan activation." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link><Link href="/settings">Settings</Link></div>}/><PricingClient hasRecurring={Boolean(recurring.subscription&&!["cancelled","completed","expired"].includes(recurring.subscription.status))} {...model} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
+  return <div className="phase11-page"><PageHeader preview={false} eyebrow="Plans" title="Choose your plan" description="Free, Basic or Pro. Your progress stays with you." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link></div>}/><PricingClient hasRecurring={Boolean(recurring.subscription&&!["cancelled","completed","expired"].includes(recurring.subscription.status))} {...model} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
 }
