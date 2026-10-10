@@ -14,7 +14,7 @@ import { getBillingModel } from "@/lib/billing/service";
 
 export const dynamic="force-dynamic";
 export const metadata:Metadata={title:"Billing | CA Progress"};
-const money=(amount:number,currency:string)=>new Intl.NumberFormat("en-IN",{style:"currency",currency,maximumFractionDigits:0}).format(amount/100);
+const money=(amount:number,currency:string)=>new Intl.NumberFormat("en-IN",{style:"currency",currency,minimumFractionDigits:0,maximumFractionDigits:2}).format(amount/100);
 const date=(value:string|null|undefined)=>value?new Intl.DateTimeFormat("en-IN",{dateStyle:"medium",timeZone:"Asia/Kolkata"}).format(new Date(value)):"—";
 
 const paymentLabel=(value:string)=>({captured:"Paid",paid:"Paid",authorized:"Confirming payment",created:"Awaiting payment",pending:"Processing",failed:"Failed",refunded:"Refunded",partially_refunded:"Partially refunded",cancelled:"Cancelled"} as Record<string,string>)[value]??"Being checked";
