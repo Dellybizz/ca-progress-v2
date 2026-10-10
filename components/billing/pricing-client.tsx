@@ -47,6 +47,9 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     checkoutGuard.current=true;setBusy(plan.id);setNotice(null);setFallbackUrl(null);
     let original:CheckoutView|null=null;
     try{
+      // Billing closure happens in another page; discard its completed browser intent before purchase.
+      const saved=await fetch('/api/v1/payments/checkout/status',{cache:'no-store'}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null);
+      if(saved&&['failed','cancelled','succeeded'].includes(saved.state))clearCheckoutIntent(localStorage,viewerId,saved.requestId);
       const input=checkoutIntent(localStorage,viewerId,{planId:plan.id,paymentMethod:method,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID());
       const response=await fetch("/api/v1/payments/create-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input),signal:AbortSignal.timeout(45000)});
       const result=await response.json() as CheckoutView&{error?:string};
