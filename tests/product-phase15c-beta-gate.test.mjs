@@ -69,7 +69,7 @@ test("every implemented paid API surface is represented by the audit and has a s
     assert.notEqual(PLAN_FEATURE_REQUIRED_TIER[surface.featureKey], "free", surface.featureKey);
     const source = read(surface.route);
     assert.match(source, new RegExp(`[\"']${surface.featureKey}[\"']`), surface.key);
-    if (surface.route.includes("/exports/")) assert.match(source, /canUseExport/);
+    if (surface.route.includes("/exports/")) assert.match(source, /getPlanFeatureAccessForUser/);
     else assert.match(source, /getPlanFeatureAccessForUser/);
   }
 });
@@ -109,14 +109,14 @@ test("controlled beta matrix preserves a genuinely usable Free product and monot
   ];
   for (const feature of freeCore) assert.equal(canUsePlanFeature("free", feature), true, `Free ${feature}`);
 
-  const proUpgrades = ["advanced_analytics", "advanced_planner_calendar", "customisation_reminders", "expanded_study_buddy", "detailed_goals_reports", "study_csv", "test_history_csv"];
+  const proUpgrades = [ "advanced_planner_calendar", "customisation_reminders", "expanded_study_buddy", "detailed_goals_reports", "study_csv", "test_history_csv"];
   for (const feature of proUpgrades) {
     assert.equal(canUsePlanFeature("free", feature), false, feature);
     assert.equal(canUsePlanFeature("basic", feature), true, feature);
     assert.equal(canUsePlanFeature("pro", feature), true, feature);
   }
 
-  const premiumUpgrades = ["advanced_preparation", "advanced_forecasts_insights", "full_backup", "full_historical_insights", "advanced_recovery_planning"];
+  const premiumUpgrades = ["advanced_analytics","advanced_preparation", "advanced_forecasts_insights", "full_backup", "full_historical_insights", "advanced_recovery_planning"];
   for (const feature of premiumUpgrades) {
     assert.equal(canUsePlanFeature("free", feature), false, feature);
     assert.equal(canUsePlanFeature("basic", feature), false, feature);

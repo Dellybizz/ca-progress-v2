@@ -3,7 +3,6 @@ import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess } from "@/lib/billing/service";
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
-import { getPhase5TestAttachmentUsageBytes } from "@/lib/tests/phase5";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -96,8 +95,7 @@ export async function POST(request: Request) {
   let access;
   try { access = await getResourceStorageAccess(user.id); }
   catch { return fail("Storage access is temporarily unavailable.", 503, "STORAGE_ACCESS_UNAVAILABLE"); }
-  const testUsage = await getPhase5TestAttachmentUsageBytes(user.id, database);
-  if (!access.allowed || (access.limitBytes !== null && access.usedBytes + testUsage + Number(intent.expected_size_bytes) > access.limitBytes)) {
+  if (!access.allowed || (access.limitBytes !== null && access.usedBytes + Number(intent.expected_size_bytes) > access.limitBytes)) {
     await bucket.delete(intent.object_key).catch(() => undefined);
     await database.prepare("UPDATE test_attachment_upload_intents SET status='failed' WHERE id=?1 AND user_id=?2").bind(uploadId, user.id).run();
     return fail(access.upgradeMessage || "Your storage allowance has changed.", 403, "STORAGE_LIMIT_REACHED");

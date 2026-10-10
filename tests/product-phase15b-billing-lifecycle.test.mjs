@@ -87,7 +87,7 @@ test("downgrade UX promises preservation while blocking only new uploads over li
   assert.match(settings, /existing files stay available, but new uploads pause until you reduce usage or upgrade\./i);
   assert.match(settings, /Cancelled — paid access remains active through/);
   assert.match(settings, /Billing grace period — paid access remains active through/);
-  assert.match(settings, /Free, Pro and Premium/);
+  assert.match(settings, /Free, Basic and Pro/);
 
   const billing = source("lib/billing/service.ts");
   const worker = source("workers/billing/index.ts");

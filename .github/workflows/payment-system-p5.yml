@@ -29,6 +29,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Verify complete repository
         run: npm run ci
+      - name: Validate native service screens
+        run: npm run native:bundle
       - name: Build Cloudflare runtime
         run: npm run cf:build
       - name: Apply fixed-grace and recovery migrations before billing deployment
@@ -37,6 +39,8 @@ jobs:
         run: npm run cf:deploy:billing
       - name: Deploy web runtime
         run: npm run cf:deploy:web
+      - name: Verify published plan service allocation
+        run: node scripts/payments/verify-plan-services.mjs
       - name: Verify deployed method-aware quotes
         run: node scripts/payments/verify-p1-quotes.mjs
       - name: Verify durable schema and private recovery endpoints
@@ -54,6 +58,7 @@ jobs:
         with:
           name: payment-system-p5-${{ github.sha }}
           path: |
+            deployment-evidence/plan-services/*.json
             deployment-evidence/payment-system-p5/*.json
             deployment-evidence/payment-system-p4/*.json
             deployment-evidence/payment-system-p3/*.json

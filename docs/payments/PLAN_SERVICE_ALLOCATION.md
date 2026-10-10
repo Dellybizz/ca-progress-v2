@@ -1,0 +1,13 @@
+# Free, Basic and Pro services
+
+Free keeps core progress, revision and test tracking, focus, personal notes, community, basic Study Buddy, summaries, baseline forecast and Progress PDF. Basic adds personal calendar, detailed goals, reminder preferences, shared goals/nudges/study together and study/test CSV. Pro adds advanced performance analysis and the full backup archive. Storage is 250 MB, 2.5 GB and 15 GB respectively; resource files and private test attachments share the allowance.
+
+The completed service catalogue lives in lib/billing/plan-policy.mjs. Migration 0074 fills missing rules in all existing policy versions, including retired versions referenced by purchased contracts. It preserves explicit feature switches, per-user overrides and storage allowances above the new defaults. It does not alter payment prices, provider plans, mandate terms, purchase records or stored study data. A subscriber whose saved policy explicitly grants a different benefit retains that rule. Subsequent changes belong in audited policy drafts/publications.
+
+Website and native analytics share the advanced_analytics rule. Native responses retain Free summaries and the baseline forecast, while redacting readiness, consistency and advanced signals when access is denied. The updated native source hides unverified old cached advanced snapshots. A new APK is required to receive updated native screen copy; API protection applies immediately to existing builds.
+
+Exports and their Settings actions consult server permissions rather than fixed tier comparisons. Page disable no longer falls back to enabled legacy access. Storage accepts explicit byte allowances including zero, or compatible legacy MB allowances; new uploads are blocked above quota while existing downloads remain available. Upload intents reserve against resource files, test attachments and both classes of pending uploads. Configured per-file allowances are enforced when upload intents are issued.
+
+Unfinished richer notes, streak freezes, extended history, larger archives, advanced preparation, advanced forecasts and recovery planning are excluded from public comparison. Native store products and annual checkout remain disabled until configured separately.
+
+Validation includes the actual bundled billing worker for every completed rule and all tiers, paid expiry/cancellation, temporary overrides, disabled pages, older contracts, repeatable migration, unchanged prices, actual export handlers and analytics response redaction. The release verifies the 87 live published rules, storage units and unchanged prices with read-only queries; it creates no customer charges.

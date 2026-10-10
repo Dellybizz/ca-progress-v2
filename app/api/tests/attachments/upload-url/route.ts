@@ -4,7 +4,7 @@ import { getResourceStorageAccess } from "@/lib/billing/service";
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 import { createR2PresignedUrl } from "@/lib/resources/r2-presign";
 import { RESOURCE_MAX_BYTES, normalizeFilename } from "@/lib/resources/validation";
-import { getOwnedPhase5Attempt, getPhase5TestAttachmentUsageBytes, parsePhase5AttachmentKind } from "@/lib/tests/phase5";
+import { getOwnedPhase5Attempt, parsePhase5AttachmentKind } from "@/lib/tests/phase5";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,8 +46,8 @@ export async function POST(request: Request) {
   try { access = await getResourceStorageAccess(user.id); }
   catch { return fail("Storage access is temporarily unavailable.", 503, "STORAGE_ACCESS_UNAVAILABLE"); }
   if (!access.allowed) return fail(access.upgradeMessage || "Your plan does not allow file storage.", 403, "ENTITLEMENT_REQUIRED");
-  const testUsage = await getPhase5TestAttachmentUsageBytes(user.id);
-  if (access.limitBytes !== null && access.usedBytes + testUsage + sizeBytes > access.limitBytes) return fail(access.upgradeMessage || "Your storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
+  if(access.fileSizeLimitBytes!=null&&sizeBytes>access.fileSizeLimitBytes)return fail("This file exceeds your plan file-size allowance.",403,"FILE_SIZE_LIMIT_REACHED");
+  if (access.limitBytes !== null && access.usedBytes + sizeBytes > access.limitBytes) return fail(access.upgradeMessage || "Your storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
 
   const objectKey = `test-attempts/${user.id}/${attempt.id}/${crypto.randomUUID()}/${normalizeFilename(filename)}`;
   let signed;
@@ -57,10 +57,16 @@ export async function POST(request: Request) {
   const uploadId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
   try {
-    await getHotD1Database().prepare(`INSERT INTO test_attachment_upload_intents
+    const reservation=await getHotD1Database().prepare(`INSERT INTO test_attachment_upload_intents
       (id,user_id,attempt_id,attachment_kind,object_key,filename,mime_type,expected_size_bytes,expires_at)
-      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`)
-      .bind(uploadId, user.id, attempt.id, kind, objectKey, filename, mimeType, sizeBytes, expiresAt).run();
+      SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9 WHERE
+      COALESCE((SELECT SUM(size_bytes) FROM uploaded_resources WHERE owner_user_id=?2),0)
+      +COALESCE((SELECT SUM(size_bytes) FROM test_attempt_attachments WHERE user_id=?2),0)
+      +COALESCE((SELECT SUM(expected_size_bytes) FROM r2_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?10),0)
+      +COALESCE((SELECT SUM(expected_size_bytes) FROM test_attachment_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?10),0)
+      +?8<=?11`)
+      .bind(uploadId, user.id, attempt.id, kind, objectKey, filename, mimeType, sizeBytes, expiresAt,new Date().toISOString(),access.limitBytes).run() as {meta?:{changes?:number}};
+    if(Number(reservation.meta?.changes)!==1)return fail("Your storage allowance has been reached.",403,"STORAGE_LIMIT_REACHED");
   } catch {
     return fail("Test upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");
   }

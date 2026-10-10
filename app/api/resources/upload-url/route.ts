@@ -35,6 +35,7 @@ async function createUploadIntent(request: Request) {
   try { access = await getResourceStorageAccess(identity.id); }
   catch { return error("Resource storage access is temporarily unavailable.", 503, "STORAGE_ACCESS_UNAVAILABLE"); }
   if (!access.allowed) return error(access.upgradeMessage || "Your plan does not allow file storage.", 403, "ENTITLEMENT_REQUIRED");
+  if(access.fileSizeLimitBytes!=null&&sizeBytes>access.fileSizeLimitBytes)return error("This file exceeds your plan file-size allowance.",403,"FILE_SIZE_LIMIT_REACHED");
   if (access.limitBytes !== null && access.usedBytes + sizeBytes > access.limitBytes) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
 
   const objectKey = `uploads/${identity.id}/${crypto.randomUUID()}/${normalizeFilename(filename)}`;
@@ -52,6 +53,8 @@ async function createUploadIntent(request: Request) {
       WHERE (
         COALESCE((SELECT SUM(size_bytes) FROM uploaded_resources WHERE owner_user_id=?2), 0)
         + COALESCE((SELECT SUM(expected_size_bytes) FROM r2_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?9), 0)
+        + COALESCE((SELECT SUM(size_bytes) FROM test_attempt_attachments WHERE user_id=?2), 0)
+        + COALESCE((SELECT SUM(expected_size_bytes) FROM test_attachment_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?9), 0)
         + ?6
       ) <= ?10
     `)

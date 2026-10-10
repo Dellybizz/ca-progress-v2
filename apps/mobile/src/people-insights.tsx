@@ -106,6 +106,7 @@ export function NativeTests({ repository, workspace }: { repository: LocalAccoun
 }
 
 type AnalyticsModel = {
+  advancedAccess?: boolean;
   levelName: string; attemptKey: string;
   weeklyStudy: { currentMinutes: number; priorMinutes: number; direction: string };
   readiness: Array<{ key: string; label: string; percent: number; numerator: number; denominator: number; calculation: string }>;
@@ -128,8 +129,10 @@ export function NativeAnalytics({ repository, workspace, forecast = false, onNav
       {value && <details className="insights-method"><summary>How this forecast works</summary><p>{evidence?.boundary}</p><p>{evidence?.calculation}</p>{Boolean(evidence?.reasons.length) && <ul>{evidence?.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>}</details>}</section>
     </> : <>
       <div className="metric-grid insights-summary"><article><small>Study this week</small><strong>{value?.weeklyStudy.currentMinutes ?? "—"} min</strong><p>Previous: {value?.weeklyStudy.priorMinutes ?? "—"} min</p></article><article><small>First coverage</small><strong>{evidence?.completionPercent ?? (workspace.progress.length ? Math.round(completed / workspace.progress.length * 100) : 0)}%</strong><p>{value?.evidence.completedChapters ?? completed} chapters</p></article><article><small>Test attempts</small><strong>{value?.evidence.testAttempts ?? "—"}</strong><p>Recorded evidence</p></article><article><small>Sessions</small><strong>{value?.evidence.studySessionsLast14 ?? "—"}</strong><p>Past 14 days</p></article></div>
+      {value?.advancedAccess===true ? <>
       <section className="insights-list"><h2>Readiness</h2>{value?.readiness.length ? value.readiness.map(item => <article className="insights-line" key={item.key}><div><strong>{item.label}</strong><small>{item.numerator}/{item.denominator}</small></div><b>{item.percent}%</b><details><summary>Calculation</summary>{item.calculation}</details></article>) : <p>Connect to load verified readiness metrics.</p>}</section>
       <section className="insights-list"><h2>Subject consistency</h2>{value?.consistency.length ? value.consistency.map(item => <article className="insights-line" key={item.subjectId}><div><strong>{item.subjectTitle}</strong><small>{item.activeDaysLast14} active days · {item.minutesLast14} min in 14 days</small></div></article>) : <p>Connect to load your subject activity.</p>}</section>
+      </> : <section className="planner-p3-card"><h2>Advanced analytics · Pro</h2><p>Your basic summaries and baseline forecast remain available. Pro adds readiness and subject consistency analysis.</p></section>}
     </>}
   </section>;
 }

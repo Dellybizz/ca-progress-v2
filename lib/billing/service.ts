@@ -7,7 +7,7 @@ import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
 import { hasSubscriptionAccess } from "./lifecycle.mjs";
-import { storageQuotaBytes, tierRank } from "./plan-policy.mjs";
+import { configuredStorageBytes, tierRank } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -127,9 +127,11 @@ export async function getResourceStorageAccess(userId: string) {
   const entitlement = await getEntitlementForUser(userId, "resources.storage");
   const result = await db().from("uploaded_resources").select("size_bytes").eq("owner_user_id", userId);
   if (result.error) throw new Error(result.error.message);
-  const usedBytes = asRows<StorageRow>(result.data).reduce((sum, item) => sum + Number(item.size_bytes ?? 0), 0);
+  const attachments = await db().from("test_attempt_attachments").select("size_bytes").eq("user_id", userId);
+  if (attachments.error) throw new Error(attachments.error.message);
+  const usedBytes = [...asRows<StorageRow>(result.data),...asRows<StorageRow>(attachments.data)].reduce((sum, item) => sum + Number(item.size_bytes ?? 0), 0);
   const allowed = Boolean(entitlement.planId) && entitlement.allowed;
-  const limitBytes = entitlement.storageLimitBytes ?? storageQuotaBytes(entitlement.tier);
+  const limitBytes = configuredStorageBytes(entitlement);
   const limitValue = limitBytes / (1024 * 1024);
   return {
     ...entitlement,
@@ -146,6 +148,7 @@ export async function createResourceMetadataWithinQuota(input: { userId: string;
   const client = db();
   const access = await getResourceStorageAccess(input.userId);
   if (!access.allowed) throw new Error(access.upgradeMessage || "Resource storage is not available on this plan.");
+  if(access.fileSizeLimitBytes!=null&&input.sizeBytes>access.fileSizeLimitBytes)throw new Error("This file exceeds your plan file-size allowance.");
   if (access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
   const duplicateResult = await client.from("uploaded_resources").select("id").eq("storage_path", input.storagePath).maybeSingle();
   if (duplicateResult.error) throw new Error(duplicateResult.error.message);

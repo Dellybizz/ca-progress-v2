@@ -23,3 +23,6 @@ export function storageQuotaMegabytes(value: unknown): number;
 export function storageQuotaBytes(value: unknown): number;
 export function canUsePlanFeature(value: unknown, featureKey: string): boolean;
 export function planFeatureRequirement(featureKey: string): Readonly<{ tier: PlanTier; productPlan: ProductPlanLabel }> | null;
+
+export const PLAN_SERVICE_CATALOG:readonly Readonly<{key:string;page:string;label:string;tier:PlanTier}>[];
+export function configuredStorageBytes(entitlement:{tier:unknown;storageLimitBytes?:number|null;limitValue?:number|null;limitUnit?:string}):number;

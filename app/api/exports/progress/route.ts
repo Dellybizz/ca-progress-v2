@@ -1,6 +1,5 @@
 import { optionalUser } from "@/lib/auth/server";
-import { getBillingModel } from "@/lib/billing/service";
-import { canUseExport } from "@/lib/exports/policy.mjs";
+import { getPlanFeatureAccessForUser } from "@/lib/billing/feature-access";
 import { createOwnedProgressPdf } from "@/lib/exports/service";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +19,9 @@ export async function GET() {
     });
   }
 
-  const billing = await getBillingModel();
-  const tier = billing.currentPlan?.tier_key ?? "free";
-  if (!canUseExport(tier, "progress_pdf")) {
-    return Response.json({ error: "Your current plan does not include this export." }, {
+  const access = await getPlanFeatureAccessForUser(user.id, "progress_pdf");
+  if (!access.allowed) {
+    return Response.json({ error: access.upgradeMessage }, {
       status: 403,
       headers: PRIVATE_HEADERS,
     });

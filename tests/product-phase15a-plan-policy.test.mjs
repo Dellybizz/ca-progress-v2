@@ -91,12 +91,14 @@ test("Free remains a complete core study product while paid feature floors stay 
     assert.equal(canUsePlanFeature("free", feature), true, feature);
   }
 
-  for (const feature of ["advanced_analytics", "study_csv", "test_history_csv"]) {
+  for (const feature of ["study_csv", "test_history_csv"]) {
     assert.equal(canUsePlanFeature("free", feature), false, feature);
     assert.equal(canUsePlanFeature("basic", feature), true, feature);
     assert.equal(canUsePlanFeature("pro", feature), true, feature);
   }
 
+  assert.equal(canUsePlanFeature("basic", "advanced_analytics"), false);
+  assert.equal(canUsePlanFeature("pro", "advanced_analytics"), true);
   assert.equal(canUsePlanFeature("basic", "full_backup"), false);
   assert.equal(canUsePlanFeature("pro", "full_backup"), true);
   assert.equal(canUsePlanFeature("pro", "unknown_feature"), false);
@@ -139,7 +141,7 @@ test("exports and resource storage consume the canonical policy instead of priva
   assert.match(billingSource, /from "\.\/plan-policy\.mjs"/);
   assert.match(billingSource, /tierRank\(rewardTier\)/);
   assert.match(billingSource, /tierRank\(currentTier\)/);
-  assert.match(billingSource, /entitlement\.storageLimitBytes \?\? storageQuotaBytes\(entitlement\.tier\)/);
+  assert.match(billingSource, /configuredStorageBytes\(entitlement\)/);
   assert.match(billingSource, /entitlement\.allowed/);
   assert.doesNotMatch(billingSource, /entitlement\.limitValue \* 1024 \* 1024/);
 });
