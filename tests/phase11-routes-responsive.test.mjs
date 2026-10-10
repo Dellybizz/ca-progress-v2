@@ -29,7 +29,7 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
     "Active until",
     "Payments and renewal",
     "Payment history",
-    "Subscription audit",
+    "Plan changes",
     "No paid transactions yet",
     "CheckoutRecovery",
   ]) {
