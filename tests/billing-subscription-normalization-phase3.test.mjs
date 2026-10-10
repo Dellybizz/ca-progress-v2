@@ -35,7 +35,8 @@ test("Phase 3 reconciles the discounted first cycle without treating it as a pla
   const engine=read("lib/billing/renewal-engine.mjs");
   assert.match(engine,/number<=discountCycles\?first:regular/);
   assert.match(engine,/invoice\.cycleNumber/);
-  assert.match(worker,/provider_offer_mismatch/);
+  assert.match(engine,/offerMatches/);
+  assert.match(read("lib/billing/offer-evidence.mjs"),/provider_snapshot_json/);
   assert.match(worker,/offer_id:value\.offer_id/);
 });
 

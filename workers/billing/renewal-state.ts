@@ -9,6 +9,8 @@ export async function renewalEvidence(env:Env,local:Row,subscription:Row,payment
  if(!env.DB||!env.RAZORPAY_KEY_ID||!env.RAZORPAY_KEY_SECRET)throw new RenewalError('Renewal verification is unavailable.');
  let contract=local;
  if(local.campaign_claim_id){const claim=await env.DB.prepare('SELECT discount_cycles,provider_offer_id FROM billing_campaign_claims WHERE id=?1').bind(local.campaign_claim_id).first<Row>();if(!claim||claim.provider_offer_id!==local.provider_offer_id)throw new RenewalError('Campaign offer identity changed.','renewal_contract_mismatch');contract={...local,discount_cycles:Number(claim.discount_cycles)};}
+ const attempt=await env.DB.prepare('SELECT * FROM payment_checkout_attempts WHERE provider_subscription_id=?1 AND user_id=?2 AND request_key=?3 LIMIT 1').bind(local.provider_subscription_id,local.user_id,local.checkout_key).first<Row>();
+ contract={...contract,offer_creation_attempt:attempt};
  if(['refunded','disputed'].includes(String(local.financial_state)))throw new RenewalError('Financial review is required before extending this subscription.','renewal_financial_hold');
  const result=await collectRenewalEvidence(env.DB,contract,subscription,async path=>{
   const response=await providerFetch(`https://api.razorpay.com/v1/${path}`,{method:'GET',headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,accept:'application/json'}});
