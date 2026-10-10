@@ -35,7 +35,8 @@ test("Phase 11 data views retain every labeled field in purpose-built mobile row
   assert.match(css, /\.data-table td::before\s*\{\s*content:\s*attr\(data-label\)/);
   assert.match(users, /className="data-table"/);
   assert.match(users, /data-label="CA profile"/);
-  assert.match(billing, /data-label="Provider reference"/);
+  assert.match(billing, /data-label="Details"/);
+  assert.match(billing, /<p>Payment reference<\/p>/);
 });
 
 test("Phase 11 overlays trap and restore focus and honor reduced motion", () => {
