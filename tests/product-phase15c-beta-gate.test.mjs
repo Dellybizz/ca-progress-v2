@@ -50,7 +50,7 @@ test("pricing UX is comparison-first and uses the Phase 1 commercial product nam
   const page = read("app/(student)/pricing/page.tsx");
   const client = read("components/billing/pricing-client.tsx");
   assert.match(page, /Free, Basic or Pro/);
-  assert.match(page, /server, not trusted from the browser/);
+  assert.match(page, /clear prices and automatic plan activation/);
   assert.match(client, /PLAN_COMPARISON_COLUMNS/);
   assert.match(client, /PLAN_COMPARISON_ROWS/);
   assert.match(client, /productPlanLabel\(plan\.tier_key\)/);

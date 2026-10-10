@@ -15,7 +15,7 @@ export type PlanTier = "free" | "basic" | "pro";
 export type SubscriptionPlan = { id: string; tier_key: PlanTier; billing_cycle: BillingCycle; name: string; tagline: string; rank: number; price_subunits: number | null; currency: string; duration_value: number; duration_unit: string; active: boolean; checkout_enabled: boolean; sort_order: number };
 export type PlanEntitlement = { plan_id: string; feature_key: string; enabled: boolean; limit_value: number | null; limit_unit: string; reset_period: string; upgrade_message: string };
 export type Entitlement = { planId: string; tier: PlanTier; planName: string; featureKey: string; allowed: boolean; limitValue: number | null; limitUnit: string; resetPeriod: string; upgradeMessage: string; policyVersionId?: string; timeLimitMinutes?: number | null; storageLimitBytes?: number | null; fileSizeLimitBytes?: number | null; retentionDays?: number | null };
-export type BillingModel = { mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: SubscriptionRow | null; payments?: PaymentRow[]; events?: SubscriptionEventRow[]; plans?: SubscriptionPlan[] };
+export type BillingModel = { viewerId?: string; mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: SubscriptionRow | null; payments?: PaymentRow[]; events?: SubscriptionEventRow[]; plans?: SubscriptionPlan[] };
 
 type CurrentPlanRow = { plan_id: string; status: string; starts_at: string; ends_at: string | null };
 type StorageRow = { size_bytes: number };
@@ -184,5 +184,5 @@ export async function getBillingModel(): Promise<BillingModel> {
   const subscriptions = asRows<SubscriptionRow>(subscriptionsResult.data);
   const now = new Date();
   const currentSubscription = subscriptions.find((item) => hasSubscriptionAccess(item, now)) ?? null;
-  return { mode: "ready", currentPlan, currentSubscription, payments: asRows<PaymentRow>(paymentsResult.data), events: asRows<SubscriptionEventRow>(eventsResult.data), plans };
+  return { mode: "ready", viewerId: identity.id, currentPlan, currentSubscription, payments: asRows<PaymentRow>(paymentsResult.data), events: asRows<SubscriptionEventRow>(eventsResult.data), plans };
 }

@@ -27,18 +27,19 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
   for (const phrase of [
     "Current plan",
     "Active until",
-    "Renewal state",
+    "Payments and renewal",
     "Payment history",
     "Subscription audit",
     "No paid transactions yet",
-    "Retry payment",
+    "CheckoutRecovery",
   ]) {
     assert.ok(billing.includes(phrase), `${phrase} should be represented`);
   }
-  assert.match(billing, /state\s*===\s*"success"/);
-  assert.match(billing, /state\s*===\s*"pending"/);
-  assert.match(billing, /state\s*===\s*"failed"/);
-  assert.match(billing, /Retry payment/);
+  assert.doesNotMatch(billing, /PaymentState|query\.payment/);
+  assert.match(billing, /viewerId=\{model\.viewerId\}/);
+  const recovery=read("components/billing/checkout-recovery.tsx");
+  assert.match(recovery, /monitorCheckout/);
+  assert.match(recovery, /next\?\.accessGranted/);
 });
 
 test("pricing remains configuration-safe and sends policy and method identifiers without a client charge amount", () => {
@@ -46,7 +47,7 @@ test("pricing remains configuration-safe and sends policy and method identifiers
   assert.match(pricing, /checkoutIntent\(localStorage,viewerId,\{planId:plan\.id,paymentMethod:method,policyVersionId:offer\?\.policyVersionId/);
   assert.match(pricing, /body:JSON\.stringify\(input\)/);
   assert.doesNotMatch(pricing, /body:JSON\.stringify\(\{[^}]*\b(?:amount|price_subunits)\b[^}]*\}\)/);
-  assert.match(pricing, /Checkout not configured/);
+  assert.match(pricing, /Currently unavailable/);
   assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
   assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer,method\)/);
   assert.match(pricing, /published server policy has a valid price/);
