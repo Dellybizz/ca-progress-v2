@@ -4,7 +4,7 @@ New direct monthly Basic and Pro purchases can use one subscription checkout whe
 
 ## Provider setup still required
 
-Create Subscription Offers in Razorpay Live Mode, with payment blocked when offer validation fails:
+Create Subscription Offers in Razorpay Live Mode, with the chosen validation-failure behavior explicitly disclosed at checkout:
 
 | Plan | Method | Regular monthly price | First-month price | Flat discount | Offer duration |
 | --- | --- | --- | --- | --- | --- |
@@ -23,8 +23,8 @@ Razorpay's documented Subscription Offer methods are UPI and card. eMandate rema
 
 The server checks first-paid-purchase eligibility, binding policy, method, currency, introductory price and recurring price. A stale binding or changed eligibility aborts preparation before provider subscription creation. Trial and non-monthly interval combinations are not enabled by this feature. Existing payment contracts and already-paid first months retain their original recovery paths.
 
-Access requires captured invoice evidence at the exact discounted amount. Cycle two and later require the regular amount on the same provider subscription. Bank authorization alone does not grant paid access.
+Access requires captured invoice evidence at the exact discounted amount, or the exact regular first-month amount when the saved checkout includes explicit customer acceptance of that fallback. Arbitrary amounts and unconsented full-price charges remain blocked. Cycle two and later require the regular amount on the same provider subscription. Bank authorization alone does not grant paid access.
 
 Closing an unactivated mandate checkout requests provider-confirmed cancellation. If payment evidence exists or cancellation cannot be verified, the checkout remains under reconciliation and verified access is preserved.
 
-Migration 0080 activates the operator-supplied live Basic UPI offer `offer_TmiyM56nUFR5PJ` only when the current published policy is ₹50/month with a ₹25 introductory purchase. It aborts if those terms differ. The operator created the offer in the Razorpay dashboard and requested activation; Razorpay still validates the offer at checkout, and access still requires exact captured invoice evidence. Existing contracts are unchanged. Pro and card bindings still require their own live offers.
+Migration 0080 activates the operator-supplied live Basic UPI offer `offer_TmiyM56nUFR5PJ` only when the current published policy is ₹50/month with a ₹25 introductory purchase. It aborts if those terms differ. The operator created the offer in the Razorpay dashboard and requested activation; Razorpay still validates the offer at checkout, and access still requires exact captured invoice evidence. Existing contracts are unchanged. Migration 0081 activates Pro UPI offer `offer_Tmm4dnEyOmuBaO` at ₹50 first month / ₹150 monthly and enables the operator-requested regular-price fallback for both UPI offers. Fresh checkouts require customer acceptance of the possible full-price first month. Card bindings still require their own live offers.
