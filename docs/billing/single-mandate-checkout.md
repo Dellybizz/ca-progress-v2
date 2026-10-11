@@ -27,4 +27,4 @@ Access requires captured invoice evidence at the exact discounted amount. Cycle 
 
 Closing an unactivated mandate checkout requests provider-confirmed cancellation. If payment evidence exists or cancellation cannot be verified, the checkout remains under reconciliation and verified access is preserved.
 
-No live Offer IDs are seeded. Deploying this implementation alone does not enable the single-mandate flow; matching offer bindings are required.
+Migration 0080 activates the operator-supplied live Basic UPI offer `offer_TmiyM56nUFR5PJ` only when the current published policy is ₹50/month with a ₹25 introductory purchase. It aborts if those terms differ. The operator created the offer in the Razorpay dashboard and requested activation; Razorpay still validates the offer at checkout, and access still requires exact captured invoice evidence. Existing contracts are unchanged. Pro and card bindings still require their own live offers.
