@@ -24,14 +24,13 @@ export function dependencies(env:Env,userId:string):Dependencies{
       if(single?.allowRegularPriceFallback&&!input.acceptRegularPriceFallback)throw new CheckoutError('Review and accept the regular-price fallback before continuing.','checkout_fallback_consent_required');
       const terms=single??(input.paymentMethod==='upi'?resolved:{...resolved,introPrice:null,introCycles:0,introProviderOfferId:null});
       if(input.promoCode&&(terms.introPrice!==null||input.paymentMethod!=='upi'))throw new CheckoutError('This offer cannot be combined with the selected checkout.','checkout_offer_conflict');
-      const mapping=await ensurePlan(env,terms,'recurring',terms.recurringPrice);
+      const [mapping,paid]=await Promise.all([ensurePlan(env,terms,'recurring',terms.recurringPrice),prepaidAccess(db,userId)]);
       const campaign=input.paymentMethod==='upi'&&terms.introPrice===null?await reserveCampaign(db,{userId,planId:input.planId,requestId:input.requestId,policyVersionId:terms.policyVersionId,base:terms.recurringPrice,promoCode:input.promoCode}):null;
       const offerId=campaign?.campaign.providerOfferId??requireIntroOffer(terms);
       const schedule=mandateSchedule(terms),totalCount=schedule.totalCount;
       const contract={...terms,regularPriceFallbackAccepted:Boolean(single?.allowRegularPriceFallback&&input.acceptRegularPriceFallback),discountCycles:campaign?.campaign.discountCycles??terms.introCycles,providerTransportVersion:"manual-v1",paymentMethod:input.paymentMethod,mandateScheduleVersion:schedule.scheduleVersion,providerPlanId:mapping.providerPlanId,initialAmount:campaign?.final??terms.introPrice??terms.recurringPrice,totalCount,providerOfferId:offerId,campaignClaimId:campaign?.claimId??null,promoCode:campaign?.campaign.promoCode??null,expectedCampaignPrice:campaign?.final??null};
       const payload:Record<string,unknown>={plan_id:mapping.providerPlanId,total_count:totalCount,quantity:1,customer_notify:true,notes:{ca_progress_user_id:userId,ca_progress_plan_id:terms.planId,ca_progress_policy_version_id:terms.policyVersionId,checkout_key:input.requestId,...(campaign?{ca_progress_campaign_version_id:campaign.campaign.id}:{})}};
       if(offerId)payload.offer_id=offerId;
-      const paid=await prepaidAccess(db,userId);
       const start=Math.max(terms.trialDays>0?Math.floor(Date.now()/1000+terms.trialDays*86400):0,paid?.ends_at?Math.floor(Date.parse(paid.ends_at)/1000):0);
       if(start>Math.floor(Date.now()/1000)+60)payload.start_at=start;
       return {contract,payload};

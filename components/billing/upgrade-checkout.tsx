@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import type {UpgradeQuote} from '@/lib/billing/subscription-rules.mjs';
 import type {UpgradeView} from '@/lib/billing/upgrade-engine.mjs';
@@ -17,11 +17,12 @@ export function UpgradeCheckout({planLabel="Pro",introPurchase=false,planId,onCl
  useEffect(()=>{let active=true;void fetch('/api/v1/payments/upgrade',{cache:'no-store'}).then(r=>r.json()).then(result=>{if(active)setSaved(result.upgrade??null);}).catch(()=>undefined);return()=>{active=false;};},[]);
  useEffect(()=>{
   if(!planId)return;
+  void loadCheckout();
   const controller=new AbortController();
   void fetch('/api/v1/payments/upgrade-quote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({planId,paymentMethod:method,purchaseKind:introPurchase?"intro":"upgrade"}),signal:controller.signal}).then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||'Your upgrade review is unavailable.');if(!controller.signal.aborted)setReview({...result,planId,method});}).catch(reason=>{if(!controller.signal.aborted)setError(reason.message);});
   return()=>controller.abort();
- },[planId,method,introPurchase]);
- useEffect(()=>{if(planId&&!dialog.current?.open)dialog.current?.showModal();},[planId]);
+ },[planId,method,introPurchase,loadCheckout]);
+ useLayoutEffect(()=>{if(planId&&!dialog.current?.open)dialog.current?.showModal();},[planId]);
  useEffect(()=>{
   if(!savedId||savedReady)return;
   let active=true,count=0;const id=savedId;

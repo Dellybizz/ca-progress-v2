@@ -1,11 +1,12 @@
 "use client";
+import {loadCheckout} from '@/lib/billing/checkout-loader.mjs';
 import {SingleMandateReview} from './single-mandate-review';
 import {UpgradeCheckout} from './upgrade-checkout';
 import {CheckoutRecovery} from './checkout-recovery';
-import {checkoutIntent,clearCheckoutIntent,adoptCheckoutRequest} from '@/lib/billing/checkout-client.mjs';
+import {checkoutIntent,clearCheckoutIntent,adoptCheckoutRequest,readCheckoutIntent} from '@/lib/billing/checkout-client.mjs';
 import type {CheckoutView} from '@/lib/billing/checkout-engine.mjs';
 import { quoteForMethod, type PaymentMethod } from "@/lib/billing/payment-quote.mjs";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useLayoutEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import type { RecurringSubscriptionView } from "@/lib/billing/recurring-service";
@@ -17,18 +18,7 @@ import type { AppCommercePolicy } from "@/lib/mobile/commerce-policy";
 
 type CheckoutResult={razorpay_subscription_id:string;razorpay_payment_id:string;razorpay_signature:string};
 type RazorpayInstance={open():void;close?():void;on?(event:string,callback:(response:unknown)=>void):void};type RazorpayConstructor=new(options:Record<string,unknown>)=>RazorpayInstance;declare global{interface Window{Razorpay?:RazorpayConstructor}}
-function loadCheckout(){return new Promise<boolean>(resolve=>{
-  if(window.Razorpay){resolve(true);return;}
-  let script=document.querySelector<HTMLScriptElement>('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
-  const fresh=!script;
-  if(!script){script=document.createElement("script");script.src="https://checkout.razorpay.com/v1/checkout.js";script.async=true;}
-  const target=script;
-  const finish=(ready:boolean)=>{clearTimeout(timeout);target.removeEventListener("load",loaded);target.removeEventListener("error",failed);if(!ready)target.remove();resolve(ready);};
-  const loaded=()=>finish(Boolean(window.Razorpay)),failed=()=>finish(false);
-  const timeout=setTimeout(failed,15000);
-  target.addEventListener("load",loaded,{once:true});target.addEventListener("error",failed,{once:true});
-  if(fresh)document.head.appendChild(target);
-});}
+
 
 const featureCopy:Record<string,{name:string;help:string}>={
   core:{name:"Daily study tools",help:"Track study time, chapters, revisions, notes and tests."},
@@ -49,12 +39,13 @@ function storageLabel(plan:SubscriptionPlan,entitlements:PlanEntitlement[]=[]){c
 
 function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers,viewerId,hasRecurring,subscription}:{subscription:RecurringSubscriptionView|null;hasRecurring:boolean;viewerId:string|null;plans:SubscriptionPlan[];entitlements:PlanEntitlement[];authenticated:boolean;currentPlanId:string|null;offers:PublishedPricingOffer[]}){
   const checkoutGuard=useRef(false);
+  useEffect(()=>{if(authenticated)void loadCheckout();},[authenticated]);
   const [singlePlan,setSinglePlan]=useState<SubscriptionPlan|null>(null);
   const [introPurchase,setIntroPurchase]=useState(false);
   const [upgradePlanId,setUpgradePlanId]=useState<string|null>(null),[upgradeBusy,setUpgradeBusy]=useState(false);
   const [reviewPlan,setReviewPlan]=useState<SubscriptionPlan|null>(null);
   const reviewDialog=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{if(reviewPlan&&!reviewDialog.current?.open)reviewDialog.current?.showModal();},[reviewPlan]);
+  useLayoutEffect(()=>{if(reviewPlan&&!reviewDialog.current?.open)reviewDialog.current?.showModal();},[reviewPlan]);
   const router=useRouter(),[cycle,setCycle]=useState<Exclude<BillingCycle,"free">>("monthly"),[method,setMethod]=useState<PaymentMethod>("upi"),[promoCode,setPromoCode]=useState(""),[busy,setBusy]=useState<string|null>(null),[notice,setNotice]=useState<{tone:"success"|"error"|"info";text:string}|null>(null),[fallbackUrl,setFallbackUrl]=useState<string|null>(null);const visible=useMemo(()=>[plans.find(plan=>plan.tier_key==="free"),plans.find(plan=>plan.tier_key==="basic"&&plan.billing_cycle===cycle),plans.find(plan=>plan.tier_key==="pro"&&plan.billing_cycle===cycle)].filter(Boolean) as SubscriptionPlan[],[plans,cycle]),currentTier=plans.find(plan=>plan.id===(hasRecurring?subscription?.planId:currentPlanId))?.tier_key??null,offerFor=(plan:SubscriptionPlan)=>offers.find(offer=>offer.planId===plan.id),comparisonValue=(featureKey:string|undefined,tier:PlanTier)=>{if(!featureKey){const plan=plans.find(item=>item.tier_key===tier&&(tier==="free"||item.billing_cycle===cycle));return plan?storageLabel(plan,entitlements).replace(" private storage",""):"—";}const plan=plans.find(item=>item.tier_key===tier&&(tier==="free"||item.billing_cycle===cycle)),rule=entitlements.find(item=>item.plan_id===plan?.id&&item.feature_key===featureKey);return rule?.enabled?"Included":"—";};
   async function switchPlan(plan:SubscriptionPlan){
     if(checkoutGuard.current||!subscription)return;
@@ -91,11 +82,12 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     if(!authenticated||!viewerId){router.push(`/login?next=${encodeURIComponent("/pricing")}`);return;}
     const offer=offerFor(plan);
     if(!checkoutMatchesPolicy(plan,cycle,offer,method)){setNotice({tone:"info",text:"This checkout stays locked until its published server policy has a valid price and recurring terms."});return;}
-    checkoutGuard.current=true;setBusy(plan.id);setNotice(null);setFallbackUrl(null);
+    checkoutGuard.current=true;setBusy(plan.id);setNotice({tone:"info",text:"Preparing secure payment…"});setFallbackUrl(null);
+    void loadCheckout();
     let original:CheckoutView|null=null;
     try{
       // Billing closure happens in another page; discard its completed browser intent before purchase.
-      const saved=await fetch('/api/v1/payments/checkout/status',{cache:'no-store'}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null);
+      const saved=readCheckoutIntent(localStorage,viewerId)?await fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null):null;
       if(saved&&['failed','cancelled','succeeded'].includes(saved.state))clearCheckoutIntent(localStorage,viewerId,saved.requestId);
       let input=checkoutIntent(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID());
       let response=await fetch("/api/v1/payments/create-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input),signal:AbortSignal.timeout(45000)});

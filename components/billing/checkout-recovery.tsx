@@ -13,7 +13,7 @@ export function CheckoutRecovery({viewerId,onResume,webCheckoutAllowed,refreshKe
     const controller=new AbortController();
     const signal=()=>AbortSignal.any([controller.signal,AbortSignal.timeout(30000)]);
     const stop=monitorCheckout({
-      canCheck:()=>!document.hidden&&!guard.current,
+      canCheck:()=>!refreshKey&&!document.hidden&&!guard.current,
       read:async()=>{const response=await fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:signal()});if(!response.ok)throw new Error('unavailable');return (await response.json()).checkout;},
       reconcile:async next=>{
         if(!webCheckoutAllowed)return next;
