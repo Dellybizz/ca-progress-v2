@@ -15,7 +15,7 @@ export async function POST(request:Request){
  let input:{planId?:unknown;paymentMethod?:unknown;purchaseKind?:unknown}|null;try{input=JSON.parse(raw||'null');}catch{return NextResponse.json({error:'Invalid upgrade request.'},{status:400,headers});}
  if(typeof input?.planId!=='string')return NextResponse.json({error:'Choose a plan.'},{status:400,headers});
  try{
-  const target=(await listPublishedPricingOffers()).find(p=>p.planId===input.planId&&p.tierKey==='pro'&&p.billingCycle==='monthly'&&p.currency==='INR'&&p.checkoutEnabled);
+  const target=(await listPublishedPricingOffers()).find(p=>p.planId===input.planId&&(p.tierKey==='pro'||(input.purchaseKind==='intro'&&p.tierKey==='basic'))&&p.billingCycle==='monthly'&&p.currency==='INR'&&p.checkoutEnabled);
   if(!target)return NextResponse.json({error:'This upgrade is unavailable.'},{status:409,headers});
   return NextResponse.json(await (input.purchaseKind==='intro'?saveIntroQuote:saveUpgradeQuote)(getD1RuntimeDatabase(),user.id,target,paymentMethod(input.paymentMethod??'upi')),{headers});
  }catch(error){return NextResponse.json({error:error instanceof CheckoutError?error.message:'Your upgrade review is temporarily unavailable. Please try again.'},{status:error instanceof CheckoutError?error.status:503,headers});}

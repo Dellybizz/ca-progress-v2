@@ -44,7 +44,7 @@ async function renewal(env:Env,user:string,id:string){
  }
  if(checkout.state==='failed'&&!checkout.subscriptionId){
   await db.prepare('UPDATE subscription_upgrades SET replacement_request_id=?1,last_error=?2,updated_at=?3 WHERE purchase_group_id=?4 AND replacement_request_id=?5 AND replacement_subscription_id IS NULL').bind(crypto.randomUUID(),checkout.errorCode??'renewal_creation_failed',stamp(),id,row.replacement_request_id).run();
-  deny('Renewal setup could not start. Your paid Pro access is safe; please try Continue setup again.','upgrade_renewal_retry');
+  deny('Renewal setup could not start. Your paid access is safe; please try Continue setup again.','upgrade_renewal_retry');
  }
  if(checkout.subscriptionId){await db.prepare("UPDATE subscription_upgrades SET replacement_subscription_id=?1,state=CASE WHEN state='completed' THEN state ELSE 'renewal_ready' END,updated_at=?2 WHERE purchase_group_id=?3 AND source_cancelled_at IS NOT NULL").bind(checkout.subscriptionId,stamp(),id).run();}
  row=await ownedUpgrade(db,user,id);return {...await upgradeView(db,row!,d),checkout};
@@ -55,7 +55,7 @@ async function confirmRenewal(env:Env,user:string,id:string){
  if(!attempt)deny('Your renewal setup needs recovery.','upgrade_renewal_missing');
  const d=deps(env,user);await recoverCheckout(db,user,String(attempt.id),d);
  const sub=await d.provider(`subscriptions/${row.replacement_subscription_id}`),q=upgradeSnapshot(row).quote,notes=sub.notes as Row|undefined;
- if(sub.id!==row.replacement_subscription_id||notes?.ca_progress_user_id!==user||notes?.checkout_key!==row.replacement_request_id||Number(sub.start_at)!==Math.floor(Date.parse(q.nextRenewalAt)/1000)||!['authenticated','active'].includes(String(sub.status)))deny('Your bank approval is still being checked. Your paid Pro access remains available.','upgrade_renewal_pending',202);
+ if(sub.id!==row.replacement_subscription_id||notes?.ca_progress_user_id!==user||notes?.checkout_key!==row.replacement_request_id||Number(sub.start_at)!==Math.floor(Date.parse(q.nextRenewalAt)/1000)||!['authenticated','active'].includes(String(sub.status)))deny('Your bank approval is still being checked. Your paid access remains available.','upgrade_renewal_pending',202);
  await db.prepare("UPDATE subscription_upgrades SET state='completed',last_error=NULL,updated_at=?1 WHERE purchase_group_id=?2").bind(stamp(),id).run();
  return upgradeView(db,(await ownedUpgrade(db,user,id))!,d);
 }

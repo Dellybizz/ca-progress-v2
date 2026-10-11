@@ -2,7 +2,7 @@ import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {fixture} from './helpers/payment-worker-fixture.mjs';
-import {saveUpgradeQuote,saveIntroQuote,acceptUpgrade,ownedUpgrade,verifyUpgradePayment,recoverUpgrade,proOfferEligible} from '../lib/billing/upgrade-engine.mjs';
+import {saveUpgradeQuote,saveIntroQuote,acceptUpgrade,ownedUpgrade,verifyUpgradePayment,recoverUpgrade,proOfferEligible,tierOfferEligible} from '../lib/billing/upgrade-engine.mjs';
 import {maintainUpgradeRefunds} from '../lib/billing/upgrade-refunds.mjs';
 function setup(introMigration=true){
  const f=fixture({fetch(){}},{introMigration}),{sql}=f;
@@ -69,3 +69,10 @@ test('direct-intro migration preserves an existing saved upgrade and its verifie
  }finally{f.cleanup();}});
 
 test('legacy paid Pro orders consume the direct first-month offer even without a subscription payment link',async()=>{const f=direct(setup());try{f.sql.exec("INSERT INTO payment_orders(id,provider_order_id,user_id,plan_id,status,provider_payment_id) VALUES('legacypro','order_legacypro','user1','pro','paid',NULL)");assert.equal(await proOfferEligible(f.db,'user1'),false);await assert.rejects(saveIntroQuote(f.db,'user1',f.target),{code:'upgrade_offer_used'});}finally{f.cleanup();}});
+
+test('Basic and Pro first-month eligibility is independent, while unpaid admin grants do not consume either',async()=>{const f=setup();try{
+ assert.equal(await tierOfferEligible(f.db,'user1','basic'),false);assert.equal(await tierOfferEligible(f.db,'user1','pro'),true);
+ f.sql.exec("INSERT INTO app_users VALUES('user2');INSERT INTO user_subscriptions(id,user_id,plan_id,status,starts_at,ends_at,source) VALUES('grant','user2','basic','active','2026-01-01','2099-01-01','admin')");
+ const target={planId:'basic',policyVersionId:'pv1',recurringPriceSubunits:5000,currency:'INR'},q=await saveIntroQuote(f.db,'user2',target,'emandate');assert.equal(q.quote.amountDueSubunits,2500);assert.equal(q.quote.recurringPriceSubunits,5000);assert.equal(await tierOfferEligible(f.db,'user2','basic'),true);
+ f.sql.exec("INSERT INTO payment_orders(id,provider_order_id,user_id,plan_id,status) VALUES('oldbasic','order_oldbasic','user2','basic','paid')");await assert.rejects(acceptUpgrade(f.db,'user2',q.quoteId,f.deps),{code:'upgrade_offer_used'});assert.equal(await tierOfferEligible(f.db,'user2','pro'),true);
+ }finally{f.cleanup();}});

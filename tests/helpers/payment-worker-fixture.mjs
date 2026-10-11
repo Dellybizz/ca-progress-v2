@@ -16,7 +16,7 @@ export function fixture(worker,{introMigration=true}={}){
  sql.exec(readFileSync('d1/migrations/0072_payment_system_p4_convergence.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0075_subscription_lifecycle_rules.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0076_immediate_upgrade_checkout.sql','utf8'));
- if(introMigration)sql.exec(readFileSync('d1/migrations/0077_direct_pro_intro.sql','utf8'));
+ if(introMigration){sql.exec(readFileSync('d1/migrations/0077_direct_pro_intro.sql','utf8'));sql.exec(readFileSync('d1/migrations/0078_basic_first_month.sql','utf8'));}
  sql.exec('CREATE TABLE billing_campaign_claims(id TEXT PRIMARY KEY,provider_offer_id TEXT,discount_cycles INTEGER,campaign_version_id TEXT);CREATE TABLE billing_campaign_versions(id TEXT PRIMARY KEY,discount_kind TEXT,discount_value INTEGER,discount_cycles INTEGER);')
  sql.exec(`INSERT INTO razorpay_plan_mappings(id,policy_version_id,internal_plan_id,price_kind,provider_plan_id,period,interval_value,amount_subunits,currency,state) VALUES('mapping1','pv1','basic','recurring','plan_1','monthly',1,5000,'INR','ready');
  INSERT INTO razorpay_subscriptions(id,checkout_key,user_id,plan_id,policy_version_id,provider_subscription_id,provider_plan_id,recurring_provider_plan_id,status,recurring_price_subunits,initial_price_subunits,currency,billing_cycle,billing_duration_value,billing_duration_unit,intro_billing_cycles,intro_remaining_cycles,cancellation_mode,total_count,provider_offer_id,checkout_payment_method) VALUES('local1','checkout_request_001','user1','basic','pv1','sub_1','plan_1','plan_1','created',5000,2500,'INR','monthly',1,'month',1,1,'period_end',12,'offer_1','upi');`);

@@ -47,3 +47,5 @@ Remaining integration work (must not be represented as live):
 ## Release requirements
 
 Never activate new monetary paths based on browser calculations. Fresh provider proof must match owner, purchase, amount, currency and immutable quote. A database claim decides the winner atomically. Before retrying an uncertain refund, fetch by its stable idempotency key. Access activation and competing mandate closure must reconcile independently. Cleanup must recheck effective entitlement, current importance, current usage, current transition and lease at execution; if entitlement lookup fails, do not delete. Storage reservations count toward upload limits. No automatic deletion before deadline and delivered warnings.
+
+Basic first-month checkout now shares the independent verified-Order flow: the published ₹25 first month applies irrespective of the chosen future renewal method (UPI AutoPay, card or eMandate), followed by the saved regular ₹50 monthly price. Introductory eligibility is checked separately per tier; existing mandates and saved legacy checkouts keep their accepted terms. Admin grants do not consume a paid first-month offer.
