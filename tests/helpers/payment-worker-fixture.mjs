@@ -1,6 +1,6 @@
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
-export function fixture(worker){
+export function fixture(worker,{introMigration=true}={}){
  const sql=new DatabaseSync(':memory:');
  sql.exec(`CREATE TABLE app_users(user_id TEXT PRIMARY KEY);INSERT INTO app_users VALUES('user1');CREATE TABLE subscription_plans(id TEXT PRIMARY KEY,tier_key TEXT,billing_cycle TEXT,currency TEXT);INSERT INTO subscription_plans VALUES('basic','basic','monthly','INR');CREATE TABLE uploaded_resources(id TEXT PRIMARY KEY);CREATE TABLE plan_policy_versions(id TEXT PRIMARY KEY,plan_id TEXT);INSERT INTO plan_policy_versions VALUES('pv1','basic');CREATE TABLE _ca_schema_migrations(version TEXT PRIMARY KEY,description TEXT,source_freeze_commit TEXT);
  CREATE TABLE user_subscriptions(id TEXT PRIMARY KEY,user_id TEXT,plan_id TEXT,status TEXT,starts_at TEXT,ends_at TEXT,source TEXT,source_order_id TEXT,source_payment_id TEXT,created_at TEXT,updated_at TEXT);
@@ -16,6 +16,7 @@ export function fixture(worker){
  sql.exec(readFileSync('d1/migrations/0072_payment_system_p4_convergence.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0075_subscription_lifecycle_rules.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0076_immediate_upgrade_checkout.sql','utf8'));
+ if(introMigration)sql.exec(readFileSync('d1/migrations/0077_direct_pro_intro.sql','utf8'));
  sql.exec('CREATE TABLE billing_campaign_claims(id TEXT PRIMARY KEY,provider_offer_id TEXT,discount_cycles INTEGER,campaign_version_id TEXT);CREATE TABLE billing_campaign_versions(id TEXT PRIMARY KEY,discount_kind TEXT,discount_value INTEGER,discount_cycles INTEGER);')
  sql.exec(`INSERT INTO razorpay_plan_mappings(id,policy_version_id,internal_plan_id,price_kind,provider_plan_id,period,interval_value,amount_subunits,currency,state) VALUES('mapping1','pv1','basic','recurring','plan_1','monthly',1,5000,'INR','ready');
  INSERT INTO razorpay_subscriptions(id,checkout_key,user_id,plan_id,policy_version_id,provider_subscription_id,provider_plan_id,recurring_provider_plan_id,status,recurring_price_subunits,initial_price_subunits,currency,billing_cycle,billing_duration_value,billing_duration_unit,intro_billing_cycles,intro_remaining_cycles,cancellation_mode,total_count,provider_offer_id,checkout_payment_method) VALUES('local1','checkout_request_001','user1','basic','pv1','sub_1','plan_1','plan_1','created',5000,2500,'INR','monthly',1,'month',1,1,'period_end',12,'offer_1','upi');`);

@@ -19,7 +19,7 @@ export async function listPublishedPricingOffers():Promise<PublishedPricingOffer
     identity?database.prepare("SELECT sp.tier_key,COUNT(*) paid_count FROM payment_orders po JOIN subscription_plans sp ON sp.id=po.plan_id WHERE po.user_id=?1 AND po.status='paid' GROUP BY sp.tier_key").bind(identity.id).all<Row>():Promise.resolve({results:[]} as {results:Row[]}),
     identity?database.prepare("SELECT sp.tier_key,COALESCE(SUM(rs.paid_count),0) paid_count FROM razorpay_subscriptions rs JOIN subscription_plans sp ON sp.id=rs.plan_id WHERE rs.user_id=?1 AND rs.financial_state<>'mismatch' GROUP BY sp.tier_key").bind(identity.id).all<Row>():Promise.resolve({results:[]} as {results:Row[]}),
     identity?database.prepare("SELECT sp.tier_key,COUNT(*) paid_count FROM subscription_purchase_groups g JOIN subscription_plans sp ON sp.id=g.plan_id WHERE g.user_id=?1 AND g.winning_payment_id IS NOT NULL GROUP BY sp.tier_key").bind(identity.id).all<Row>():Promise.resolve({results:[]} as {results:Row[]}),
-    identity?database.prepare("SELECT plan_id,intro_price_subunits FROM subscription_upgrade_offers WHERE state='published'").all<Row>():Promise.resolve({results:[]} as {results:Row[]}),
+    database.prepare("SELECT plan_id,intro_price_subunits FROM subscription_upgrade_offers WHERE state='published'").all<Row>(),
     database.prepare("SELECT policy_version_id FROM razorpay_plan_mappings WHERE price_kind='recurring' AND state='ready' AND provider_plan_id IS NOT NULL").all<Row>(),
   ]);
   const readyPolicies=new Set(asRows(mappings).map(row=>String(row.policy_version_id)));

@@ -1,10 +1,11 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {fixture} from './helpers/payment-worker-fixture.mjs';
-import {saveUpgradeQuote,acceptUpgrade,ownedUpgrade,verifyUpgradePayment,recoverUpgrade,proOfferEligible} from '../lib/billing/upgrade-engine.mjs';
+import {saveUpgradeQuote,saveIntroQuote,acceptUpgrade,ownedUpgrade,verifyUpgradePayment,recoverUpgrade,proOfferEligible} from '../lib/billing/upgrade-engine.mjs';
 import {maintainUpgradeRefunds} from '../lib/billing/upgrade-refunds.mjs';
-function setup(){
- const f=fixture({fetch(){}}),{sql}=f;
+function setup(introMigration=true){
+ const f=fixture({fetch(){}},{introMigration}),{sql}=f;
  sql.exec("UPDATE subscription_plans SET tier_key='basic',billing_cycle='monthly',currency='INR';INSERT INTO subscription_plans VALUES('pro','pro','monthly','INR');INSERT INTO plan_policy_versions VALUES('pvpro','pro');");
  sql.exec("INSERT INTO subscription_upgrade_offers(plan_id,intro_price_subunits,currency,state,version) VALUES('pro',5000,'INR','published',1);");
  sql.exec("UPDATE razorpay_subscriptions SET financial_state='paid',status='active'");
@@ -40,3 +41,31 @@ test('late captured duplicate is refunded once and cannot extend or replace winn
 test('provider cancellation failure preserves paid Pro and remains recoverable',async()=>{const f=setup();try{const q=await saveUpgradeQuote(f.db,'user1',f.target);await acceptUpgrade(f.db,'user1',q.quoteId,f.deps);f.pay();f.setCancelFails(true);await assert.rejects(verifyUpgradePayment(f.db,await ownedUpgrade(f.db,'user1',q.quoteId),'pay_upgrade',f.deps));assert.equal(f.sql.prepare('SELECT status FROM user_subscriptions').get().status,'active');assert.equal(f.sql.prepare('SELECT source_cancelled_at FROM subscription_upgrades').get().source_cancelled_at,null);f.setCancelFails(false);const result=await recoverUpgrade(f.db,'user1',q.quoteId,f.deps);assert.equal(result.sourceCancelled,true);}finally{f.cleanup();}});
 
 test('used Pro offer switches to proration and preserves the existing renewal date',async()=>{const f=setup();try{f.sql.exec("INSERT INTO subscription_purchase_groups(id,user_id,plan_id,policy_snapshot_json,quoted_amount_subunits,currency,winning_payment_id,state) VALUES('oldpro','user1','pro','{}',5000,'INR','pay_previouspro','paid')");const q=await saveUpgradeQuote(f.db,'user1',f.target);assert.equal(q.quote.mode,'remaining_paid_period');assert.equal(q.quote.nextRenewalAt,new Date(f.invoices[0].billing_end*1000).toISOString());assert.equal(q.quote.amountDueSubunits,q.quote.planChargeSubunits-q.quote.unusedCreditSubunits);}finally{f.cleanup();}});
+
+function direct(f){f.sql.exec("UPDATE razorpay_subscriptions SET status='expired'");f.sub.status='expired';return f;}
+test('direct first Pro purchase charges 50, starts a full month after capture and never cancels another mandate',async()=>{const f=direct(setup());try{
+ const q=await saveIntroQuote(f.db,'user1',f.target,'card');assert.equal(q.kind,'intro');assert.equal(q.quote.amountDueSubunits,5000);assert.equal(q.quote.unusedCreditSubunits,0);
+ await acceptUpgrade(f.db,'user1',q.quoteId,f.deps);f.pay();const result=await verifyUpgradePayment(f.db,await ownedUpgrade(f.db,'user1',q.quoteId),'pay_upgrade',f.deps);assert.equal(result.accessGranted,true);assert.equal(result.kind,'intro');assert.equal(result.sourceCancelled,true);
+ assert.equal(f.calls.some(c=>c.path.startsWith('subscriptions/')),false);const access=f.sql.prepare('SELECT * FROM user_subscriptions').get();assert.equal(access.starts_at,result.quote.effectiveAt);assert.equal(access.ends_at,result.quote.nextRenewalAt);
+ assert.equal(await proOfferEligible(f.db,'user1'),false);await verifyUpgradePayment(f.db,await ownedUpgrade(f.db,'user1',q.quoteId),'pay_upgrade',f.deps);assert.equal(f.sql.prepare('SELECT ends_at FROM user_subscriptions').get().ends_at,access.ends_at);
+ await assert.rejects(saveIntroQuote(f.db,'user1',f.target),{code:'upgrade_offer_used'});
+ }finally{f.cleanup();}});
+test('direct Pro offer refuses an existing mandate, lost-response checkout, or another accepted first-month payment',async()=>{const f=setup();try{
+ await assert.rejects(saveIntroQuote(f.db,'user1',f.target),{code:'intro_existing_subscription'});direct(f);
+ const q=await saveIntroQuote(f.db,'user1',f.target);await acceptUpgrade(f.db,'user1',q.quoteId,f.deps);await assert.rejects(saveIntroQuote(f.db,'user1',f.target),{code:'intro_existing_subscription'});
+ assert.throws(()=>f.sql.prepare("INSERT INTO payment_checkout_attempts(id,request_key,user_id,fingerprint,input_json,state,created_at,updated_at) VALUES('other','otherkey','user1','x','{}','reserved',?,?)").run(new Date().toISOString(),new Date().toISOString()),/saved Pro payment/);
+ }finally{f.cleanup();}});
+test('direct payment which loses offer eligibility is refunded rather than granted',async()=>{const f=direct(setup());try{
+ const q=await saveIntroQuote(f.db,'user1',f.target);await acceptUpgrade(f.db,'user1',q.quoteId,f.deps);f.pay();f.sql.exec("INSERT INTO subscription_purchase_groups(id,user_id,plan_id,policy_snapshot_json,quoted_amount_subunits,currency,winning_payment_id,state) VALUES('prior','user1','pro','{}',5000,'INR','pay_prior','paid')");
+ const view=await verifyUpgradePayment(f.db,await ownedUpgrade(f.db,'user1',q.quoteId),'pay_upgrade',f.deps);assert.equal(view.accessGranted,false);assert.equal(view.state,'review');assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,0);assert.equal(f.sql.prepare('SELECT state FROM subscription_refund_obligations').get().state,'pending');
+ await maintainUpgradeRefunds(f.db,f.deps);assert.equal(f.sql.prepare('SELECT state FROM subscription_refund_obligations').get().state,'processed');
+ }finally{f.cleanup();}});
+
+test('direct-intro migration preserves an existing saved upgrade and its verified-payment attribution',async()=>{const f=setup(false);try{
+ const q=await saveUpgradeQuote(f.db,'user1',f.target),receipt=`up_${q.quoteId.replaceAll('-','')}`;
+ f.sql.prepare("INSERT INTO subscription_upgrades(purchase_group_id,user_id,source_subscription_id,source_invoice_id,state,provider_order_id,receipt,replacement_request_id,updated_at) VALUES(?,'user1','sub_1','inv_1','ready','order_upgrade',?,'previous-renewal-key',?)").run(q.quoteId,receipt,new Date().toISOString());
+ const before=f.sql.prepare('SELECT * FROM subscription_upgrades').get();f.sql.exec(readFileSync('d1/migrations/0077_direct_pro_intro.sql','utf8'));const after=f.sql.prepare('SELECT * FROM subscription_upgrades').get();for(const [key,value] of Object.entries(before))assert.equal(after[key],value);assert.equal(after.kind,'upgrade');assert.equal(after.access_ends_at,null);assert.equal(f.sql.prepare('PRAGMA foreign_key_check').all().length,0);
+ f.orders.set('order_upgrade',{id:'order_upgrade',receipt,amount:q.quote.amountDueSubunits,currency:'INR',partial_payment:false,notes:{ca_progress_user_id:'user1',ca_progress_purchase_group_id:q.quoteId,ca_progress_policy_version_id:'pvpro'}});f.pay();const result=await verifyUpgradePayment(f.db,await ownedUpgrade(f.db,'user1',q.quoteId),'pay_upgrade',f.deps);assert.equal(result.accessGranted,true);assert.equal(result.quote.nextRenewalAt,q.quote.nextRenewalAt);
+ }finally{f.cleanup();}});
+
+test('legacy paid Pro orders consume the direct first-month offer even without a subscription payment link',async()=>{const f=direct(setup());try{f.sql.exec("INSERT INTO payment_orders(id,provider_order_id,user_id,plan_id,status,provider_payment_id) VALUES('legacypro','order_legacypro','user1','pro','paid',NULL)");assert.equal(await proOfferEligible(f.db,'user1'),false);await assert.rejects(saveIntroQuote(f.db,'user1',f.target),{code:'upgrade_offer_used'});}finally{f.cleanup();}});

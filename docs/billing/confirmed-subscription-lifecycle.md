@@ -35,11 +35,11 @@ Upgrade integration in this release:
 - Paid Pro survives interrupted future authorization; Pricing and Billing provide a saved continuation. Regular renewals continue through the existing invoice verifier. Upgrade payments/refund status appear in Billing.
 - Signed late old-mandate renewal captures are verified and queued for refund instead of extending overlapping Basic access. Refund/dispute holds remove only the affected upgrade access and remain visible for review.
 
-This release covers Basic-to-Pro upgrades. The standalone new-Pro subscription introductory offer is still not published through the legacy subscription-offer checkout. Payment retries/refunds here cover upgrade Orders; the general checkout retry-group replacement is still pending. Quotes below the gateway's one-rupee minimum require renewal rather than silently increasing the charge or discarding credit. No real customer payments/cancellations/refunds were performed for testing.
+This release covers Basic-to-Pro upgrades and direct introductory Pro purchases. Eligible direct Pro buyers pay the published first-month amount through a verified Order, receive a full calendar month from payment verification, then authorize future recurring payments at the saved regular price. Existing unresolved recurring checkouts must be recovered first; ordinary repeat Pro subscriptions continue through the existing recurring checkout. Payment retries/refunds here cover upgrade Orders; the general checkout retry-group replacement is still pending. Quotes below the gateway's one-rupee minimum require renewal rather than silently increasing the charge or discarding credit. No real customer payments/cancellations/refunds were performed for testing.
 
 Remaining integration work (must not be represented as live):
 - Retry groups and captured-payment arbitration in verification/webhook/queue paths; idempotent duplicate refunds and duplicate mandate closure.
-- First-month Pro offer for fresh standalone subscriptions, not just Basic-to-Pro upgrades.
+- General fresh checkout retry groups across all payment flows (direct introductory Orders currently resume the same saved Order).
 - Admin grant issuance UI, student claim/notification UI, atomic queued activation and verified provider schedule extension.
 - Storage transition creation, reminder delivery, protected cleanup worker covering resources and test attachments; grace upload allowance and importance marking for attachments.
 - Persisted one-year lock enforcement, future reauthorization and continuation flow.
