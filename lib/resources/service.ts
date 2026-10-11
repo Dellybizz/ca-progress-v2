@@ -1,4 +1,5 @@
 import "server-only";
+import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 
 import { optionalUser } from "@/lib/auth/server";
 import { getStudentContext } from "@/lib/academic/student-context";
@@ -178,7 +179,8 @@ export async function getResourceDetailModel(resourceId: string): Promise<Resour
   if (!row) return { mode: "missing" };
   const names = await nameMaps(client);
   const canManage = row.owner_user_id === identity.id;
-  return { mode: "ready", resource: uploadDto(row, names, identity.id), canManage, canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved" };
+  const importance=canManage?await getD1RuntimeDatabase().prepare("SELECT resource_id FROM resource_importance WHERE resource_id=?1 AND owner_user_id=?2").bind(resourceId,identity.id).first():null;
+  return { mode: "ready", resource: {...uploadDto(row, names, identity.id),important:Boolean(importance)}, canManage, canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved" };
 }
 
 export async function getResourceModerationPageModel(): Promise<ModerationPageModel> {

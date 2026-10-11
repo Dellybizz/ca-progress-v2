@@ -28,6 +28,7 @@ export type NoteCard = {
 };
 
 export type UploadCard = {
+  important?: boolean;
   id: string;
   title: string;
   description: string | null;
