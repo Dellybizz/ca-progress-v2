@@ -6,7 +6,7 @@ This is the implementation contract, not a claim that every flow is live.
 
 - Prices, storage, grace and offer rules resolve from versioned policies. Preserve existing paid-period contracts.
 - Basic introductory price 25 INR; Pro introductory price 50 INR. Recurring prices remain published plan prices (currently 50/150 INR). Eligibility is first verified paid purchase per tier, independent across tiers. Manual grants never consume introductory offers. Payment-method scope for the new Pro offer remains undecided.
-- Upgrade immediately after verified payment. Normal upgrade: target price prorated to remaining verified paid period minus actual unused payment credit; retain renewal date. Eligible Pro offer: a full calendar month at intro price minus unused actual Basic payment; reset renewal date. Popup displays amounts, credit, period, next charge and renewal date.
+- Upgrade immediately after verified payment. Normal upgrade: target price prorated to the remaining verified paid period, without unused Basic payment setoff; retain renewal date. Eligible Pro offer: a full calendar month at the complete intro price (currently ₹50), without Basic setoff; reset renewal date. Existing saved upgrade quotes retain their original credit and exact charge. The popup shows credit only for those historical quotes.
 - Downgrade at renewal. Free stops renewal while preserving already-paid and valid grant access. Schedule even over quota with warning. Current storage features continue until effective date.
 - Undo scheduled downgrade from Pricing with no additional charge.
 - Pending purchase or upgrade can be retried. One verified captured payment wins per purchase group. Refund every later captured duplicate via durable idempotent refund obligations. Only one continuing recurring subscription. Preserve old plan during unverified upgrade.
@@ -28,7 +28,7 @@ Implemented and tested in this change:
 - Cancel a scheduled provider plan change from Pricing, with provider confirmation before clearing the local scheduled state.
 
 Upgrade integration in this release:
-- Authenticated five-minute server quote snapshots, published configurable Pro first-upgrade-month price (50 INR), independent paid-Pro eligibility, actual captured Basic credit, and original quote/period ownership checks.
+- Authenticated five-minute server quote snapshots, published configurable Pro first-upgrade-month price (50 INR), independent paid-Pro eligibility, verified Basic paid-period evidence, no Basic payment setoff for fresh quotes, and original quote/period ownership checks.
 - Pricing review with full-month intro versus remaining-period proration, credit, exact due, renewal date/price, and bank approval method. Prominent first-upgrade-month offer for eligible Basic subscribers; full comparison preserved.
 - Separate Razorpay upgrade Order settlement: immutable quote validation, captured payment verification, atomic winner/access grant, exact fixed dates and repeat-safe audit history. Late duplicate captured upgrade payments create idempotent refund obligations.
 - Preserve Basic before successful payment. Cancel its provider renewal only after verified Pro activation; create replacement authorization only after fresh confirmed cancellation. Save/recover uncertain creation without repeating possibly dispatched requests. Approved replacement starts on the quoted renewal date at the agreed recurring price.
