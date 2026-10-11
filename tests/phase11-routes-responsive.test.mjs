@@ -44,7 +44,7 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
 
 test("pricing remains configuration-safe and sends policy and method identifiers without a client charge amount", () => {
   const pricing = read("components/billing/pricing-client.tsx");
-  assert.match(pricing, /checkoutIntent\(localStorage,viewerId,\{planId:plan\.id,paymentMethod:method,policyVersionId:offer\?\.policyVersionId/);
+  assert.match(pricing, /checkoutIntent\(localStorage,viewerId,\{planId:plan\.id,[^\n]*paymentMethod:selectedMethod,policyVersionId:offer\?\.policyVersionId/);
   assert.match(pricing, /body:JSON\.stringify\(input\)/);
   assert.doesNotMatch(pricing, /body:JSON\.stringify\(\{[^}]*\b(?:amount|price_subunits)\b[^}]*\}\)/);
   assert.match(pricing, /Currently unavailable/);

@@ -1,3 +1,4 @@
+import {singleMandateTerms} from '../../lib/billing/single-mandate-offers.mjs';
 import {prepaidAccess} from "../../lib/billing/prepaid-access.mjs";
 import {providerFetch} from "./provider-http";
 import {mandateSchedule} from "../../lib/billing/mandate-schedule.mjs";
@@ -18,7 +19,9 @@ export function dependencies(env:Env,userId:string):Dependencies{
     async prepare(input){
       const resolved=await resolveCommercial(db,input.planId,userId);
       if(input.policyVersionId&&input.policyVersionId!==resolved.policyVersionId)throw new CheckoutError('Pricing changed. Refresh before checkout.','checkout_policy_changed');
-      const terms=input.paymentMethod==='upi'?resolved:{...resolved,introPrice:null,introCycles:0,introProviderOfferId:null};
+      const single=input.singleMandate?await singleMandateTerms(db,userId,resolved,input.paymentMethod):null;
+      if(input.singleMandate&&!single)throw new CheckoutError('This first-month mandate offer needs configuration or your eligibility changed. Refresh Pricing.','single_mandate_offer_unavailable');
+      const terms=single??(input.paymentMethod==='upi'?resolved:{...resolved,introPrice:null,introCycles:0,introProviderOfferId:null});
       if(input.promoCode&&(terms.introPrice!==null||input.paymentMethod!=='upi'))throw new CheckoutError('This offer cannot be combined with the selected checkout.','checkout_offer_conflict');
       const mapping=await ensurePlan(env,terms,'recurring',terms.recurringPrice);
       const campaign=input.paymentMethod==='upi'&&terms.introPrice===null?await reserveCampaign(db,{userId,planId:input.planId,requestId:input.requestId,policyVersionId:terms.policyVersionId,base:terms.recurringPrice,promoCode:input.promoCode}):null;

@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdminCapability } from "@/lib/authorization/server";
 import { invokeBillingService } from "@/lib/billing/service-binding";
-import { saveDraftOfferBinding, savePolicyOfferTerms } from "@/lib/billing/commercial-policy";
+import { saveMandateOfferBinding, saveDraftOfferBinding, savePolicyOfferTerms } from "@/lib/billing/commercial-policy";
 import { createPolicyDraft, createUserPromotion, grantEntitlementOverride, publishPolicy, savePolicyBasics, savePolicyFeature, savePolicyPage, scheduleUserPlanChange } from "@/lib/billing/granular-policy";
 const v=(d:FormData,k:string)=>String(d.get(k)??"").trim();
 const done=(notice:string,section="pricing")=>{revalidatePath("/admin/plans");revalidatePath("/pricing");redirect(`/admin/plans?section=${encodeURIComponent(section)}&notice=${encodeURIComponent(notice)}`);};
@@ -19,3 +19,5 @@ export async function createPromotionAction(d:FormData){const a=await requireAdm
 
 export async function validateProviderPolicyAction(d:FormData){const a=await requireAdminCapability("billing.plan.configure");const response=await invokeBillingService({path:"/admin/validate-policy",userId:a.user.id,actorRole:a.role,contentType:"application/json",body:JSON.stringify({policyId:v(d,"policyId"),reason:v(d,"reason")})});if(!response.ok){const result=await response.json() as {error?:string};throw new Error(result.error||"Provider validation failed.");}done("Recurring provider mapping validated");}
 export async function saveDraftOfferBindingAction(d:FormData){const a=await requireAdminCapability("billing.plan.configure");await saveDraftOfferBinding({policyId:v(d,"policyId"),offerId:v(d,"offerId"),evidence:v(d,"evidence"),confirmed:d.get("confirmed")==="on",reason:v(d,"reason"),actor:{userId:a.user.id,role:a.role}});done("UPI offer dashboard evidence recorded; Razorpay must still validate the offer at authorisation");}
+
+export async function saveMandateOfferBindingAction(d:FormData){const a=await requireAdminCapability("billing.plan.configure");await saveMandateOfferBinding({policyId:v(d,"policyId"),method:v(d,"method"),offerId:v(d,"offerId"),evidence:v(d,"evidence"),confirmed:d.get("confirmed")==="on",reason:v(d,"reason"),actor:{userId:a.user.id,role:a.role}});done("Single-mandate offer binding saved; Razorpay validates it at checkout");}
