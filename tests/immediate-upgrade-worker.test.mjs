@@ -83,3 +83,9 @@ for(const method of ['upi','card','emandate'])test(`Basic first month costs 25 w
  f.replacement.status='authenticated';response=await f.request('confirm_renewal',f.quote.quoteId);assert.equal(response.status,200);assert.equal((await response.json()).upgrade.renewalReady,true);
  assert.equal(f.calls.filter(c=>c.path==='/v1/orders'&&c.method==='POST').length,1);assert.equal(f.calls.filter(c=>c.path.includes('/cancel')).length,0);
  }finally{f.cleanup();}});
+
+test('real worker abandons unpaid first-month checkout, excludes it from status, and accepts a new review',async()=>{const f=await setup({direct:true});try{
+ await f.request('pay',f.quote.quoteId);let response=await f.request('abandon',f.quote.quoteId);assert.equal(response.status,200);const result=await response.json();assert.equal(result.abandoned,true);assert.equal(result.upgrade,null);
+ response=await worker.fetch(new Request('https://billing.internal/upgrade',{headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':'user1'}}),f.env);assert.equal(response.status,200);assert.equal((await response.json()).upgrade,null);
+ const next=await saveIntroQuote(f.db,'user1',{planId:'pro',policyVersionId:'pvpro',recurringPriceSubunits:15000,currency:'INR'});assert.notEqual(next.quoteId,f.quote.quoteId);
+ }finally{f.cleanup();}});

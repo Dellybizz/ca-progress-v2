@@ -19,3 +19,5 @@ export function ownedUpgrade(db:Database,user:string,id:string):Promise<Row|null
 export function upgradeByOrder(db:Database,id:string):Promise<Row|null>;
 export function upgradeView(db:Database,row:Row,deps:UpgradeDependencies):Promise<UpgradeView>;
 export function upgradeSnapshot(row:Row):{quote:UpgradeQuote;sourceSubscriptionId:string;sourceInvoiceId:string;sourcePaymentId:string;sourcePeriodStart:string;sourcePeriodEnd:string;renewalPaymentMethod?:string;expiresAt:string};
+
+export function abandonUpgrade(db:Database,user:string,id:string,deps:UpgradeDependencies):Promise<{abandoned:boolean;upgrade:UpgradeView|null}>;

@@ -4,7 +4,7 @@ import {ensurePlan} from './p3';
 import {paymentMethod} from '../../lib/billing/payment-quote.mjs';
 import {mandateSchedule} from '../../lib/billing/mandate-schedule.mjs';
 import {createCheckout,recoverCheckout,CheckoutError} from '../../lib/billing/checkout-engine.mjs';
-import {acceptUpgrade,recoverUpgrade,ownedUpgrade,upgradeByOrder,verifyUpgradePayment,latestUpgrade,upgradeView,upgradeSnapshot,type Row} from '../../lib/billing/upgrade-engine.mjs';
+import {abandonUpgrade,acceptUpgrade,recoverUpgrade,ownedUpgrade,upgradeByOrder,verifyUpgradePayment,latestUpgrade,upgradeView,upgradeSnapshot,type Row} from '../../lib/billing/upgrade-engine.mjs';
 type Env=Parameters<typeof dependencies>[0];
 const stamp=()=>new Date().toISOString();
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{'content-type':'application/json','cache-control':'private, no-store'}});
@@ -70,6 +70,7 @@ export async function upgradeFetch(request:Request,env:Env){
   const input=JSON.parse(raw) as {quoteId?:string;action?:string;razorpay_payment_id?:string;razorpay_order_id?:string;razorpay_signature?:string};
   if(!input.quoteId||!/^[a-f0-9-]{36}$/.test(input.quoteId))return json({error:'Invalid upgrade review.'},400);
   const d=deps(env,user);let upgrade;
+  if(input.action==='abandon')return json(await abandonUpgrade(env.DB,user,input.quoteId,d));
   if(input.action==='pay')upgrade=await acceptUpgrade(env.DB,user,input.quoteId,d);
   else if(input.action==='recover')upgrade=await recoverUpgrade(env.DB,user,input.quoteId,d);
   else if(input.action==='renewal')return json(await renewal(env,user,input.quoteId));

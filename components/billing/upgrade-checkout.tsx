@@ -30,7 +30,7 @@ export function UpgradeCheckout({planLabel="Pro",introPurchase=false,planId,onCl
  },[savedId,savedReady,router]);
  async function action(quoteId:string,actionName:string,proof:Record<string,string>={}){
   const response=await fetch('/api/v1/payments/upgrade',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({quoteId,action:actionName,...proof})});
-  const result=await response.json();if(result.upgrade)setSaved(result.upgrade);
+  const result=await response.json();if(result.upgrade||result.abandoned)setSaved(result.upgrade??null);
   if(!response.ok||result.error)throw new Error(result.error||'Your upgrade is being confirmed.');return result;
  }
  async function renew(id:string){
@@ -54,11 +54,14 @@ export function UpgradeCheckout({planLabel="Pro",introPurchase=false,planId,onCl
     if(!await loadCheckout()||!window.Razorpay)throw new Error('Secure payment could not load. Your upgrade is saved; try Continue payment.');
     const Razorpay=window.Razorpay;
   await new Promise<void>((resolve,reject)=>{
-     const instance=new Razorpay({key:upgrade.keyId,order_id:upgrade.orderId,amount:upgrade.quote.amountDueSubunits,currency:upgrade.quote.currency,name:'CA Progress',description:upgrade.kind==='intro'?`First month of ${upgrade.planLabel??planLabel}`:'Pro upgrade after unused Basic credit',theme:{color:'#4f46e5'},modal:{ondismiss:()=>reject(new Error('Your payment is saved. Continue whenever you’re ready.'))},handler:async(proof:Record<string,string>)=>{try{await action(id,'verify',proof);resolve();}catch(reason){reject(reason);}}});instance.on?.('payment.failed',()=>reject(new Error('Payment was not completed. Your current plan remains available. You can try again.')));instance.open();
+     let verifying=false;
+     const instance=new Razorpay({key:upgrade.keyId,order_id:upgrade.orderId,amount:upgrade.quote.amountDueSubunits,currency:upgrade.quote.currency,name:'CA Progress',description:upgrade.kind==='intro'?`First month of ${upgrade.planLabel??planLabel}`:'Pro upgrade after unused Basic credit',theme:{color:'#4f46e5'},modal:{ondismiss:()=>{if(!verifying)reject(Object.assign(new Error('Payment closed. You can choose a plan again.'),{abandonCheckout:true}));}},handler:async(proof:Record<string,string>)=>{verifying=true;try{await action(id,'verify',proof);resolve();}catch(reason){reject(reason);}}});instance.on?.('payment.failed',()=>{if(verifying)return;reject(Object.assign(new Error('Payment failed. Please try again.'),{abandonCheckout:true}));instance.close?.();});instance.open();
     });
    }
    setReview(null);onClose();router.refresh();await renew(id);
-  }catch(reason){setError(reason instanceof Error?reason.message:'Your upgrade is being checked.');const latest=await fetch('/api/v1/payments/upgrade',{cache:'no-store'}).then(r=>r.json()).catch(()=>null);if(latest?.upgrade)setSaved(latest.upgrade);router.refresh();}
+  }catch(reason){
+   if(reason instanceof Error&&'abandonCheckout' in reason){setSaved(null);setError(null);try{await action(id,'abandon');}catch{setError('Payment status is being checked. Please try again shortly.');}setReview(null);onClose();router.refresh();return;}
+   setError(reason instanceof Error?reason.message:'Your upgrade is being checked.');const latest=await fetch('/api/v1/payments/upgrade',{cache:'no-store'}).then(r=>r.json()).catch(()=>null);if(latest?.upgrade)setSaved(latest.upgrade);router.refresh();}
   finally{setWorking(false);}
  }
  async function continueRenewal(id:string){if(guard.current)return;setWorking(true);setError(null);try{await renew(id);}catch(reason){setError(reason instanceof Error?reason.message:'Your renewal is being confirmed.');}finally{setWorking(false);}}

@@ -15,7 +15,7 @@ import { productPlanLabel, storageQuotaMegabytes } from "@/lib/billing/plan-poli
 import type { AppCommercePolicy } from "@/lib/mobile/commerce-policy";
 
 type CheckoutResult={razorpay_subscription_id:string;razorpay_payment_id:string;razorpay_signature:string};
-type RazorpayInstance={open():void;on?(event:string,callback:(response:unknown)=>void):void};type RazorpayConstructor=new(options:Record<string,unknown>)=>RazorpayInstance;declare global{interface Window{Razorpay?:RazorpayConstructor}}
+type RazorpayInstance={open():void;close?():void;on?(event:string,callback:(response:unknown)=>void):void};type RazorpayConstructor=new(options:Record<string,unknown>)=>RazorpayInstance;declare global{interface Window{Razorpay?:RazorpayConstructor}}
 function loadCheckout(){return new Promise<boolean>(resolve=>{
   if(window.Razorpay){resolve(true);return;}
   let script=document.querySelector<HTMLScriptElement>('script[src="https://checkout.razorpay.com/v1/checkout.js"]');

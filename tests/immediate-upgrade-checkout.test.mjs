@@ -2,7 +2,7 @@ import test from 'node:test';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {fixture} from './helpers/payment-worker-fixture.mjs';
-import {saveUpgradeQuote,saveIntroQuote,acceptUpgrade,ownedUpgrade,verifyUpgradePayment,recoverUpgrade,proOfferEligible,tierOfferEligible} from '../lib/billing/upgrade-engine.mjs';
+import {abandonUpgrade,saveUpgradeQuote,saveIntroQuote,acceptUpgrade,ownedUpgrade,verifyUpgradePayment,recoverUpgrade,proOfferEligible,tierOfferEligible} from '../lib/billing/upgrade-engine.mjs';
 import {maintainUpgradeRefunds} from '../lib/billing/upgrade-refunds.mjs';
 function setup(introMigration=true){
  const f=fixture({fetch(){}},{introMigration}),{sql}=f;
@@ -75,4 +75,22 @@ test('Basic and Pro first-month eligibility is independent, while unpaid admin g
  f.sql.exec("INSERT INTO app_users VALUES('user2');INSERT INTO user_subscriptions(id,user_id,plan_id,status,starts_at,ends_at,source) VALUES('grant','user2','basic','active','2026-01-01','2099-01-01','admin')");
  const target={planId:'basic',policyVersionId:'pv1',recurringPriceSubunits:5000,currency:'INR'},q=await saveIntroQuote(f.db,'user2',target,'emandate');assert.equal(q.quote.amountDueSubunits,2500);assert.equal(q.quote.recurringPriceSubunits,5000);assert.equal(await tierOfferEligible(f.db,'user2','basic'),true);
  f.sql.exec("INSERT INTO payment_orders(id,provider_order_id,user_id,plan_id,status) VALUES('oldbasic','order_oldbasic','user2','basic','paid')");await assert.rejects(acceptUpgrade(f.db,'user2',q.quoteId,f.deps),{code:'upgrade_offer_used'});assert.equal(await tierOfferEligible(f.db,'user2','pro'),true);
+ }finally{f.cleanup();}});
+
+for(const stale of [false,true])test(`abandoned checkout refunds late capture without access, including stale verifier=${stale}`,async()=>{const f=direct(setup());try{
+ const q=await saveIntroQuote(f.db,'user1',f.target);await acceptUpgrade(f.db,'user1',q.quoteId,f.deps);
+ const before=await ownedUpgrade(f.db,'user1',q.quoteId);
+ await assert.rejects(abandonUpgrade(f.db,'foreign',q.quoteId,f.deps),{code:'upgrade_not_found'});
+ const closed=await abandonUpgrade(f.db,'user1',q.quoteId,f.deps);assert.equal(closed.abandoned,true);assert.equal(closed.upgrade,null);
+ await assert.rejects(acceptUpgrade(f.db,'user1',q.quoteId,f.deps),{code:'upgrade_checkout_closed'});
+ assert.equal(await proOfferEligible(f.db,'user1'),true);await saveIntroQuote(f.db,'user1',f.target);
+ f.pay('pay_late',q.quote.amountDueSubunits);
+ const view=await verifyUpgradePayment(f.db,stale?before:await ownedUpgrade(f.db,'user1',q.quoteId),'pay_late',f.deps);
+ assert.equal(view.accessGranted,false);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,0);
+ await maintainUpgradeRefunds(f.db,f.deps);await maintainUpgradeRefunds(f.db,f.deps);assert.equal(f.refunds.size,1);assert.equal(await proOfferEligible(f.db,'user1'),true);
+ }finally{f.cleanup();}});
+test('closing checkout after verified capture preserves paid access and renewal recovery',async()=>{const f=direct(setup());try{
+ const q=await saveIntroQuote(f.db,'user1',f.target);await acceptUpgrade(f.db,'user1',q.quoteId,f.deps);f.pay();
+ const paid=await verifyUpgradePayment(f.db,await ownedUpgrade(f.db,'user1',q.quoteId),'pay_upgrade',f.deps);
+ const result=await abandonUpgrade(f.db,'user1',q.quoteId,f.deps);assert.equal(result.abandoned,false);assert.equal(result.upgrade.accessGranted,true);assert.equal(result.upgrade.quote.nextRenewalAt,paid.quote.nextRenewalAt);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM subscription_refund_obligations').get().n,0);
  }finally{f.cleanup();}});
