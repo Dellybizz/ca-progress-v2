@@ -27,10 +27,19 @@ Implemented and tested in this change:
 - Owner-only resource importance marking.
 - Cancel a scheduled provider plan change from Pricing, with provider confirmation before clearing the local scheduled state.
 
+Upgrade integration in this release:
+- Authenticated five-minute server quote snapshots, published configurable Pro first-upgrade-month price (50 INR), independent paid-Pro eligibility, actual captured Basic credit, and original quote/period ownership checks.
+- Pricing review with full-month intro versus remaining-period proration, credit, exact due, renewal date/price, and bank approval method. Prominent first-upgrade-month offer for eligible Basic subscribers; full comparison preserved.
+- Separate Razorpay upgrade Order settlement: immutable quote validation, captured payment verification, atomic winner/access grant, exact fixed dates and repeat-safe audit history. Late duplicate captured upgrade payments create idempotent refund obligations.
+- Preserve Basic before successful payment. Cancel its provider renewal only after verified Pro activation; create replacement authorization only after fresh confirmed cancellation. Save/recover uncertain creation without repeating possibly dispatched requests. Approved replacement starts on the quoted renewal date at the agreed recurring price.
+- Paid Pro survives interrupted future authorization; Pricing and Billing provide a saved continuation. Regular renewals continue through the existing invoice verifier. Upgrade payments/refund status appear in Billing.
+- Signed late old-mandate renewal captures are verified and queued for refund instead of extending overlapping Basic access. Refund/dispute holds remove only the affected upgrade access and remain visible for review.
+
+This release covers Basic-to-Pro upgrades. The standalone new-Pro subscription introductory offer is still not published through the legacy subscription-offer checkout. Payment retries/refunds here cover upgrade Orders; the general checkout retry-group replacement is still pending. Quotes below the gateway's one-rupee minimum require renewal rather than silently increasing the charge or discarding credit. No real customer payments/cancellations/refunds were performed for testing.
+
 Remaining integration work (must not be represented as live):
-- Server quote API and upgrade checkout with immutable quote acceptance; provider renewal updates and activation reconciliation.
 - Retry groups and captured-payment arbitration in verification/webhook/queue paths; idempotent duplicate refunds and duplicate mandate closure.
-- Provider-backed Pro introductory offer binding and policy publication.
+- First-month Pro offer for fresh standalone subscriptions, not just Basic-to-Pro upgrades.
 - Admin grant issuance UI, student claim/notification UI, atomic queued activation and verified provider schedule extension.
 - Storage transition creation, reminder delivery, protected cleanup worker covering resources and test attachments; grace upload allowance and importance marking for attachments.
 - Persisted one-year lock enforcement, future reauthorization and continuation flow.

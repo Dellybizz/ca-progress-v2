@@ -34,7 +34,7 @@ export function dependencies(env:Env,userId:string):Dependencies{
     },
     async provider(path,init={}){
       if(!env.RAZORPAY_KEY_ID||!env.RAZORPAY_KEY_SECRET)throw new CheckoutError('Checkout is unavailable.','provider_not_configured',503);
-      const response=await providerFetch(`https://api.razorpay.com/v1/${path}`,{...init,headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,'content-type':'application/json'}});
+      const response=await providerFetch(`https://api.razorpay.com/v1/${path}`,{...init,headers:{...Object.fromEntries(new Headers(init.headers)),authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,'content-type':'application/json'}});
       if(!response.ok){const detail=await response.json().catch(()=>null) as {error?:{field?:string}}|null;const field=typeof detail?.error?.field==='string'&&/^[a-z_]{1,40}$/.test(detail.error.field)?detail.error.field:null;const error=Object.assign(new CheckoutError(`Razorpay rejected this request (HTTP ${response.status}${field?`; ${field}`:''}).`,'provider_http_'+response.status+(field?'_'+field:''),502),{definitiveRejection:response.status>=400&&response.status<500&&![408,409,429].includes(response.status)});throw error;}
       return await response.json() as Record<string,unknown>;
     },

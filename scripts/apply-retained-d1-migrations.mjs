@@ -70,6 +70,7 @@ const migrations = [
   ["0073", "d1/migrations/0073_payment_system_p5_recovery.sql"],
   ["0074", "d1/migrations/0074_plan_service_allocation.sql"],
   ["0075", "d1/migrations/0075_subscription_lifecycle_rules.sql"],
+  ["0076", "d1/migrations/0076_immediate_upgrade_checkout.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");

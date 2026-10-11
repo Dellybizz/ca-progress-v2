@@ -1,3 +1,4 @@
+import {processUpgradeEvent} from './upgrades';
 import {providerFetch} from "./provider-http";
 import previous from './payment-p3';
 import {dependencies} from './payment-p2';
@@ -58,7 +59,9 @@ async function processInbox(env:Env,eventKey:string){
  const row=await db.prepare('SELECT * FROM billing_webhook_inbox WHERE event_key=?1').bind(eventKey).first<Row>();
  try{
   const payload=JSON.parse(String(row!.raw_body)) as Row,{local,paymentId}=await resolveLocal(env,payload),eventType=String(payload.event);
-  if(local&&!eventType.startsWith('refund.')&&!eventType.startsWith('payment.dispute.')){
+  if(await processUpgradeEvent(env,payload,local)){
+   // Upgrade orders are verified against their exact saved credit quote.
+  }else if(local&&!eventType.startsWith('refund.')&&!eventType.startsWith('payment.dispute.')){
    await db.prepare("INSERT OR IGNORE INTO razorpay_subscription_events(id,provider_event_id,razorpay_subscription_id,provider_subscription_id,provider_payment_id,event_type,payload_sha256,evidence_json,outcome,received_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'received',?9)").bind(crypto.randomUUID(),eventKey,local.id,local.provider_subscription_id,paymentId||null,eventType,row!.payload_sha256,JSON.stringify({source:'durable_inbox',subscription_id:local.provider_subscription_id}),stamp()).run();
    await reconcileKnown(env,local,paymentId||null,eventType);
    await db.prepare("UPDATE razorpay_subscription_events SET outcome='reconciled',error_code=NULL,processed_at=?1 WHERE provider_event_id=?2").bind(stamp(),eventKey).run();
