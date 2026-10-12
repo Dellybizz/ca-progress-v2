@@ -33,7 +33,7 @@ test('rendered Pricing keeps Free current and Pro purchasable when an unpaid Pro
  const dir=await mkdtemp(join(process.cwd(),'.pricing-state-test-'));
  try{
   const output=join(dir,'pricing.mjs');
-  await build({entryPoints:['components/billing/pricing-client.tsx'],outfile:output,bundle:true,format:'esm',platform:'node',jsx:'automatic',alias:{'@':process.cwd()},external:['react','react/jsx-runtime'],plugins:[{name:'navigation-fixture',setup(builder){
+  await build({entryPoints:['components/billing/pricing-client.tsx'],outfile:output,bundle:true,format:'esm',platform:'node',jsx:'automatic',alias:{'@':process.cwd()},external:['react','react/jsx-runtime','react-dom'],plugins:[{name:'navigation-fixture',setup(builder){
    builder.onResolve({filter:/^next\/navigation$/},()=>({path:'navigation',namespace:'fixture'}));
    builder.onLoad({filter:/.*/,namespace:'fixture'},()=>({contents:'export const useRouter=()=>({push(){},refresh(){}});',loader:'js'}));
   }}]});
