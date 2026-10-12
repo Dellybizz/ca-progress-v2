@@ -13,11 +13,11 @@ export const metadata: Metadata = { title: "Plans & Pricing | CA Progress" };
 
 export default async function PricingPage() {
   const [model, offers, entitlements, requestHeaders, recurring] = await Promise.all([
-    getPricingModel(),
+    getPricingModel({includeEntitlements:false}),
     listPublishedPricingOffers(),
     listActivePlanEntitlements(),
     headers(),
-    getRecurringBillingState(),
+    getRecurringBillingState({includeHistory:false}),
   ]);
   const commercePolicy = commercePolicyFromUserAgent(requestHeaders.get("user-agent"));
   return <div className="phase11-page pricing-page"><PageHeader preview={false} eyebrow="Plans" title="More focus. More progress." description="Free, Basic or Pro. Compare your tools, then choose your plan." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link></div>}/><PricingClient subscription={recurring.subscription??null} hasRecurring={Boolean(recurring.subscription&&!["cancelled","completed","expired"].includes(recurring.subscription.status))} {...model} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;

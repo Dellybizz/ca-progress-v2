@@ -4,19 +4,22 @@ import {useRouter} from 'next/navigation';
 import type {CheckoutView} from '@/lib/billing/checkout-engine.mjs';
 import {monitorCheckout} from '@/lib/billing/checkout-monitor.mjs';
 import {clearCheckoutIntent} from '@/lib/billing/checkout-client.mjs';
-export function CheckoutRecovery({viewerId,onResume,webCheckoutAllowed,refreshKey}:{refreshKey?:string|null;webCheckoutAllowed:boolean;viewerId?:string|null;onResume?:(view:CheckoutView)=>Promise<void>}){
+export function CheckoutRecovery({viewerId,onResume,webCheckoutAllowed,refreshKey,fastUpdates=false,onAccessGranted,onTerminal}:{fastUpdates?:boolean;onAccessGranted?:(view:CheckoutView)=>void;onTerminal?:(view:CheckoutView)=>void;refreshKey?:string|null;webCheckoutAllowed:boolean;viewerId?:string|null;onResume?:(view:CheckoutView)=>Promise<void>}){
   const router=useRouter();
   const [view,setView]=useState<CheckoutView|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const guard=useRef(false),refreshed=useRef<string|null>(null);
-  function accept(next:CheckoutView|null){setView(next);if(next&&['failed','cancelled','succeeded'].includes(next.state)&&viewerId)clearCheckoutIntent(localStorage,viewerId,next.requestId);if(next?.accessGranted&&refreshed.current!==next.attemptId){refreshed.current=next.attemptId;router.refresh();}}
+  function accept(next:CheckoutView|null){setView(next);if(next&&['failed','cancelled','succeeded'].includes(next.state)&&viewerId)clearCheckoutIntent(localStorage,viewerId,next.requestId);if(next&&['failed','cancelled','succeeded'].includes(next.state))onTerminal?.(next);if(next?.accessGranted&&refreshed.current!==next.attemptId){refreshed.current=next.attemptId;onAccessGranted?.(next);router.refresh();}}
   useEffect(()=>{
     const controller=new AbortController();
     const signal=()=>AbortSignal.any([controller.signal,AbortSignal.timeout(30000)]);
+    let lastRecovery=0;
     const stop=monitorCheckout({
+      maxChecks:fastUpdates?24:12,pollIntervalMs:fastUpdates?1000:5000,maxIntervalMs:fastUpdates?5000:30000,
       canCheck:()=>!refreshKey&&!document.hidden&&!guard.current,
       read:async()=>{const response=await fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:signal()});if(!response.ok)throw new Error('unavailable');return (await response.json()).checkout;},
       reconcile:async next=>{
-        if(!webCheckoutAllowed)return next;
+        if(!webCheckoutAllowed||(fastUpdates&&Date.now()-lastRecovery<5000))return next;
+        lastRecovery=Date.now();
         guard.current=true;
         try{const response=await fetch('/api/v1/payments/checkout/recover',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({attemptId:next.attemptId}),signal:signal()});if(!response.ok)throw new Error('unavailable');return (await response.json()).checkout;}finally{guard.current=false;}
       },
@@ -26,7 +29,7 @@ export function CheckoutRecovery({viewerId,onResume,webCheckoutAllowed,refreshKe
     return()=>{stop();controller.abort();};
     // The attempt is read from the server on every check; no payment is created here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[viewerId,webCheckoutAllowed,refreshKey]);
+  },[viewerId,webCheckoutAllowed,refreshKey,fastUpdates]);
   async function recover(resume=false){if(!view||guard.current)return;guard.current=true;setBusy(true);setError('');try{const response=await fetch('/api/v1/payments/checkout/recover',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({attemptId:view.attemptId}),signal:AbortSignal.timeout(30000)});const result=await response.json();if(!response.ok)throw new Error('Your checkout is saved. We could not get an update yet; please try again shortly.');const next=result.checkout as CheckoutView;accept(next);if(resume&&next.resumable&&onResume)await onResume(next);}catch(caught){setError(caught instanceof Error?caught.message:'Payment updates are temporarily unavailable.');}finally{guard.current=false;setBusy(false);}}
   if(!view||['failed','cancelled','succeeded'].includes(view.state)||view.accessGranted)return null;
   const unsupported=view.errorCode==='mandate_schedule_unsupported';

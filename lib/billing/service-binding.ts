@@ -13,6 +13,7 @@ function binding(): BillingService | null {
 }
 export function billingServiceConfigured() { return Boolean(binding()); }
 export async function invokeBillingService(input: BillingInvoke) {
+  const started=performance.now();
   const service = binding();
   if (!service) return new Response(JSON.stringify({ error: "Billing service is not connected in this environment yet." }), { status: 503, headers: { "content-type": "application/json", "cache-control": "no-store" } });
   const headers = new Headers({ "x-ca-progress-internal": "ca-progress-v2-web" });
@@ -30,5 +31,7 @@ export async function invokeBillingService(input: BillingInvoke) {
     const userId = responseUserId ?? authenticatedMutationUserId;
     if (userId) await invalidateUserFeatureCache(userId);
   }
-  return response;
+  const resultHeaders=new Headers(response.headers);
+  resultHeaders.append("server-timing",`billing;dur=${(performance.now()-started).toFixed(1)}`);
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers:resultHeaders});
 }

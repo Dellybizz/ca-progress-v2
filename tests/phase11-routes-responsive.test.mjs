@@ -51,9 +51,10 @@ test("pricing remains configuration-safe and sends policy and method identifiers
   assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
   assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer,method\)/);
   assert.match(pricing, /published server policy has a valid price/);
-  assert.match(pricing, /payment=\$\{granted/);
-  assert.match(pricing, /recovered\.checkout\?\.accessGranted===true/);
-  assert.match(pricing, /\/billing\?payment=pending/);
+  assert.match(pricing, /result\.accessGranted===true/);
+  assert.match(pricing, /setConfirmedPlanId\(created\.planId\)/);
+  assert.match(pricing, /setCompletionPhase\('pending'\)/);
+  assert.match(pricing, /createCheckoutCompletion/);
   assert.match(pricing, /payment\.failed/);
   assert.doesNotMatch(pricing, /retry:\{/);
   assert.doesNotMatch(pricing, /max_count/);

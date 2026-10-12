@@ -165,9 +165,11 @@ export async function createResourceMetadataWithinQuota(input: { userId: string;
   return { id: created.id, moderationStatus: created.moderation_status, usedBytes, limitBytes: access.limitBytes };
 }
 
-export async function getPricingModel() {
-  const [plans, entitlements, identity] = await Promise.all([listPlans(), listPlanEntitlements(), optionalUser()]);
-  return { plans, entitlements, authenticated: Boolean(identity), viewerId: identity?.id ?? null, currentPlanId: identity ? await currentPlanId(identity.id) : null };
+export async function getPricingModel({includeEntitlements=true}:{includeEntitlements?:boolean}={}) {
+  const identityPromise=optionalUser();
+  const currentPlanPromise=identityPromise.then(identity=>identity?currentPlanId(identity.id):null);
+  const [plans, entitlements, identity, planId] = await Promise.all([listPlans(), includeEntitlements?listPlanEntitlements():Promise.resolve([]), identityPromise,currentPlanPromise]);
+  return { plans, entitlements, authenticated: Boolean(identity), viewerId: identity?.id ?? null, currentPlanId: planId };
 }
 
 export async function getBillingModel(): Promise<BillingModel> {

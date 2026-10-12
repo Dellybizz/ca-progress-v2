@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {build} from 'esbuild';
 const dir=await mkdtemp(join(tmpdir(),'payment-p3-worker-')),bundle=join(dir,'worker.mjs');
 await build({entryPoints:['workers/billing/p3.ts'],outfile:bundle,bundle:true,format:'esm',platform:'neutral'});
-const worker=(await import(pathToFileURL(bundle))).default;
+const workerModule=await import(pathToFileURL(bundle)),worker=workerModule.default;
 const fixture=()=>makeFixture(worker);
 test('actual private worker grants first verified term and full renewal without browser callback',async()=>{const f=fixture();try{let response=await f.sync();assert.equal(response.status,200);assert.equal((await response.json()).reconciliation.paidCount,1);let access=f.sql.prepare('SELECT * FROM user_subscriptions').get();assert.equal(access.ends_at,new Date(f.invoices[0].billing_end*1000).toISOString());const initialId=access.id;const next={...f.invoices[0],id:'inv_2',payment_id:'pay_2',billing_start:f.invoices[0].billing_end,billing_end:f.invoices[0].billing_end+28*86400,amount:5000,amount_paid:5000};f.invoices.push(next);f.payments.set('pay_2',{...f.payments.get('pay_1'),id:'pay_2',invoice_id:'inv_2',amount:5000,created_at:next.billing_start});Object.assign(f.sub,{paid_count:2,current_start:next.billing_start,current_end:next.billing_end});for(let i=0;i<2;i++){response=await f.sync();assert.equal(response.status,200);assert.equal((await response.json()).reconciliation.paidCount,2);}access=f.sql.prepare('SELECT * FROM user_subscriptions').get();assert.equal(access.id,initialId);assert.ok(Date.parse(access.starts_at)<=Date.now());assert.equal(access.ends_at,new Date(next.billing_end*1000).toISOString());assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,1);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM payment_subscription_cycles').get().n,2);assert.ok(f.calls.every(c=>c.method==='GET'));}finally{f.cleanup();}});
 test('private worker keeps authorization without initial captured payment pending',async()=>{const f=fixture();try{Object.assign(f.sub,{status:'authenticated',paid_count:0,current_end:null});f.invoices.length=0;const response=await f.sync();assert.equal(response.status,200);assert.equal((await response.json()).reconciliation.paidCount,0);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,0);}finally{f.cleanup();}});
@@ -37,3 +37,34 @@ function savedOfferProof(f){
 }
 test('consumed intro offer with immutable creation proof verifies gross invoice and net capture idempotently',async()=>{const f=fixture();try{savedOfferProof(f);for(let i=0;i<2;i++){const response=await f.sync();assert.equal((await response.json()).reconciliation.paidCount,1);}assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,1);assert.equal(f.sql.prepare('SELECT amount_subunits FROM payment_subscription_cycles').get().amount_subunits,2500);assert.equal(f.sql.prepare('SELECT financial_state FROM razorpay_subscriptions').get().financial_state,'paid');assert.ok(f.calls.every(c=>c.method==='GET'));}finally{f.cleanup();}});
 for(const scenario of ['missing-proof','wrong-offer','wrong-owner','unconsumed','underpayment','outstanding'])test(`consumed offer recovery rejects ${scenario}`,async()=>{const f=fixture();try{savedOfferProof(f);if(scenario==='missing-proof')f.sql.exec('DELETE FROM payment_checkout_attempts');if(scenario==='wrong-offer')f.sub.offer_id='offer_other';if(scenario==='wrong-owner')f.sub.notes.ca_progress_user_id='another';if(scenario==='unconsumed')f.sub.paid_count=0;if(scenario==='underpayment')f.payments.get('pay_1').amount=2400;if(scenario==='outstanding')f.invoices[0].amount_due=2500;assert.equal((await (await f.sync()).json()).reconciliation.mismatch,true);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,0);}finally{f.cleanup();}});
+
+
+test('signed first-payment confirmation uses one subscription, invoice and payment read and returns verified access',async()=>{const f=fixture();try{
+ const proof={razorpay_subscription_id:'sub_1',razorpay_payment_id:'pay_1',razorpay_signature:createHmac('sha256',f.env.RAZORPAY_KEY_SECRET).update('pay_1|sub_1').digest('hex')};
+ const response=await worker.fetch(new Request('https://billing.internal/verify-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':'user1','content-type':'application/json'},body:JSON.stringify(proof)}),f.env);
+ assert.equal(response.status,200);assert.equal((await response.json()).accessGranted,true);
+ assert.equal(f.calls.filter(c=>new URL(c.url).pathname==='/v1/subscriptions/sub_1').length,1);assert.equal(f.calls.filter(c=>new URL(c.url).pathname==='/v1/payments/pay_1').length,1);assert.equal(f.calls.filter(c=>new URL(c.url).pathname==='/v1/invoices').length,1);
+ }finally{f.cleanup();}});
+
+test('checkout Plan validation uses a fresh exact snapshot while admin verification always rechecks Razorpay',async()=>{const f=fixture();try{
+ const fetchFixture=globalThis.fetch;let reads=0;
+ globalThis.fetch=async(url,init)=>{if(new URL(url).pathname==='/v1/plans/plan_1'){reads++;return Response.json({id:'plan_1',period:'monthly',interval:1,item:{amount:5000,currency:'INR'}});}return fetchFixture(url,init);};
+ const terms={policyVersionId:'pv1',planId:'basic',billingCycle:'monthly',durationValue:1,durationUnit:'month',currency:'INR',recurringPrice:5000};
+ await workerModule.ensurePlan(f.env,terms,'recurring',5000,{allowCached:true});assert.equal(reads,1);
+ await workerModule.ensurePlan(f.env,terms,'recurring',5000,{allowCached:true});assert.equal(reads,1);
+ await workerModule.ensurePlan(f.env,terms,'recurring',5000);assert.equal(reads,2);
+ await workerModule.ensurePlan({...f.env,RAZORPAY_KEY_ID:'rzp_test_rotated'},terms,'recurring',5000,{allowCached:true});assert.equal(reads,3);
+ f.sql.prepare('UPDATE razorpay_plan_mappings SET last_checked_at=?').run(new Date(Date.now()-300001).toISOString());
+ await workerModule.ensurePlan(f.env,terms,'recurring',5000,{allowCached:true});assert.equal(reads,4);
+ await assert.rejects(()=>workerModule.ensurePlan(f.env,{...terms,recurringPrice:6000},'recurring',6000,{allowCached:true}),/mapping no longer matches/);assert.equal(reads,4);
+ }finally{f.cleanup();}});
+
+
+test('existing paid access does not falsely confirm a captured callback whose invoice is still pending',async()=>{const f=fixture();try{
+ await f.sync();
+ const first=f.invoices[0];f.invoices.push({id:'inv_2',subscription_id:'sub_1',payment_id:'pay_2',status:'issued',billing_start:first.billing_end,billing_end:first.billing_end+86400,amount:5000,amount_paid:0,amount_due:5000,currency:'INR'});
+ f.payments.set('pay_2',{id:'pay_2',invoice_id:'inv_2',subscription_id:'sub_1',status:'captured',method:'upi',amount:5000,currency:'INR',created_at:first.billing_end});
+ const proof={razorpay_subscription_id:'sub_1',razorpay_payment_id:'pay_2',razorpay_signature:createHmac('sha256',f.env.RAZORPAY_KEY_SECRET).update('pay_2|sub_1').digest('hex')};
+ const response=await worker.fetch(new Request('https://billing.internal/verify-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':'user1','content-type':'application/json'},body:JSON.stringify(proof)}),f.env);
+ assert.equal(response.status,200);assert.equal((await response.json()).accessGranted,false);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,1);
+ }finally{f.cleanup();}});

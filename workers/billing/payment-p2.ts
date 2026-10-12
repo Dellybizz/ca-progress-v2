@@ -24,7 +24,7 @@ export function dependencies(env:Env,userId:string):Dependencies{
       if(single?.allowRegularPriceFallback&&!input.acceptRegularPriceFallback)throw new CheckoutError('Review and accept the regular-price fallback before continuing.','checkout_fallback_consent_required');
       const terms=single??(input.paymentMethod==='upi'?resolved:{...resolved,introPrice:null,introCycles:0,introProviderOfferId:null});
       if(input.promoCode&&(terms.introPrice!==null||input.paymentMethod!=='upi'))throw new CheckoutError('This offer cannot be combined with the selected checkout.','checkout_offer_conflict');
-      const [mapping,paid]=await Promise.all([ensurePlan(env,terms,'recurring',terms.recurringPrice),prepaidAccess(db,userId)]);
+      const [mapping,paid]=await Promise.all([ensurePlan(env,terms,'recurring',terms.recurringPrice,{allowCached:true}),prepaidAccess(db,userId)]);
       const campaign=input.paymentMethod==='upi'&&terms.introPrice===null?await reserveCampaign(db,{userId,planId:input.planId,requestId:input.requestId,policyVersionId:terms.policyVersionId,base:terms.recurringPrice,promoCode:input.promoCode}):null;
       const offerId=campaign?.campaign.providerOfferId??requireIntroOffer(terms);
       const schedule=mandateSchedule(terms),totalCount=schedule.totalCount;

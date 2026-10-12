@@ -21,6 +21,10 @@ Razorpay's documented Subscription Offer methods are UPI and card. eMandate rema
 
 ## Activation and recovery
 
+Checkout loads Razorpay ahead of time and keeps the plan review visible while setup is prepared. Closing the provider window acknowledges the closure immediately; a new payment still waits for confirmed cancellation of the old setup. Payment callbacks show confirmation progress immediately and update the selected plan from the verification response, without running a second full reconciliation or waiting for a Billing-page navigation. Pending status reads accelerate for a bounded window; provider recovery requests remain throttled.
+
+Checkout may reuse a provider-verified Plan snapshot for five minutes only when the provider key, Plan ID, currency, amount and billing frequency exactly match. Missing, expired or changed snapshots require a live GET. Admin verification always performs a fresh read. This cache contains no payment or entitlement evidence. Signed callback verification reads the subscription under its existing projection lease and reuses its freshly provider-read payment for the matching invoice; other invoice payments still require provider reads.
+
 The server checks first-paid-purchase eligibility, binding policy, method, currency, introductory price and recurring price. A stale binding or changed eligibility aborts preparation before provider subscription creation. Trial and non-monthly interval combinations are not enabled by this feature. Existing payment contracts and already-paid first months retain their original recovery paths.
 
 Access requires captured invoice evidence at the exact discounted amount, or the exact regular first-month amount when the saved checkout includes explicit customer acceptance of that fallback. Arbitrary amounts and unconsented full-price charges remain blocked. Cycle two and later require the regular amount on the same provider subscription. Bank authorization alone does not grant paid access.

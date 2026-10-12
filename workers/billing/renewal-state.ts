@@ -15,7 +15,7 @@ export async function renewalEvidence(env:Env,local:Row,subscription:Row,payment
  const result=await collectRenewalEvidence(env.DB,contract,subscription,async path=>{
   const response=await providerFetch(`https://api.razorpay.com/v1/${path}`,{method:'GET',headers:{authorization:`Basic ${btoa(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`)}`,accept:'application/json'}});
   if(!response.ok)throw new RenewalError('Provider renewal evidence could not be read.');return await response.json() as Row;
- },{keyId:env.RAZORPAY_KEY_ID,callbackPayment:payment});
+ },{keyId:env.RAZORPAY_KEY_ID,callbackPayment:payment,callbackPaymentVerified:true});
  await env.DB.prepare('UPDATE razorpay_subscriptions SET renewal_evidence_error=NULL,provider_end_at=?1 WHERE id=?2').bind(Number(subscription.end_at)>0?new Date(Number(subscription.end_at)*1000).toISOString():null,local.id).run();
  return result;
 }
