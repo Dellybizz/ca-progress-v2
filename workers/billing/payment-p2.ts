@@ -81,7 +81,7 @@ const worker={...previous,
       }
       if(input.attemptId!==undefined&&(typeof input.attemptId!=='string'||input.attemptId.length>100))return json({error:'Invalid checkout identifier.'},400);
       return json({checkout:await recoverCheckout(env.DB,user,input.attemptId,deps),userId:user});
-    }catch(error){return reply({error:error instanceof CheckoutError?error.message:'Checkout could not be verified. Check its status in Billing.',code:error instanceof CheckoutError?error.code:'checkout_unavailable'},error instanceof CheckoutError?error.status:503);}
+    }catch(error){return reply({error:error instanceof CheckoutError?error.message:'Checkout could not be verified. Check its status in Billing.',code:error instanceof CheckoutError?error.code:'checkout_unavailable',retryable:(error as {retryable?:boolean})?.retryable===true},error instanceof CheckoutError?error.status:503);}
   },
   async queue(batch:Parameters<typeof previous.queue>[0],env:Env){
     for(const message of batch.messages){

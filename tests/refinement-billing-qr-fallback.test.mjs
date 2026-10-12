@@ -22,7 +22,7 @@ test("API-created subscriptions authenticate through Razorpay Standard Checkout 
   assert.match(client,/new window\.Razorpay\(/);
   assert.doesNotMatch(client,/window\.location\.assign\(authorizationUrl\)/);
   assert.equal((client.match(/\/api\/v1\/payments\/create-subscription/g)||[]).length,2);
-  assert.match(client,/result\.state==='failed'&&result\.errorCode==='provider_request_not_dispatched'/);
+  assert.match(client,/result\.state==='cancelled'\|\|result\.state==='failed'/);
   assert.match(client,/setFallbackUrl\(authorizationUrl\)/);
   assert.match(client,/UPI QR not loading\?/);
   assert.match(client,/Open Razorpay secure page/);
