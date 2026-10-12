@@ -78,6 +78,7 @@ const migrations = [
   ["0081", "d1/migrations/0081_pro_live_single_mandate_fallback.sql"],
   ["0082", "d1/migrations/0082_single_checkout_switches.sql"],
   ["0083", "d1/migrations/0083_admin_plan_display_names.sql"],
+  ["0084", "d1/migrations/0084_checkout_retry_groups.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");

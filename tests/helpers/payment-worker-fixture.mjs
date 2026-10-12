@@ -13,6 +13,7 @@ export function fixture(worker,{introMigration=true}={}){
  sql.exec(readFileSync('d1/migrations/0070_payment_system_p2_checkout.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0082_single_checkout_switches.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0071_payment_system_p3_renewals.sql','utf8'));
+ sql.exec(readFileSync('d1/migrations/0084_checkout_retry_groups.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0010_phase12_background_jobs.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0072_payment_system_p4_convergence.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0075_subscription_lifecycle_rules.sql','utf8'));

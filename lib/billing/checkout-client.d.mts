@@ -6,4 +6,4 @@ export function clearCheckoutIntent(storage:Storage,user:string,requestId:string
 
 export function adoptCheckoutRequest(storage:Storage,user:string,requestId:string):void;
 
-export function checkoutIntentForPurchase(storage:Storage,user:string,terms:Omit<CheckoutInput,'requestId'>,uuid:()=>string,readStatus?:()=>Promise<{requestId:string;state:string}|null>):Promise<CheckoutInput>;
+export function checkoutIntentForPurchase(storage:Storage,user:string,terms:Omit<CheckoutInput,'requestId'>,uuid:()=>string,readStatus?:()=>Promise<{requestId:string;state:string;attemptId?:string;accessGranted?:boolean;planId?:string;paymentMethod?:string}|null>):Promise<CheckoutInput>;
