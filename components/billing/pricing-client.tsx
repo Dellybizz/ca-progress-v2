@@ -4,7 +4,7 @@ import {loadCheckout} from '@/lib/billing/checkout-loader.mjs';
 import {SingleMandateReview} from './single-mandate-review';
 import {UpgradeCheckout} from './upgrade-checkout';
 import {CheckoutRecovery} from './checkout-recovery';
-import {checkoutIntent,clearCheckoutIntent,adoptCheckoutRequest,readCheckoutIntent} from '@/lib/billing/checkout-client.mjs';
+import {checkoutIntent,checkoutIntentForPurchase,clearCheckoutIntent,adoptCheckoutRequest} from '@/lib/billing/checkout-client.mjs';
 import type {CheckoutView} from '@/lib/billing/checkout-engine.mjs';
 import { quoteForMethod, type PaymentMethod } from "@/lib/billing/payment-quote.mjs";
 import { useEffect, useMemo, useState, useRef, useLayoutEffect } from "react";
@@ -98,13 +98,10 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     try{
       if(closingCheckout.current){const closed=await closingCheckout.current;if(!closed)throw new Error('Your previous checkout is being confirmed. Check its status before starting another payment.');closingCheckout.current=null;}
       setCompletionPhase('idle');
-      // Billing closure happens in another page; discard its completed browser intent before purchase.
-      const saved=readCheckoutIntent(localStorage,viewerId)?await fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null):null;
-      if(saved&&['failed','cancelled','succeeded'].includes(saved.state))clearCheckoutIntent(localStorage,viewerId,saved.requestId);
-      let input=checkoutIntent(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID());
+      let input=await checkoutIntentForPurchase(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID(),()=>fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null));
       let response=await fetch("/api/v1/payments/create-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input),signal:AbortSignal.timeout(45000)});
       let result=await response.json() as CheckoutView&{error?:string};
-      if(result.state==='failed'&&result.errorCode==='provider_request_not_dispatched'){
+      if(result.state==='cancelled'||(result.state==='failed'&&result.errorCode==='provider_request_not_dispatched')){
         clearCheckoutIntent(localStorage,viewerId,input.requestId);
         input=checkoutIntent(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID());
         response=await fetch("/api/v1/payments/create-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input),signal:AbortSignal.timeout(45000)});

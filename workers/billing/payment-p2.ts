@@ -56,20 +56,32 @@ const worker={...previous,
     if(request.headers.get('x-ca-progress-internal')!=='ca-progress-v2-web')return json({error:'Internal billing service only.'},403);
     const user=request.headers.get('x-ca-progress-user-id');if(!user)return json({error:'Sign in to manage checkout.'},401);
     if(!env.DB)return json({error:'Billing is unavailable.'},503);
+    const timings:Record<string,number>={};
+    const started=performance.now();
+    const timed=async<T>(name:string,work:()=>Promise<T>):Promise<T>=>{const start=performance.now();try{return await work();}finally{timings[name]=(timings[name]??0)+performance.now()-start;}};
+    const reply=(value:unknown,status=200)=>{
+      const response=json(value,status);
+      response.headers.set('server-timing',[`checkout;dur=${(performance.now()-started).toFixed(1)}`,...Object.entries(timings).map(([name,duration])=>`checkout_${name};dur=${duration.toFixed(1)}`)].join(', '));
+      return response;
+    };
     try{
       const deps=dependencies(env,user);
+      const prepare=deps.prepare,provider=deps.provider,preflight=deps.preflight;
+      deps.prepare=(...args)=>timed('policy',()=>prepare(...args));
+      deps.provider=(...args)=>timed('provider',()=>provider(...args));
+      if(preflight)deps.preflight=(...args)=>timed('preflight',()=>preflight(...args));
       if(path==='/checkout/status'&&request.method==='GET')return json({checkout:await publicCheckout(env.DB,await latestCheckout(env.DB,user,url.searchParams.get('attemptId')||undefined),deps.keyId)});
       if(request.method!=='POST')return json({error:'Method not allowed.'},405);
       const raw=await request.text();if(raw.length>4096)return json({error:'Request is too large.'},413);
       let input:{attemptId?:string};try{const value=JSON.parse(raw);if(!value||typeof value!=='object'||Array.isArray(value))throw new Error();input=value;}catch{return json({error:'Invalid checkout request.'},400);}
       if(path==='/create-subscription'){
         const checkout=await createCheckout(env.DB,user,input,deps);
-        if(checkout.state==='failed')return json({...checkout,error:'This attempt failed before subscription creation. Start a new checkout.'},409);
-        return json(checkout,checkout.subscriptionId?200:202);
+        if(checkout.state==='failed')return reply({...checkout,error:'This attempt failed before subscription creation. Start a new checkout.'},409);
+        return reply(checkout,checkout.subscriptionId?200:202);
       }
       if(input.attemptId!==undefined&&(typeof input.attemptId!=='string'||input.attemptId.length>100))return json({error:'Invalid checkout identifier.'},400);
       return json({checkout:await recoverCheckout(env.DB,user,input.attemptId,deps),userId:user});
-    }catch(error){return json({error:error instanceof CheckoutError?error.message:'Checkout could not be verified. Check its status in Billing.',code:error instanceof CheckoutError?error.code:'checkout_unavailable'},error instanceof CheckoutError?error.status:503);}
+    }catch(error){return reply({error:error instanceof CheckoutError?error.message:'Checkout could not be verified. Check its status in Billing.',code:error instanceof CheckoutError?error.code:'checkout_unavailable'},error instanceof CheckoutError?error.status:503);}
   },
   async queue(batch:Parameters<typeof previous.queue>[0],env:Env){
     for(const message of batch.messages){

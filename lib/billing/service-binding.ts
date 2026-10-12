@@ -25,11 +25,11 @@ export async function invokeBillingService(input: BillingInvoke) {
   const response = await service.fetch(new Request(`https://billing.internal${input.path}${input.query ?? ""}`, { method: input.method ?? "POST", headers, body: input.method === "GET" ? undefined : input.body }));
   const mutatesAccess = input.path === "/upgrade" || input.path === "/create-subscription" || input.path === "/checkout/recover" || input.path === "/verify" || input.path === "/webhook" || input.path === "/verify-subscription" || input.path === "/subscription-action" || input.path === "/admin/action";
   if (mutatesAccess && response.ok) {
-    const payload = await response.clone().json().catch(() => null) as { userId?: unknown; reconciliation?: { userId?: unknown } } | null;
+    const payload = await response.clone().json().catch(() => null) as { userId?: unknown; accessGranted?: unknown; reconciliation?: { userId?: unknown } } | null;
     const responseUserId = typeof payload?.userId === "string" ? payload.userId : typeof payload?.reconciliation?.userId === "string" ? payload.reconciliation.userId : null;
     const authenticatedMutationUserId = input.path === "/upgrade" || input.path === "/verify-subscription" || input.path === "/subscription-action" || input.path === "/checkout/recover" || input.path === "/create-subscription" ? input.userId ?? null : null;
     const userId = responseUserId ?? authenticatedMutationUserId;
-    if (userId) await invalidateUserFeatureCache(userId);
+    if (userId && (input.path !== "/create-subscription" || payload?.accessGranted === true)) await invalidateUserFeatureCache(userId);
   }
   const resultHeaders=new Headers(response.headers);
   resultHeaders.append("server-timing",`billing;dur=${(performance.now()-started).toFixed(1)}`);
