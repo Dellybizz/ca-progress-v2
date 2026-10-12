@@ -26,3 +26,5 @@ export function planFeatureRequirement(featureKey: string): Readonly<{ tier: Pla
 
 export const PLAN_SERVICE_CATALOG:readonly Readonly<{key:string;page:string;label:string;tier:PlanTier}>[];
 export function configuredStorageBytes(entitlement:{tier:unknown;storageLimitBytes?:number|null;limitValue?:number|null;limitUnit?:string}):number;
+
+export function configuredPlanLabel(tier: unknown, name?: unknown): string;

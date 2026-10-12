@@ -46,14 +46,14 @@ test("Phase 15C comparison locks canonical Free, Pro and Premium product values"
   assert.equal(planComparisonValue(storage, "pro"), "15 GB");
 });
 
-test("pricing UX is comparison-first and uses the Phase 1 commercial product names", () => {
+test("pricing UX is comparison-first and uses admin configured product names", () => {
   const page = read("app/(student)/pricing/page.tsx");
   const client = read("components/billing/pricing-client.tsx");
-  assert.match(page, /Explorer, Striver or Ranker/);
+  assert.match(page, /name:offer\?\.planName\|\|plan\.name/);
   assert.match(page, /Compare your tools/);
   assert.match(client, /PLAN_COMPARISON_COLUMNS/);
   assert.match(client, /PLAN_COMPARISON_ROWS/);
-  assert.match(client, /productPlanLabel\(plan\.tier_key\)/);
+  assert.match(client, /configuredPlanLabel\(plan\.tier_key,plan\.name\)/);
   assert.match(client, /plan\.price_subunits/);
   assert.match(client, /if\(!checkoutMatchesPolicy\(plan,cycle,offer,selectedMethod\)\)throw/);
   assert.doesNotMatch(client, />Basic</);

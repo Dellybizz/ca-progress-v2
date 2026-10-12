@@ -7,7 +7,7 @@ import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
 import { hasSubscriptionAccess } from "./lifecycle.mjs";
-import { configuredStorageBytes, tierRank, productPlanLabel } from "./plan-policy.mjs";
+import { configuredStorageBytes, tierRank, configuredPlanLabel } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -87,7 +87,7 @@ async function rewardEntitlementOverride(userId: string, featureKey: string, cur
   return {
     planId: plan.id,
     tier: plan.tier_key,
-    planName: productPlanLabel(plan.tier_key),
+    planName: configuredPlanLabel(plan.tier_key,plan.name),
     featureKey,
     allowed: Boolean(entitlement?.enabled),
     limitValue: entitlement?.limit_value ?? null,

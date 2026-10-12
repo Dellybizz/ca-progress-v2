@@ -20,10 +20,11 @@ export default async function PricingPage() {
     headers(),
     getRecurringBillingState({includeHistory:false}),
   ]);
+  const plans=model.plans.map(plan=>{const offer=offers.find(item=>item.planId===plan.id);return {...plan,name:offer?.planName||plan.name,tagline:offer?.planDescription??plan.tagline,price_subunits:offer?.recurringPriceSubunits??plan.price_subunits};});
   const commercePolicy = commercePolicyFromUserAgent(requestHeaders.get("user-agent"));
   if(model.authenticated&&commercePolicy.webCheckoutAllowed){
     for(const origin of ["https://checkout.razorpay.com","https://api.razorpay.com","https://cdn.razorpay.com"])preconnect(origin);
     preload("https://checkout.razorpay.com/v1/checkout.js",{as:"script"});
   }
-  return <div className="phase11-page pricing-page">{model.authenticated&&commercePolicy.webCheckoutAllowed?<script async src="https://checkout.razorpay.com/v1/checkout.js"/>:null}<PageHeader preview={false} eyebrow="Plans" title="More focus. More progress." description="Explorer, Striver or Ranker. Compare your tools, then choose your plan." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link></div>}/><PricingClient subscription={recurring.subscription??null} hasRecurring={Boolean(recurring.subscription&&!["cancelled","completed","expired"].includes(recurring.subscription.status))} {...model} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
+  return <div className="phase11-page pricing-page">{model.authenticated&&commercePolicy.webCheckoutAllowed?<script async src="https://checkout.razorpay.com/v1/checkout.js"/>:null}<PageHeader preview={false} eyebrow="Plans" title="More focus. More progress." description="Compare your tools, then choose your plan." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link></div>}/><PricingClient subscription={recurring.subscription??null} hasRecurring={Boolean(recurring.subscription&&!["cancelled","completed","expired"].includes(recurring.subscription.status))} {...model} plans={plans} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
 }
