@@ -67,3 +67,5 @@
 
 .pricing-matrix .mobile-pricing-labels{display:none}
 @media(max-width:650px){.pricing-matrix .mobile-pricing-labels{display:grid;background:var(--color-surface-muted)}.pricing-matrix .mobile-pricing-labels td{font-weight:750;font-size:10px;color:var(--color-text-soft)}}
+
+@media(max-width:650px){.pricing-matrix table{display:flex;flex-direction:column}.pricing-matrix thead{order:0}.pricing-matrix tfoot{order:1}.pricing-matrix tbody{order:2}}
