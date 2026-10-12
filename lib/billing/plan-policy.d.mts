@@ -1,5 +1,5 @@
 export type PlanTier = "free" | "basic" | "pro";
-export type ProductPlanLabel = "Free" | "Basic" | "Pro";
+export type ProductPlanLabel = "Explorer" | "Striver" | "Ranker";
 export type PlanFeatureKey = keyof typeof PLAN_FEATURE_REQUIRED_TIER;
 
 export const PLAN_TIERS: readonly PlanTier[];

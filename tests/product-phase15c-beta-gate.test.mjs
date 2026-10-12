@@ -29,15 +29,15 @@ test("Phase 15C comparison locks canonical Free, Pro and Premium product values"
     monthlyPriceInr: column.monthlyPriceInr,
     storageQuotaMegabytes: column.storageQuotaMegabytes,
   })), [
-    { tier: "free", label: "Free", monthlyPriceInr: 0, storageQuotaMegabytes: 250 },
-    { tier: "basic", label: "Basic", monthlyPriceInr: 50, storageQuotaMegabytes: 2560 },
-    { tier: "pro", label: "Pro", monthlyPriceInr: 150, storageQuotaMegabytes: 15360 },
+    { tier: "free", label: "Explorer", monthlyPriceInr: 0, storageQuotaMegabytes: 250 },
+    { tier: "basic", label: "Striver", monthlyPriceInr: 50, storageQuotaMegabytes: 2560 },
+    { tier: "pro", label: "Ranker", monthlyPriceInr: 150, storageQuotaMegabytes: 15360 },
   ]);
   assert.equal(monthlyPriceInr("free"), 0);
   assert.equal(monthlyPriceInr("basic"), 50);
   assert.equal(monthlyPriceInr("pro"), 150);
-  assert.equal(productPlanLabel("basic"), "Basic");
-  assert.equal(productPlanLabel("pro"), "Pro");
+  assert.equal(productPlanLabel("basic"), "Striver");
+  assert.equal(productPlanLabel("pro"), "Ranker");
 
   const storage = PLAN_COMPARISON_ROWS.find((row) => row.key === "storage");
   assert.ok(storage);
@@ -49,7 +49,7 @@ test("Phase 15C comparison locks canonical Free, Pro and Premium product values"
 test("pricing UX is comparison-first and uses the Phase 1 commercial product names", () => {
   const page = read("app/(student)/pricing/page.tsx");
   const client = read("components/billing/pricing-client.tsx");
-  assert.match(page, /Free, Basic or Pro/);
+  assert.match(page, /Explorer, Striver or Ranker/);
   assert.match(page, /Compare your tools/);
   assert.match(client, /PLAN_COMPARISON_COLUMNS/);
   assert.match(client, /PLAN_COMPARISON_ROWS/);

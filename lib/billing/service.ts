@@ -7,7 +7,7 @@ import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
 import { hasSubscriptionAccess } from "./lifecycle.mjs";
-import { configuredStorageBytes, tierRank } from "./plan-policy.mjs";
+import { configuredStorageBytes, tierRank, productPlanLabel } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -87,7 +87,7 @@ async function rewardEntitlementOverride(userId: string, featureKey: string, cur
   return {
     planId: plan.id,
     tier: plan.tier_key,
-    planName: plan.name,
+    planName: productPlanLabel(plan.tier_key),
     featureKey,
     allowed: Boolean(entitlement?.enabled),
     limitValue: entitlement?.limit_value ?? null,
@@ -118,7 +118,7 @@ export async function getEntitlementForUser(userId: string, featureKey: string):
       } catch {
         if (providerEntitlement) return providerEntitlement;
       }
-      return providerEntitlement ?? { planId: "", tier: "free", planName: "Free", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
+      return providerEntitlement ?? { planId: "", tier: "free", planName: "Explorer", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
     },
   });
 }

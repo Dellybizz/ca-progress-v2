@@ -11,9 +11,9 @@ import { buildProgressPdf } from "../lib/exports/progress-pdf.mjs";
 const decoder = new TextDecoder();
 
 test("Phase 14.1 maps internal billing tiers to product plans without weakening the matrix", () => {
-  assert.equal(exportProductPlanLabel("free"), "Free");
-  assert.equal(exportProductPlanLabel("basic"), "Basic");
-  assert.equal(exportProductPlanLabel("pro"), "Pro");
+  assert.equal(exportProductPlanLabel("free"), "Explorer");
+  assert.equal(exportProductPlanLabel("basic"), "Striver");
+  assert.equal(exportProductPlanLabel("pro"), "Ranker");
 
   assert.equal(canUseExport("free", "progress_pdf"), true);
   assert.equal(canUseExport("free", "study_csv"), false);
@@ -29,7 +29,7 @@ test("Phase 14.1 maps internal billing tiers to product plans without weakening 
   assert.equal(canUseExport("pro", "study_csv"), true);
   assert.equal(canUseExport("pro", "test_history_csv"), true);
   assert.equal(canUseExport("pro", "full_backup"), true);
-  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Pro" });
+  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Ranker" });
 });
 
 test("Progress PDF is valid for an empty account", () => {

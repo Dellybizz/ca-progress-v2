@@ -7,7 +7,7 @@ import type {PaymentMethod} from '@/lib/billing/payment-quote.mjs';
 type Review={planId:string;method:PaymentMethod;quoteId:string;expiresAt:string;kind?:string;quote:UpgradeQuote;checkoutReady:boolean};
 const money=(n:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:0,maximumFractionDigits:2}).format(n/100);
 const date=(s:string)=>new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'}).format(new Date(s));
-export function UpgradeCheckout({planLabel="Pro",introPurchase=false,planId,onClose,loadCheckout,onBusyChange}:{planLabel?:string;introPurchase?:boolean;planId:string|null;onClose:()=>void;loadCheckout:()=>Promise<boolean>;onBusyChange:(busy:boolean)=>void}){
+export function UpgradeCheckout({planLabel="Ranker",introPurchase=false,planId,onClose,loadCheckout,onBusyChange}:{planLabel?:string;introPurchase?:boolean;planId:string|null;onClose:()=>void;loadCheckout:()=>Promise<boolean>;onBusyChange:(busy:boolean)=>void}){
  const router=useRouter(),dialog=useRef<HTMLDialogElement>(null),guard=useRef(false);
  const [reviewData,setReview]=useState<Review|null>(null),[saved,setSaved]=useState<UpgradeView|null>(null),[method,setMethod]=useState<PaymentMethod>('upi'),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
  const review=reviewData?.planId===planId&&reviewData?.method===method?reviewData:null;

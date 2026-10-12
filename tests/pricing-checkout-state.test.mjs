@@ -42,8 +42,8 @@ test('rendered Pricing keeps Free current and Pro purchasable when an unpaid Pro
   const offers=plans.slice(1).map(p=>({planId:p.id,checkoutReady:true,currency:'INR',recurringPriceSubunits:p.price_subunits,introEligible:false}));
   const html=renderToStaticMarkup(createElement(PricingClient,{plans,offers,entitlements:[],authenticated:true,viewerId:'user1',currentPlanId:'free',hasRecurring:true,subscription:{...setup,providerSubscriptionId:'sub_1'},commercePolicy:{webCheckoutAllowed:true}}));
   assert.match(html,/pricing-column--free[^]*?YOUR PLAN/);
-  assert.match(html,/Choose Pro/);
-  assert.doesNotMatch(html,/Change to Pro|Finish your payment|Your checkout is saved/);
+  assert.match(html,/Choose Ranker/);
+  assert.doesNotMatch(html,/Change to Ranker|Finish your payment|Your checkout is saved/);
   assert.match(html,/pricing-column--free[^]*?Current plan/);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
