@@ -1,4 +1,5 @@
 import p4FinalWorker from "./p4-final";
+import {providerFetch} from "./provider-http";
 
 type D1Result<T = Record<string, unknown>> = { results?: T[]; success?: boolean; meta?: { changes?: number } };
 type D1Statement = {
@@ -42,7 +43,7 @@ async function providerSubscriptionSnapshot(subscriptionId: string, env: Env) {
   const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
   if (!keyId || !keySecret) throw new Error("Razorpay recurring checkout is not configured.");
   if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) throw new Error("Stored Razorpay subscription ID is invalid.");
-  const response = await fetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+  const response = await providerFetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
     method: "GET",
     headers: {
       authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`,
@@ -80,22 +81,29 @@ export async function freezeUnsafeSubscriptionCreation(request: Request, env: En
 
   if (rows.length === 0) {
     const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits,total_count,billing_duration_value,billing_duration_unit
-      FROM razorpay_subscriptions WHERE user_id=?1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
+      FROM razorpay_subscriptions WHERE user_id=?1 AND COALESCE(provider_verified,0)<>1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
     if (latest) rows = [latest];
   }
   if (rows.length === 0) return null;
 
   const verifiedOpen: Array<{ local: Row; providerStatus: string; authorizationUrl: string | null }> = [];
-  for (const local of rows) {
+  // Bound concurrency without accumulating one provider round trip per old setup.
+  const snapshots: PromiseSettledResult<ProviderSubscriptionSnapshot>[] = [];
+  for (let offset = 0; offset < rows.length; offset += 4) {
+    snapshots.push(...await Promise.allSettled(rows.slice(offset, offset + 4).map(local =>
+      providerSubscriptionSnapshot(clean(local.provider_subscription_id, 100), env))));
+  }
+  for (const [index, local] of rows.entries()) {
     const localStatus = clean(local.status, 32);
     if (!KNOWN_SUBSCRIPTION_STATUSES.has(localStatus)) {
       return json({ error: "Checkout is frozen because an existing subscription has an unknown local state. Reconcile billing before retrying.", code: "subscription_state_requires_reconciliation", localStatus }, 409);
     }
 
-    const subscriptionId = clean(local.provider_subscription_id, 100);
     let providerState: ProviderSubscriptionSnapshot;
     try {
-      providerState = await providerSubscriptionSnapshot(subscriptionId, env);
+      const snapshot = snapshots[index];
+      if (snapshot.status === "rejected") throw snapshot.reason;
+      providerState = snapshot.value;
     } catch {
       return json({ error: "Checkout is frozen because the existing Razorpay subscription could not be verified. Retry reconciliation before starting another subscription.", code: "provider_subscription_unverifiable" }, 503);
     }

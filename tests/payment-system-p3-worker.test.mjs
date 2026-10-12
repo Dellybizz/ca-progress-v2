@@ -68,3 +68,22 @@ test('existing paid access does not falsely confirm a captured callback whose in
  const response=await worker.fetch(new Request('https://billing.internal/verify-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':'user1','content-type':'application/json'},body:JSON.stringify(proof)}),f.env);
  assert.equal(response.status,200);assert.equal((await response.json()).accessGranted,false);assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n,1);
  }finally{f.cleanup();}});
+
+const guardBundle=join(dir,'startup-guard.mjs');
+await build({entryPoints:['workers/billing/p4-closure.ts'],outfile:guardBundle,bundle:true,format:'esm',platform:'neutral'});
+const {freezeUnsafeSubscriptionCreation:startupGuard}=await import(pathToFileURL(guardBundle));
+const guardRequest=()=>new Request('https://billing.internal/create-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':'user1','content-type':'application/json'},body:JSON.stringify({planId:'basic',paymentMethod:'upi'})});
+test('verified terminal setup adds no Razorpay request to a fresh checkout',async()=>{
+ const f=fixture();try{f.sql.exec("UPDATE razorpay_subscriptions SET status='cancelled',provider_verified=1");assert.equal(await startupGuard(guardRequest(),f.env),null);assert.equal(f.calls.length,0);}finally{f.cleanup();}
+});
+test('unverified terminal setup still requires fresh provider confirmation',async()=>{
+ const f=fixture();try{f.sql.exec("UPDATE razorpay_subscriptions SET status='cancelled',provider_verified=0");f.sub.status='created';const response=await startupGuard(guardRequest(),f.env);assert.equal(response.status,409);assert.equal((await response.json()).code,'subscription_state_mismatch');assert.equal(f.calls.length,1);}finally{f.cleanup();}
+});
+test('multiple unresolved setups are checked concurrently and still block duplicate checkout',async()=>{
+ const f=fixture();try{
+ f.sql.exec("INSERT INTO razorpay_subscriptions(id,checkout_key,user_id,plan_id,policy_version_id,provider_subscription_id,provider_plan_id,recurring_provider_plan_id,status,recurring_price_subunits,initial_price_subunits,currency,billing_cycle,billing_duration_value,billing_duration_unit,total_count,cancellation_mode) SELECT 'local2','other_checkout_001',user_id,plan_id,policy_version_id,'sub_2',provider_plan_id,recurring_provider_plan_id,status,recurring_price_subunits,initial_price_subunits,currency,billing_cycle,billing_duration_value,billing_duration_unit,total_count,cancellation_mode FROM razorpay_subscriptions WHERE id='local1'");
+ let inFlight=0,maxInFlight=0;
+ globalThis.fetch=async()=>{inFlight++;maxInFlight=Math.max(maxInFlight,inFlight);await new Promise(resolve=>setImmediate(resolve));inFlight--;return Response.json({...f.sub,status:'created',paid_count:0});};
+ const response=await startupGuard(guardRequest(),f.env);assert.equal(maxInFlight,2);assert.equal(response.status,409);assert.equal((await response.json()).code,'multiple_open_subscriptions');
+ }finally{f.cleanup();}
+});
