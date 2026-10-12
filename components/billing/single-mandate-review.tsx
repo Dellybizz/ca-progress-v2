@@ -1,12 +1,13 @@
 'use client';
-import {useLayoutEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import type {PaymentMethod} from '@/lib/billing/payment-quote.mjs';
 import type {PublishedPricingOffer} from '@/lib/billing/commercial-policy';
 const money=(n:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(n/100);
-export function SingleMandateReview({offer,label,onClose,onContinue,preparing=false,feedback}:{offer:PublishedPricingOffer;label:string;onClose:()=>void;onContinue:(method:PaymentMethod,accepted:boolean)=>void;preparing?:boolean;feedback?:string}){
+export function SingleMandateReview({offer,label,onClose,onContinue,onPrepare,preparing=false,feedback}:{offer:PublishedPricingOffer;label:string;onClose:()=>void;onContinue:(method:PaymentMethod,accepted:boolean)=>void;onPrepare?:(method:PaymentMethod,accepted:boolean)=>void;preparing?:boolean;feedback?:string}){
  const dialog=useRef<HTMLDialogElement>(null),[method,setMethod]=useState<PaymentMethod>((offer.singleMandateMethods?.[0]??'upi') as PaymentMethod);
  const fallback=Boolean(offer.singleMandateFallbackMethods?.includes(method));
  useLayoutEffect(()=>{dialog.current?.showModal();},[]);
+ useEffect(()=>{onPrepare?.(method,fallback);},[method,fallback,onPrepare]);
  return <dialog ref={dialog} className="billing-review upgrade-review subscription-review" aria-labelledby="single-mandate-title" aria-busy={preparing} onCancel={event=>{if(preparing)event.preventDefault();else onClose();}}>
  <header className="subscription-review-header"><div><span className="subscription-review-eyebrow">YOUR SUBSCRIPTION</span><h2 id="single-mandate-title">{label}</h2></div><button type="button" className="subscription-review-close" aria-label="Close subscription review" disabled={preparing} onClick={onClose}>×</button></header>
  <section className="subscription-review-price"><span className="subscription-review-offer">First-month offer</span><span className="subscription-review-price-label">First payment</span><strong>{money(Number(offer.upgradeIntroPriceSubunits))}</strong><p>For your first month</p></section>

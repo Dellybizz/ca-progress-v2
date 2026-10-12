@@ -50,7 +50,7 @@ test("pricing remains configuration-safe and sends policy and method identifiers
   assert.match(pricing, /Currently unavailable/);
   assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
   assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer,method\)/);
-  assert.match(pricing, /published server policy has a valid price/);
+  assert.match(pricing, /if\(!checkoutMatchesPolicy\(plan,cycle,offer,selectedMethod\)\)throw/);
   assert.match(pricing, /result\.accessGranted===true/);
   assert.match(pricing, /setConfirmedPlanId\(created\.planId\)/);
   assert.match(pricing, /setCompletionPhase\('pending'\)/);

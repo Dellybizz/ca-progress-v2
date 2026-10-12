@@ -55,7 +55,7 @@ test("pricing UX is comparison-first and uses the Phase 1 commercial product nam
   assert.match(client, /PLAN_COMPARISON_ROWS/);
   assert.match(client, /productPlanLabel\(plan\.tier_key\)/);
   assert.match(client, /plan\.price_subunits/);
-  assert.match(client, /published server policy has a valid price/);
+  assert.match(client, /if\(!checkoutMatchesPolicy\(plan,cycle,offer,selectedMethod\)\)throw/);
   assert.doesNotMatch(client, />Basic</);
 });
 

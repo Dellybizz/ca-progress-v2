@@ -46,7 +46,7 @@ test('signed first-payment confirmation uses one subscription, invoice and payme
  assert.equal(f.calls.filter(c=>new URL(c.url).pathname==='/v1/subscriptions/sub_1').length,1);assert.equal(f.calls.filter(c=>new URL(c.url).pathname==='/v1/payments/pay_1').length,1);assert.equal(f.calls.filter(c=>new URL(c.url).pathname==='/v1/invoices').length,1);
  }finally{f.cleanup();}});
 
-test('checkout Plan validation uses a fresh exact snapshot while admin verification always rechecks Razorpay',async()=>{const f=fixture();try{
+test('checkout Plan validation uses an exact immutable snapshot while admin verification always rechecks Razorpay',async()=>{const f=fixture();try{
  const fetchFixture=globalThis.fetch;let reads=0;
  globalThis.fetch=async(url,init)=>{if(new URL(url).pathname==='/v1/plans/plan_1'){reads++;return Response.json({id:'plan_1',period:'monthly',interval:1,item:{amount:5000,currency:'INR'}});}return fetchFixture(url,init);};
  const terms={policyVersionId:'pv1',planId:'basic',billingCycle:'monthly',durationValue:1,durationUnit:'month',currency:'INR',recurringPrice:5000};
@@ -54,9 +54,9 @@ test('checkout Plan validation uses a fresh exact snapshot while admin verificat
  await workerModule.ensurePlan(f.env,terms,'recurring',5000,{allowCached:true});assert.equal(reads,1);
  await workerModule.ensurePlan(f.env,terms,'recurring',5000);assert.equal(reads,2);
  await workerModule.ensurePlan({...f.env,RAZORPAY_KEY_ID:'rzp_test_rotated'},terms,'recurring',5000,{allowCached:true});assert.equal(reads,3);
- f.sql.prepare('UPDATE razorpay_plan_mappings SET last_checked_at=?').run(new Date(Date.now()-300001).toISOString());
- await workerModule.ensurePlan(f.env,terms,'recurring',5000,{allowCached:true});assert.equal(reads,4);
- await assert.rejects(()=>workerModule.ensurePlan(f.env,{...terms,recurringPrice:6000},'recurring',6000,{allowCached:true}),/mapping no longer matches/);assert.equal(reads,4);
+ f.sql.prepare('UPDATE razorpay_plan_mappings SET last_checked_at=?').run(new Date(Date.now()-86400000).toISOString());
+ await workerModule.ensurePlan({...f.env,RAZORPAY_KEY_ID:'rzp_test_rotated'},terms,'recurring',5000,{allowCached:true});assert.equal(reads,3);
+ await assert.rejects(()=>workerModule.ensurePlan(f.env,{...terms,recurringPrice:6000},'recurring',6000,{allowCached:true}),/mapping no longer matches/);assert.equal(reads,3);
  }finally{f.cleanup();}});
 
 
