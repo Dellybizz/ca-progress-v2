@@ -3,6 +3,7 @@
   "name": "ca-progress-v2-billing",
   "main": "./payment-p5.ts",
   "minify": true,
+  "placement": { "mode": "smart" },
   "compatibility_date": "2026-08-29",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
