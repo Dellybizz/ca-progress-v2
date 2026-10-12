@@ -66,3 +66,10 @@ test('uncertain or paid previous setup cannot be replaced when verified closure 
  const f=fixture();await createCheckout(f.db,'user1',input,f.deps);f.deps.abandonUnpaid=async()=>{throw new Error('payment pending');};
  await assert.rejects(createCheckout(f.db,'user1',{...input,paymentMethod:'card',requestId:'checkout_request_00002'},f.deps),/payment pending/);assert.equal(f.posts,1);
 });
+test('a rejected safety gate blocks preparation and provider dispatch',async()=>{
+ const f=fixture();let preparations=0;
+ f.deps.preflight=async()=>Response.json({error:'Existing payment is being verified.',code:'payment_pending'}, {status:409});
+ f.deps.prepare=async()=>{preparations++;throw new Error('must not prepare');};
+ await assert.rejects(createCheckout(f.db,'user1',input,f.deps),{code:'payment_pending'});
+ assert.equal(preparations,0);assert.equal(f.posts,0);
+});

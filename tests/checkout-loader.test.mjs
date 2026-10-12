@@ -8,7 +8,7 @@ test('Razorpay preload and simultaneous checkout callers share one script and re
  try{
  const preload=loadCheckout(),click=loadCheckout();assert.equal(preload,click);assert.equal(elements.filter(e=>e.src).length,1);
  elements.find(e=>e.src).dispatchEvent(new Event('error'));assert.equal(await preload,false);assert.equal(await click,false);assert.equal(elements.filter(e=>e.src).length,0);
- const retry=loadCheckout(),other=loadCheckout();assert.equal(retry,other);assert.equal(elements.filter(e=>e.rel==='preconnect').length,2);assert.equal(elements.filter(e=>e.src).length,1);
+ const retry=loadCheckout(),other=loadCheckout();assert.equal(retry,other);assert.equal(elements.filter(e=>e.rel==='preconnect').length,3);assert.equal(elements.filter(e=>e.src).length,1);
  globalThis.window.Razorpay=function(){};elements.find(e=>e.src).dispatchEvent(new Event('load'));assert.equal(await retry,true);assert.equal(await loadCheckout(),true);assert.equal(elements.filter(e=>e.src).length,1);
  }finally{if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow;if(oldDocument===undefined)delete globalThis.document;else globalThis.document=oldDocument;}
 });

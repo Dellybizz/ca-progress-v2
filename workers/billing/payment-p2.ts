@@ -11,13 +11,24 @@ type Env=Parameters<typeof previous.fetch>[1];
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{"content-type":"application/json","cache-control":"private, no-store"}});
 export function dependencies(env:Env,userId:string,measure:<T>(name:string,work:()=>Promise<T>)=>Promise<T>=(_name,work)=>work()):Dependencies{
   const db=env.DB!;
+  // Request-local, read-only work overlaps the safety gate. No campaign or provider writes.
+  const reads=new Map<string,Promise<[Awaited<ReturnType<typeof resolveCommercial>>,Awaited<ReturnType<typeof prepaidAccess>>]>>();
+  const readTerms=(planId:string)=>{
+    let pending=reads.get(planId);
+    if(!pending){
+      pending=Promise.all([measure('commercial',()=>resolveCommercial(db,planId,userId)),measure('prepaid',()=>prepaidAccess(db,userId))]);
+      reads.set(planId,pending);
+      void pending.catch(()=>{});
+    }
+    return pending;
+  };
   return {
     keyId:env.RAZORPAY_KEY_ID,
     authorizationUrl:safeAuthorizationUrl,
     knownUndispatched(row){const c=JSON.parse(String(row.contract_json)),payload=JSON.parse(String(row.payload_json));return c.mandateScheduleVersion==='p3-one-year-v1'&&!c.providerTransportVersion&&payload.notes?.checkout_key===row.request_key&&payload.notes?.ca_progress_user_id===row.user_id;},
-    preflight:input=>freezeUnsafeSubscriptionCreation(new Request('https://billing.internal/create-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':userId,'content-type':'application/json'},body:JSON.stringify(input)}),env),
+    preflight:input=>{void readTerms(input.planId);return freezeUnsafeSubscriptionCreation(new Request('https://billing.internal/create-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':userId,'content-type':'application/json'},body:JSON.stringify(input)}),env);},
     async prepare(input){
-      const [resolved,paid]=await Promise.all([measure('commercial',()=>resolveCommercial(db,input.planId,userId)),measure('prepaid',()=>prepaidAccess(db,userId))]);
+      const [resolved,paid]=await readTerms(input.planId);
       if(input.policyVersionId&&input.policyVersionId!==resolved.policyVersionId)throw new CheckoutError('Pricing changed. Refresh before checkout.','checkout_policy_changed');
       const single=input.singleMandate?await measure('offer',()=>singleMandateTerms(db,userId,resolved,input.paymentMethod)):null;
       if(input.singleMandate&&!single)throw new CheckoutError('This first-month mandate offer needs configuration or your eligibility changed. Refresh Pricing.','single_mandate_offer_unavailable');
