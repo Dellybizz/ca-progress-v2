@@ -102,7 +102,8 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
       let input=await checkoutIntentForPurchase(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID(),()=>fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null));
       let response=await fetch("/api/v1/payments/create-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input),signal:AbortSignal.timeout(45000)});
       console.info('[checkout timing] '+JSON.stringify({phase:'preparation',durationMs:Math.round(performance.now()-startupStarted),serverTiming:response.headers.get('server-timing')}));
-      let result=await response.json() as CheckoutView&{error?:string};
+      let result=await response.json() as CheckoutView&{error?:string;preparationTiming?:Record<string,number>};
+      if(result.preparationTiming)console.info('[checkout timing] '+JSON.stringify({phase:'server',...result.preparationTiming}));
       if(result.state==='cancelled'||(result.state==='failed'&&result.errorCode==='provider_request_not_dispatched')){
         clearCheckoutIntent(localStorage,viewerId,input.requestId);
         input=checkoutIntent(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID());

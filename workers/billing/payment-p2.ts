@@ -60,7 +60,7 @@ const worker={...previous,
     const started=performance.now();
     const timed=async<T>(name:string,work:()=>Promise<T>):Promise<T>=>{const start=performance.now();try{return await work();}finally{timings[name]=(timings[name]??0)+performance.now()-start;}};
     const reply=(value:unknown,status=200)=>{
-      const response=json(value,status);
+      const response=json({...value as Record<string,unknown>,preparationTiming:{totalMs:Math.round(performance.now()-started),...Object.fromEntries(Object.entries(timings).map(([name,duration])=>[name,Math.round(duration)]))}},status);
       response.headers.set('server-timing',[`checkout;dur=${(performance.now()-started).toFixed(1)}`,...Object.entries(timings).map(([name,duration])=>`checkout_${name};dur=${duration.toFixed(1)}`)].join(', '));
       return response;
     };
