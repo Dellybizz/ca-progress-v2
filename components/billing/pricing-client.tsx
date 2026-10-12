@@ -61,7 +61,7 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
   async function switchPlan(plan:SubscriptionPlan){
     if(checkoutGuard.current||!subscription)return;
     if(plan.tier_key==="free"){router.push("/billing#manage-plan");return;}
-    if(plan.tier_key==="pro"&&currentTier==="basic"){setIntroPurchase(false);setUpgradePlanId(plan.id);return;}
+    if(plan.tier_key==="pro"&&currentTier==="basic"){if(offerFor(plan)?.singleMandateMethods?.length){setSinglePlan(plan);}else setReviewPlan(plan);return;}
     if(subscription.status!=="active"||subscription.cancelAtPeriodEnd){setNotice({tone:"info",text:"You can change plans once your subscription is active and renewal is on. See Billing for your subscription status."});return;}
     const undo=plan.id===subscription.planId&&Boolean(subscription.scheduledTargetPlanId);
     if(!window.confirm(undo?`Keep ${productPlanLabel(plan.tier_key)}? This cancels your scheduled plan change without an extra charge.`:`Switch to ${productPlanLabel(plan.tier_key)} for ${money(plan.price_subunits)} per ${cycle==="monthly"?"month":"year"}? Your new plan starts on your next payment date. You keep your current plan until then.`))return;
@@ -96,7 +96,7 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     }catch(error){finish();setNotice({tone:"error",text:error instanceof Error?error.message:"Could not resume checkout."});}
   }
   function preparation(){return preparedCheckout.current??=createCheckoutPreparation<CheckoutView>();}
-  function preparationKey(plan:SubscriptionPlan,selected:PaymentMethod,single:boolean,fallback:boolean){return JSON.stringify([viewerId,plan.id,offerFor(plan)?.policyVersionId,selected,single,fallback,promoCode.trim().toUpperCase()]);}
+  function preparationKey(plan:SubscriptionPlan,selected:PaymentMethod,single:boolean,fallback:boolean){return JSON.stringify([viewerId,plan.id,offerFor(plan)?.policyVersionId,selected,single,fallback,promoCode.trim().toUpperCase(),hasRecurring?subscription?.providerSubscriptionId:null]);}
   async function abandonPrepared(view:CheckoutView){
     if(!viewerId||view.accessGranted||!view.resumable||view.providerStatus!=='created')return;
     clearCheckoutIntent(localStorage,viewerId,view.requestId);
@@ -111,14 +111,14 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     void loadCheckout();
       if(closingCheckout.current){await closingCheckout.current;closingCheckout.current=null;}
       setCompletionPhase('idle');
-      let input=await checkoutIntentForPurchase(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID(),()=>fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null));
+      let input=await checkoutIntentForPurchase(localStorage,viewerId,{planId:plan.id,...(hasRecurring&&subscription&&plan.tier_key==="pro"?{switchFromSubscriptionId:subscription.providerSubscriptionId}:{}),...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID(),()=>fetch('/api/v1/payments/checkout/status',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(async response=>response.ok?(await response.json()).checkout:null).catch(()=>null));
       let response=await fetch("/api/v1/payments/create-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input),signal:AbortSignal.timeout(45000)});
       console.info('[checkout timing] '+JSON.stringify({phase:'preparation',durationMs:Math.round(performance.now()-startupStarted),serverTiming:response.headers.get('server-timing')}));
       let result=await response.json() as CheckoutView&{error?:string;retryable?:boolean;preparationTiming?:Record<string,number>};
       if(result.preparationTiming)console.info('[checkout timing] '+JSON.stringify({phase:'server',...result.preparationTiming}));
       if(result.state==='cancelled'||result.state==='failed'){
         clearCheckoutIntent(localStorage,viewerId,input.requestId);
-        input=checkoutIntent(localStorage,viewerId,{planId:plan.id,...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID());
+        input=checkoutIntent(localStorage,viewerId,{planId:plan.id,...(hasRecurring&&subscription&&plan.tier_key==="pro"?{switchFromSubscriptionId:subscription.providerSubscriptionId}:{}),...(singleMandate?{singleMandate:true}:{}),...(acceptRegularPriceFallback?{acceptRegularPriceFallback:true}:{}),paymentMethod:selectedMethod,policyVersionId:offer?.policyVersionId??"",promoCode:promoCode.trim().toUpperCase()},()=>crypto.randomUUID());
         response=await fetch("/api/v1/payments/create-subscription",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(input),signal:AbortSignal.timeout(45000)});
         result=await response.json() as CheckoutView&{error?:string;retryable?:boolean};
       }
