@@ -48,7 +48,8 @@ test("pricing remains configuration-safe and sends policy and method identifiers
   assert.match(pricing, /body:JSON\.stringify\(input\)/);
   assert.doesNotMatch(pricing, /body:JSON\.stringify\(\{[^}]*\b(?:amount|price_subunits)\b[^}]*\}\)/);
   assert.match(pricing, /Currently unavailable/);
-  assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
+  assert.match(pricing, /publishedComparisonValue/);
+  assert.doesNotMatch(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
   assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer,method\)/);
   assert.match(pricing, /if\(!checkoutMatchesPolicy\(plan,cycle,offer,selectedMethod\)\)throw/);
   assert.match(pricing, /result\.accessGranted===true/);
