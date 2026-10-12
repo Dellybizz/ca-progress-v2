@@ -45,7 +45,7 @@ test('fallback acceptance survives validation and cannot silently reuse an uncon
  const input={requestId:'checkout_request_001',planId:'basic',paymentMethod:'upi',singleMandate:true,acceptRegularPriceFallback:true};assert.equal(checkoutInput(input).acceptRegularPriceFallback,true);assert.equal(checkoutInput({...input,acceptRegularPriceFallback:'true'}).acceptRegularPriceFallback,undefined);
  const values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)};
  checkoutIntent(storage,'user1',{...input,acceptRegularPriceFallback:false},()=>input.requestId);
- assert.throws(()=>checkoutIntent(storage,'user1',input,()=>input.requestId),/existing checkout/);
+ const replacement=checkoutIntent(storage,'user1',input,()=> 'checkout_request_00002');assert.equal(replacement.acceptRegularPriceFallback,true);assert.notEqual(replacement.requestId,input.requestId);
 });
 
 test('live Pro binding targets current matching policy and updates Basic fallback without touching paid contracts',()=>{

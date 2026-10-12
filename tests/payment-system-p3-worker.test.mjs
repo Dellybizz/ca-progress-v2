@@ -87,3 +87,15 @@ test('multiple unresolved setups are checked concurrently and still block duplic
  const response=await startupGuard(guardRequest(),f.env);assert.equal(maxInFlight,2);assert.equal(response.status,409);assert.equal((await response.json()).code,'multiple_open_subscriptions');
  }finally{f.cleanup();}
 });
+
+for(const paymentStatus of ['failed','authorized','captured'])test(`automatic unpaid closure verifies referenced ${paymentStatus} payment`,async()=>{
+ const f=fixture();try{
+  Object.assign(f.sub,{status:'created',paid_count:0,current_start:null,current_end:null});
+  Object.assign(f.invoices[0],{status:'issued',amount_paid:0,amount_due:2500});f.payments.get('pay_1').status=paymentStatus;
+  const original=globalThis.fetch;let cancelled=0;
+  globalThis.fetch=async(url,init={})=>{if(new URL(url).pathname==='/v1/subscriptions/sub_1/cancel'){cancelled++;f.sub.status='cancelled';return Response.json(f.sub);}return original(url,init);};
+  const work=worker.fetch(new Request('https://billing.internal/subscription-action',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':'user1','content-type':'application/json'},body:JSON.stringify({subscriptionId:'sub_1',action:'abandon_setup',requestId:crypto.randomUUID()})}),f.env);
+  if(paymentStatus==='failed')assert.equal((await work).ok,true);else await assert.rejects(work,/confirmation is still pending/);
+  assert.equal(cancelled,paymentStatus==='failed'?1:0);
+ }finally{f.cleanup();}
+});

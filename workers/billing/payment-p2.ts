@@ -41,6 +41,11 @@ export function dependencies(env:Env,userId:string,measure:<T>(name:string,work:
       if(!response.ok){const detail=await response.json().catch(()=>null) as {error?:{field?:string}}|null;const field=typeof detail?.error?.field==='string'&&/^[a-z_]{1,40}$/.test(detail.error.field)?detail.error.field:null;const error=Object.assign(new CheckoutError(`Razorpay rejected this request (HTTP ${response.status}${field?`; ${field}`:''}).`,'provider_http_'+response.status+(field?'_'+field:''),502),{definitiveRejection:response.status>=400&&response.status<500&&![408,409,429].includes(response.status)});throw error;}
       return await response.json() as Record<string,unknown>;
     },
+    async abandonUnpaid(subscriptionId,user){
+      const response=await previous.fetch(new Request('https://billing.internal/subscription-action',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':user,'content-type':'application/json'},body:JSON.stringify({subscriptionId,action:'abandon_setup',requestId:crypto.randomUUID()})}),env);
+      const result=await response.json() as {providerStatus?:string};
+      if(!response.ok||result.providerStatus!=='cancelled')throw new CheckoutError('Your previous payment is still being checked. Please try again shortly.','checkout_previous_payment_pending');
+    },
     async releaseCampaign(user,key){await db.prepare("UPDATE billing_campaign_claims SET state='failed',failed_at=?1 WHERE user_id=?2 AND claim_key=?3 AND state='reserved' AND provider_subscription_id IS NULL").bind(new Date().toISOString(),user,`checkout_${user}_${key}`.slice(0,160)).run();},
     async reconcile(subscriptionId,user){
       const response=await previous.fetch(new Request('https://billing.internal/subscription-action',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':user,'content-type':'application/json'},body:JSON.stringify({subscriptionId,action:'sync',requestId:crypto.randomUUID()})}),env);

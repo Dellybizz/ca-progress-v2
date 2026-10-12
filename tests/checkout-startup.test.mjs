@@ -14,15 +14,15 @@ test('fresh and resumed matching purchases never wait on a separate status looku
  const resumed=await checkoutIntentForPurchase(s,'user1',terms,()=> 'checkout_request_00002',read);
  assert.deepEqual(resumed,first);
 });
-test('changed terms replace only the same server-confirmed terminal intent',async()=>{
+test('changed terms allocate a fresh server request without a status waterfall',async()=>{
  const s=storage(),old=checkoutIntent(s,'user1',terms,()=> 'checkout_request_00001');
  const next=await checkoutIntentForPurchase(s,'user1',{...terms,planId:'pro'},()=> 'checkout_request_00002',async()=>({requestId:old.requestId,state:'cancelled'}));
  assert.equal(next.planId,'pro');assert.equal(next.requestId,'checkout_request_00002');
 });
-for(const status of [{requestId:'checkout_request_00001',state:'ready'},{requestId:'another_checkout_00001',state:'cancelled'},null])test(`unresolved or unrelated status preserves the saved intent: ${JSON.stringify(status)}`,async()=>{
+for(const status of [{requestId:'checkout_request_00001',state:'ready'},{requestId:'another_checkout_00001',state:'cancelled'},null])test(`new selection does not wait on old browser status: ${JSON.stringify(status)}`,async()=>{
  const s=storage(),old=checkoutIntent(s,'user1',terms,()=> 'checkout_request_00001');
- await assert.rejects(checkoutIntentForPurchase(s,'user1',{...terms,planId:'pro'},()=> 'checkout_request_00002',async()=>status));
- assert.deepEqual(readCheckoutIntent(s,'user1'),old);
+ const next=await checkoutIntentForPurchase(s,'user1',{...terms,planId:'pro'},()=> 'checkout_request_00002',async()=>{throw new Error('unnecessary status request');});
+ assert.equal(next.requestId,'checkout_request_00002');assert.equal(next.planId,'pro');assert.equal(old.planId,'basic');assert.deepEqual(readCheckoutIntent(s,'user1'),next);
 });
 const dir=await mkdtemp(join(tmpdir(),'checkout-startup-')),bundle=join(dir,'binding.mjs');
 await build({entryPoints:['lib/billing/service-binding.ts'],outfile:bundle,bundle:true,format:'esm',platform:'neutral',plugins:[{name:'fixture-bindings',setup(build){
