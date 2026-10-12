@@ -9,7 +9,7 @@ import {freezeUnsafeSubscriptionCreation,safeAuthorizationUrl} from "./p4-closur
 import {CheckoutError,createCheckout,recoverCheckout,latestCheckout,publicCheckout,type Dependencies} from "../../lib/billing/checkout-engine.mjs";
 type Env=Parameters<typeof previous.fetch>[1];
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{"content-type":"application/json","cache-control":"private, no-store"}});
-export function dependencies(env:Env,userId:string):Dependencies{
+export function dependencies(env:Env,userId:string,measure:<T>(name:string,work:()=>Promise<T>)=>Promise<T>=(_name,work)=>work()):Dependencies{
   const db=env.DB!;
   return {
     keyId:env.RAZORPAY_KEY_ID,
@@ -17,14 +17,14 @@ export function dependencies(env:Env,userId:string):Dependencies{
     knownUndispatched(row){const c=JSON.parse(String(row.contract_json)),payload=JSON.parse(String(row.payload_json));return c.mandateScheduleVersion==='p3-one-year-v1'&&!c.providerTransportVersion&&payload.notes?.checkout_key===row.request_key&&payload.notes?.ca_progress_user_id===row.user_id;},
     preflight:input=>freezeUnsafeSubscriptionCreation(new Request('https://billing.internal/create-subscription',{method:'POST',headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':userId,'content-type':'application/json'},body:JSON.stringify(input)}),env),
     async prepare(input){
-      const resolved=await resolveCommercial(db,input.planId,userId);
+      const [resolved,paid]=await Promise.all([measure('commercial',()=>resolveCommercial(db,input.planId,userId)),measure('prepaid',()=>prepaidAccess(db,userId))]);
       if(input.policyVersionId&&input.policyVersionId!==resolved.policyVersionId)throw new CheckoutError('Pricing changed. Refresh before checkout.','checkout_policy_changed');
-      const single=input.singleMandate?await singleMandateTerms(db,userId,resolved,input.paymentMethod):null;
+      const single=input.singleMandate?await measure('offer',()=>singleMandateTerms(db,userId,resolved,input.paymentMethod)):null;
       if(input.singleMandate&&!single)throw new CheckoutError('This first-month mandate offer needs configuration or your eligibility changed. Refresh Pricing.','single_mandate_offer_unavailable');
       if(single?.allowRegularPriceFallback&&!input.acceptRegularPriceFallback)throw new CheckoutError('Review and accept the regular-price fallback before continuing.','checkout_fallback_consent_required');
       const terms=single??(input.paymentMethod==='upi'?resolved:{...resolved,introPrice:null,introCycles:0,introProviderOfferId:null});
       if(input.promoCode&&(terms.introPrice!==null||input.paymentMethod!=='upi'))throw new CheckoutError('This offer cannot be combined with the selected checkout.','checkout_offer_conflict');
-      const [mapping,paid]=await Promise.all([ensurePlan(env,terms,'recurring',terms.recurringPrice,{allowCached:true}),prepaidAccess(db,userId)]);
+      const mapping=await measure('mapping',()=>ensurePlan(env,terms,'recurring',terms.recurringPrice,{allowCached:true}));
       const campaign=input.paymentMethod==='upi'&&terms.introPrice===null?await reserveCampaign(db,{userId,planId:input.planId,requestId:input.requestId,policyVersionId:terms.policyVersionId,base:terms.recurringPrice,promoCode:input.promoCode}):null;
       const offerId=campaign?.campaign.providerOfferId??requireIntroOffer(terms);
       const schedule=mandateSchedule(terms),totalCount=schedule.totalCount;
@@ -65,7 +65,7 @@ const worker={...previous,
       return response;
     };
     try{
-      const deps=dependencies(env,user);
+      const deps=dependencies(env,user,timed);
       const prepare=deps.prepare,provider=deps.provider,preflight=deps.preflight;
       deps.prepare=(...args)=>timed('policy',()=>prepare(...args));
       deps.provider=(...args)=>timed('provider',()=>provider(...args));

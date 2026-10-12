@@ -43,3 +43,18 @@ test('unpaid creation returns immediately without invalidating paid access, veri
  await invokeBillingService({path:'/verify-subscription',userId:'user1',body:'{}'});
  assert.deepEqual(globalThis.__checkoutInvalidations,['user1']);
 });
+
+test('checkout view reads local state and access concurrently without granting mismatched access',async()=>{
+ const {publicCheckout}=await import('../lib/billing/checkout-engine.mjs');
+ for(const financialState of ['unpaid','mismatch']){
+  const calls=[],pending=[];
+  const db={prepare(sql){return {bind(){return this;},first(){calls.push(sql);return new Promise(resolve=>pending.push(resolve));}};}};
+  const row={id:'attempt1',request_key:'checkout_request_00001',user_id:'user1',state:'ready',provider_subscription_id:'sub_1',contract_json:JSON.stringify({planId:'pro',initialAmount:5000,recurringPrice:15000,totalCount:12}),input_json:JSON.stringify({planId:'pro',paymentMethod:'upi'})};
+  const result=publicCheckout(db,row,'key');
+  assert.equal(calls.length,2,'both independent reads start before either completes');
+  pending[0]({provider_subscription_id:'sub_1',status:'created',financial_state:financialState,total_count:12,billing_duration_unit:'month',billing_duration_value:1});
+  pending[1]({id:'access1'});
+  const view=await result;
+  assert.equal(view.accessGranted,financialState!=='mismatch');
+ }
+});
