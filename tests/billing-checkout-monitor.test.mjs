@@ -10,3 +10,12 @@ test('unmount during provider response prevents stale publications and schedules
 test('hidden or busy page skips requests without consuming retry budget',async()=>{let visible=false;const h=harness({canCheck:()=>visible,maxChecks:1});await flush();assert.equal(h.reads,0);visible=true;await h.queue.shift()();assert.equal(h.reads,1);assert.equal(h.recovers,1);assert.equal(h.queue.length,0);});
 test('provider failures are retried only within the bounded budget',async()=>{const h=harness({maxChecks:2,reconcile:async()=>{throw new Error('provider unavailable');}});await flush();await h.queue.shift()();assert.equal(h.errors.length,2);assert.equal(h.queue.length,0);});
 test('manual action starting during status read prevents overlapping recovery',async()=>{let resolve,available=true;const h=harness({read:()=>new Promise(done=>{resolve=done;}),canCheck:()=>available});available=false;resolve({state:'ready',accessGranted:false});await flush();assert.equal(h.recovers,0);assert.equal(h.queue.length,1);h.stop();});
+
+test('unactivated unpaid setup stops background recovery and polling',async()=>{
+ const h=harness({read:async()=>({state:'ready',providerStatus:'created',resumable:true,accessGranted:false})});
+ await flush();assert.equal(h.published.length,1);assert.equal(h.recovers,0);assert.equal(h.queue.length,0);
+});
+test('authenticated mandate still checks pending payment verification',async()=>{
+ const h=harness({maxChecks:1,read:async()=>({state:'pending',providerStatus:'authenticated',resumable:true,accessGranted:false})});
+ await flush();assert.equal(h.recovers,1);
+});

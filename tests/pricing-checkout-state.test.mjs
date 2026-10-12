@@ -14,8 +14,9 @@ test('paid subscriptions and verified active trials retain renewal management',(
  for(const financialState of ['mismatch','disputed','refunded'])assert.equal(hasEstablishedRecurring({...setup,status:'active',paidCount:1,financialState},'pro'),false);
 });
 test('unfinished unpaid checkout prompts stay hidden while uncertain payment verification stays visible',()=>{
- const view={state:'ready',subscriptionId:'sub_1',resumable:true,accessGranted:false};
+ const view={state:'ready',providerStatus:'created',subscriptionId:'sub_1',resumable:true,accessGranted:false};
  assert.equal(checkoutRecoveryVisible(view),false);
+ assert.equal(checkoutRecoveryVisible({...view,state:'pending',providerStatus:'authenticated'}),true);
  for(const state of ['failed','cancelled','succeeded'])assert.equal(checkoutRecoveryVisible({...view,state,resumable:false}),false);
  assert.equal(checkoutRecoveryVisible({...view,state:'uncertain',resumable:false}),true);
  assert.equal(checkoutRecoveryVisible({...view,state:'pending',resumable:false},'sub_1'),false);
