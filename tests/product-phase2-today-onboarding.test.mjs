@@ -30,7 +30,7 @@ test("Product Phase 2 new-user and existing-user routing make Today the default 
   const home = read("app/page.tsx");
   const navigation = read("lib/auth/navigation.ts");
   const login = read("app/login/page.tsx");
-  const onboarding = read("app/(public)/onboarding/page.tsx");
+  const onboarding = read("app/onboarding/page.tsx");
 
   assert.match(home, /redirect\("\/planner\/today"\)/);
   assert.match(navigation, /fallback = "\/planner\/today"/);

@@ -1,20 +1,41 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { optionalUser, loadAttemptOptions } from "@/lib/auth/server";
+import { optionalUser, loadAttemptOptions, getProfileForUser } from "@/lib/auth/server";
 import { saveOnboardingPreparationState } from "@/lib/profile/onboarding-experience";
 import { saveProfilePatch, type ProfilePatch } from "@/lib/profile/service";
 import { attemptAppliesToLevel, isCALevel, isGroupChoice, isPreparationState, validateOnboardingSelection } from "@/lib/profile/validation";
 import { validateAcademicContextSelection } from "@/lib/academic/student-context";
 import { invalidateUserFeatureCache } from "@/lib/cache/public";
 
+import {assertSameOriginMutation} from '@/lib/auth/csrf';
+import {getSetupState} from '@/lib/profile/setup-state';
+import {persistSetup,SetupError} from '@/lib/profile/setup-service';
+
 export const dynamic = "force-dynamic";
 
+export async function GET(){const user=await optionalUser();if(!user)return NextResponse.json({ok:false,error:'Sign in to read setup.'},{status:401,headers:{'Cache-Control':'private, no-store'}});return NextResponse.json({ok:true,state:await getSetupState(user.id)},{headers:{'Cache-Control':'private, no-store'}});}
+
 export async function POST(request: Request) {
+  if(!request.headers.get('authorization')?.startsWith('Bearer ')){try{assertSameOriginMutation(request);}catch{return NextResponse.json({ok:false,error:'Invalid request origin.'},{status:403});}}
+  if(Number(request.headers.get('content-length')||0)>8192)return NextResponse.json({ok:false,error:'Setup request is too large.'},{status:413});
   const user = await optionalUser();
   if (!user) return NextResponse.json({ ok: false, error: "Sign in to save onboarding." }, { status: 401 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || (body.action !== "draft" && body.action !== "complete")) return NextResponse.json({ ok: false, error: "Invalid onboarding request." }, { status: 400 });
-  const attempts = await loadAttemptOptions();
+  const currentProfile=await getProfileForUser(user.id);
+  if(body.schemaVersion!==undefined){
+    if(body.schemaVersion!==2)return NextResponse.json({ok:false,error:'Unsupported setup version.'},{status:400});
+    if(body.ownerId!==user.id)return NextResponse.json({ok:false,error:'Your signed-in account changed. Reload before saving setup.'},{status:409});
+    if(currentProfile?.onboarding_completed_at)return NextResponse.json({ok:true,alreadyCompleted:true},{headers:{'Cache-Control':'private, no-store'}});
+    const attempts=await loadAttemptOptions();
+    try{const result=await persistSetup(user.id,body.draft,body.revision,body.action==='complete',attempts);
+      if(body.action==='complete'){await invalidateUserFeatureCache(user.id);revalidatePath('/', 'layout');}
+      return NextResponse.json(result,{headers:{'Cache-Control':'private, no-store'}});
+    }catch(error){return NextResponse.json({ok:false,error:error instanceof SetupError?error.message:'Could not save setup right now.'},{status:error instanceof SetupError?error.status:500,headers:{'Cache-Control':'private, no-store'}});}
+  }
+  // Retried legacy clients cannot reset an already completed account.
+  if(currentProfile?.onboarding_completed_at)return NextResponse.json({ok:true,alreadyCompleted:true},{headers:{'Cache-Control':'private, no-store'}});
+  const attempts=await loadAttemptOptions();
   const update: ProfilePatch = {};
 
   try {

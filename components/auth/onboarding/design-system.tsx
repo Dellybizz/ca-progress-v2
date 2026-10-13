@@ -7,9 +7,9 @@ export const webOnboardingAssets:OnboardingAssets={stationery:'/onboarding/stati
 export function OnboardingFrame({children,aside,className='',assets=webOnboardingAssets}:{children:ReactNode;aside?:ReactNode;className?:string;assets?:OnboardingAssets}){
  return <main className={`ca-onboarding ${className}`} style={{'--onboarding-background':`url("${assets.stationery}")`} as CSSProperties}><div className="ca-onboarding-brand">CA PROGRESS</div><div className={`ca-onboarding-layout${aside?' has-aside':''}`}>{aside?<aside className="ca-onboarding-aside">{aside}</aside>:null}<section className="ca-onboarding-panel">{children}</section></div></main>;
 }
-export function OnboardingProgress({step,total,onBack}:{step:number;total:number;onBack?:()=>void}){
+export function OnboardingProgress({step,total,onBack,disabled=false}:{step:number;total:number;onBack?:()=>void;disabled?:boolean}){
  const safeTotal=Math.max(1,total),safeStep=Math.max(0,Math.min(step,safeTotal));
- return <header className="ca-onboarding-progress">{onBack?<button type="button" aria-label="Back" onClick={onBack}>‹</button>:<span/>}<div role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={safeTotal} aria-valuenow={safeStep}><span style={{width:`${safeStep/safeTotal*100}%`}}/></div><span className="ca-onboarding-sr">Step {safeStep} of {safeTotal}</span></header>;
+ return <header className="ca-onboarding-progress">{onBack?<button type="button" aria-label="Back" disabled={disabled} onClick={onBack}>‹</button>:<span/>}<div role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={safeTotal} aria-valuenow={safeStep}><span style={{width:`${safeStep/safeTotal*100}%`}}/></div><span className="ca-onboarding-sr">Step {safeStep} of {safeTotal}</span></header>;
 }
 export function OnboardingMascot({message,assets=webOnboardingAssets}:{message:string;assets?:OnboardingAssets}){return <div className="ca-onboarding-mascot"><img src={assets.book} alt="" width={112} height={112}/><p>{message}</p></div>;}
 export function OnboardingHeading({title,description,id}:{title:string;description?:string;id?:string}){return <div className="ca-onboarding-heading"><h1 id={id}>{title}</h1>{description?<p>{description}</p>:null}</div>;}
