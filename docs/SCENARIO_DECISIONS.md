@@ -55,7 +55,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Product owner selection: **A — Latest edit wins**
 - Trigger: A student edits the same active note or eligible record independently on two offline devices, which later synchronize.
 - Policy: The version corresponding to the **most recently made edit** becomes the authoritative current version. It supersedes the earlier version; no automatic content merge or mandatory conflict-selection popup is required by this decision.
-- Important distinction: **Latest edit time**, not **first sync arrival time**, is the decision criterion. How to establish reliable edit ordering despite incorrect device clocks is pending in S0-007.
+- Important distinction: **Latest edit time**, not **first sync arrival time**, determines the winner **when edit ordering is reliable**. S0-007 provides the clock-correction safeguard. When edit order cannot be proven, S0-CONFLICT-005 preserves both versions for later user inspection/restore in private history; never pick a winner by server arrival time.
 - Scope: Concurrent edits to the same active note or single eligible record. This does not override S0-005 (edit of an item in Trash counts as restoration), S0-003/S0-004 (permanent deletion), or transaction-specific safeguards for files, counters and academic history.
 - Open details: Reliable edit timestamp ordering; exact ties; how to identify stale/clock-skewed offline devices; whether previous versions remain recoverable; reporting a superseded local edit.
 - Status: Approved for product specification; implementation not yet verified.
@@ -68,7 +68,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Policy: When determining the most recent edit under S0-006, use server-synchronized clock offsets and reliable event-ordering metadata **where available** instead of blindly trusting raw device time. If the true order cannot be established reliably, preserve both conflicting versions so that neither is irreversibly lost, and allow resolution rather than falsely assigning a winner.
 - Implementation caution: A previous server clock offset is not absolute proof of event order during long offline periods or manual clock changes. Do not resolve uncertain offline edits on raw device timestamps alone; record confidence/conflict state and retain both versions.
 - Scope: Eligible edit conflicts. This does not reverse S0-003/S0-004 permanent deletion or override S0-005 recovery of a still-trashed item.
-- Remaining technical detail: Accurate conflict detection, order metadata, tie resolution, version retention duration, user interface for uncertain ordering, and cleanup of archived conflict copies.
+- Remaining technical detail: Reliable conflict detection, ordering metadata and history lifecycle. **User experience is settled by S0-CONFLICT-005:** preserve both uncertain versions, expose them only through private file history for later comparison/restore, and show no automatic sync/conflict popup.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## S0-008 — Offline edit after permanent deletion
@@ -133,7 +133,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Product owner direction: **Every synchronization must happen in the background; show nothing to the student.**
 - Policy: Automatic data synchronization, retries, partial-batch processing, conflict resolution and reconciliation run in the background with **no routine student-facing sync screens, loaders, status counters, success messages, progress bars, toast notifications, or manual synchronization prompts**. Normal student workflow should not be blocked on synchronization.
 - Internal engineering requirement: Maintain durable queues, per-operation acknowledgements, safe ordering, idempotency, accurate internal state, retry backoff and failure logs/diagnostics without placing routine sync details in the student's UI.
-- Precedence: Overrides previous suggestions in S0-011 and S0-012 to display routine sync status or counts. It does not revoke **S0-009** (explicit warning before signing out or app-controlled clearing when unsynced work is at risk) or **S0-010** (visible error when a change cannot be saved locally); these are data-protection exceptions, not routine sync notifications.
+- Precedence: Overrides previous suggestions in S0-011 and S0-012 to display routine sync status or counts. **S0-CONFLICT-005 preserves uncertain competing edits without an unsolicited conflict dialog, and lets students compare/restore them from private history on demand.** It does not revoke **S0-009** (explicit warning before signing out or app-controlled clearing when unsynced work is at risk) or **S0-010** (visible error when a change cannot be saved locally); these are data-protection exceptions, not routine sync notifications.
 - Failure handling still to decide: If work is persistently unsyncable for a non-transient reason, preserve it and log diagnostics; appropriate escalation must be settled without misleading the student into thinking the work is secure on the server.
 - Status: Approved for product specification; implementation not yet verified.
 
@@ -469,7 +469,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Trigger: A student edits their own private notes or files over time and wishes to inspect, restore, or manage earlier versions.
 - Policy: **Preserve private-file revisions by default**, subject to applicable storage quotas, and let students **delete selected past revisions** or **set their own version-retention limit**. Do not impose a mandatory automatic 20-version or 90-day limit on everyone.
 - Default behavior: Unless the student has chosen a retention limit, CA Progress must not silently purge historical private revisions for routine age-, count-, or storage-optimization reasons. Existing data must not be discarded without an authorized user retention/deletion action, except for separately authorized security, legal, or deletion lifecycle rules.
-- User controls: Provide per-file history with revision identification, restoration of a chosen earlier revision, selected-revision deletion, and configurable retention preferences. A restore must affect only that student's private editable copy, must not mutate its immutable publicly published snapshots (S0-FILE-IMMUTABLE-001), and must remain safe under the existing deletion/Trash rules.
+- User controls: Provide per-file history with revision identification, **side-by-side inspection/comparison of concurrent uncertain offline revisions (S0-CONFLICT-005)**, restoration of a chosen earlier revision, selected-revision deletion, and configurable retention preferences. Neither uncertain competing version is silently discarded or automatically merged; restoration affects only that student's private editable copy, never an immutable published snapshot (S0-FILE-IMMUTABLE-001), and remains subject to deletion/Trash rules.
 - Quota and capacity: Retained history counts toward applicable storage consumption according to a separately defined quota-accounting rule. At quota or device capacity exhaustion, do not automatically delete revisions to make room; handle the inability to save reliably and visibly under S0-010 and S0-030, offering user-directed cleanup instead.
 - Data model and deduplication: Revisions retain a stable association with their private file identity through renames and moves (S0-035). Reuse verified identical content safely using S0-034, with copy-on-write and reference-safe deletion; removing one revision must not corrupt another entry or snapshot.
 - Sync and permissions: Sync private version history and retention choices among authorized devices under S0-032 while keeping routine sync invisible (S0-SYNC-UI-001). Permit changes only by the student who owns the private file, subject to access rules; offline competing updates follow established conflict policies.
@@ -522,6 +522,18 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Editing: Neither A nor B nor C can edit either already-published immutable file; B may edit their separate private working copy, and C may edit their own independently saved private copy if permitted (S0-FILE-IMMUTABLE-001/S0-CONFLICT-002).
 - Exceptional removal: A separately authorized legal, safety or compliance takedown is not defined by this ordinary-revocation decision.
 - Reconciliation: Confirms and clarifies S0-019, S0-021, S0-024 and S0-SHARE-002 without overriding original-reference branch restrictions or creating new redistribution rights.
+- Status: Approved for product specification; implementation not yet verified.
+
+## S0-CONFLICT-005 — Preserve uncertain offline edits in private file history without sync popups
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Keep both, resolve from file history**, conflict-resolution question 5 of 7.
+- Trigger: A student edits the same independently owned private note/file on two offline devices, and server-corrected clocks plus available ordering metadata **cannot reliably establish which edit came last**.
+- Policy: **Retain both competing revisions intact and independently identifiable**; neither is silently discarded, automatically merged, or chosen as a winner based merely on upload arrival time. Permit the student to compare them and explicitly restore the desired revision from their private file history at any later time. Do not display a mandatory conflict-resolution popup or routine sync notification.
+- Ordinary conflict priority: When reliable edit ordering exists, S0-006's latest-edit-wins rule still applies, with S0-007 server-assisted timestamp correction. This entry governs only genuine uncertainty where a trustworthy ordering cannot be determined.
+- Privacy and history: These are revisions of the student's **private editable file**, not mutations of an immutable published original. File history preserves the competing content under S0-036, subject to explicit owner-chosen history-management actions. Internal unresolved markers may be recorded without exposing routine synchronization indicators.
+- Sync mechanics: Use version IDs/provenance, distinguish current view from preserved alternatives without falsifying chronology, keep retries idempotent, and silently reconcile metadata as far as possible. A student's explicit comparison/restore inside file history is an ordinary feature interaction, not a background sync popup.
+- Reconciliation: Clarifies S0-006, S0-007, S0-SYNC-UI-001 and S0-036. No revision to the user's approved general latest-edit-wins or invisible-background-sync decisions.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
