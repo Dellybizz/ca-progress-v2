@@ -642,6 +642,16 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Scope: Only genuine unorderable concurrent edit conflicts. When time ordering can be established reliably, S0-006's latest-edit-wins policy still applies. Detailed UX for **new edits made while an unresolved conflict exists** requires a separate rule and must not silently overwrite either preserved branch.
 - Reconciliation: Clarifies S0-006, S0-007, S0-CONFLICT-005, S0-CONFLICT-011, S0-036 and invisible background sync. Policy approved; code implementation unverified.
 
+## S0-SECURITY-004 — Actionable non-blocking warning for unsyncable changes
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Alert only for actionable failures**, security/offline-sync gap 4 of 4.
+- Policy: Keep routine synchronization completely invisible. For transient offline/network/server errors, retry silently (S0-011/S0-SYNC-UI-001). If a successfully saved local file or note **cannot upload without student action** (such as resolving a quota or authentication issue), show a **clear, non-blocking, non-repetitive warning** saying the data is saved on this device **but not cloud-backed-up**, with an appropriate fix.
+- Integrity: Keep legitimate locally saved work and its queued operations; never mark cloud backup complete without verified server acknowledgement; never delete local content to make room. After the blocker is resolved, retry eligible operations safely in the background, leaving independent completed operations intact.
+- Authorization: An unauthorized write targeting revoked shared content remains rejected under S0-015 and must not be replayed; this rule does not grant access or turn such changes into private copies.
+- Precedence: The exceptional user-actionable warning is allowed even though normal sync UI is invisible. Sign-out/data-clearing risk warnings remain required (S0-009); verified remote wipe retains security-first priority (S0-SECURITY-001).
+- Reconciles S0-011/S0-012/S0-013/S0-SYNC-UI-001/S0-032/S0-033. Exact warning copy and display cadence are implementation details. Policy approval is not implementation or deployment verification.
+
 ## Next pending scenario
 
 S0-037: What should CA Progress do when a student attempts to upload or open a corrupted or unsupported file?
