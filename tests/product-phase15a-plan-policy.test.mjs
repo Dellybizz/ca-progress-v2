@@ -141,8 +141,11 @@ test("exports and resource storage consume the canonical policy instead of priva
   assert.match(billingSource, /from "\.\/plan-policy\.mjs"/);
   assert.match(billingSource, /tierRank\(rewardTier\)/);
   assert.match(billingSource, /tierRank\(currentTier\)/);
-  assert.match(billingSource, /configuredStorageBytes\(entitlement\)/);
-  assert.match(billingSource, /entitlement\.allowed/);
+  assert.match(billingSource, /storageAllowance/);
+  const allowanceSource=read("lib/billing/storage-allowance.mjs");
+  assert.match(allowanceSource,/configuredStorageBytes\(entitlement\)/);
+  assert.match(billingSource, /resolved\.allowed/);
+  assert.match(allowanceSource,/entitlement\.allowed/);
   assert.doesNotMatch(billingSource, /entitlement\.limitValue \* 1024 \* 1024/);
 });
 

@@ -1,0 +1,12 @@
+'use client';
+import Link from 'next/link';
+import {useEffect,useState} from 'react';
+import type {CleanupStatus} from '@/lib/billing/storage-cleanup.mjs';
+const bytes=(n:number)=>n>=1024**3?`${(n/(1024**3)).toLocaleString('en-IN',{maximumFractionDigits:1})} GB`:`${(n/(1024*1024)).toLocaleString('en-IN',{maximumFractionDigits:1})} MB`;
+export function StorageCleanupNotice({initialStatus}:{initialStatus:CleanupStatus|null}){
+ const [status,setStatus]=useState(initialStatus);
+ useEffect(()=>{const controller=new AbortController();let checking=false;async function update(){if(document.hidden||checking)return;checking=true;try{const response=await fetch('/api/v1/resources/storage-cleanup',{cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])});if(!response.ok)return;const data=await response.json();if(!controller.signal.aborted)setStatus(data.storageCleanup??null);}catch{/* Keep the last warning while updates are unavailable. */}finally{checking=false;}}const timer=window.setInterval(()=>void update(),30000);window.addEventListener('focus',update);return()=>{controller.abort();window.clearInterval(timer);window.removeEventListener('focus',update);};},[]);
+ if(!status)return null;
+ const deadline=new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Kolkata'}).format(new Date(status.deadline));
+ return <section className="phase11-notice phase11-notice--info" role="status" aria-label="Storage cleanup warning"><strong>Review your files before {deadline}</strong><p>You use {bytes(status.usedBytes)} of {bytes(status.limitBytes)}. {status.filesToDelete} {status.filesToDelete===1?'file is':'files are'} currently selected for permanent deletion after the seven-day warning period.</p><p>Normal files are removed least recently opened first. Already-uploaded important files can use up to {bytes(status.importantLimitBytes)}; largest important files are removed first if that allowance is exceeded.</p><p>Download, delete or mark files important in Resources and Test Archive. New uploads stay paused while you exceed the normal limit. A verified upgrade with enough storage cancels cleanup. Deleted files cannot be recovered.</p>{status.lastError?<p>Cleanup is awaiting confirmation. You can still manage files that have not entered deletion.</p>:null}<Link className="ui-button ui-button--secondary" href="/pricing">Review storage plans</Link></section>;
+}

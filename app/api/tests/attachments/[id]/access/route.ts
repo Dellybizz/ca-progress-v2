@@ -1,3 +1,5 @@
+import {touchStorageFile} from "@/lib/billing/storage-cleanup.mjs";
+import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { createR2PresignedUrl } from "@/lib/resources/r2-presign";
@@ -16,6 +18,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!attachment) return NextResponse.json({ error: "Attachment not found." }, { status: 404, headers: { "Cache-Control": "private, no-store" } });
   try {
     const signed = await createR2PresignedUrl({ key: attachment.object_key, method: "GET", expiresInSeconds: 300 });
+    if(!await touchStorageFile(getD1RuntimeDatabase(),"test_attachment",id,user.id))return NextResponse.json({error:"Attachment cleanup is being confirmed."},{status:404});
     return NextResponse.json({ url: signed.url, expiresAt: signed.expiresAt, filename: attachment.filename }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "Private attachment access is temporarily unavailable." }, { status: 503, headers: { "Cache-Control": "private, no-store" } });

@@ -1,3 +1,5 @@
+import {touchStorageFile} from "@/lib/billing/storage-cleanup.mjs";
+import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { createR2PresignedUrl } from "@/lib/resources/r2-presign";
@@ -34,6 +36,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       responseContentDisposition: `${download ? "attachment" : "inline"}; filename="${filename}"`,
       responseContentType: String(row.mime_type || "application/octet-stream"),
     });
+    if(!await touchStorageFile(getD1RuntimeDatabase(),"resource",id,identity.id))return NextResponse.json({error:"File cleanup is being confirmed."},{status:404});
     return NextResponse.redirect(signed.url, { status: 307, headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ error: "Signed R2 download is temporarily unavailable." }, { status: 503, headers: { "Cache-Control": "private, no-store" } });

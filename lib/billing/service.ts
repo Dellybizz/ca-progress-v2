@@ -1,4 +1,6 @@
 import "server-only";
+import {storageAllowance} from "./storage-allowance.mjs";
+import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 
 import { optionalUser } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
@@ -7,7 +9,7 @@ import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
 import { hasSubscriptionAccess } from "./lifecycle.mjs";
-import { configuredStorageBytes, tierRank, configuredPlanLabel } from "./plan-policy.mjs";
+import { tierRank, configuredPlanLabel } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -97,9 +99,9 @@ async function rewardEntitlementOverride(userId: string, featureKey: string, cur
   } satisfies Entitlement;
 }
 
-export async function getEntitlementForUser(userId: string, featureKey: string): Promise<Entitlement> {
+export async function getEntitlementForUser(userId: string, featureKey: string, {fresh=false}:{fresh?:boolean}={}): Promise<Entitlement> {
   if (await isCurrentGuestTestUser(userId)) return { planId: "guest-test", tier: "pro", planName: "Guest test access", featureKey, allowed: true, limitValue: null, limitUnit: "unlimited", resetPeriod: "never", upgradeMessage: "" };
-  return getCachedUserFeature({
+  const lookup={
     userId,
     featureKey,
     load: async () => {
@@ -120,22 +122,23 @@ export async function getEntitlementForUser(userId: string, featureKey: string):
       }
       return providerEntitlement ?? { planId: "", tier: "free", planName: "Explorer", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
     },
-  });
+  };
+  return fresh?lookup.load():getCachedUserFeature(lookup);
 }
 
 export async function getResourceStorageAccess(userId: string) {
-  const entitlement = await getEntitlementForUser(userId, "resources.storage");
+  const entitlement = await getEntitlementForUser(userId, "resources.storage", {fresh:true});
   const result = await db().from("uploaded_resources").select("size_bytes").eq("owner_user_id", userId);
   if (result.error) throw new Error(result.error.message);
   const attachments = await db().from("test_attempt_attachments").select("size_bytes").eq("user_id", userId);
   if (attachments.error) throw new Error(attachments.error.message);
   const usedBytes = [...asRows<StorageRow>(result.data),...asRows<StorageRow>(attachments.data)].reduce((sum, item) => sum + Number(item.size_bytes ?? 0), 0);
-  const allowed = Boolean(entitlement.planId) && entitlement.allowed;
-  const limitBytes = configuredStorageBytes(entitlement);
+  const resolved=await storageAllowance(getD1RuntimeDatabase(),userId,entitlement);
+  const limitBytes = resolved.limitBytes;
   const limitValue = limitBytes / (1024 * 1024);
   return {
     ...entitlement,
-    allowed,
+    allowed: Boolean(resolved.planId) && resolved.allowed,
     limitValue,
     limitUnit: "megabytes",
     usedBytes,
