@@ -136,8 +136,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Failure handling still to decide: If work is persistently unsyncable for a non-transient reason, preserve it and log diagnostics; appropriate escalation must be settled without misleading the student into thinking the work is secure on the server.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-013 — Dependent offline changes wait for their prerequisite
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Wait and retry in order**
+- Trigger: A student creates a folder offline, then creates notes inside it; the folder creation request fails on reconnect.
+- Policy: Keep the folder and its dependent notes saved locally. Retry the failed parent-folder creation automatically in the background under S0-011. Only synchronize notes to the server within that folder after the parent exists and is acknowledged by the server.
+- Consistency: Enforce dependency ordering for related queued operations, while allowing independent changes to synchronize as approved by S0-012. Do not silently move dependent notes into Uncategorised, cancel their changes, or create duplicates during retries.
+- Presentation: All routine retries, operation ordering, and reconciliation are invisible to students under S0-SYNC-UI-001.
+- Guardrails: Track stable local-to-server identifiers, operation dependencies and idempotency keys. A permanently rejected prerequisite (such as an authorization failure) must not be endlessly retried; preserve the dependent local data and handle the blocking error according to the separately approved policy.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-013: If an offline change depends on an earlier queued action that fails (for example, creating a folder before adding a note to it), what should happen to the dependent change?
+S0-014: If a pending offline edit is permanently rejected by the server (for example, the student no longer has permission, or the target was removed), how should CA Progress protect the unsynced work without showing routine synchronization messages?
 
 
