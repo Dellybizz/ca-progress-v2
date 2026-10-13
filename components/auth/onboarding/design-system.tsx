@@ -4,8 +4,8 @@ import './onboarding.css';
 
 export type OnboardingAssets = {stationery:string;book:string};
 export const webOnboardingAssets:OnboardingAssets={stationery:'/onboarding/stationery.svg',book:'/onboarding/book.svg'};
-export function OnboardingFrame({children,aside,assets=webOnboardingAssets}:{children:ReactNode;aside?:ReactNode;assets?:OnboardingAssets}){
- return <main className="ca-onboarding" style={{'--onboarding-background':`url("${assets.stationery}")`} as CSSProperties}><div className="ca-onboarding-brand">CA PROGRESS</div><div className={`ca-onboarding-layout${aside?' has-aside':''}`}>{aside?<aside className="ca-onboarding-aside">{aside}</aside>:null}<section className="ca-onboarding-panel">{children}</section></div></main>;
+export function OnboardingFrame({children,aside,className='',assets=webOnboardingAssets}:{children:ReactNode;aside?:ReactNode;className?:string;assets?:OnboardingAssets}){
+ return <main className={`ca-onboarding ${className}`} style={{'--onboarding-background':`url("${assets.stationery}")`} as CSSProperties}><div className="ca-onboarding-brand">CA PROGRESS</div><div className={`ca-onboarding-layout${aside?' has-aside':''}`}>{aside?<aside className="ca-onboarding-aside">{aside}</aside>:null}<section className="ca-onboarding-panel">{children}</section></div></main>;
 }
 export function OnboardingProgress({step,total,onBack}:{step:number;total:number;onBack?:()=>void}){
  const safeTotal=Math.max(1,total),safeStep=Math.max(0,Math.min(step,safeTotal));
