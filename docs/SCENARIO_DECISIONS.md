@@ -102,6 +102,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Policy: Stop accepting or claiming successful saves that cannot be persisted, and promptly show a clear **Storage Full / Unable to Save** error informing the student that the latest change was not saved. Do not silently delete existing student data or cached files to free space under this rule.
 - Relationship to S0-009: Existing safely persisted unsynced data remains protected where technically possible; a new unsaved edit must not appear as safely queued or synced. Avoid falsely describing an in-memory draft as saved.
 - Undecided follow-ups: Whether the student should be offered an explicit retry button, export/copy of the currently unsaved text, or a storage-management shortcut; precise thresholds for early warnings. This choice does **not** approve automatic cleanup, forced deletion of existing content, or a promise that unsaved text survives app closure.
+- Reconciliation with S0-030: **Manual-only cleanup is now explicitly approved.** Do not automatically reclaim space by deleting temporary study-material caches, even when local storage is full; preserve the error-first/no-false-save behavior. Separate authorization-driven purge of revoked shared-original cache (S0-027) and scheduled expiration of Trash (S0-003) still apply for their distinct reasons.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## S0-011 — Automatic retry of failed offline synchronization
@@ -384,8 +385,20 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Unchanged general rules: Background cache and permission reconciliation stay silent (S0-SYNC-UI-001); access revocation purges temporary shared-original cache on reconnect (S0-027); personally saved private files are independent (S0-018/S0-026).
 - A newly separately published file, if ever offered as a correction, must have a distinct snapshot ID and cannot silently replace this original. Future behavior for that case remains undecided.
 
+## S0-030 — Manual-only cleanup of temporary storage caches
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Manual cleanup only**.
+- Trigger: Temporary offline study-material caches consume considerable device storage or device storage becomes low/full.
+- Policy: **Do not automatically clear disposable locally cached study materials to reclaim storage**, whether based on storage pressure, age, a periodic schedule, or routine optimization. Only remove these caches when the student explicitly initiates a relevant cache-clearing action. Never automatically delete private files, chapter-tagged private copies or unsynced work for storage reclamation.
+- Interface: Provide an explicit, comprehensible cache-management/clear-cache action, identifying that temporary offline materials will need re-fetching when available. Clearly distinguish temporary caches from independently owned private materials and pending offline edits. The exact controls and confirmation design are implementation decisions.
+- **Reconciliation with S0-010:** This explicitly confirms and strengthens S0-010 (storage full during offline editing): **show a Storage Full / Unable to Save error and do not falsely claim data is saved; do not auto-delete student content or disposable caches to recover capacity**. Student-driven storage management can be offered, but automatic cleanup to make room is forbidden.
+- **Specific mandatory removals unaffected:** Automatic expiration/permanent deletion of user-deleted Trash items under S0-003, and security/authorization-mandated removal of a revoked shared-original temporary cache after reconnect under S0-027, are **not storage optimization cleanup** and continue to apply. Such deletion is for user-authorized Trash lifecycle or revocation, not age/low-disk routine cache clearing. Account/session security actions also remain governed by their own rules.
+- Platform limitation: Operating systems may evict app-managed cache data independently; this policy restricts CA Progress's own intentional storage-reclamation cleanup and cannot guarantee retention against OS-level eviction, user device-data clearing or uninstall.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-030: When local offline cached study materials use significant device storage, should CA Progress automatically remove older disposable cached files, only remove them when asked, or let the student choose which files stay offline?
+S0-031: Should CA Progress let students explicitly mark particular eligible files or study materials as "Keep Available Offline", separately from its ordinary temporary offline cache?
 
 
