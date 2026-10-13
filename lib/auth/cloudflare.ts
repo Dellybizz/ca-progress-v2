@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import {issuePasswordRecovery,limitRecoveryStart,PasswordRecoveryError} from "./password-recovery";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cookies, headers } from "next/headers";
 import { getServerRuntimeValue } from "@/lib/cloudflare/runtime-env";
@@ -31,6 +32,7 @@ type D1Database = {
 };
 
 type OAuthTransaction = {
+  purpose?: "login" | "recovery";
   provider: SupportedOAuthProvider;
   state: string;
   verifier: string;
@@ -97,6 +99,7 @@ export type CloudflareApplicationSession = {
 };
 
 export type CloudflareOAuthCallbackResult = {
+  purpose?: "login" | "recovery";
   next: string;
   remember: boolean;
   applicationUserId: string;
@@ -243,7 +246,10 @@ export async function startCloudflareOAuth(provider: SupportedOAuthProvider, red
   const challenge = await sha256Base64Url(verifier);
   const redirectUri = callbackUriFromRedirect(redirectTo);
   const source = new URL(redirectTo);
+  const purpose=source.searchParams.get("purpose")==="recovery"?"recovery":"login";
+  if(purpose==="recovery"){if(source.searchParams.get("client")==="mobile")throw new PasswordRecoveryError();await limitRecoveryStart();}
   const transaction: OAuthTransaction = {
+    purpose,
     provider,
     state,
     verifier,
@@ -271,6 +277,7 @@ export async function startCloudflareOAuth(provider: SupportedOAuthProvider, red
   authorization.searchParams.set("response_type", "code");
   authorization.searchParams.set("scope", config.scope);
   authorization.searchParams.set("state", state);
+  if(purpose==="recovery"&&provider==="google")authorization.searchParams.set("prompt","select_account");
   authorization.searchParams.set("code_challenge", challenge);
   authorization.searchParams.set("code_challenge_method", "S256");
   return authorization.toString();
@@ -522,6 +529,12 @@ export async function issueSession(input: {
 export async function exchangeCloudflareOAuthCode(code: string, state: string): Promise<CloudflareOAuthCallbackResult> {
   if (!code.trim()) throw new Error("OAuth code is required.");
   const transaction = await readOAuthTransaction(state);
+  if(transaction.purpose==="recovery"){
+    try{const {accessToken,config}=await exchangeCode(transaction,code);const profile=await loadProviderProfile(transaction.provider,accessToken,config.userInfoEndpoint);
+      const applicationUserId=await issuePasswordRecovery(profile.provider,profile.providerUserId);
+      return {purpose:"recovery",next:"/account/reset",remember:false,applicationUserId,clientKind:"web"};
+    }catch(error){if(error instanceof PasswordRecoveryError)throw error;throw new PasswordRecoveryError();}
+  }
   const { accessToken, config } = await exchangeCode(transaction, code);
   const profile = await loadProviderProfile(transaction.provider, accessToken, config.userInfoEndpoint);
   const identity = await resolveApplicationIdentity(profile);

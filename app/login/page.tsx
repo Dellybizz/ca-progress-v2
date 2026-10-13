@@ -14,5 +14,5 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const next = sanitizeReturnPath(typeof params.next === "string" ? params.next : null, "/planner/today");
   const errorKey = typeof params.error === "string" ? params.error : "";
-  return <LoginPanel next={next} initialError={errors[errorKey] ?? null}/>;
+  return <LoginPanel next={next} initialError={errors[errorKey] ?? null} resetComplete={params.reset === "complete"}/>;
 }

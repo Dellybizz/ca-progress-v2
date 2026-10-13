@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 test("verified provider setup attaches a password to the existing owner; guest and revoked sessions cannot", () => {
   const service = readFileSync(new URL("../lib/auth/account-setup.ts", import.meta.url), "utf8");
-  const insert = service.match(/prepare\(`(INSERT INTO password_credentials[\s\S]+?NOT EXISTS\(SELECT 1 FROM password_credentials pc WHERE pc\.user_id=u\.user_id\))`\)/)?.[1];
+  const insert = service.match(/prepare\(`(INSERT INTO password_credentials[\s\S]+?NOT EXISTS\(SELECT 1 FROM password_credentials pc WHERE pc\.user_id=u\.user_id\) RETURNING user_id)`\)/)?.[1];
   assert.ok(insert, "use the credential write from the real account service");
   const migration = readFileSync(new URL("../d1/migrations/0069_auth_phase1_account_usernames.sql", import.meta.url), "utf8");
   const script = `import json,sqlite3,sys\n`+
@@ -17,12 +17,12 @@ test("verified provider setup attaches a password to the existing owner; guest a
     `db.executemany("INSERT INTO sessions VALUES(?,?,?,?,?,?)",[('student-session','student','google-id',None,'2099-01-01','2099-01-02'),('guest-session','guest','google-id',None,'2099-01-01','2099-01-02'),('revoked-session','student','google-id','2026-01-01','2099-01-01','2099-01-02')])\n`+
     `db.executescript(data['migration'])\n`+
     `args=lambda user,session,name:(name,'salt','hash',310000,user,session)\n`+
-    `assert db.execute(data['insert'],args('guest','guest-session','guest_name')).rowcount==0\n`+
-    `assert db.execute(data['insert'],args('student','revoked-session','revoked_name')).rowcount==0\n`+
-    `assert db.execute(data['insert'],args('student','student-session','chosen_name')).rowcount==1\n`+
+    `assert db.execute(data['insert'],args('guest','guest-session','guest_name')).fetchone() is None\n`+
+    `assert db.execute(data['insert'],args('student','revoked-session','revoked_name')).fetchone() is None\n`+
+    `assert db.execute(data['insert'],args('student','student-session','chosen_name')).fetchone()==('student',)\n`+
     `assert db.execute('SELECT username,is_temporary FROM account_usernames WHERE user_id=?',('student',)).fetchone()==('chosen_name',0)\n`+
     `assert db.execute('SELECT display_name FROM profiles WHERE user_id=?',('student',)).fetchone()[0]=='Original student'\n`+
-    `assert db.execute(data['insert'],args('student','student-session','second_name')).rowcount==0\n`+
+    `assert db.execute(data['insert'],args('student','student-session','second_name')).fetchone() is None\n`+
     `assert db.execute('SELECT COUNT(*) FROM app_users').fetchone()[0]==2\n`;
   const result = spawnSync("python3", ["-c", script], { input: JSON.stringify({ insert, migration }), encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);

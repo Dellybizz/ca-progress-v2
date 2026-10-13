@@ -29,7 +29,7 @@ test("Product Phase 2 keeps onboarding short and stores preparation state withou
 test("Product Phase 2 new-user and existing-user routing make Today the default without re-onboarding completed users", () => {
   const home = read("app/page.tsx");
   const navigation = read("lib/auth/navigation.ts");
-  const login = read("app/(public)/login/page.tsx");
+  const login = read("app/login/page.tsx");
   const onboarding = read("app/(public)/onboarding/page.tsx");
 
   assert.match(home, /redirect\("\/planner\/today"\)/);

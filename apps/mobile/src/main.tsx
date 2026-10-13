@@ -1,3 +1,6 @@
+import {AccountLogin} from '../../../components/auth/onboarding/accounts';
+import {FeatureSignup} from '../../../components/auth/onboarding/welcome';
+import {useOnline} from '../../../components/auth/onboarding/use-online';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MOBILE_BUILD } from "./build";
@@ -209,13 +212,12 @@ function Settings({ authenticated, guest, repository, recovered, onLogout, onRem
 const defaultDashboard: LocalDashboard = { today: [...localPreview.today], progress: localPreview.progress[0], community: [...localPreview.community] };
 const defaultWorkspace:LocalWorkspace={academic:{contextKey:null,level:"Not selected",attempt:"Not selected",subjects:[],chapters:[],attempts:[],lastUpdatedAt:null},dashboard:defaultDashboard,progress:[],planner:[],notes:[],profile:{displayName:"CA Progress student",level:null,group:null,attempt:null,timezone:null,dailyTargetMinutes:null},activity:[],leaderboard:{rank:null,score:0,category:"overall"},buddies:[],pending:0,conflicts:0,lastSyncedAt:null};
 
-function Bootstrap({ callbackError, onGuest, onAuthenticated }: { callbackError: string; onGuest:()=>void; onAuthenticated:(session:NativeSessionSnapshot)=>void }) {
-  const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const [username,setUsername]=useState("");const [password,setPassword]=useState("");
-  const signIn = (provider: "google" | "linkedin_oidc") => { setBusy(true); setError(""); void startNativeSignIn(provider).catch((cause) => { setBusy(false); setError(cause.message); }); };
-  const passwordSignIn=(event:React.FormEvent)=>{event.preventDefault();setBusy(true);setError("");void passwordNativeSignIn(username,password).then(session=>{if(!session?.authenticated)throw new Error("Sign-in failed.");setPassword("");onAuthenticated(session);}).catch(cause=>setError(cause instanceof Error?cause.message:"Sign-in failed.")).finally(()=>setBusy(false));};
-  const credentials=<form className="bootstrap-password" onSubmit={passwordSignIn}><label>Username<input autoComplete="username" required minLength={3} maxLength={30} pattern="[A-Za-z][A-Za-z0-9._]{2,29}" value={username} onChange={event=>setUsername(event.target.value)}/></label><label>Password<input type="password" autoComplete="current-password" required minLength={1} maxLength={128} value={password} onChange={event=>setPassword(event.target.value)}/></label><button className="primary" disabled={busy} type="submit">Sign in</button><small>New here? Continue with Google or LinkedIn to verify your account, then choose your username and password.</small></form>;
-  return <div className="bootstrap"><div className="bootstrap-card"><span className="bootstrap-logo">CA</span><p className="eyebrow">INSTALLED WORKSPACE</p><h1>CA Progress is ready</h1><p>The application interface is stored on this device. Sign in to use the same account and cloud data as the website.</p>{credentials}<p>Or continue with</p><button className="secondary" disabled={busy} onClick={() => signIn("google")}>Continue with Google</button><button className="secondary" disabled={busy} onClick={() => signIn("linkedin_oidc")}>Continue with LinkedIn</button><button className="secondary" disabled={busy} onClick={onGuest}>Continue as guest on this device</button><small>Guest work stays on this device. It does not sync to the website or move into a signed-in account.</small>{(error || callbackError) && <small className="auth-error" role="alert">{error || callbackError}</small>}<small>This device stays signed in across app updates while its session is valid. After uninstall, sign in again to restore your synced account. Passwords are sent over HTTPS; the phone stores only its encrypted session token.</small></div></div>;
+function Bootstrap({callbackError,onGuest,onAuthenticated}:{callbackError:string;onGuest:()=>void;onAuthenticated:(session:NativeSessionSnapshot)=>void}){
+ const [signup,setSignup]=useState(false),[error,setError]=useState('');const online=useOnline();
+ const assets={stationery:'assets/onboarding/stationery.svg',book:'assets/onboarding/book.svg'};
+ const provider=(value:'google'|'linkedin_oidc')=>startNativeSignIn(value);
+ if(signup)return <FeatureSignup assets={assets} online={online} error={error||callbackError} onBack={()=>setSignup(false)} onLogin={()=>setSignup(false)} onGoogle={()=>void provider('google').catch(cause=>setError(cause instanceof Error?cause.message:'Sign-in failed.'))} onLinkedIn={()=>void provider('linkedin_oidc').catch(cause=>setError(cause instanceof Error?cause.message:'Sign-in failed.'))}/>;
+ return <AccountLogin assets={assets} online={online} showRemember={false} recoveryHint="Recovery opens in your browser. After resetting, return here to log in." error={callbackError} onBack={()=>setSignup(true)} onSignup={()=>setSignup(true)} onRecovery={()=>openExternalSafely('https://ca-progress-v2.habeebaasif622.workers.dev/account/recover')} onProvider={value=>provider(value)} onGuest={async()=>onGuest()} onLogin={async(username,password)=>{const session=await passwordNativeSignIn(username,password);if(!session?.authenticated)throw new Error('Sign-in failed.');onAuthenticated(session);}}/>;
 }
 
 function ShellNotificationList({accountId,onOpen}:{accountId:string|null;onOpen:(href:string)=>void}) {

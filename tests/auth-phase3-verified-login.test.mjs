@@ -14,8 +14,8 @@ test("public password endpoint only accepts login and never creates users", () =
 });
 
 test("web and Android offer verified provider onboarding and username login", () => {
-  const web = read("components/auth/login-panel.tsx");
-  const mobile = read("apps/mobile/src/main.tsx");
+  const web = read("components/auth/login-panel.tsx") + read("components/auth/onboarding/accounts.tsx");
+  const mobile = read("apps/mobile/src/main.tsx") + read("components/auth/onboarding/accounts.tsx");
   const transport = read("apps/mobile/src/native-auth.ts");
   for (const screen of [web, mobile]) {
     assert.match(screen, /Continue with Google/);

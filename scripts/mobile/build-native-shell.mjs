@@ -9,6 +9,8 @@ const output = path.join(root, "native-shell");
 await rm(output, { recursive: true, force: true });
 await mkdir(path.join(output, "assets"), { recursive: true });
 await cp(path.join(source, "index.html"), path.join(output, "index.html"));
+// Account screens now use bundled onboarding illustrations.
+await cp(path.join(root,"public/onboarding"),path.join(output,"assets/onboarding"),{recursive:true});
 await build({
   entryPoints: [path.join(source, "src/main.tsx")],
   outfile: path.join(output, "assets/app.js"),

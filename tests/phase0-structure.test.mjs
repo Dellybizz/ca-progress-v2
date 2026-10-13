@@ -4,7 +4,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("../", import.meta.url).pathname;
-const required = ["app/(student)/dashboard/page.tsx", "app/(public)/login/page.tsx", "app/(public)/onboarding/page.tsx", "app/(admin)/admin/page.tsx", "app/api/health/route.ts", "lib/auth/provider.ts", "lib/auth/server.ts", "lib/auth/proxy.ts", "lib/data/d1/client.ts", "d1/migrations/0001_phase2_platform.sql", "wrangler.jsonc", "open-next.config.ts", "scripts/verify-supabase-retired.mjs"];
+const required = ["app/(student)/dashboard/page.tsx", "app/login/page.tsx", "app/(public)/onboarding/page.tsx", "app/(admin)/admin/page.tsx", "app/api/health/route.ts", "lib/auth/provider.ts", "lib/auth/server.ts", "lib/auth/proxy.ts", "lib/data/d1/client.ts", "d1/migrations/0001_phase2_platform.sql", "wrangler.jsonc", "open-next.config.ts", "scripts/verify-supabase-retired.mjs"];
 
 test("post-retirement application boundaries exist", () => {
   for (const file of required) assert.equal(existsSync(join(root, file)), true, `missing ${file}`);

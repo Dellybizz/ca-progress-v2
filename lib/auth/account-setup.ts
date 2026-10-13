@@ -54,9 +54,9 @@ export async function completeAccountSetup(usernameInput: string, password: stri
         AND s.expires_at>CURRENT_TIMESTAMP AND s.absolute_expires_at>CURRENT_TIMESTAMP
         AND u.account_state='active' AND u.auth_provider<>'guest-test'
         AND i.application_user_id=u.user_id AND i.provider IN ('google','linkedin_oidc') AND n.is_temporary=1
-        AND NOT EXISTS(SELECT 1 FROM password_credentials pc WHERE pc.user_id=u.user_id)`)
-      .bind(username, credential.salt, credential.hash, credential.iterations, session.applicationUserId, session.sessionId).run();
-    if (result.meta?.changes !== 1) throw new AccountSetupError("This sign-in is no longer eligible. Sign in again.", 403);
+        AND NOT EXISTS(SELECT 1 FROM password_credentials pc WHERE pc.user_id=u.user_id) RETURNING user_id`)
+      .bind(username, credential.salt, credential.hash, credential.iterations, session.applicationUserId, session.sessionId).first<{user_id:string}>();
+    if (result?.user_id !== session.applicationUserId) throw new AccountSetupError("This sign-in is no longer eligible. Sign in again.", 403);
   } catch (error) {
     if (/UNIQUE constraint failed/i.test(String(error))) throw new AccountSetupError("This username is unavailable. Choose another.", 409);
     throw error;
