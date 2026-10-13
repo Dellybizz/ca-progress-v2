@@ -93,7 +93,12 @@ try {
   }
   await loadSample();
   const reset = await request("/account/reset", "desktop");
-  if (![302,303,307,308].includes(reset.status) || !reset.headers.get("location")?.includes("/account/recover")) throw new Error("Reset without a proof must return to recovery.");
+  const resetHtml=await reset.text();
+  const httpRedirect=[302,303,307,308].includes(reset.status)&&reset.headers.get("location")?.includes("/account/recover");
+  // Next may flush the root loading shell before this async page redirects.
+  // Its streamed redirect must have the explicit recovery destination and no reset fields.
+  const streamingRedirect=reset.status===200&&/<meta[^>]*id="__next-page-redirect"[^>]*content="[^"<>]*url=\/account\/recover[^"<>]*"/i.test(resetHtml);
+  if ((!httpRedirect&&!streamingRedirect)||/<input[^>]*autoComplete="new-password"/i.test(resetHtml))throw new Error(`Reset without proof did not safely return to recovery (status ${reset.status}).`);
   const unverifiedReset=await fetch(`${base}/api/v1/password-recovery`,{method:"POST",headers:{...headers("desktop"),"Content-Type":"application/json",origin:base},body:JSON.stringify({password:"synthetic-only-password-12"})});
   if(unverifiedReset.status!==403)throw new Error("Unverified password reset was not rejected.");
   const oauthFailure = await fetch(`${base}/auth/google?next=%2F%2Fevil.example`, { redirect: "manual", headers: headers("desktop") });
