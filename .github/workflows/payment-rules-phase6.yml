@@ -74,7 +74,7 @@ jobs:
       - name: Deploy billing and web services
         id: deploy
         run: |
-          node scripts/run-cloudflare-command.mjs wrangler deploy -c workers/billing/wrangler.jsonc --var CA_PAYMENT_RELEASE_PAUSED:true
+          node scripts/run-cloudflare-command.mjs npx --no-install wrangler deploy -c workers/billing/wrangler.jsonc --var CA_PAYMENT_RELEASE_PAUSED:true
           npm run cf:deploy:web
       - name: Validate mappings and publish untouched approved annual defaults
         run: node scripts/payments/provision-p1.mjs --publish-owner-annual-defaults
@@ -83,7 +83,7 @@ jobs:
       - name: Verify durable signed inbox convergence
         run: node scripts/payments/verify-p4-convergence.mjs
       - name: Open new checkouts after release verification
-        run: node scripts/run-cloudflare-command.mjs wrangler deploy -c workers/billing/wrangler.jsonc --var CA_PAYMENT_RELEASE_PAUSED:false
+        run: node scripts/run-cloudflare-command.mjs npx --no-install wrangler deploy -c workers/billing/wrangler.jsonc --var CA_PAYMENT_RELEASE_PAUSED:false
       - name: Verify opened checkout health
         run: node scripts/payments/verify-owner-release.mjs --require-open
       - name: Capture deployed Worker versions
