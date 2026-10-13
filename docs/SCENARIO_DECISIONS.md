@@ -411,8 +411,22 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Not decided here: Whether the user's pin selection should sync across devices, whether private files are duplicated to multiple devices by default, file size limits, and how local-vs-cloud copies are managed; S0-032 addresses local/cloud storage.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-032 — Local-first private files with automatic cloud and multi-device sync
+
+- Decision date: 2026-10-13
+- Product owner selection: **C — Local-first with automatic cloud sync**.
+- Trigger: A student creates, saves, or edits an independently owned private file on one authorized device and later accesses the same account on another device, whether online or offline.
+- Policy: **Save permitted private files locally first for instant offline use and automatically sync them securely to the student's account in the cloud.** Authorized devices signed in to that account should automatically receive the student's private files for local offline access as background synchronization permits and **subject to actual available device storage**. Do not require manual per-file downloads for normal cross-device availability under this selection.
+- Offline and reliability: Local edits must remain usable offline and queue for eventual synchronization. Use idempotent retries and partial-operation safety (S0-011/S0-012), maintain parent/child dependency ordering (S0-013), and resolve concurrent private-file edits per approved edit-time/clock-correction rules (S0-006/S0-007); never claim a write succeeded without durable local persistence (S0-010).
+- Capacity: Honor each student's actual cloud plan/quota limits and device free-space constraints without promising unlimited storage. If insufficient space exists for a new local save or transfer, provide an actionable storage error (S0-010) rather than falsely claiming offline availability, and never auto-clean private files or caches to make space (S0-030). Exact quota/error treatment is not decided in this file.
+- Permissions and isolation: Sync only files independently owned or otherwise legitimately allowed as private copies. **Do not silently duplicate restricted merely-shared originals into permanent private ownership**; S0-023/S0-026/S0-028/S0-031 still govern shared-original downloads, save rights, temporary offline caching and offline pins. Maintain user-scoped access and encryption/protection across devices.
+- Sync presentation: Automatic normal synchronization must run invisibly in the background under S0-SYNC-UI-001; only actionable exceptional situations (such as data loss / full storage) warrant alerts. Distinguish files queued for cloud upload from server-confirmed backups internally.
+- Deletion and history: Cross-device deletions, Trash retention and restoration continue to obey S0-001 through S0-008; automatic multi-device propagation must not resurrect permanently deleted originals or erase legitimately independent private copies.
+- Limitations: Files cannot arrive on an offline secondary device until synchronization/connectivity is available; the operating system may remove local app data independently. Sync does not guarantee instantaneous delivery in these cases.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-032: When a student saves or edits a private file on one device, should CA Progress keep it only on that device, in the cloud only, or both locally and synced across the student's devices?
+S0-033: If a private file upload to cloud storage is interrupted by lost internet or app closure, should CA Progress resume the partial upload automatically from the last verified chunk, restart from zero, wait for a preferred network, or require manual retry?
 
 
