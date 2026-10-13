@@ -328,17 +328,30 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Decision date: 2026-10-13
 - Product owner selection: **Custom clarification — distinguish public shared access from independently saved/tagged copies, and apply extra restrictions to private selective shares.**
 - **Publicly shared file:** If a student legitimately uses **Save to Private Files** or **Add/Tag to Chapter** on a publicly available shared file, that action must result in a durable, student-owned private file/version, not merely an access-dependent link to the public original. Revoking or restricting access to the publicly shared source removes access **only to that public shared original**, not to private copies previously saved or attached to the student's chapter. The student keeps their own permitted edits and personal restore rights under S0-019.
-- **Public file not saved/tagged:** Merely viewing a public original or transiently caching it is NOT equivalent to deliberately adding it to Private Files or a chapter. The behavior of a transient offline cache after revocation remains to be determined separately in S0-027.
+- **Public file not saved/tagged:** Merely viewing a public original or transiently caching it is NOT equivalent to deliberately adding it to Private Files or a chapter. Temporary caches must be purged after confirmed revocation, as decided in S0-027.
 - **Privately shared file with selected people:** At the time of sharing, the sender/owner must be able to independently control whether recipients can **Save to Private Files** and whether they can **Add/Tag to Chapter**. If the sender disallows an action, that action must not create an independent recipient-owned copy or chapter attachment. Permitted viewing does not imply permission to retain privately or attach to a chapter.
 - **Permission consistency:** If chapter tagging creates a durable private file as defined above, it requires private-save permission. The sharing UI must prevent contradictory combinations that would circumvent an owner's ban on private saving; owners may allow private saving while separately prohibiting chapter tagging.
 - **Previously authorized copies:** A durable personal copy properly created when the sender allowed saving/tagging remains independent if access to the shared original is later withdrawn, consistent with S0-019. This does not override unlawful-content takedown or security/legal restrictions (to be separately specified).
 - **Other permissions:** Do not conflate in-app **Save to Private Files** / **Tag to Chapter** with external **Download/Export**. Export remains subject to S0-023; edit-personal-version and re-sharing remain subject to S0-017/S0-020/S0-022 and the sharing-time configuration rule S0-SHARE-001.
 - **Enforcement:** Store a stable private file identity/ownership record and copied content as required to ensure true independence, with provenance back to the originating public/private share. Apply sharing-type and per-share permissions server-side (including on API calls and queued offline actions). When share access is revoked, stop access to the original while preserving explicitly authorized durable personal copies.
-- **Unresolved:** Transient offline cache handling for files only viewed but never saved/tagged (S0-027); exact file-copy and storage-accounting lifecycle; UI for public saves and selective-private sharing.
+- **Unresolved:** Whether restricted privately shared files permit temporary offline caches before revocation (S0-028); exact file-copy and storage-accounting lifecycle; UI for public saves and selective-private sharing.
+- Status: Approved for product specification; implementation not yet verified.
+
+## S0-027 — Purge temporary shared-original cache on revocation
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Automatically remove cached original on reconnect**
+- Trigger: A recipient viewed a shared original, which CA Progress temporarily cached without explicitly saving it to Private Files or attaching it to a chapter; the owner revokes that recipient's access while the device is offline.
+- Policy: When the device reconnects and the server confirms access revocation, **automatically delete the local temporary cache of the shared original** and prevent further access to that original through the revoked permission. No student intervention is required.
+- Protection: Do not remove independent student-owned personal versions or chapter-linked private copies previously created with permission under S0-019 and S0-026. A temporary preview/cache is not a durable private copy.
+- Multi-path access: If another independently valid sharing route still grants access (S0-025), do not treat the recipient as fully revoked; assess effective permissions and decide cache handling on those permissions.
+- Security: Enforce server authorization before serving the source. Clean up cache keys, derivative previews, offline indexes and associated data as applicable; do not confuse ordinary cache purge with remote erasure of files exported outside the app.
+- Limitation: An entirely offline device cannot learn about the revocation immediately; automatic cache deletion only happens after it reconnects and verifies the changed access.
+- Presentation: Execute authorization reconciliation and cache cleanup silently in the background under S0-SYNC-UI-001.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
 
-S0-027: If a student only viewed a shared file and never used Save to Private Files or Tag to Chapter, what should happen to that temporary offline cache when access to the original is revoked and the device reconnects?
+S0-028: For a privately shared view-only file whose owner forbids saving/downloading, should the recipient still be allowed to temporarily cache it for offline reading while access remains valid?
 
 
