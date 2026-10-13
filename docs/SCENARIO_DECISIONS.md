@@ -451,8 +451,17 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Quotas: Precise plan-quota accounting and any user-visible storage savings metrics are not decided by this choice; define these separately to avoid silently changing subscription/storage entitlements.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-035 — Preserve private file identity when moving or renaming
+
+- Date: 2026-10-13
+- Selection: **A — Preserve original file identity**.
+- Rename and move the same owned private file; do not create a new copy.
+- Preserve its file ID, revision history, annotations, and existing chapter attachments. Changing a folder is not equivalent to removing a chapter tag.
+- Update file metadata locally first and synchronize the change to the user's other devices silently (S0-032), without re-uploading file contents.
+- Honor private-file permissions, concurrent offline edit rules (S0-006/S0-007), smart deduplication (S0-034), and public-file immutability (S0-FILE-IMMUTABLE-001).
+- Handle name conflicts or invalid destination folders safely, without dropping references.
+- Status: Approved product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-035: When a student renames or moves a privately owned file between folders or chapters, should CA Progress preserve one file identity and its history, create a new copy, ask on each move, or restrict moves that affect chapter links?
-
-
+S0-036: How many past revisions of a privately editable file should remain available to restore?
