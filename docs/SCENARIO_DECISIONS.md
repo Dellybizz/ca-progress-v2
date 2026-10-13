@@ -49,8 +49,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Safety / scope: Editing cannot resurrect an item that was already permanently erased through S0-003 or S0-004; the handling of unsynced edits encountered after permanent purge remains open for a separate decision. Keep access checks, duplicate-event protection, and sync auditability.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-006 — Concurrent offline edits of the same active record
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Latest edit wins**
+- Trigger: A student edits the same active note or eligible record independently on two offline devices, which later synchronize.
+- Policy: The version corresponding to the **most recently made edit** becomes the authoritative current version. It supersedes the earlier version; no automatic content merge or mandatory conflict-selection popup is required by this decision.
+- Important distinction: **Latest edit time**, not **first sync arrival time**, is the decision criterion. How to establish reliable edit ordering despite incorrect device clocks is pending in S0-007.
+- Scope: Concurrent edits to the same active note or single eligible record. This does not override S0-005 (edit of an item in Trash counts as restoration), S0-003/S0-004 (permanent deletion), or transaction-specific safeguards for files, counters and academic history.
+- Open details: Reliable edit timestamp ordering; exact ties; how to identify stale/clock-skewed offline devices; whether previous versions remain recoverable; reporting a superseded local edit.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-006: When the same active note or record is edited separately on two offline devices, how should the application resolve the changes once they reconnect?
+S0-007: When a device's date or clock is incorrect, how should CA Progress determine which offline edit is actually the latest?
 
 
