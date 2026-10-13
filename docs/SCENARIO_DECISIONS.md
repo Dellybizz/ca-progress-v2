@@ -438,8 +438,21 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Implementation note: Chunk granularity, encryption format, persistence mechanism and server provider-specific upload protocol remain technical design matters, not yet verified in the deployed site or APK.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-034 — Deduplicate identical content without merging file entries
+
+- Decision date: 2026-10-13
+- Product owner selection: **D — Smart storage deduplication (recommended)**.
+- Trigger: A student uploads, copies or saves a file whose bytes are identical to a file already stored in an eligible storage scope.
+- Policy: **Retain separate logical file entries and locations** with their own names, folders/chapter attachments, ownership/access metadata, and lifecycle, while **reusing one verified underlying content object** for identical bytes where safe and technically possible. Do not unexpectedly merge or remove file entries, and do not require a routine duplicate-warning prompt.
+- Content identity: Only deduplicate after checking full-content identity (e.g., cryptographic digest plus verified size/content or integrity checks). Equal filenames do not imply identical content; differing bytes must remain separate content objects. Reference counting or equivalent safe reachability tracking must prevent accidental content deletion while any authorized file entry still references it.
+- Independent edits: Use **copy-on-write** or immutable content objects so edits to one *private* file create a separate content revision and never modify another logical file, another student's copy or any immutable online publication (S0-FILE-IMMUTABLE-001). Independent file history/trash and personal versions remain isolated.
+- Permission and privacy: Deduplication is a storage implementation detail only, never a reason to reveal another user's file existence, share a decryption key without authorization, grant access, bypass save/export permissions (S0-023/S0-026), or couple deletion/access revocation across different file entries. Cross-account deduplication is not automatically authorized; apply appropriate isolation and encryption boundary policies.
+- Sync and offline: Local-first storage and multi-device cloud sync remain per S0-032; perform deduplication without interruptive sync messages under S0-SYNC-UI-001. On content corruption or inability to prove identical content, safely store separately instead of coalescing unverified objects.
+- Quotas: Precise plan-quota accounting and any user-visible storage savings metrics are not decided by this choice; define these separately to avoid silently changing subscription/storage entitlements.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-034: When a student uploads or saves the same file multiple times, should CA Progress keep every separate copy, automatically detect and merge duplicates, warn before saving, or store one content object with separate file entries?
+S0-035: When a student renames or moves a privately owned file between folders or chapters, should CA Progress preserve one file identity and its history, create a new copy, ask on each move, or restrict moves that affect chapter links?
 
 
