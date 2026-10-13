@@ -245,11 +245,22 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Sharing configuration: The original publisher's share flow must contain a distinct **Allow recipients to re-share personal versions** permission (separate from **View Only / Edit Personal Version**). Apply the permissions recorded at share time, consistent with S0-SHARE-001.
 - Downstream access: If permitted, a re-shared personal version becomes a separate publisher-controlled shared source for recipients; their personal edits must not modify the re-sharer's version or the original ancestor source.
 - Security: Enforce re-sharing authorization server-side, including downstream/share-link endpoints and offline queued shares. Possessing a personal copy alone does not authorize re-sharing.
-- Unresolved: Whether permission extends transitively beyond one re-share; how rescinding the original share affects existing downstream recipients; whether any newly shared copy may permit recipients to re-share again. Decide separately.
+- Unresolved: Whether redistribution permission extends transitively beyond one re-share, and whether newly shared copies may allow further downstream re-sharing (S0-022). The effect of ordinary upstream share withdrawal on previously authorized downstream sharing is decided in S0-021.
+- Status: Approved for product specification; implementation not yet verified.
+
+## S0-021 — Downstream shares survive original owner's withdrawal
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Keep downstream sharing active**
+- Trigger: Student A originally shares a file with Student B and explicitly permits redistribution; B shares an independently edited personal version with Student C; A later stops sharing the original file.
+- Policy: **B's already-authorized downstream sharing remains active** after A withdraws the original share. C retains access to B's shared version under the permissions granted by B. B may continue sharing B's own version with new eligible recipients under the original redistribution permission; withdrawal of A's original share does not retroactively cancel it.
+- Ownership and isolation: This does not restore B's or C's access to A's withdrawn original. B controls the independently re-shared version, and C edits only a separate personal version when allowed; nobody acquires edit rights to another person's canonical original.
+- Relationship to S0-019 / S0-020: Personal copies survive ordinary withdrawal of an upstream share (S0-019), provided the redistribution was originally authorized (S0-020). This does not determine whether recipients farther downstream may themselves re-share; that is pending S0-022.
+- Exception handling to define: Legal/compliance takedown and security incidents may need a separate, explicitly authorized override; do not infer that normal withdrawal automatically erases downstream copies.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
 
-S0-021: If Student A authorized Student B to re-share, and B has already shared a personal version with Student C, what happens to Student C's access if A later stops sharing the original file?
+S0-022: Can Student C re-share their own edited version with Student D when they received the file through Student B, and if so, whose redistribution permission controls that next sharing step?
 
 
