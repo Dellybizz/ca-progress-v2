@@ -287,8 +287,22 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Remaining decisions: Default re-sharing mode; whether restrictions on an upstream share automatically suspend its descendant original-reference links; whether publisher can change unlimited-re-sharing permission after initial sharing; visibility and audit of who received the file.
 - Status: Approved product-policy clarification; implementation not yet verified.
 
+## S0-023 — Download permission depends on shareability and publisher choice
+
+- Decision date: 2026-10-13
+- Product owner selection: **Custom — no download for non-shareable files; publisher controls download for shareable files**
+- Trigger: A recipient accesses a file published or shared within CA Progress and requests to download/export the file.
+- Policy:
+  - **Non-shareable file:** Do not allow recipients to download/export it.
+  - **Shareable file:** During the file-sharing configuration, the owner/publisher is offered an independent **Allow Download** toggle; recipient download/export is permitted only if the publisher enabled it.
+  - This is separate from **View Only vs Edit Personal Version** and from **Allow Re-sharing**. Having view access alone does not grant download rights. Having permission to re-share does not automatically grant download permission unless explicitly chosen by the owner.
+- Enforcement: Enforce download rights on server file delivery, direct download URLs, exports, client interfaces and APK workflows. Do not treat hiding the Download button alone as protection. Block unauthorized normal downloads and unapproved offline file exports.
+- Limitations: Once an authorized recipient obtains an exported copy, the platform cannot reliably recall it. Browser caching, screenshots and screen recording also mean view-only is not absolute protection against copying.
+- Terms to refine: Here, "non-shareable" means content designated by its owner or administrator as not permitted for recipient re-sharing; if more granular sharing classifications are introduced later, align download restrictions with the user's intended file classification. Offline in-app caching and preview requirements are to be decided separately.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-023: When a publisher shares a file with View Only access, should the recipient be allowed to download a copy to their device, or be restricted to viewing it inside CA Progress?
+S0-024: If the original owner disables a particular share link or sharing branch, should every downstream re-share of that same original through the disabled branch also lose access?
 
 
