@@ -147,8 +147,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Guardrails: Track stable local-to-server identifiers, operation dependencies and idempotency keys. A permanently rejected prerequisite (such as an authorization failure) must not be endlessly retried; preserve the dependent local data and handle the blocking error according to the separately approved policy.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-014 — Editing is restricted to students who have current access
+
+- Decision date: 2026-10-13
+- Product owner selection: **Custom rule — No access, no editing; renewed access restores editing rights**
+- Trigger: A student loses permission to access or edit a file, or later regains that permission.
+- Policy: When a student does not have the required file access, they must not be able to modify that file. Editing controls must be disabled/denied according to the current effective permissions, and the backend must reject any unauthorized write. When the student regains the required access, they may edit the file again for their own authorized use.
+- Offline security: A device that is offline cannot immediately know about a permission revocation made elsewhere. Offline permission caching and what happens to local drafts made before revocation are NOT resolved by this decision. On reconnection, enforce authoritative permissions; never apply an unauthorized queued edit to the protected file. Decide how to handle the retained unsynced draft separately.
+- Deleted records: A file that no longer exists is a different situation from lack of access. S0-008 covers a permanently deleted *note* with an edited offline copy; other missing-file cases require separate rules.
+- Presentation: Routine background synchronization remains silent per S0-SYNC-UI-001. The user must not be misled into thinking a denied write changed the server file.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-014: If a pending offline edit is permanently rejected by the server (for example, the student no longer has permission, or the target was removed), how should CA Progress protect the unsynced work without showing routine synchronization messages?
+S0-015: If the student edited a file offline while they still appeared to have access, but their access was revoked before the edit could sync, what should happen to that unsynced edit?
 
 
