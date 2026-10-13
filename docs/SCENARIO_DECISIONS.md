@@ -206,9 +206,9 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 
 - Decision date: 2026-10-13
 - Product owner selection: **B — Keep the student's version**
-- Trigger: An authorized administrator or community source owner publishes a new revision of an original shared file after one or more recipients have created or edited their own personal versions.
+- Trigger: An authorized administrator or community source owner makes edits to an original shared file inside CA Progress (S0-FILE-EDIT-001), creating a new in-app revision after recipients have created or edited their own personal versions.
 - Policy: **Do not modify, replace, merge, or reset recipients' personal versions automatically.** Existing personal edits, highlights, annotations, revision history and their selected base version remain intact. Students with continuing permission may separately access the latest original shared version.
-- Source ownership: Updating the shared original changes its publisher-controlled source revision only, never another person's private version.
+- Source ownership: In-app editing the shared original changes its publisher-controlled source revision only, never another person's private version. Replacement of an existing original by uploading a new PDF is prohibited under S0-FILE-EDIT-001.
 - Future user actions: A student may choose to read or make a new separate version from the updated original under applicable access permissions; whether to provide explicit rebase/merge controls for existing personal copies is not authorized by this decision.
 - Conflict and offline behavior: Source update notifications or synchronization must not silently overwrite a personal copy. Preserve independence in the website and offline APK; routine background sync is invisible under S0-SYNC-UI-001.
 - Status: Approved for product specification; implementation not yet verified.
@@ -361,8 +361,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Security: Use protected app storage and isolate files by account. Offline capability does not promise technical prevention of screenshots, copying from the screen, or other external capture.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-FILE-EDIT-001 — Original owners edit shared files inside CA Progress only
+
+- Decision date: 2026-10-13
+- Product owner clarification: **The original file's owner edits it in CA Progress; updating an existing shared original by uploading a replacement/new PDF is not allowed.**
+- Policy: The owner or another user specifically authorized to edit the canonical original must make subsequent changes **using in-app file editing tools**. Changes update the canonical source's in-app revision state; do not expose an "Upload New PDF", "Replace Original PDF", or file-replacement flow as an update path for that existing shared original.
+- Original versus personal copies: A source owner's authorized in-app edits may update the shared original without overriding recipients' independent personal versions (S0-017/S0-018). Recipients cannot write to the canonical original merely because they have permission to edit their personal copies.
+- File types: For PDFs, provide the supported in-app editing capability (e.g. annotations and other permitted PDF modifications); exact editor functions are to be decided. If a file type cannot be edited in-app, do **not** silently use PDF re-upload as a replacement workaround.
+- Scope: This restriction concerns **updating/replacing an already shared source file**, not the initial creation or upload of a new file.
+- Open decision S0-029: How to update an offline recipient's **temporary cache of the shared original** after the owner makes an authorized in-app edit.
+- Status: Approved product policy; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-029: When CA Progress caches a file for offline reading, how should it handle a newer version published by the original owner while the student's device is offline?
+S0-029: After an owner edits the shared original directly inside CA Progress, how should its temporary offline cache update for recipients when their devices reconnect?
 
 
