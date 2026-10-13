@@ -425,8 +425,21 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Limitations: Files cannot arrive on an offline secondary device until synchronization/connectivity is available; the operating system may remove local app data independently. Sync does not guarantee instantaneous delivery in these cases.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-033 — Resume interrupted private-file uploads automatically
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Resume automatically from the last verified chunk**.
+- Trigger: Cloud upload of a privately saved file stops due to network interruption, app suspension or closure, device restart, or another recoverable transport failure, after some chunks were already transferred.
+- Policy: **Preserve the complete locally saved original and automatically resume the interrupted upload from the latest server-verified chunk** after connectivity and background execution permit. Avoid restarting the full file transfer merely because the connection was interrupted.
+- Data integrity: Use resumable upload/session identifiers, deterministic chunk offsets or part IDs, authenticated ownership, server-side checksums and final end-to-end verification. A cloud backup counts as complete only after server confirmation of the whole verified object. If the server can no longer validate an upload session/chunk, safely renegotiate and retransmit only the necessary data, falling back to a new upload when technically required.
+- Background reliability: Persist pending upload state across app launches where supported, retry transient failures with bounded backoff and idempotent commit/finalization (S0-011/S0-012), and avoid duplicate or partially visible files in cloud listings.
+- Student experience: Routine transfers and resumptions happen invisibly under S0-SYNC-UI-001; do not display normal loading/progress banners, manual resume prompts, or false success messages. Raise an actionable alert only where storage, permissions or unrecoverable failure means student action is necessary.
+- Storage and offline guarantees: Never discard the local original just because upload is incomplete. Follow S0-010/S0-030 for local-full/storage-reclamation handling, and S0-032 for cross-device synchronization only after cloud completion.
+- Implementation note: Chunk granularity, encryption format, persistence mechanism and server provider-specific upload protocol remain technical design matters, not yet verified in the deployed site or APK.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-033: If a private file upload to cloud storage is interrupted by lost internet or app closure, should CA Progress resume the partial upload automatically from the last verified chunk, restart from zero, wait for a preferred network, or require manual retry?
+S0-034: When a student uploads or saves the same file multiple times, should CA Progress keep every separate copy, automatically detect and merge duplicates, warn before saving, or store one content object with separate file entries?
 
 
