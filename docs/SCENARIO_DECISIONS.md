@@ -312,8 +312,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Remaining implementation details: How to model share lineage and independent access paths; selecting users versus links; previewing the effect of revocation before confirmation; offline access/revocation limitations; event audit logs.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-025 — Independent valid sharing paths preserve access
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Keep access through valid routes**
+- Trigger: The same recipient has original-file access through multiple independently authorized sharing paths (e.g. A shares with B and C, both share with D), and the original owner disables only one path (e.g. B's branch).
+- Policy: **Revoke only the explicitly disabled path.** If the recipient still has another valid, independently authorized sharing route (e.g. via C), they **retain access to the same original** through that surviving route without needing a new share. A blocked branch must not be used as authorization.
+- Global person-block precedence: If the original owner explicitly blocks recipient D (not merely one share path), D loses access to the owner's original through **all** routes, consistent with S0-024 and S0-SHARE-002.
+- Version protection: Do not alter independently owned personal versions protected by S0-019 merely because an original-reference share path was disabled.
+- Security and engineering: Evaluate effective access as the union of valid grants minus explicit user-level blocks and source restrictions; invalidate only revoked path grants and cache decisions appropriately. Prevent alternate link IDs from bypassing person-level blocks. Preserve auditable share provenance; carry policy through offline reconnection.
+- Status: Approved product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-025: If a student has access to the same original file through several independent sharing paths and the owner disables only one of those paths, should the student keep access through the remaining valid path(s)?
+S0-026: If access to a shared original is revoked while the student is offline and has a protected offline cached copy, what should happen to that cached original when the device reconnects?
 
 
