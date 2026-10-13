@@ -82,8 +82,20 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Safeguards / details to define: Confirm the queued offline content contains genuine edits; ensure one recovered note per unique offline change (idempotency); do not expose permanently deleted content from server storage; preserve edits available on the offline device; handle permanent deletion of folders and non-note record types separately; avoid repeating creation on reconnect/retries.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-009 — Protect unsynced changes across sign-out
+
+- Decision date: 2026-10-13
+- Product owner selection: **Combination of B and D — Warn, offer sync/backup, and retain an encrypted local queue**
+- Trigger: A student has unsynced local edits and attempts in-app sign-out, in-app data clearing, or otherwise leaves a device while offline.
+- Policy: When an in-app sign-out or data-clearing action risks pending local work, show a clear warning with the number of pending changes and offer **Sync Now** (when online) and **Export Local Backup**. On sign-out, retain pending work in a **secure, encrypted, account-scoped local queue** where supported; resume its sync **only after the same student account signs in again**. Do not silently erase the pending work.
+- Account isolation: A different signed-in account cannot read or upload another student's pending changes. Encrypt retained drafts/queue, and manage encryption keys so signed-out state does not expose them.
+- Clearing data: Warn before app-controlled destructive clear operations, offer backup/sync, and explain that a deliberate erase of local storage can destroy unsynced records. Do not imply an exported backup is synchronized server data.
+- Platform limitation: OS-level uninstall/app-data clearing or browser storage purges cannot reliably be intercepted or prevented; retained encrypted local work may be lost in those cases. Product must not promise survival of these external actions.
+- Implementation guardrails: Show pending/synced/failed states accurately; avoid duplicate replay through idempotent operations; handle authorization/session expiry; do not automatically sync the retained queue under another identity. The actual encryption/key-retention approach and backup import format remain to be designed and tested.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-009: What should happen to unsynced local edits when the student tries to sign out, clear app data, or uninstall the APK before those changes reach the server?
+S0-010: When device storage is nearly full and an offline save cannot be safely persisted, how should the app protect the student's work?
 
 
