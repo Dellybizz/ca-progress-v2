@@ -323,8 +323,22 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Security and engineering: Evaluate effective access as the union of valid grants minus explicit user-level blocks and source restrictions; invalidate only revoked path grants and cache decisions appropriately. Prevent alternate link IDs from bypassing person-level blocks. Preserve auditable share provenance; carry policy through offline reconnection.
 - Status: Approved product specification; implementation not yet verified.
 
+## S0-026 — Revocation affects shared originals, not independently saved files
+
+- Decision date: 2026-10-13
+- Product owner selection: **Custom clarification — distinguish public shared access from independently saved/tagged copies, and apply extra restrictions to private selective shares.**
+- **Publicly shared file:** If a student legitimately uses **Save to Private Files** or **Add/Tag to Chapter** on a publicly available shared file, that action must result in a durable, student-owned private file/version, not merely an access-dependent link to the public original. Revoking or restricting access to the publicly shared source removes access **only to that public shared original**, not to private copies previously saved or attached to the student's chapter. The student keeps their own permitted edits and personal restore rights under S0-019.
+- **Public file not saved/tagged:** Merely viewing a public original or transiently caching it is NOT equivalent to deliberately adding it to Private Files or a chapter. The behavior of a transient offline cache after revocation remains to be determined separately in S0-027.
+- **Privately shared file with selected people:** At the time of sharing, the sender/owner must be able to independently control whether recipients can **Save to Private Files** and whether they can **Add/Tag to Chapter**. If the sender disallows an action, that action must not create an independent recipient-owned copy or chapter attachment. Permitted viewing does not imply permission to retain privately or attach to a chapter.
+- **Permission consistency:** If chapter tagging creates a durable private file as defined above, it requires private-save permission. The sharing UI must prevent contradictory combinations that would circumvent an owner's ban on private saving; owners may allow private saving while separately prohibiting chapter tagging.
+- **Previously authorized copies:** A durable personal copy properly created when the sender allowed saving/tagging remains independent if access to the shared original is later withdrawn, consistent with S0-019. This does not override unlawful-content takedown or security/legal restrictions (to be separately specified).
+- **Other permissions:** Do not conflate in-app **Save to Private Files** / **Tag to Chapter** with external **Download/Export**. Export remains subject to S0-023; edit-personal-version and re-sharing remain subject to S0-017/S0-020/S0-022 and the sharing-time configuration rule S0-SHARE-001.
+- **Enforcement:** Store a stable private file identity/ownership record and copied content as required to ensure true independence, with provenance back to the originating public/private share. Apply sharing-type and per-share permissions server-side (including on API calls and queued offline actions). When share access is revoked, stop access to the original while preserving explicitly authorized durable personal copies.
+- **Unresolved:** Transient offline cache handling for files only viewed but never saved/tagged (S0-027); exact file-copy and storage-accounting lifecycle; UI for public saves and selective-private sharing.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-026: If access to a shared original is revoked while the student is offline and has a protected offline cached copy, what should happen to that cached original when the device reconnects?
+S0-027: If a student only viewed a shared file and never used Save to Private Files or Tag to Chapter, what should happen to that temporary offline cache when access to the original is revoked and the device reconnects?
 
 
