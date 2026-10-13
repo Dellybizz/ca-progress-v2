@@ -190,28 +190,26 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 
 - Decision date: 2026-10-13
 - Product owner selection: **C — Both students and administrators, with the previously specified multi-layer ownership and permission system**. This explicitly confirms option C without replacing the previously approved source/personal-version isolation rules.
-- Configuration authority: Students may manage editable settings and revisions of **their own personal versions**, subject to access rules. Authorized administrators manage platform-wide defaults/restrictions and admin-published originals. A community publisher controls their shared original, while recipients only configure and edit their own versions. Admin restrictions cannot be overridden by students.
-- **Layer 1 — Source/original:** Each shared file has a canonical original with a clear publisher/owner and source version history. Admin-published originals are editable **only by authorized administrators**; recipients never change the admin's global version. In a community, an original shared by a community member remains controlled by its original owner/publisher; other members cannot edit that community-wide original.
+- Configuration authority: Students can edit and restore **their own private versions** when permitted. Administrators manage platform defaults, access rules, and publication of admin-owned originals; community publishers manage original-file sharing and access. **Once published online, the shared original's content is uneditable by anyone, including the owner and administrators** (S0-FILE-IMMUTABLE-001).
+- **Layer 1 — Published original:** Each shared file has an owner/publisher and a **frozen published content snapshot**. Once shared online, **nobody may edit the published content**, including its publisher or administrators. The publisher controls distribution and access, not the published bytes (S0-FILE-IMMUTABLE-001).
 - **Layer 2 — Access permissions:** Only people with currently granted access can view and work from the shared file. Enforce visibility and authorization on the server and on all modifying endpoints. Possessing a link or a previously cached copy is not permission to modify a protected original.
 - **Layer 3 — Personal editable version:** A recipient with permitted access may create/use **their own per-user version** of the accessible original and edit only that personal version. They cannot edit the original file or other recipients' personal versions. Each personal copy has its own owner, identity, content and revision history; personal edits never silently propagate back to the global/admin/community original.
-- **Layer 4 — Restore:** Let recipients **restore their own personal version** from its history, and (while access remains granted) reset their version from an accessible source version without altering the source. An original publisher/admin may restore an original only with their respective original-edit permissions; ordinary recipients cannot perform a global restore.
-- Admin share example: Admin publishes Study Material.pdf. Students with access can read it and make personal annotated/edited versions. Only an authorized admin can modify or restore the global source.
-- Community share example: Member A shares Notes.pdf to a group. Members B and C with access can each edit their own version, independently. Only Member A or another explicitly authorized source owner can change the source (ordinary recipients cannot).
+- **Layer 4 — Restore:** Let students restore their **own private personal versions** from private revision history, and, where allowed, reset a private copy using an accessible published snapshot. Nobody (including owner/admin) may edit, overwrite, or roll back the content of a **published** original; access-removal is a separate action.
+- Admin share example: Admin publishes Study Material.pdf, and that public/shared snapshot becomes permanently read-only for **everyone, including admins**. Authorized students may edit independent private copies.
+- Community share example: Member A shares Notes.pdf to a group, and that shared snapshot becomes read-only for A, B, C and administrators. Where allowed, B and C edit separate private copies.
 - Interaction with earlier policies: S0-014 requires current access before editing; S0-015 discards queued edits **to a file whose access was revoked**. No shared-source overwrite from a recipient is allowed. The handling of pre-existing personal copies and revoked access must be separately decided, rather than assumed.
 - Engineering safeguards: Associate personal versions with source ID and source revision; distinguish source-level vs per-user permissions in both API and database; never treat a personal restore as a source write; record history; enforce isolation on every read/write/restore operation, including offline replay.
-- Open questions: What happens to a personal version when source access is revoked or the original is deleted; whether users can re-share personal versions; how far restore history goes and which file types support direct editing; who may change source ownership. Source updates are governed by S0-018.
+- Open questions: Available tools for editing private copies, and how a publisher corrects a published error by a separate publication or notice. A published original cannot receive source-content updates under S0-FILE-IMMUTABLE-001.
 - Status: Approved for product specification; implementation not yet verified.
 
-## S0-018 — Updated original shared file leaves personal versions unchanged
+## S0-018 — Independently saved personal versions are not overwritten
 
 - Decision date: 2026-10-13
-- Product owner selection: **B — Keep the student's version**
-- Trigger: An authorized administrator or community source owner makes edits to an original shared file inside CA Progress (S0-FILE-EDIT-001), creating a new in-app revision after recipients have created or edited their own personal versions.
-- Policy: **Do not modify, replace, merge, or reset recipients' personal versions automatically.** Existing personal edits, highlights, annotations, revision history and their selected base version remain intact. Students with continuing permission may separately access the latest original shared version.
-- Source ownership: In-app editing the shared original changes its publisher-controlled source revision only, never another person's private version. Replacement of an existing original by uploading a new PDF is prohibited under S0-FILE-EDIT-001.
-- Future user actions: A student may choose to read or make a new separate version from the updated original under applicable access permissions; whether to provide explicit rebase/merge controls for existing personal copies is not authorized by this decision.
-- Conflict and offline behavior: Source update notifications or synchronization must not silently overwrite a personal copy. Preserve independence in the website and offline APK; routine background sync is invisible under S0-SYNC-UI-001.
-- Status: Approved for product specification; implementation not yet verified.
+- Original selection: **B — Keep the student's version**.
+- Continuing approved outcome: A student-owned **private version** keeps its content, edits and history without being changed by the original publisher's actions.
+- Superseded premise: Earlier wording assumed a publisher/admin could revise an existing online published original. Under S0-FILE-IMMUTABLE-001 the published content **cannot be edited**. Accordingly there is no in-place source-update event that could replace a student's copy.
+- If the owner separately publishes an entirely new resource, that is a different file/snapshot and must not silently overwrite prior public or private copies. A correction/new-publication policy remains to be decided.
+- Status: Private-copy protection approved; original-update scenario superseded; implementation not yet verified.
 
 ## S0-SHARE-001 — Edit permission is configured at the moment of sharing
 
@@ -220,7 +218,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Supersession: This replaces the earlier S0-SHARE-001 proposal to provide ongoing post-sharing edit-permission changes or revocation. That earlier statement is **superseded**, not an active approved rule.
 - Sharing flow: When the owner shares a file, the sharing interface must let the owner select whether recipients receive permission to **edit their own personal versions** or have **view-only** access. That choice is made during the share action.
 - After sharing: Do not change an existing share's View Only vs Edit Personal Version setting. **Separate owner-controlled access restrictions** for selected recipients or share instances are allowed after sharing under S0-SHARE-002. Restricting access does not edit the share's original permission setting.
-- Ownership: Only the source publisher/owner (or authorized administrators where applicable) may change the shared original. A recipient with edit access can modify only their own version, never the canonical shared original or anyone else's version, consistent with S0-017.
+- Ownership: **No one**, including the publisher or administrators, may edit the published original content once shared online (S0-FILE-IMMUTABLE-001). A recipient with edit access can edit only an authorized **private personal version**, never the public source or anyone else's private copy.
 - Security: The backend enforces the permission selected at sharing. An unauthorized recipient cannot bypass view-only by using an API, cached copy, or offline replay.
 - Open items: Exact UI/workflow for unsharing the original, and recipient-by-recipient withdrawal. Under S0-019, already-created personal versions survive ordinary withdrawal or deletion of the original.
 - Status: Approved product policy; implementation not yet verified.
@@ -277,7 +275,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Decision date: 2026-10-13
 - Product owner clarification: **A recipient does not have to make or share a personal version; an original file may itself be re-shared. An owner can allow unlimited re-shares of that original, while restricting access for selected people or selected shares.**
 - Two distinct sharing paths:
-  1. **Direct original-reference re-share:** A recipient shares access to the publisher's original file **without creating a new editable original or duplicating the content**. Subsequent viewers see the publisher-controlled original (subject to their permissions); they cannot modify that source. Original updates remain publisher-controlled.
+  1. **Direct original-reference re-share:** A recipient shares access to the publisher's original file **without creating a new editable original or duplicating the content**. Subsequent viewers see the **immutable published original** (subject to permissions); **no one**, including the publisher and administrators, can edit that snapshot. The publisher may still control access and sharing.
   2. **Independent personal-version re-share:** A recipient shares their own separate edited version where authorized. Rules S0-017 through S0-022 continue to govern its ownership, independence, and per-hop re-sharing authorization.
 - Unlimited original re-sharing: During the original sharing configuration, its publisher can permit **unlimited onward re-sharing of the original reference**. When enabled, no new direct publisher approval is required for each onward re-share of that original, **provided each recipient is otherwise eligible and the original owner's active restrictions allow access**. This is an explicit mode distinct from S0-022's per-hop permission grants for independent personal-version sharing.
 - Owner's targeted restrictions: The original owner may subsequently **block particular people** from access to the original and/or **disable particular share instances/links or branches**. Such restrictions take precedence over unlimited re-sharing. A blocked person must not regain source access through another path/link, and a disabled share link must not continue to authorize source access. Whether disabling a parent share should automatically disable its descendants is not yet decided.
@@ -361,28 +359,30 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Security: Use protected app storage and isolate files by account. Offline capability does not promise technical prevention of screenshots, copying from the screen, or other external capture.
 - Status: Approved for product specification; implementation not yet verified.
 
-## S0-FILE-EDIT-001 — Original owners edit shared files inside CA Progress only
+## S0-FILE-EDIT-001 — Superseded published-original editing rule
+
+- Original decision date: 2026-10-13
+- Previous decision allowed in-app editing of a shared original by its owner/admin but disallowed replacement PDF uploads.
+- **Status: SUPERSEDED by S0-FILE-IMMUTABLE-001.** Editing a published original in-app or by a new upload is no longer permitted. Kept only as historical context.
+
+## S0-FILE-IMMUTABLE-001 — Public/shared originals are immutable; private copies remain editable
 
 - Decision date: 2026-10-13
-- Product owner clarification: **The original file's owner edits it in CA Progress; updating an existing shared original by uploading a replacement/new PDF is not allowed.**
-- Policy: The owner or another user specifically authorized to edit the canonical original must make subsequent changes **using in-app file editing tools**. Changes update the canonical source's in-app revision state; do not expose an "Upload New PDF", "Replace Original PDF", or file-replacement flow as an update path for that existing shared original.
-- Original versus personal copies: A source owner's authorized in-app edits may update the shared original without overriding recipients' independent personal versions (S0-017/S0-018). Recipients cannot write to the canonical original merely because they have permission to edit their personal copies.
-- File types: For PDFs, provide the supported in-app editing capability (e.g. annotations and other permitted PDF modifications); exact editor functions are to be decided. If a file type cannot be edited in-app, do **not** silently use PDF re-upload as a replacement workaround.
-- Scope: This restriction concerns **updating/replacing an already shared source file**, not the initial creation or upload of a new file.
-- S0-029 resolves cache refresh after in-app edits: update the authorized original silently on reconnection, while preserving independent personal versions.
-- Status: Approved product policy; implementation not yet verified.
+- **Latest product owner decision:** Once a file is shared online, its **published online version cannot be edited by anyone, including an administrator or its owner**. A **private version can still be edited** by the person entitled to edit that private version.
+- **Public/shared file:** Freeze the published content as an immutable version or snapshot at the first online share/publication. Prohibit owner/admin/recipient in-place edits, PDF replacements, annotations written back to the published source, content restoration over that source, and any offline queued write to it. Enforce server-side, not merely by hiding UI controls. Publisher controls file access, sharing branches, and other approved share settings without mutating content.
+- **Private editable file/version:** The user may edit their own private version in-app as authorized; editing the private copy **never updates the published shared original**. If the private version is later shared as a separate online source, publish an immutable shared snapshot of that version; further editing of the privately owned working copy must not modify its already published snapshot.
+- **New publication vs editing:** Initial creation/upload/sharing remains possible. The user has not yet specified the workflow for correcting a published error, publishing a separate corrected snapshot, or withdrawing the erroneous original. No replacement of the same public snapshot is authorized.
+- **Overrides:** Supersedes S0-FILE-EDIT-001's in-app edits of the published original; removes the in-place-update premises of S0-018 and S0-029; updates original-edit references in S0-017 and S0-SHARE-001. Independent personal copies and permissions from S0-019/S0-026 remain protected.
+- Technical implementation: Separate private editable records from immutable published snapshots, with stable source/version IDs and write-authorization checks for all roles. Edits to a private source should not change the content hash or bytes of any previously published snapshot.
+- Status: Approved policy; implementation not yet verified.
 
-## S0-029 — Automatically refresh cached originals after in-app source edits
+## S0-029 — Prior automatic update of shared original is not applicable
 
-- Decision date: 2026-10-13
-- Product owner selection: **A — Update automatically in the background**
-- Trigger: A canonical shared-file owner makes an authorized in-app edit to the original while an authorized recipient is offline with a temporary cached older revision; the recipient later reconnects.
-- Policy: Automatically refresh the recipient's temporary cached original to the current authorized in-app revision in the background after reconnection, without a user prompt or manual file-opening requirement. Keep the identity of the original file consistent.
-- Personal-version isolation: Independently saved student-owned copies, personal edits and chapter-attached private versions must **remain unchanged** (S0-018/S0-026).
-- Authorization priority: Before refreshing, verify the student's current effective access via permitted share routes. If access has been revoked, do not fetch the new revision; remove temporary cache as approved in S0-027.
-- Reliability: Use revision identifiers and integrity checking; install new cached content atomically when verified, with no broken/partially written PDF. Ensure sync is idempotent, retry on temporary failure under S0-011, and respects the background-only UI rule S0-SYNC-UI-001.
-- Scope: Authorized in-app source revisions (S0-FILE-EDIT-001), never replacement by uploading a new PDF.
-- Status: Approved for product specification; implementation not yet verified.
+- Original decision date: 2026-10-13
+- Previous selection: **A — Refresh the offline cached original automatically after an owner's in-app source edit**.
+- **Status: SUPERSEDED premise** by S0-FILE-IMMUTABLE-001: no owner/admin may edit the shared original after publication, so the cache will not receive in-place content revisions of that same snapshot.
+- Unchanged general rules: Background cache and permission reconciliation stay silent (S0-SYNC-UI-001); access revocation purges temporary shared-original cache on reconnect (S0-027); personally saved private files are independent (S0-018/S0-026).
+- A newly separately published file, if ever offered as a correction, must have a distinct snapshot ID and cannot silently replace this original. Future behavior for that case remains undecided.
 
 ## Next pending scenario
 
