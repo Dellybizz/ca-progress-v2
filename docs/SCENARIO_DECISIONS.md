@@ -180,16 +180,29 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Scope/details remaining: Selection and display of device sessions, all-device revocation semantics, native/web data-wipe capabilities, secure offline key storage, how prior unsynced work on a wiped device is handled, and authorization/audit logging.
 - Status: Approved for product specification; implementation not yet verified.
 
-## Saved-file configuration — requested area to decide
+## Saved-file configuration — approved multilayer foundation
 
 - Request date: 2026-10-13
-- Product owner request: **Allow changing configurations for saved files.**
-- Status: **Scope pending**. No specific settings, roles or defaults have been approved yet.
-- Candidate dimensions to review: Per-file display name and location, offline availability/local download preference, permissions/sharing on personally owned files, file replacement/version policy, and administrative global defaults. Do not infer approval of public sharing, bypassing permissions, or destructive changes.
-- Next: Decide whether configuration control belongs to students, administrators, or both.
+- Product owner direction: **Use a multi-layered ownership, access, personal-version and restore model for saved/shared files.**
+- Scope: The foundation is approved in S0-017. Specific configuration controls, defaults, and follow-up update/revocation behavior require further decisions.
+
+## S0-017 — Multi-layer file ownership, sharing and personal versions
+
+- Decision date: 2026-10-13
+- Product owner selection: **Custom multi-layer system** (instead of simple admin-only, student-only or generic shared editing).
+- **Layer 1 — Source/original:** Each shared file has a canonical original with a clear publisher/owner and source version history. Admin-published originals are editable **only by authorized administrators**; recipients never change the admin's global version. In a community, an original shared by a community member remains controlled by its original owner/publisher; other members cannot edit that community-wide original.
+- **Layer 2 — Access permissions:** Only people with currently granted access can view and work from the shared file. Enforce visibility and authorization on the server and on all modifying endpoints. Possessing a link or a previously cached copy is not permission to modify a protected original.
+- **Layer 3 — Personal editable version:** A recipient with permitted access may create/use **their own per-user version** of the accessible original and edit only that personal version. They cannot edit the original file or other recipients' personal versions. Each personal copy has its own owner, identity, content and revision history; personal edits never silently propagate back to the global/admin/community original.
+- **Layer 4 — Restore:** Let recipients **restore their own personal version** from its history, and (while access remains granted) reset their version from an accessible source version without altering the source. An original publisher/admin may restore an original only with their respective original-edit permissions; ordinary recipients cannot perform a global restore.
+- Admin share example: Admin publishes Study Material.pdf. Students with access can read it and make personal annotated/edited versions. Only an authorized admin can modify or restore the global source.
+- Community share example: Member A shares Notes.pdf to a group. Members B and C with access can each edit their own version, independently. Only Member A or another explicitly authorized source owner can change the source (ordinary recipients cannot).
+- Interaction with earlier policies: S0-014 requires current access before editing; S0-015 discards queued edits **to a file whose access was revoked**. No shared-source overwrite from a recipient is allowed. The handling of pre-existing personal copies and revoked access must be separately decided, rather than assumed.
+- Engineering safeguards: Associate personal versions with source ID and source revision; distinguish source-level vs per-user permissions in both API and database; never treat a personal restore as a source write; record history; enforce isolation on every read/write/restore operation, including offline replay.
+- Open questions: What happens to personal edits when the original source is revised (S0-018); what happens to a personal version when source access is revoked or the original is deleted; whether users can re-share personal versions; how far restore history goes and which file types support direct editing; who may change source ownership.
+- Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
 
-S0-017: Who should be allowed to configure saved-file settings: students for their own files, administrators globally, or both with permission-based controls?
+S0-018: When an admin or community owner updates an original shared file, what should happen to students' existing independently edited personal versions?
 
 
