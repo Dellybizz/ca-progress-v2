@@ -284,7 +284,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Config-time vs post-share: The View Only versus Edit Personal Version capability is selected **at sharing time** under S0-SHARE-001; the owner may nevertheless later restrict **access itself** for selected recipients or shares. This is not a post-sharing change to the existing edit permission.
 - Personal-version retention: Ordinary revocation of original-source access does not erase already-created independently owned personal copies (S0-019), nor does it automatically terminate independently authorized personal-version re-sharing (S0-021). A direct reference to the source, however, must always pass current owner access restrictions.
 - Enforcement: Use source-ID references, provenance/share lineage and server-side checks on every access or redistribution. Never grant source-edit rights to downstream viewers. Cache/offline access, branch-level revocation propagation, and time to enforce downloaded-copy restrictions need explicit technical designs.
-- Remaining decisions: Default re-sharing mode; whether restrictions on an upstream share automatically suspend its descendant original-reference links; whether publisher can change unlimited-re-sharing permission after initial sharing; visibility and audit of who received the file.
+- Remaining decisions: Default re-sharing mode; whether publisher can change unlimited-re-sharing permission after initial sharing; visibility and audit of who received the file. S0-024 establishes owner-selected revocation of specific recipients/branches; S0-025 will establish the effect of multiple independent access paths.
 - Status: Approved product-policy clarification; implementation not yet verified.
 
 ## S0-023 — Download permission depends on shareability and publisher choice
@@ -301,8 +301,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Terms to refine: Here, "non-shareable" means content designated by its owner or administrator as not permitted for recipient re-sharing; if more granular sharing classifications are introduced later, align download restrictions with the user's intended file classification. Offline in-app caching and preview requirements are to be decided separately.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-024 — Selective revocation of recipients and sharing branches
+
+- Decision date: 2026-10-13
+- Product owner selection: **C — Owner selects affected recipients**
+- Trigger: The original publisher/owner wants to revoke access to one or more recipients or downstream branches in a sharing tree (for example, A shared the original with B, B onward to C, C onward to D).
+- Policy: Provide the original owner with a **sharing-chain viewer** showing people and share branches; allow the owner to **select exactly which recipients and/or downstream branches to disable**. Do **not** automatically revoke an entire branch merely because the owner targets one recipient, and do not disable unrelated branches. Only the selected recipient(s) and selected branch(es) lose the access that the corresponding restriction controls.
+- Owner authority: Enforce targeted person-level blocks and share-link/branch restrictions server-side; recipients cannot bypass an explicit person-level block by using an alternative link. If an entire selected share branch is disabled, access paths under that branch must be invalidated as applicable. Retaining access for untargeted downstream recipients requires valid individual grants or independent share paths rather than treating a revoked ancestor's link as authorization.
+- Existing personal versions: As approved in S0-019, independently owned personal versions remain available for their owners after ordinary source-sharing withdrawal. Independently authorized re-sharing of personal versions follows S0-021; restrictions on direct references to the original are enforced separately under S0-SHARE-002.
+- Remaining implementation details: How to model share lineage and independent access paths; selecting users versus links; previewing the effect of revocation before confirmation; offline access/revocation limitations; event audit logs.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-024: If the original owner disables a particular share link or sharing branch, should every downstream re-share of that same original through the disabled branch also lose access?
+S0-025: If a student has access to the same original file through several independent sharing paths and the owner disables only one of those paths, should the student keep access through the remaining valid path(s)?
 
 
