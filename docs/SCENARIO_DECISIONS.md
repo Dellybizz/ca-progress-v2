@@ -236,8 +236,20 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Exceptions requiring separate design: Administrator-imposed legal/compliance removal, unlawful content, and emergency security takedown; ordinary share withdrawal alone is not grounds for deleting a student's independent personal copy.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-020 — Re-sharing a personal version requires original publisher permission
+
+- Decision date: 2026-10-13
+- Product owner selection: **C — Require original owner's permission**
+- Trigger: A student has an independent edited personal version derived from another person's shared original and wants to share that personal version with additional people.
+- Policy: The recipient may re-share their edited personal version **only when the original publisher explicitly allowed redistribution at the time of the original share**. Without that permission, the personal version remains independently editable and restorable by its owner under S0-017 and S0-019, but cannot be redistributed to another person.
+- Sharing configuration: The original publisher's share flow must contain a distinct **Allow recipients to re-share personal versions** permission (separate from **View Only / Edit Personal Version**). Apply the permissions recorded at share time, consistent with S0-SHARE-001.
+- Downstream access: If permitted, a re-shared personal version becomes a separate publisher-controlled shared source for recipients; their personal edits must not modify the re-sharer's version or the original ancestor source.
+- Security: Enforce re-sharing authorization server-side, including downstream/share-link endpoints and offline queued shares. Possessing a personal copy alone does not authorize re-sharing.
+- Unresolved: Whether permission extends transitively beyond one re-share; how rescinding the original share affects existing downstream recipients; whether any newly shared copy may permit recipients to re-share again. Decide separately.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-020: May a student share their edited personal version with other people, creating a new share whose recipients can only view or edit their own copies?
+S0-021: If Student A authorized Student B to re-share, and B has already shared a personal version with Student C, what happens to Student C's access if A later stops sharing the original file?
 
 
