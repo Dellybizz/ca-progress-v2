@@ -40,8 +40,17 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Guardrails / pending details: Permanent deletion is limited to items the authenticated student is authorized to erase. Official ICAI academic source records or independently protected records are not made deletable by this decision. Offline execution, server-confirmation, duplicate requests, cascading deletion, backups/legal retention, and failure messaging must be defined during implementation; do not falsely display successful permanent deletion before it is committed.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-005 — Editing a trashed item is recovery
+
+- Decision date: 2026-10-13
+- Product owner selection: **Custom rule — edit means recovery**
+- Trigger: An authorized student edits an eligible item that was moved to Trash on another device while this device was offline, and the edit subsequently syncs.
+- Policy: Treat the valid edit as an intent to **restore the original item**. Restore the same item from Trash to its active location and apply the edit; do not create an unnecessary separate recovered copy or silently discard the edit. Reflect the restored and updated state on other devices.
+- Safety / scope: Editing cannot resurrect an item that was already permanently erased through S0-003 or S0-004; the handling of unsynced edits encountered after permanent purge remains open for a separate decision. Keep access checks, duplicate-event protection, and sync auditability.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-005: If a student deletes an item on one device while another device is offline and has edited the same item, which state should win when the offline device reconnects?
+S0-006: When the same active note or record is edited separately on two offline devices, how should the application resolve the changes once they reconnect?
 
 
