@@ -87,9 +87,9 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Decision date: 2026-10-13
 - Product owner selection: **Combination of B and D — Warn, offer sync/backup, and retain an encrypted local queue**
 - Trigger: A student has unsynced local edits and attempts in-app sign-out, in-app data clearing, or otherwise leaves a device while offline.
-- Policy: When an in-app sign-out or data-clearing action risks pending local work, show a clear warning with the number of pending changes and offer **Sync Now** (when online) and **Export Local Backup**. On sign-out, retain pending work in a **secure, encrypted, account-scoped local queue** where supported; resume its sync **only after the same student account signs in again**. Do not silently erase the pending work.
+- Policy: For **ordinary voluntary in-app sign-out or data-clearing**, warn about pending changes, offer **Sync Now** (when online) and **Export Local Backup**, and retain account-scoped encrypted unsynced work on sign-out where supported until that account signs in again. **Explicit remote wipe of a lost/stolen device is a security-first exception**: do not delay its execution to upload/export unsynced work (S0-SECURITY-001).
 - Account isolation: A different signed-in account cannot read or upload another student's pending changes. Encrypt retained drafts/queue, and manage encryption keys so signed-out state does not expose them.
-- Clearing data: Warn before app-controlled destructive clear operations, offer backup/sync, and explain that a deliberate erase of local storage can destroy unsynced records. Do not imply an exported backup is synchronized server data.
+- Clearing data: For routine app-controlled clearing, warn and offer backup/sync; deliberate erasure may destroy unsynced work. **Remote wipe requested from another device follows S0-SECURITY-001 instead:** warn the requester of potential unsynced-data loss before confirming the wipe, but do not wait for the affected device to sync or offer a last-minute recovery from that device. Do not imply an exported backup is server-synced.
 - Platform limitation: OS-level uninstall/app-data clearing or browser storage purges cannot reliably be intercepted or prevented; retained encrypted local work may be lost in those cases. Product must not promise survival of these external actions.
 - Implementation guardrails: Show pending/synced/failed states accurately; avoid duplicate replay through idempotent operations; handle authorization/session expiry; do not automatically sync the retained queue under another identity. The actual encryption/key-retention approach and backup import format remain to be designed and tested.
 - Status: Approved for product specification; implementation not yet verified.
@@ -178,7 +178,8 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Policy: Let the student view authenticated devices/sessions, **revoke individual selected sessions**, and optionally **Sign Out Everywhere**. Let the student request a **remote wipe of CA Progress account data on a selected device**. Immediately deny further server access for revoked sessions; the app must honor pending remote wipe instructions upon reconnecting and verifying the command.
 - Security safeguards: Verify the student's identity before sensitive remote actions; protect local files and session secrets using suitable device encryption and key management. A remote wipe is a request for app-controlled account data, not an OS-wide erase of the phone/laptop. Account and device identifiers must be authenticated so one student cannot wipe another student's data.
 - Hard limit: **Remote wipe cannot be guaranteed before the missing device reconnects**, and a device that stays offline may retain its already-downloaded data. Security must not imply instantaneous or guaranteed deletion of offline copies.
-- Scope/details remaining: Selection and display of device sessions, all-device revocation semantics, native/web data-wipe capabilities, secure offline key storage, how prior unsynced work on a wiped device is handled, and authorization/audit logging.
+- Unsynced-data precedence: **Remote wipe has priority over local unsynced-work preservation** under S0-009. Explain during the remote-wipe confirmation that unsynced work existing only on the targeted device may be irreversibly lost. On receipt of a verified wipe command, do not delay cleanup to sync, export or recover that device's unsynced queue (S0-SECURITY-001).
+- Scope/details remaining: Device/session selection, all-device revocation, native/web wiping and protected-key destruction, command authentication/delivery to a revoked session without granting normal account access, retry/acknowledgement and audit logging. Do not claim offline devices have already been wiped.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## Saved-file configuration — approved multilayer foundation
@@ -607,6 +608,17 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - After resolution: The student's configured automatic history limit resumes for ordinary nonprotected revisions, but cleanup must not delete required bases/deltas/checkpoints for remaining versions (S0-STORAGE-INCREMENTAL-001). Do not impose automatic quota cleanup; at storage exhaustion, surface actionable errors under S0-010/S0-030.
 - UX: Comparison, selection and restore happen only when the student chooses to use history. No automatic merge, forced popup, or routine sync notification (S0-SYNC-UI-001).
 - Reconciliation: Clarifies S0-036 and S0-CONFLICT-005 without undoing user-controlled retention settings. Implementation not yet verified.
+
+## S0-SECURITY-001 — Remote wipe takes precedence over unsynced data
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Security first**, security/offline-sync gap 1 of 4.
+- Trigger: A user requests a remote wipe of a lost or stolen device that may contain offline, unsynchronized CA Progress data.
+- Policy: Require authenticated authorization and a clear **confirmation warning that unsynced data stored only on the target device may be permanently lost**. Immediately revoke that device's normal server access and queue a device-specific, authenticated remote-wipe instruction.
+- Execution: Once the targeted device reconnects and validates an authentic wipe instruction, **wipe CA Progress account data on that device immediately** without attempting to synchronize, back up, export or recover its unsynced changes first. Wiping must not be blocked by a failed upload or an offline queue. This explicitly overrides S0-009's normal sign-out preservation protections for an authorized remote-wipe action only.
+- Delivery security: Permit at most a strictly limited, device-authenticated **revocation/wipe command check** to a normally revoked session; do not restore content access, write/sync authorization or normal API privileges. Ensure idempotent command execution and prevent cross-account device wipes.
+- Limits: A disconnected device may retain app data until it reconnects. Remotely requested wipe is not OS-wide erasure, and unsynced data existing only on the lost device might be unrecoverable. Do not falsely report a requested wipe as completed before device confirmation.
+- Reconciliation: Clarifies precedence between S0-009 and S0-016 while preserving standard encrypted unsynced-queue retention for **ordinary** voluntary sign-out. Implementation not yet verified.
 
 ## Next pending scenario
 
