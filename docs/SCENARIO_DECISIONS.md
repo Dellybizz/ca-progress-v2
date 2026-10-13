@@ -71,8 +71,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Remaining technical detail: Accurate conflict detection, order metadata, tie resolution, version retention duration, user interface for uncertain ordering, and cleanup of archived conflict copies.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-008 — Offline edit after permanent deletion
+
+- Decision date: 2026-10-13
+- Product owner selection: **C — Automatically create a new note**
+- Trigger: The student permanently deletes a note on one device while another device retains an offline copy, edits it while offline, then reconnects to synchronize.
+- Policy: The permanently deleted original remains deleted. Automatically preserve the offline device's new edits as a **separate newly created note** rather than discarding them, prompting for recovery, or reviving the original item.
+- Presentation: Make the new recovered note identifiable to the student without requiring a blocking approval step. Its new identity must not reuse the erased original ID.
+- Precedence: Unlike S0-005 (edits to an item still in Trash restore the original), this applies only when permanent deletion has already occurred under S0-003/S0-004.
+- Safeguards / details to define: Confirm the queued offline content contains genuine edits; ensure one recovered note per unique offline change (idempotency); do not expose permanently deleted content from server storage; preserve edits available on the offline device; handle permanent deletion of folders and non-note record types separately; avoid repeating creation on reconnect/retries.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-008: An item was permanently deleted on one device, but another device was offline and edited its old local copy. What should happen when that offline device reconnects?
+S0-009: What should happen to unsynced local edits when the student tries to sign out, clear app data, or uninstall the APK before those changes reach the server?
 
 
