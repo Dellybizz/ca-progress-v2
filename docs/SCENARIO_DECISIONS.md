@@ -369,11 +369,23 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Original versus personal copies: A source owner's authorized in-app edits may update the shared original without overriding recipients' independent personal versions (S0-017/S0-018). Recipients cannot write to the canonical original merely because they have permission to edit their personal copies.
 - File types: For PDFs, provide the supported in-app editing capability (e.g. annotations and other permitted PDF modifications); exact editor functions are to be decided. If a file type cannot be edited in-app, do **not** silently use PDF re-upload as a replacement workaround.
 - Scope: This restriction concerns **updating/replacing an already shared source file**, not the initial creation or upload of a new file.
-- Open decision S0-029: How to update an offline recipient's **temporary cache of the shared original** after the owner makes an authorized in-app edit.
+- S0-029 resolves cache refresh after in-app edits: update the authorized original silently on reconnection, while preserving independent personal versions.
 - Status: Approved product policy; implementation not yet verified.
+
+## S0-029 — Automatically refresh cached originals after in-app source edits
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Update automatically in the background**
+- Trigger: A canonical shared-file owner makes an authorized in-app edit to the original while an authorized recipient is offline with a temporary cached older revision; the recipient later reconnects.
+- Policy: Automatically refresh the recipient's temporary cached original to the current authorized in-app revision in the background after reconnection, without a user prompt or manual file-opening requirement. Keep the identity of the original file consistent.
+- Personal-version isolation: Independently saved student-owned copies, personal edits and chapter-attached private versions must **remain unchanged** (S0-018/S0-026).
+- Authorization priority: Before refreshing, verify the student's current effective access via permitted share routes. If access has been revoked, do not fetch the new revision; remove temporary cache as approved in S0-027.
+- Reliability: Use revision identifiers and integrity checking; install new cached content atomically when verified, with no broken/partially written PDF. Ensure sync is idempotent, retry on temporary failure under S0-011, and respects the background-only UI rule S0-SYNC-UI-001.
+- Scope: Authorized in-app source revisions (S0-FILE-EDIT-001), never replacement by uploading a new PDF.
+- Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
 
-S0-029: After an owner edits the shared original directly inside CA Progress, how should its temporary offline cache update for recipients when their devices reconnect?
+S0-030: When local offline cached study materials use significant device storage, should CA Progress automatically remove older disposable cached files, only remove them when asked, or let the student choose which files stay offline?
 
 
