@@ -7,3 +7,5 @@ export function reserveSubscriptionSwitch(db:Database,user:string,input:Checkout
 export function maintainSubscriptionSwitches(db:Database,provider:Provider,user?:string):Promise<void>;
 
 export function maintainSwitchChargeRefunds(db:Database,provider:Provider,user?:string):Promise<void>;
+
+export function reverseScheduledSwitch(db:Database,provider:Provider,user:string,sourceId:string):Promise<boolean>;

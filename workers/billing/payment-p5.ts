@@ -16,7 +16,7 @@ const worker = {
   const user=request.headers.get('x-ca-progress-user-id');
   if(env.DB&&user&&request.headers.get('x-ca-progress-internal')==='ca-progress-v2-web'&&['/verify-subscription','/subscription-action','/checkout/recover'].includes(new URL(request.url).pathname)){await maintainSubscriptionSwitches(env.DB,dependencies(env,user).provider,user);await maintainSwitchChargeRefunds(env.DB,dependencies(env,user).provider,user);await env.BILLING_OPS_QUEUE?.send({kind:'retry_maintenance',userId:user} as never).catch(()=>undefined);}
   if(request.headers.get('x-ca-progress-internal')==='ca-progress-v2-web'&&new URL(request.url).pathname==='/health'&&response.ok){
-   return new Response(JSON.stringify({...await response.json() as object,phase:5,ownerRulesPhase:2,recoveryAfterGraceDays:7,recoveryReminders:'daily_in_app',graceAnchor:'verified_paid_through'}),{headers:response.headers});
+   return new Response(JSON.stringify({...await response.json() as object,phase:5,ownerRulesPhase:3,recoveryAfterGraceDays:7,recoveryReminders:'daily_in_app',graceAnchor:'verified_paid_through'}),{headers:response.headers});
   }
   return response;
  },

@@ -11,7 +11,7 @@ export function fixture(worker,{introMigration=true,ownerRecoveryMigration=true}
  sql.exec(readFileSync('d1/migrations/0051_refinement_phase3_razorpay_subscriptions.sql','utf8'));
  sql.exec('ALTER TABLE razorpay_subscriptions ADD COLUMN provider_offer_id TEXT;ALTER TABLE razorpay_subscriptions ADD COLUMN campaign_claim_id TEXT;');
  sql.exec(readFileSync('d1/migrations/0070_payment_system_p2_checkout.sql','utf8'));
- sql.exec(readFileSync('d1/migrations/0082_single_checkout_switches.sql','utf8'));
+ sql.exec(readFileSync('d1/migrations/0082_single_checkout_switches.sql','utf8'));sql.exec(readFileSync('d1/migrations/0089_owner_plan_switches.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0071_payment_system_p3_renewals.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0084_checkout_retry_groups.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0010_phase12_background_jobs.sql','utf8'));

@@ -1,3 +1,5 @@
+import {reverseScheduledSwitch} from '../../lib/billing/subscription-switch.mjs';
+import {enforceScheduledSwitchBoundary} from '../../lib/billing/scheduled-switch.mjs';
 import {enforceCancelledRenewal,commercialGraceUntil} from "../../lib/billing/cancellation-policy.mjs";
 import {introductoryConsumed} from "../../lib/billing/introductory-history.mjs";
 import {verifiedPlanCacheMatches} from '../../lib/billing/verified-plan-cache.mjs';
@@ -97,6 +99,7 @@ async function reconcileVerified(env:Env,providerSubscription:ProviderSubscripti
   if(payment&&payment.subscription_id&&payment.subscription_id!==providerSubscription.id)return{mismatch:true,reason:"payment_subscription_mismatch",userId:String(local.user_id)};
   let evidence;try{evidence=await renewalEvidence(env,local,{...providerSubscription},payment?{...payment}:null);}catch(error){return recordRenewalIssue(env,local,error,{...providerSubscription},token);}
   evidence=await enforceCancelledRenewal(db,local,evidence);
+  evidence=await enforceScheduledSwitchBoundary(db,local,evidence);
   const paidCount=evidence.paidCount,authorizationOnly=evidence.authorizationOnly;
   const targetPlanId=String(mapping.mapped_plan_id),targetPolicy=String(mapping.policy_version_id),currentEnd=iso(providerSubscription.current_end),paidThrough=evidence.paidThrough;
   const providerStatus=String(providerSubscription.status);let financial=String(local.financial_state??"unpaid");if(paidCount>0)financial="paid";else if(payment?.status==="failed")financial="failed";
@@ -135,6 +138,7 @@ async function action(request:Request,env:Env,ctx:InternalContext){
   try{
     const [snapshot,setupInvoices]=await Promise.all([getSubscription(subscriptionId,p),kind==='abandon_setup'?rp<{items?:Array<{payment_id?:string;status?:string;amount_paid?:number}>}>(`invoices?subscription_id=${encodeURIComponent(subscriptionId)}&count=100`,p):Promise.resolve(null)]);
     let sub=snapshot,effectiveAt:string|null=null,decision:Record<string,unknown>={provider_status_before:sub.status};
+    if(["cancel_period_end","cancel_immediate"].includes(kind))await reverseScheduledSwitch(db,(path,init)=>rp(path,p,init),ctx.userId,subscriptionId);
     if(kind==="pause"){if(sub.status!=="active")throw new Error("Only an active subscription can be paused.");await rp(`subscriptions/${encodeURIComponent(subscriptionId)}/pause`,p,{method:"POST",body:JSON.stringify({pause_at:"now"})});decision={...decision,pause_at:"now"};}
     else if(kind==="resume"){if(sub.status==="cancelled")return json({error:"A cancelled Razorpay subscription cannot be resumed. Start a new checkout to reactivate.",reactivationRequiresCheckout:true},409);if(sub.status!=="paused")throw new Error("Only a paused subscription can be resumed.");await rp(`subscriptions/${encodeURIComponent(subscriptionId)}/resume`,p,{method:"POST",body:JSON.stringify({resume_at:"now"})});decision={...decision,resume_at:"now"};}
     else if(kind==="abandon_setup"){
@@ -152,14 +156,17 @@ async function action(request:Request,env:Env,ctx:InternalContext){
     if(graceCancel){await db.batch([db.prepare("INSERT INTO subscription_cancel_intents(source_subscription_id,user_id,reason,boundary_at,paid_count_before,paid_start_before,requested_at) VALUES(?1,?2,'user_grace',?3,?4,?5,?6) ON CONFLICT(source_subscription_id) DO UPDATE SET reason='user_grace',requested_at=excluded.requested_at").bind(local.id,ctx.userId,local.paid_through_at,Number(local.paid_count),local.current_start,nowIso()),db.prepare("UPDATE subscription_policy_change_jobs SET state='superseded' WHERE source_subscription_id=?1 AND state IN ('pending','awaiting_approval')").bind(local.id),db.prepare("UPDATE user_subscriptions SET ends_at=?1,status='expired',updated_at=?2 WHERE provider_subscription_id=?3 AND user_id=?4").bind(local.paid_through_at,nowIso(),subscriptionId,ctx.userId)]);}
     if(immediate&&!graceCancel&&(String(local.cancellation_mode)!=="immediate_if_unpaid"||(local.paid_through_at&&Date.parse(String(local.paid_through_at))>Date.now())))throw new Error("Immediate cancellation is not permitted while paid-through access remains.");await rp(`subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,p,{method:"POST",body:JSON.stringify({cancel_at_cycle_end:immediate?0:1})});effectiveAt=immediate?nowIso():(iso(sub.current_end)||String(local.paid_through_at||"")||null);decision={...decision,cancel_at_cycle_end:immediate?0:1};await db.prepare("UPDATE razorpay_subscriptions SET cancel_at_period_end=?1,updated_at=?2 WHERE id=?3").bind(immediate?0:1,nowIso(),local.id).run();}
     else if(kind==="change_plan"&&String(body?.targetPlanId??"").trim()===String(local.plan_id)&&local.scheduled_target_plan_id){
+      if(await reverseScheduledSwitch(db,(path,init)=>rp(path,p,init),ctx.userId,subscriptionId)){decision={...decision,cancel_scheduled_change:true,no_extra_charge:true};}
+      else {
       if(sub.status!=="active"||sub.plan_id!==local.provider_plan_id)throw new Error("Your scheduled change needs to be confirmed before it can be cancelled.");
       if(sub.has_scheduled_changes)await rp(`subscriptions/${encodeURIComponent(subscriptionId)}/cancel_scheduled_changes`,p,{method:"POST",body:JSON.stringify({})});
       const verified=await getSubscription(subscriptionId,p);
       if(verified.has_scheduled_changes!==false||verified.plan_id!==local.provider_plan_id||verified.status!=="active")throw new Error("Cancellation is awaiting provider confirmation. Your current paid access remains available.");
       await db.batch([db.prepare("UPDATE razorpay_subscriptions SET scheduled_target_plan_id=NULL,scheduled_target_policy_version_id=NULL,scheduled_target_provider_plan_id=NULL,updated_at=?1 WHERE id=?2").bind(nowIso(),local.id),db.prepare("UPDATE scheduled_plan_changes SET state='cancelled' WHERE user_id=?1 AND from_plan_id=?2 AND to_plan_id=?3 AND state='scheduled'").bind(ctx.userId,local.plan_id,local.scheduled_target_plan_id)]);
       decision={...decision,cancel_scheduled_change:true,no_extra_charge:true};
+      }
     }
-    else if(kind==="change_plan"){if(sub.status!=="active")throw new Error("Only an active subscription can change plan at cycle end.");const targetPlanId=String(body?.targetPlanId??"").trim(),cycleEnd=iso(sub.current_end);if(!targetPlanId||targetPlanId===String(local.plan_id))throw new Error("Choose a different paid plan.");if(!cycleEnd)throw new Error("Razorpay did not provide a current billing-cycle end for this change.");const terms=await resolveCommercial(db,targetPlanId,ctx.userId),mapping=await ensurePlan(env,{...terms,introPrice:null,introCycles:0},"recurring",terms.recurringPrice);await rp(`subscriptions/${encodeURIComponent(subscriptionId)}`,p,{method:"PATCH",body:JSON.stringify({plan_id:mapping.providerPlanId,schedule_change_at:"cycle_end",customer_notify:true})});effectiveAt=cycleEnd;decision={...decision,target_plan_id:targetPlanId,target_policy_version_id:terms.policyVersionId,schedule_change_at:"cycle_end",proration:"none"};await db.batch([db.prepare("UPDATE razorpay_subscriptions SET scheduled_target_plan_id=?1,scheduled_target_policy_version_id=?2,scheduled_target_provider_plan_id=?3,updated_at=?4 WHERE id=?5").bind(targetPlanId,terms.policyVersionId,mapping.providerPlanId,nowIso(),local.id),db.prepare("INSERT INTO scheduled_plan_changes(id,user_id,from_plan_id,to_plan_id,effective_at,state,reason,created_by) VALUES(?1,?2,?3,?4,?5,'scheduled','Student recurring subscription change at provider cycle end',NULL)").bind(uuid(),ctx.userId,local.plan_id,targetPlanId,effectiveAt)]);}
+    else if(kind==="change_plan"){return json({error:"Approve a fresh AutoPay mandate from Pricing before changing your plan.",requiresCheckout:true},409);}
     if(kind!=="abandon_setup")sub=await getSubscription(subscriptionId,p);
     if(['cancelled','completed','expired'].includes(sub.status))await db.prepare("UPDATE subscription_cancel_intents SET provider_confirmed_at=COALESCE(provider_confirmed_at,?1) WHERE source_subscription_id=?2 AND user_id=?3").bind(nowIso(),local.id,ctx.userId).run();
     if(kind==="abandon_setup"){

@@ -16,7 +16,7 @@ function fixture(){
  CREATE TABLE payment_checkout_retry_members(attempt_id TEXT,group_id TEXT);CREATE TABLE payment_checkout_attempts(id TEXT,retry_superseded INTEGER DEFAULT 0,request_key TEXT,user_id TEXT,provider_subscription_id TEXT,state TEXT,updated_at TEXT,lease_token TEXT,lease_until TEXT);
  CREATE TABLE payment_subscription_cycles(razorpay_subscription_id TEXT,provider_subscription_id TEXT,provider_invoice_id TEXT,provider_payment_id TEXT,amount_subunits INT,currency TEXT,status TEXT,cycle_number INT);
  CREATE TABLE user_subscriptions(provider_subscription_id TEXT,user_id TEXT,starts_at TEXT,ends_at TEXT,status TEXT);
- `);sql.exec(readFileSync(new URL('../d1/migrations/0082_single_checkout_switches.sql',import.meta.url),'utf8'));
+ `);sql.exec(readFileSync(new URL('../d1/migrations/0082_single_checkout_switches.sql',import.meta.url),'utf8'));sql.exec(readFileSync(new URL('../d1/migrations/0089_owner_plan_switches.sql',import.meta.url),'utf8'));
  const db={prepare(query){let values=[];return {bind(...v){values=v;return this;},async first(){return sql.prepare(query).get(...values)??null;},async all(){return {results:sql.prepare(query).all(...values)};},async run(){return {meta:{changes:Number(sql.prepare(query).run(...values).changes)}};}};},async batch(statements){sql.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}}};
  const input=checkoutInput({switchFromSubscriptionId:'sub_Old',singleMandate:true,planId:'pro',policyVersionId:'pv1',paymentMethod:'upi',requestId:'switch_request_00001'}),calls=[];
  let oldStatus='active',payStatus='captured',refund=0,amount=5000;
@@ -39,3 +39,52 @@ for(const [paidAt,expected] of [[100,0],[200,1]])test(`late source debit compens
  const provider=async(path)=>{if(path==='invoices/inv_Late')return {id:'inv_Late',subscription_id:'sub_Old',payment_id:'pay_Late',status:'paid',amount_due:0,amount_paid:5000,currency:'INR',paid_at:paidAt,billing_end:400};if(path==='invoices/inv_New')return {id:'inv_New',subscription_id:'sub_New',status:'paid',paid_at:150,billing_start:150};if(path==='payments/pay_Late')return {id:'pay_Late',invoice_id:'inv_Late',status:'captured',amount:5000,currency:'INR',amount_refunded:0};if(path==='payments/pay_Late/refunds?count=100')return {items:[]};if(path==='payments/pay_Late/refund'){refunds++;return {id:'rfnd_Late',payment_id:'pay_Late',amount:5000,status:'processed'};}throw new Error('unexpected '+path);};
  await maintainSwitchChargeRefunds(f.db,provider,'user1');await maintainSwitchChargeRefunds(f.db,provider,'user1');assert.equal(refunds,expected);
  }finally{f.close();}});
+
+// Phase 3: all billing cycles and mandate-gated downgrade boundaries.
+for(const [sourceTier,targetTier,cycle] of [['basic','pro','annual'],['basic','basic','annual'],['pro','pro','annual'],['pro','pro','monthly']])test(`immediate ${sourceTier} to ${targetTier} ${cycle} uses a fresh payment`,async()=>{
+ const f=fixture();try{f.sql.exec(`INSERT INTO subscription_plans VALUES('target','${targetTier}','${cycle}',1,1);UPDATE subscription_plans SET tier_key='${sourceTier}',billing_cycle='${cycle==='monthly'?'annual':'monthly'}' WHERE id='basic'`);await reserveSubscriptionSwitch(f.db,'user1',{...f.input,planId:'target'},f.provider);assert.equal(f.sql.prepare('SELECT switch_kind FROM subscription_checkout_switches').get().switch_kind,'immediate');assert.ok(!f.calls.some(c=>c.method));}finally{f.close();}
+});
+import {maintainScheduledSwitch,reverseScheduledSwitch,enforceScheduledSwitchBoundary} from '../lib/billing/scheduled-switch.mjs';
+async function scheduledFixture({authorized=true,paid=false}={}){
+ const f=fixture();f.sql.exec("UPDATE subscription_plans SET tier_key='pro' WHERE id='basic';UPDATE subscription_plans SET tier_key='basic' WHERE id='pro'");
+ await reserveSubscriptionSwitch(f.db,'user1',{...f.input,singleMandate:undefined},f.provider);f.target(paid);
+ f.sql.exec(`ALTER TABLE razorpay_subscriptions ADD COLUMN policy_version_id TEXT DEFAULT 'pv1';ALTER TABLE razorpay_subscriptions ADD COLUMN scheduled_target_plan_id TEXT;ALTER TABLE razorpay_subscriptions ADD COLUMN scheduled_target_policy_version_id TEXT;ALTER TABLE razorpay_subscriptions ADD COLUMN scheduled_target_provider_plan_id TEXT;ALTER TABLE razorpay_subscriptions ADD COLUMN grace_until TEXT;ALTER TABLE user_subscriptions ADD COLUMN updated_at TEXT;UPDATE user_subscriptions SET ends_at='2100-01-01';`);
+ let targetStatus=authorized?'authenticated':'created';const base=f.provider;
+ f.provider=async(path,init)=>{
+  if(path==='subscriptions/sub_New/cancel'){f.calls.push({path,method:'POST'});targetStatus='cancelled';return {id:'sub_New',status:targetStatus};}
+  const result=await base(path,init);if(path==='subscriptions/sub_New')return {...result,status:paid?'active':targetStatus,paid_count:paid?1:0,start_at:Math.floor(Date.parse('2099-01-01')/1000)};return result;
+ };
+ f.setAuthorization=status=>{targetStatus=status;};
+ f.atBoundary=async()=>{f.sql.exec("UPDATE subscription_checkout_switches SET target_subscription_id='sub_New',lease_token='test_lock'");const row=f.sql.prepare('SELECT * FROM subscription_checkout_switches').get();await maintainScheduledSwitch(f.db,f.provider,row,'test_lock','2099-01-01T00:00:00.000Z');};
+ return f;
+}
+test('downgrade requires UPI and does not schedule before confirmed authorization',async()=>{
+ const f=await scheduledFixture({authorized:false});try{await maintainSubscriptionSwitches(f.db,f.provider,'user1');assert.equal(f.sql.prepare('SELECT approved_at FROM subscription_checkout_switches').get().approved_at,null);assert.equal(f.sql.prepare("SELECT scheduled_target_plan_id FROM razorpay_subscriptions WHERE id='old'").get().scheduled_target_plan_id,null);assert.ok(!f.calls.some(c=>c.method));await assert.rejects(reserveSubscriptionSwitch(f.db,'user1',{...f.input,singleMandate:undefined,paymentMethod:'card'},f.provider),{code:'switch_upi_required'});}finally{f.close();}
+});
+test('fresh approved downgrade keeps old renewal and paid access until the fixed boundary',async()=>{
+ const f=await scheduledFixture();try{await maintainSubscriptionSwitches(f.db,f.provider,'user1');await maintainSubscriptionSwitches(f.db,f.provider,'user1');const row=f.sql.prepare('SELECT * FROM subscription_checkout_switches').get();assert.ok(row.approved_at);assert.equal(row.effective_at,'2099-01-01');assert.equal(f.sql.prepare("SELECT scheduled_target_plan_id FROM razorpay_subscriptions WHERE id='old'").get().scheduled_target_plan_id,'pro');assert.ok(!f.calls.some(c=>c.method));}finally{f.close();}
+});
+test('reversing an approved downgrade closes only the replacement, without a charge',async()=>{
+ const f=await scheduledFixture();try{await maintainSubscriptionSwitches(f.db,f.provider,'user1');assert.equal(await reverseScheduledSwitch(f.db,f.provider,'user1','sub_Old'),true);assert.equal(await reverseScheduledSwitch(f.db,f.provider,'user1','sub_Old'),false);assert.equal(f.sql.prepare('SELECT state FROM subscription_checkout_switches').get().state,'cancelled');assert.equal(f.sql.prepare("SELECT status FROM razorpay_subscriptions WHERE id='old'").get().status,'active');assert.deepEqual(f.calls.filter(c=>c.method==='POST').map(c=>c.path),['subscriptions/sub_New/cancel']);}finally{f.close();}
+});
+test('unapproved downgrade at expiry never stops current renewal',async()=>{
+ const f=await scheduledFixture({authorized:false});try{await f.atBoundary();assert.ok(!f.calls.some(c=>c.method));assert.equal(f.sql.prepare('SELECT approved_at FROM subscription_checkout_switches').get().approved_at,null);}finally{f.close();}
+});
+test('approved downgrade stops old billing at expiry but does not grant unpaid target access',async()=>{
+ const f=await scheduledFixture();try{await maintainSubscriptionSwitches(f.db,f.provider,'user1');await f.atBoundary();assert.equal(f.sql.prepare("SELECT status FROM razorpay_subscriptions WHERE id='old'").get().status,'cancelled');assert.equal(f.sql.prepare('SELECT state FROM subscription_checkout_switches').get().state,'closing_source');assert.equal(f.sql.prepare('SELECT count(*) n FROM user_subscriptions').get().n,0);}finally{f.close();}
+});
+test('verified downgrade payment completes the scheduled replacement at expiry',async()=>{
+ const f=await scheduledFixture({paid:true});try{await maintainSubscriptionSwitches(f.db,f.provider,'user1');await f.atBoundary();assert.equal(f.sql.prepare('SELECT state FROM subscription_checkout_switches').get().state,'completed');assert.equal(f.sql.prepare("SELECT status FROM razorpay_subscriptions WHERE id='old'").get().status,'cancelled');}finally{f.close();}
+});
+test('a revoked target mandate before expiry removes the schedule and keeps old billing',async()=>{
+ const f=await scheduledFixture();try{await maintainSubscriptionSwitches(f.db,f.provider,'user1');f.setAuthorization('cancelled');await maintainSubscriptionSwitches(f.db,f.provider,'user1');assert.equal(f.sql.prepare('SELECT state FROM subscription_checkout_switches').get().state,'cancelled');assert.equal(f.sql.prepare("SELECT status FROM razorpay_subscriptions WHERE id='old'").get().status,'active');assert.ok(!f.calls.some(c=>c.method));}finally{f.close();}
+});
+test('wrong target identity cannot authorize a downgrade or retire the source',async()=>{
+ const f=await scheduledFixture();try{const p=f.provider;f.provider=async(...args)=>{const result=await p(...args);return args[0]==='subscriptions/sub_New'?{...result,notes:{...result.notes,ca_progress_user_id:'other'}}:result;};await maintainSubscriptionSwitches(f.db,f.provider,'user1');assert.equal(f.sql.prepare('SELECT last_error FROM subscription_checkout_switches').get().last_error,'switch_target_mismatch');assert.ok(!f.calls.some(c=>c.method));}finally{f.close();}
+});
+test('late source renewal cannot extend its period after the approved downgrade',async()=>{
+ const f=await scheduledFixture();try{await maintainSubscriptionSwitches(f.db,f.provider,'user1');await f.atBoundary();f.sql.exec("ALTER TABLE payment_subscription_cycles ADD COLUMN starts_at TEXT;CREATE TABLE subscription_cancellation_refunds(payment_id TEXT PRIMARY KEY,purchase_group_id TEXT,amount_subunits INT,currency TEXT,state TEXT,request_key TEXT);INSERT INTO payment_subscription_cycles VALUES('old','sub_Old','inv_Late','pay_Late',5000,'INR','verified',2,'2099-01-01')");const local=f.sql.prepare("SELECT * FROM razorpay_subscriptions WHERE id='old'").get();const result=await enforceScheduledSwitchBoundary(f.db,local,{paidCount:2,paidThrough:'2100-01-01'});assert.equal(result.paidThrough,'2099-01-01');assert.equal(result.paidCount,1);await enforceScheduledSwitchBoundary(f.db,local,result);assert.equal(f.sql.prepare('SELECT count(*) n FROM subscription_cancellation_refunds').get().n,1);}finally{f.close();}
+});
+test('immediate replacement consumes unused old access and reconciliation cannot resurrect it',async()=>{
+ const f=fixture();try{await reserveSubscriptionSwitch(f.db,'user1',f.input,f.provider);f.target();const boundary=new Date(Date.now()-1000).toISOString();f.sql.prepare("UPDATE user_subscriptions SET starts_at=? WHERE provider_subscription_id='sub_New'").run(boundary);f.sql.exec("INSERT INTO user_subscriptions VALUES('sub_Old','user1','2020-01-01','2100-01-01','active');ALTER TABLE payment_subscription_cycles ADD COLUMN starts_at TEXT");await maintainSubscriptionSwitches(f.db,f.provider,'user1');const old=f.sql.prepare("SELECT * FROM user_subscriptions WHERE provider_subscription_id='sub_Old'").get();assert.equal(old.status,'expired');assert.equal(old.ends_at,boundary);const local=f.sql.prepare("SELECT * FROM razorpay_subscriptions WHERE id='old'").get();const evidence=await enforceScheduledSwitchBoundary(f.db,local,{paidCount:1,paidThrough:'2100-01-01',latestPaidStart:'2020-01-01'});assert.equal(evidence.paidThrough,boundary);assert.equal(evidence.forcePaidBoundary,true);}finally{f.close();}
+});
