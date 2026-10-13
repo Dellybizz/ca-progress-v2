@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import {preconnect,preload} from "react-dom";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { PricingClient } from "@/components/billing/pricing-client";
-import { PageHeader } from "@/components/ui/page-header";
 import { getPendingPriceChange, listActivePlanEntitlements, listPublishedPricingOffers } from "@/lib/billing/commercial-policy";
 import { getRecurringBillingState } from "@/lib/billing/recurring-service";
 import { getPricingModel } from "@/lib/billing/service";
@@ -27,5 +25,5 @@ export default async function PricingPage() {
     for(const origin of ["https://checkout.razorpay.com","https://api.razorpay.com","https://cdn.razorpay.com"])preconnect(origin);
     preload("https://checkout.razorpay.com/v1/checkout.js",{as:"script"});
   }
-  return <div className="phase11-page pricing-page">{model.authenticated&&commercePolicy.webCheckoutAllowed?<script async src="https://checkout.razorpay.com/v1/checkout.js"/>:null}<PageHeader preview={false} eyebrow="Plans" title="More focus. More progress." description="Compare your tools, then choose your plan." actions={<div className="phase11-header-links"><Link href="/billing">Billing</Link></div>}/><PricingClient priceChange={priceChange} subscription={recurring.subscription??null} hasRecurring={Boolean(recurring.subscription&&!["cancelled","completed","expired"].includes(recurring.subscription.status))} {...model} plans={plans} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
+  return <div className="phase11-page pricing-page">{model.authenticated&&commercePolicy.webCheckoutAllowed?<script async src="https://checkout.razorpay.com/v1/checkout.js"/>:null}<PricingClient priceChange={priceChange} subscription={recurring.subscription??null} hasRecurring={Boolean(recurring.subscription&&!["cancelled","completed","expired"].includes(recurring.subscription.status))} {...model} plans={plans} entitlements={entitlements} offers={offers} commercePolicy={commercePolicy}/></div>;
 }

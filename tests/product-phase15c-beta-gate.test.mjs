@@ -50,7 +50,8 @@ test("pricing UX is comparison-first and uses admin configured product names", (
   const page = read("app/(student)/pricing/page.tsx");
   const client = read("components/billing/pricing-client.tsx");
   assert.match(page, /name:offer\?\.planName\|\|plan\.name/);
-  assert.match(page, /Compare your tools/);
+  assert.doesNotMatch(page, /PageHeader|More focus|Compare your tools/);
+  assert.match(client, /annual offer/);
   assert.match(client, /PLAN_COMPARISON_COLUMNS/);
   assert.match(client, /PLAN_COMPARISON_ROWS/);
   assert.match(client, /configuredPlanLabel\(plan\.tier_key,plan\.name\)/);
