@@ -4,7 +4,7 @@
 
 - `/login` uses the shared blue stationery, yellow book, white panel and serif heading. It lives outside the marketing shell so the designed screen fills the page.
 - `/account/setup` retains its existing signed-in provider eligibility check. The username, new password and confirmation form attaches credentials to the same account. There is no registration through the public password endpoint.
-- `/account/recover` starts an explicit recovery-purpose Google/LinkedIn transaction through `/auth/recover`. `/account/reset` requires the verified proof. Missing, expired or consumed proof returns the student to recovery.
+- `/account/recover` starts an explicit recovery-purpose Google/LinkedIn transaction through the existing provider entry routes with `purpose=recovery`. `/account/reset` requires the verified proof. Missing, expired or consumed proof returns the student to recovery.
 - Provider-verified accounts choose their username/password before academic setup. Completed accounts keep their original destination; existing assigned usernames still lead to account setup without deleting data. Nested return routes do not point onboarding back into itself.
 - Login retains remember-on-device, provider login, server errors, sanitized return paths and local guest access. Setup retains assigned usernames, later/profile actions, 3–30-character username validation and the 12–128-character password contract. Username availability is checked on save, never shown as a fictitious green badge.
 - Shared account components render locally in the native bundle. Native provider/password transports and account IDs are retained. Native recovery opens the web verification flow; students return to the app to sign in afterwards. Native remember behavior stays with its existing persistent secure-session contract, so the web-only checkbox is omitted there.
@@ -13,6 +13,8 @@
 ## Recovery boundary
 
 The signed OAuth transaction carries `purpose=recovery`; the callback verifies state, signature, expiry and PKCE using the existing provider machinery. Recovery takes a separate branch before account provisioning, normal session issuance, bootstrap or post-auth routing. Only an exact existing provider subject linked to an active, password-bearing account can receive a proof; email matching cannot recover an unrelated account.
+
+Recovery/reset share one dynamic server page handler, reducing Worker overhead without changing their public URLs.
 
 Migration 0093 adds hash-only random proof tokens with account/identity foreign keys, a credential-hash snapshot, ten-minute expiry and a single-use consumption claim. The cookie is HTTP-only, secure in production and SameSite=Lax so provider redirects work; mutations retain same-origin enforcement. The recovery token never appears in a URL or local draft.
 
@@ -32,3 +34,7 @@ Account setup now checks the returned credential owner instead of D1’s total c
 A real linked-provider reset requires the account owner to complete provider authentication and enter their new password. Automated SQL and callback boundary checks do not claim that customer flow was exercised. Live checks inspect public login/recovery and reject reset without a proof; they do not change a customer password.
 
 Phase 4 covers the new academic setup schema/screens. Phase 6 integrates the book entry and account handoff with persistent local drafts. Phase 7 remains full device/visual certification and APK install testing. The SVG artwork is the previously documented editable interpretation, with final fidelity review still pending.
+
+## Worker size budget
+
+The additional account/recovery routes raised the generated Worker above the former 3.25 MiB repository budget (3.309 MiB after consolidating the recovery pages/provider entry). This release narrowly sets the web budget to 3.35 MiB while retaining the rejecting size gate and runtime smoke checks. Framework minification experiments were not retained. Billing and ICAI Worker budgets are unchanged.

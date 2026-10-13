@@ -8,7 +8,7 @@ const host = "127.0.0.1";
 const port = 8787;
 const base = process.env.SMOKE_BASE_URL || `http://${host}:${port}`;
 const isExternal = /^https?:\/\//.test(process.env.SMOKE_BASE_URL || "");
-const routes = ["/dashboard", "/community", "/activity", "/progress", "/planner", "/resources", "/settings", "/admin"];
+const routes = ["/welcome", "/login", "/account/recover", "/dashboard", "/community", "/activity", "/progress", "/planner", "/resources", "/settings", "/admin"];
 const userAgents = {
   desktop: "CA-Progress-Synthetic/Desktop",
   mobile: "CA-Progress-Synthetic/Mobile",
@@ -92,6 +92,10 @@ try {
     await request(route, "mobile");
   }
   await loadSample();
+  const reset = await request("/account/reset", "desktop");
+  if (![302,303,307,308].includes(reset.status) || !reset.headers.get("location")?.includes("/account/recover")) throw new Error("Reset without a proof must return to recovery.");
+  const unverifiedReset=await fetch(`${base}/api/v1/password-recovery`,{method:"POST",headers:{...headers("desktop"),"Content-Type":"application/json",origin:base},body:JSON.stringify({password:"synthetic-only-password-12"})});
+  if(unverifiedReset.status!==403)throw new Error("Unverified password reset was not rejected.");
   const oauthFailure = await fetch(`${base}/auth/google?next=%2F%2Fevil.example`, { redirect: "manual", headers: headers("desktop") });
   if (oauthFailure.status >= 500) throw new Error(`OAuth failure path returned ${oauthFailure.status}`);
   const webhook = await fetch(`${base}/api/payments/webhook`, { method: "POST", headers: headers("desktop"), body: "{}" });
