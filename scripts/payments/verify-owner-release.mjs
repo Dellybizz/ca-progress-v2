@@ -21,7 +21,7 @@ for(const plan of plans){if(!plan.provider_plan_id)throw Error('Published plan l
 const base='https://ca-progress-v2.habeebaasif622.workers.dev';
 let health=null;
 for(let attempt=0;attempt<18;attempt++){
- try{const response=await fetch(base+'/api/health',{headers:{'cache-control':'no-cache'},signal:AbortSignal.timeout(10000)}),snapshot=await response.json();if(response.ok&&snapshot.status==='ok'&&snapshot.version===sha&&snapshot.checks?.database==='ok'&&snapshot.checks?.billingBinding==='configured'&&snapshot.checks?.billingOwnerRulesPhase===5){health=snapshot;break;}}catch{/* Allow bounded edge propagation after a successful deploy. */}
+ try{const response=await fetch(base+'/api/health',{headers:{'cache-control':'no-cache'},signal:AbortSignal.timeout(10000)}),snapshot=await response.json();if(response.ok&&snapshot.status==='ok'&&snapshot.version===sha&&snapshot.checks?.database==='ok'&&snapshot.checks?.billingBinding==='configured'&&snapshot.checks?.billingOwnerRulesPhase===5&&(!process.argv.includes('--require-open')||snapshot.checks?.billingCheckoutPaused===false)){health=snapshot;break;}}catch{/* Allow bounded edge propagation after a successful deploy. */}
  await new Promise(resolve=>setTimeout(resolve,5000));
 }
 if(!health)throw Error('Web health or private billing release version failed after bounded propagation checks.');
