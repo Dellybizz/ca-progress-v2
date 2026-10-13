@@ -397,8 +397,22 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Platform limitation: Operating systems may evict app-managed cache data independently; this policy restricts CA Progress's own intentional storage-reclamation cleanup and cannot guarantee retention against OS-level eviction, user device-data clearing or uninstall.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-031 — Students can pin individual eligible files for offline use
+
+- Decision date: 2026-10-13
+- Product owner selection: **B — Allow students to pin files offline**.
+- Trigger: A student wants to deliberately keep a specific eligible shared study file or material available for offline reading, separately from ordinary temporary background caching.
+- Policy: Provide a per-file **Keep Available Offline / Remove Offline Pin** control. When selected, download/store an authorized, protected in-app offline copy of that specific file and retain its pin while the student wants it kept offline. Unpinning removes the retention preference; exact cache removal after unpin remains a user-facing behavior to design. Do not interpret this decision as pinning an entire chapter.
+- Permissions: Pinning does **not** turn a shared file into an independently owned private version, grant re-sharing/export/download rights, or bypass restrictions on Save to Private Files or Tag to Chapter. It is protected in-app storage, under S0-028 and S0-023. Private files saved by the user remain distinct from source caches.
+- Revocation precedence: If the owner revokes access and the student no longer has a valid route to the shared original, remove its offline copy after permission reconciliation on reconnect even if it is pinned, as required by S0-027. A pin cannot override owner access restrictions.
+- Storage precedence: Under S0-030, routine cache cleanup remains **manual-only**, and pinned offline files must not be silently auto-evicted by CA Progress merely to free space. If storage cannot accommodate the pin/download, handle the error accurately under S0-010; do not misrepresent a pending download as successfully available offline.
+- Background behavior: Download/sync authorized pinned files without disruptive routine progress dialogs, consistent with S0-SYNC-UI-001; an intentional offline-pin indicator can communicate selected retention without exposing background sync machinery.
+- Device limitations: An OS may clear app data, cached data or the entire app upon uninstall; a pin cannot guarantee availability after OS-level removal or when the file has not yet been successfully stored.
+- Not decided here: Whether the user's pin selection should sync across devices, whether private files are duplicated to multiple devices by default, file size limits, and how local-vs-cloud copies are managed; S0-032 addresses local/cloud storage.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-031: Should CA Progress let students explicitly mark particular eligible files or study materials as "Keep Available Offline", separately from its ordinary temporary offline cache?
+S0-032: When a student saves or edits a private file on one device, should CA Progress keep it only on that device, in the cloud only, or both locally and synced across the student's devices?
 
 
