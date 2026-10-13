@@ -115,8 +115,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Relationship to S0-009: Account-scoped encrypted pending work survives supported sign-outs and resumes retry only after the same account signs in.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-012 — Partial success when synchronizing offline changes
+
+- Decision date: 2026-10-13
+- Product owner selection: **B — Independent synchronization**
+- Trigger: Multiple locally saved changes are queued for sync; some requests succeed while others temporarily fail (for example, 15 of 20 changes succeed).
+- Policy: Commit and acknowledge **each successful independent change immediately**, while keeping only the unsuccessful changes pending for automatic retry under S0-011. Do not roll back successful independent operations just because another operation failed.
+- User-facing state: Show accurate synced and pending/failed counts, without representing the whole batch as fully synced before all required changes succeed.
+- Dependency safeguard: Operations that depend on one another must be applied in a safe required order and must not leave inconsistent linked data; an operation requiring a failed prerequisite should remain queued until the prerequisite succeeds.
+- Reliability: Track per-operation status, idempotency keys and acknowledgements to prevent duplicate application on retries. Preserve pending changes according to S0-009.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-012: If some queued changes sync successfully but others fail, should CA Progress save the successful changes immediately or hold the entire batch until everything succeeds?
+S0-013: If an offline change depends on an earlier queued action that fails (for example, creating a folder before adding a note to it), what should happen to the dependent change?
 
 
