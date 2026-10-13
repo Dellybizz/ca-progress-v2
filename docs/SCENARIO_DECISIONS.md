@@ -213,19 +213,20 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Conflict and offline behavior: Source update notifications or synchronization must not silently overwrite a personal copy. Preserve independence in the website and offline APK; routine background sync is invisible under S0-SYNC-UI-001.
 - Status: Approved for product specification; implementation not yet verified.
 
-## S0-SHARE-001 — Students can revoke edit access to files they share
+## S0-SHARE-001 — Edit permission is configured at the moment of sharing
 
 - Decision date: 2026-10-13
-- Product owner direction: **A student who shares their own file must be able to revoke edit access to that shared file.**
-- Ownership: A student who owns/publishes an original community-shared file can change or revoke the edit permission they granted to recipients. This owner control must be available after sharing, not just during initial sharing.
-- Permission model: Distinguish **view/access rights** from **permission to create/edit a recipient's personal version**. Revoking edit permission stops newly attempted unauthorized edits (enforced server-side) without giving any recipient permission to edit the shared original. Whether view-only access should remain is an independent toggle/decision; do not assume revoking edit rights also removes read access.
-- Relationship to S0-017: The publisher controls the original; a recipient is never permitted to write to the original. Recipients may edit only their own versions **when the publisher currently permits that level of access**.
-- Offline enforcement: Previously queued unauthorized writes must be denied by the server after permission revocation; S0-015 governs rejected offline changes to a file whose edit access has been revoked.
-- Still undecided: Does revocation prohibit editing already-created personal versions, or only prevent creation of new editable versions from the publisher's source? What happens to existing personal copies when all access is revoked or the source deleted? Resolve in S0-019.
-- Status: Approved product-policy amendment; implementation not yet verified.
+- Current product owner direction: **Edit access can only be configured while sharing a file.**
+- Supersession: This replaces the earlier S0-SHARE-001 proposal to provide ongoing post-sharing edit-permission changes or revocation. That earlier statement is **superseded**, not an active approved rule.
+- Sharing flow: When the owner shares a file, the sharing interface must let the owner select whether recipients receive permission to **edit their own personal versions** or have **view-only** access. That choice is made during the share action.
+- After sharing: Do not provide a separate edit-permission configuration or change/revoke control on an already-shared file under this policy. Whether ending an entire share or creating a new share invitation is supported is a different decision, not implied by this rule.
+- Ownership: Only the source publisher/owner (or authorized administrators where applicable) may change the shared original. A recipient with edit access can modify only their own version, never the canonical shared original or anyone else's version, consistent with S0-017.
+- Security: The backend enforces the permission selected at sharing. An unauthorized recipient cannot bypass view-only by using an API, cached copy, or offline replay.
+- Open items: Whether the shared file itself can subsequently be unshared/revoked entirely; what happens to pre-existing personal versions if the original share is removed or the original deleted; separate treatment of access granted to different recipients.
+- Status: Approved product policy; implementation not yet verified.
 
 ## Next pending scenario
 
-S0-019: If access to the original shared file is revoked or the shared original is deleted, what happens to personal versions already created by the students?
+S0-019: If the owner stops sharing the original file entirely (or deletes it), what happens to recipients' personal versions that were created while access was allowed?
 
 
