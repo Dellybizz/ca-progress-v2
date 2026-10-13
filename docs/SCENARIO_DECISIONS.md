@@ -104,8 +104,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Undecided follow-ups: Whether the student should be offered an explicit retry button, export/copy of the currently unsaved text, or a storage-management shortcut; precise thresholds for early warnings. This choice does **not** approve automatic cleanup, forced deletion of existing content, or a promise that unsaved text survives app closure.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-011 — Automatic retry of failed offline synchronization
+
+- Decision date: 2026-10-13
+- Product owner selection: **B — Automatic retry**
+- Trigger: Saved offline changes are queued for synchronization but a transient problem (internet disconnection, temporary server outage, timeout or retryable request failure) prevents completion.
+- Policy: Keep the changes safely queued on the device and **automatically retry synchronization** when network/server availability permits, without requiring the student to press a manual Retry button. Continue retrying transient failures until successful, including after application restarts where supported.
+- Status accuracy: Display pending/retrying/synced truthfully. Never mark unsynchronized changes as synced, erase them because of a retry failure, or create duplicate server writes after retry.
+- Implementation guardrails: Use bounded, connection-aware retry with backoff to avoid overloading devices/servers; use operation IDs/idempotent writes. Authentication failure, invalid data, revoked permissions, and other non-retryable responses must not be misrepresented as temporary failures or retried indefinitely; retain affected data safely and surface the blocker.
+- Relationship to S0-009: Account-scoped encrypted pending work survives supported sign-outs and resumes retry only after the same account signs in.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-011: When queued offline changes fail to synchronize because the server is temporarily unavailable or a request fails, should CA Progress retry automatically, require manual retry, or combine both?
+S0-012: If some queued changes sync successfully but others fail, should CA Progress save the successful changes immediately or hold the entire batch until everything succeeds?
 
 
