@@ -169,8 +169,27 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Presentation: Treat the rejection as an authorization outcome rather than a transient sync failure. Do not retry the rejected write automatically while access is absent. Routine synchronization remains background-only under S0-SYNC-UI-001. Any legally or technically necessary alert about inaccessible content is an independent decision.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-016 — Lost or stolen device protection
+
+- Decision date: 2026-10-13
+- Product owner selection: **D — Complete device protection**
+- Trigger: A student's device with an authenticated CA Progress session and potentially stored offline content is lost or stolen.
+- Policy: Let the student view authenticated devices/sessions, **revoke individual selected sessions**, and optionally **Sign Out Everywhere**. Let the student request a **remote wipe of CA Progress account data on a selected device**. Immediately deny further server access for revoked sessions; the app must honor pending remote wipe instructions upon reconnecting and verifying the command.
+- Security safeguards: Verify the student's identity before sensitive remote actions; protect local files and session secrets using suitable device encryption and key management. A remote wipe is a request for app-controlled account data, not an OS-wide erase of the phone/laptop. Account and device identifiers must be authenticated so one student cannot wipe another student's data.
+- Hard limit: **Remote wipe cannot be guaranteed before the missing device reconnects**, and a device that stays offline may retain its already-downloaded data. Security must not imply instantaneous or guaranteed deletion of offline copies.
+- Scope/details remaining: Selection and display of device sessions, all-device revocation semantics, native/web data-wipe capabilities, secure offline key storage, how prior unsynced work on a wiped device is handled, and authorization/audit logging.
+- Status: Approved for product specification; implementation not yet verified.
+
+## Saved-file configuration — requested area to decide
+
+- Request date: 2026-10-13
+- Product owner request: **Allow changing configurations for saved files.**
+- Status: **Scope pending**. No specific settings, roles or defaults have been approved yet.
+- Candidate dimensions to review: Per-file display name and location, offline availability/local download preference, permissions/sharing on personally owned files, file replacement/version policy, and administrative global defaults. Do not infer approval of public sharing, bypassing permissions, or destructive changes.
+- Next: Decide whether configuration control belongs to students, administrators, or both.
+
 ## Next pending scenario
 
-S0-016: If a student's device is lost or stolen, should they be able to remotely revoke that device's session and locally stored access to their CA Progress data?
+S0-017: Who should be allowed to configure saved-file settings: students for their own files, administrators globally, or both with permission-based controls?
 
 
