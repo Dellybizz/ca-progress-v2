@@ -1,4 +1,5 @@
-const normalize=sql=>String(sql).replace(/\s+/g,' ').trim().replace(/;$/,'').toLowerCase();
+import {d1TransportSql} from './d1-sql-transport.mjs';
+const normalize=sql=>d1TransportSql(sql).replace(/\s+/g,' ').trim().replace(/;$/,'').trim().toLowerCase();
 export const p5SchemaNames=['billing_notifications','billing_notifications_owner','billing_recovery_due','billing_failure_anchor','billing_notice_financial_hold'];
 export function verifyP5MigrationLayout(sql,objects,columns){
  if(!columns.some(c=>c.name==='failure_paid_through_at'&&c.type==='TEXT'))throw new Error('Phase 5 failure anchor is missing or incompatible.');

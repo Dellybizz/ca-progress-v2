@@ -12,12 +12,13 @@ import {dependencies} from './payment-p2';
 import {upgradeFetch,maintainUpgrades} from './upgrades';
 import previous from './payment-p4';
 import {maintainRecovery} from '../../lib/billing/recovery-maintenance.mjs';
-type Env=Parameters<typeof previous.fetch>[1] & StorageEmailEnv & {USER_RESOURCES_R2?:NonNullable<StorageDependencies['bucket']>};
+type Env=Parameters<typeof previous.fetch>[1] & StorageEmailEnv & {CA_PAYMENT_RELEASE_PAUSED?:string;USER_RESOURCES_R2?:NonNullable<StorageDependencies['bucket']>};
 function storageDependencies(env:Env):StorageDependencies{return {bucket:env.USER_RESOURCES_R2,bucketName:'ca-progress-v2-staging-user-resources',async access(user){const response=await previous.fetch(new Request('https://billing.internal/entitlement?featureKey=resources.storage',{headers:{'x-ca-progress-internal':'ca-progress-v2-web','x-ca-progress-user-id':user}}),env);if(!response.ok)throw new Error('storage_entitlement_unavailable');return storageAllowance(env.DB!,user,await response.json() as {planId:string;allowed:boolean});}};}
 type BaseMessage=Parameters<typeof previous.queue>[0]['messages'][number];
 type RetryMessage={body:{kind:'retry_maintenance';userId:string};ack():void;retry():void};
 const worker = {
  async fetch(request:Request,env:Env){
+  if(env.CA_PAYMENT_RELEASE_PAUSED==='true'&&request.method==='POST'&&['/create-subscription','/create-order','/upgrade'].includes(new URL(request.url).pathname))return Response.json({error:'Payment setup is temporarily paused for release verification.'},{status:503,headers:{'cache-control':'no-store','retry-after':'120'}});
   const giftResponse=await giftsFetch(request,env);if(giftResponse)return giftResponse;
   if(new URL(request.url).pathname==='/upgrade')return upgradeFetch(request,env);
   const body=['/verify-subscription','/subscription-action','/webhook'].includes(new URL(request.url).pathname)?await request.clone().json().catch(()=>null) as {razorpay_subscription_id?:string;subscriptionId?:string;payload?:{subscription?:{entity?:{id?:string}};payment?:{entity?:{subscription_id?:string}};invoice?:{entity?:{subscription_id?:string}}}}|null:null;
@@ -29,7 +30,7 @@ const worker = {
   const user=request.headers.get('x-ca-progress-user-id');
   if(env.DB&&user&&request.headers.get('x-ca-progress-internal')==='ca-progress-v2-web'&&['/verify-subscription','/subscription-action','/checkout/recover'].includes(new URL(request.url).pathname)){await maintainSubscriptionSwitches(env.DB,dependencies(env,user).provider,user);await maintainSwitchChargeRefunds(env.DB,dependencies(env,user).provider,user);await maintainGifts(env.DB,dependencies(env,user).provider);await maintainGiftSources(env.DB,dependencies(env,user).provider);await env.BILLING_OPS_QUEUE?.send({kind:'retry_maintenance',userId:user} as never).catch(()=>undefined);}
   if(request.headers.get('x-ca-progress-internal')==='ca-progress-v2-web'&&new URL(request.url).pathname==='/health'&&response.ok){
-   return new Response(JSON.stringify({...await response.json() as object,phase:5,ownerRulesPhase:5,recoveryAfterGraceDays:7,recoveryReminders:'daily_in_app',graceAnchor:'verified_paid_through'}),{headers:response.headers});
+   return new Response(JSON.stringify({...await response.json() as object,phase:5,ownerRulesPhase:5,releaseCheckoutPaused:env.CA_PAYMENT_RELEASE_PAUSED==='true',recoveryAfterGraceDays:7,recoveryReminders:'daily_in_app',graceAnchor:'verified_paid_through'}),{headers:response.headers});
   }
   return response;
  },

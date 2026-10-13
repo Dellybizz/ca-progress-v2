@@ -1,3 +1,7 @@
+import {d1TransportSql} from './payments/d1-sql-transport.mjs';
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {verifyP5MigrationLayout,p5SchemaNames} from './payments/p5-migration-layout.mjs';
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -137,7 +141,8 @@ for (const [version,file] of migrations) {
       continue;
     }
   }
-  wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${file}`]);
+  const transportDir=mkdtempSync(join(tmpdir(),'ca-d1-transport-')),transportFile=join(transportDir,'migration.sql');
+  try{writeFileSync(transportFile,d1TransportSql(readFileSync(file,'utf8')));wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${transportFile}`]);}finally{rmSync(transportDir,{recursive:true,force:true});}
 }
 const versions=migrations.map(([version])=>`'${version}'`).join(",");
 const verification=query(`SELECT version FROM _ca_schema_migrations WHERE version IN (${versions}) ORDER BY version; PRAGMA foreign_key_check;`);

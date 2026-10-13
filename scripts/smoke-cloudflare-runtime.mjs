@@ -1,4 +1,7 @@
-import { existsSync } from "node:fs";
+import { existsSync,mkdtempSync,readdirSync,readFileSync,writeFileSync,rmSync } from "node:fs";
+import {tmpdir} from "node:os";
+import {join,resolve} from "node:path";
+import {d1TransportSql} from "./payments/d1-sql-transport.mjs";
 import { spawn, spawnSync } from "node:child_process";
 
 const host = "127.0.0.1";
@@ -50,7 +53,12 @@ if (!isExternal) {
     if (build.status !== 0) throw new Error(`Cloudflare smoke prebuild failed with exit code ${build.status ?? "unknown"}.`);
   }
   const wrangler = process.platform === "win32" ? "npx.cmd" : "npx";
-  const migrate = spawnSync(wrangler, ["wrangler", "d1", "migrations", "apply", "ca-progress-v2-smoke-local", "--local", "--config", "wrangler.smoke.jsonc"], { env: { ...process.env, NO_COLOR: "1", CI: "1", NO_D1_WARNING: "true" }, stdio: "inherit" });
+  const migrationDir=mkdtempSync(join(tmpdir(),'ca-smoke-migrations-')),migrationConfig=resolve('.wrangler-smoke-migrations.json');
+  const configuration=JSON.parse(readFileSync('wrangler.smoke.jsonc','utf8'));configuration.d1_databases[0].migrations_dir=migrationDir;
+  for(const file of readdirSync('d1/migrations').filter(f=>f.endsWith('.sql')))writeFileSync(join(migrationDir,file),d1TransportSql(readFileSync('d1/migrations/'+file,'utf8')));
+  writeFileSync(migrationConfig,JSON.stringify(configuration));
+  let migrate;try{migrate = spawnSync(wrangler, ["wrangler", "d1", "migrations", "apply", "ca-progress-v2-smoke-local", "--local", "--config", migrationConfig], { env: { ...process.env, NO_COLOR: "1", CI: "1", NO_D1_WARNING: "true" }, stdio: "inherit" });
+  }finally{rmSync(migrationDir,{recursive:true,force:true});rmSync(migrationConfig,{force:true});}
   if (migrate.status !== 0) throw new Error(`Cloudflare smoke D1 bootstrap failed with exit code ${migrate.status ?? "unknown"}.`);
   child = spawn(wrangler, ["wrangler", "dev", "--local", "--config", "wrangler.smoke.jsonc", "--ip", host, "--port", String(port)], { env: { ...process.env, NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"] });
   for (const stream of [child.stdout, child.stderr]) {
