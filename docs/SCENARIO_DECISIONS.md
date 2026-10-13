@@ -60,8 +60,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Open details: Reliable edit timestamp ordering; exact ties; how to identify stale/clock-skewed offline devices; whether previous versions remain recoverable; reporting a superseded local edit.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-007 — Incorrect device clocks during offline edit conflicts
+
+- Decision date: 2026-10-13
+- Product owner selection: **B — Correct using server time**
+- Trigger: Two devices independently edit an eligible record while offline, and at least one device has an incorrect clock or edit-order timestamps may be unreliable.
+- Policy: When determining the most recent edit under S0-006, use server-synchronized clock offsets and reliable event-ordering metadata **where available** instead of blindly trusting raw device time. If the true order cannot be established reliably, preserve both conflicting versions so that neither is irreversibly lost, and allow resolution rather than falsely assigning a winner.
+- Implementation caution: A previous server clock offset is not absolute proof of event order during long offline periods or manual clock changes. Do not resolve uncertain offline edits on raw device timestamps alone; record confidence/conflict state and retain both versions.
+- Scope: Eligible edit conflicts. This does not reverse S0-003/S0-004 permanent deletion or override S0-005 recovery of a still-trashed item.
+- Remaining technical detail: Accurate conflict detection, order metadata, tie resolution, version retention duration, user interface for uncertain ordering, and cleanup of archived conflict copies.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-007: When a device's date or clock is incorrect, how should CA Progress determine which offline edit is actually the latest?
+S0-008: An item was permanently deleted on one device, but another device was offline and edited its old local copy. What should happen when that offline device reconnects?
 
 
