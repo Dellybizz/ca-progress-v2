@@ -30,7 +30,18 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Remaining questions: Expiration timestamp/timezone and processing cadence; behavior for legal retention or disaster-recovery backups; nested-item expiration and restoration edge cases; treatment of offline devices that reconnect after purge.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-004 — Student-initiated permanent deletion before Trash expiry
+
+- Decision date: 2026-10-13
+- Product owner selection: **B — Allow permanent deletion with confirmation**
+- Trigger: A student wants to permanently remove eligible items from Trash before the normal 30-day expiry.
+- Policy: Provide **Delete Permanently** for individual eligible items and **Empty Trash** for all eligible Trash items. Both actions require a clear confirmation popup informing the student that the content cannot be restored through Trash.
+- Relationship to earlier decisions: S0-001 and S0-002 still move eligible deleted data to Trash by default; S0-003 still removes expired items automatically after 30 days without a further warning.
+- Guardrails / pending details: Permanent deletion is limited to items the authenticated student is authorized to erase. Official ICAI academic source records or independently protected records are not made deletable by this decision. Offline execution, server-confirmation, duplicate requests, cascading deletion, backups/legal retention, and failure messaging must be defined during implementation; do not falsely display successful permanent deletion before it is committed.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-004: Should students be allowed to manually and permanently delete items from Trash before their 30-day automatic expiration?
+S0-005: If a student deletes an item on one device while another device is offline and has edited the same item, which state should win when the offline device reconnects?
+
 
