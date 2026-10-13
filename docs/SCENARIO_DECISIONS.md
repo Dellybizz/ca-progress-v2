@@ -110,7 +110,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Product owner selection: **B — Automatic retry**
 - Trigger: Saved offline changes are queued for synchronization but a transient problem (internet disconnection, temporary server outage, timeout or retryable request failure) prevents completion.
 - Policy: Keep the changes safely queued on the device and **automatically retry synchronization** when network/server availability permits, without requiring the student to press a manual Retry button. Continue retrying transient failures until successful, including after application restarts where supported.
-- Status accuracy: Display pending/retrying/synced truthfully. Never mark unsynchronized changes as synced, erase them because of a retry failure, or create duplicate server writes after retry.
+- Internal status accuracy: Track pending/retrying/synced states accurately without exposing routine synchronization indicators to students (see cross-cutting S0-SYNC-UI-001). Never mark unsynchronized changes as synced internally, erase them because of a retry failure, or create duplicate server writes after retry.
 - Implementation guardrails: Use bounded, connection-aware retry with backoff to avoid overloading devices/servers; use operation IDs/idempotent writes. Authentication failure, invalid data, revoked permissions, and other non-retryable responses must not be misrepresented as temporary failures or retried indefinitely; retain affected data safely and surface the blocker.
 - Relationship to S0-009: Account-scoped encrypted pending work survives supported sign-outs and resumes retry only after the same account signs in.
 - Status: Approved for product specification; implementation not yet verified.
@@ -121,9 +121,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Product owner selection: **B — Independent synchronization**
 - Trigger: Multiple locally saved changes are queued for sync; some requests succeed while others temporarily fail (for example, 15 of 20 changes succeed).
 - Policy: Commit and acknowledge **each successful independent change immediately**, while keeping only the unsuccessful changes pending for automatic retry under S0-011. Do not roll back successful independent operations just because another operation failed.
-- User-facing state: Show accurate synced and pending/failed counts, without representing the whole batch as fully synced before all required changes succeed.
+- Background-only presentation: No student-facing sync counts, loading indicators, progress bars, banners or routine synchronization messages. Track successful/pending/failed operation states internally (see S0-SYNC-UI-001).
 - Dependency safeguard: Operations that depend on one another must be applied in a safe required order and must not leave inconsistent linked data; an operation requiring a failed prerequisite should remain queued until the prerequisite succeeds.
 - Reliability: Track per-operation status, idempotency keys and acknowledgements to prevent duplicate application on retries. Preserve pending changes according to S0-009.
+- Status: Approved for product specification; implementation not yet verified.
+
+## S0-SYNC-UI-001 — Invisible background-only synchronization (cross-cutting amendment)
+
+- Decision date: 2026-10-13
+- Product owner direction: **Every synchronization must happen in the background; show nothing to the student.**
+- Policy: Automatic data synchronization, retries, partial-batch processing, conflict resolution and reconciliation run in the background with **no routine student-facing sync screens, loaders, status counters, success messages, progress bars, toast notifications, or manual synchronization prompts**. Normal student workflow should not be blocked on synchronization.
+- Internal engineering requirement: Maintain durable queues, per-operation acknowledgements, safe ordering, idempotency, accurate internal state, retry backoff and failure logs/diagnostics without placing routine sync details in the student's UI.
+- Precedence: Overrides previous suggestions in S0-011 and S0-012 to display routine sync status or counts. It does not revoke **S0-009** (explicit warning before signing out or app-controlled clearing when unsynced work is at risk) or **S0-010** (visible error when a change cannot be saved locally); these are data-protection exceptions, not routine sync notifications.
+- Failure handling still to decide: If work is persistently unsyncable for a non-transient reason, preserve it and log diagnostics; appropriate escalation must be settled without misleading the student into thinking the work is secure on the server.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
