@@ -5,6 +5,7 @@
 - `/login` uses the shared blue stationery, yellow book, white panel and serif heading. It lives outside the marketing shell so the designed screen fills the page.
 - `/account/setup` retains its existing signed-in provider eligibility check. The username, new password and confirmation form attaches credentials to the same account. There is no registration through the public password endpoint.
 - `/account/recover` starts an explicit recovery-purpose Google/LinkedIn transaction through `/auth/recover`. `/account/reset` requires the verified proof. Missing, expired or consumed proof returns the student to recovery.
+- Provider-verified accounts choose their username/password before academic setup. Completed accounts keep their original destination; existing assigned usernames still lead to account setup without deleting data. Nested return routes do not point onboarding back into itself.
 - Login retains remember-on-device, provider login, server errors, sanitized return paths and local guest access. Setup retains assigned usernames, later/profile actions, 3–30-character username validation and the 12–128-character password contract. Username availability is checked on save, never shown as a fictitious green badge.
 - Shared account components render locally in the native bundle. Native provider/password transports and account IDs are retained. Native recovery opens the web verification flow; students return to the app to sign in afterwards. Native remember behavior stays with its existing persistent secure-session contract, so the web-only checkbox is omitted there.
 - Bundled illustrations are copied into `native-shell/assets/onboarding` because native account screens now use them. This does not complete Phase 6’s draft storage or offline synchronization gates, and no APK is delivered by this change.
@@ -24,7 +25,7 @@ Account setup now checks the returned credential owner instead of D1’s total c
 - SQL tests exercise the production statements against SQLite: valid reset, wrong account, expiry, replay, stale credentials, disabled account, removed/reassigned provider identity, unsupported identity provider, session/native exchange invalidation and transaction rollback.
 - Component rendering checks cover form semantics, password minimum, confirmation fields, offline disabled actions, honest availability text and native bundle boundaries.
 - Existing provider/account setup tests retain original-user/data and guest/revoked-session checks.
-- Local full repository CI passed: 1,265 tests, TypeScript, ESLint, retirement scan and production Next build. The native bundle also builds. Deployment separately runs additive migration rehearsal, Worker build/size/runtime checks and live public UI checks.
+- Local full repository CI passed: 1,266 tests, TypeScript, ESLint, retirement scan and production Next build. The native bundle also builds. Deployment separately runs additive migration rehearsal, Worker build/size/runtime checks and live public UI checks.
 
 ## Remaining verification
 

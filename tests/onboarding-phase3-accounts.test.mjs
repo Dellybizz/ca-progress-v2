@@ -37,3 +37,12 @@ assert d.execute("SELECT consumed_by FROM password_recovery_proofs").fetchone()[
  const input={...s,migration:await readFile('d1/migrations/0093_provider_password_recovery.sql','utf8')};const run=spawnSync('python3',['-c',script],{encoding:'utf8',input:JSON.stringify(input)});assert.equal(run.status,0,run.stderr);
  }finally{await cleanup();}});
 test('recovery callback skips provisioning and credentials never enter local drafts',async()=>{const auth=await readFile('lib/auth/cloudflare.ts','utf8');const recovery=auth.slice(auth.indexOf('if(transaction.purpose==="recovery")'),auth.indexOf('const identity = await resolveApplicationIdentity(profile);',auth.indexOf('if(transaction.purpose==="recovery")')));assert.match(recovery,/issuePasswordRecovery/);assert.doesNotMatch(recovery,/resolveApplicationIdentity|issueSession|ensureCloudflareUserBootstrap/);const source=await readFile('components/auth/onboarding/accounts.tsx','utf8');assert.doesNotMatch(source,/localStorage|sessionStorage/);const bundle=await build({entryPoints:['apps/mobile/src/account-setup.tsx'],bundle:true,write:false,platform:'browser',format:'esm',jsx:'automatic',loader:{'.css':'empty'}});assert.doesNotMatch(bundle.outputFiles[0].text,/next\/navigation|server-only/);});
+
+test('verified new accounts choose their login before study setup and completed accounts keep their destination',async()=>{const {module:c,cleanup}=await moduleAt('lib/auth/account-entry.ts');try{
+ const next=c.accountEntryDestination('/dashboard',true,false);assert.equal(next,'/account/setup?next='+encodeURIComponent('/onboarding?next='+encodeURIComponent('/dashboard')));
+ assert.equal(c.accountEntryDestination('/onboarding',true,false),'/account/setup?next=%2Fonboarding');
+ assert.equal(c.accountEntryDestination('/dashboard',false,true),'/dashboard');
+ assert.equal(c.accountEntryDestination('/dashboard',true,true),'/account/setup?next=%2Fdashboard');
+ assert.equal(c.accountEntryDestination('/account/setup',true,false),'/account/setup');
+ assert.equal(c.accountEntryDestination('//external.test',false,true),'/planner/today');
+ }finally{await cleanup();}});
