@@ -22,6 +22,7 @@ Baseline: Phase 5 (`eb86fdb6` published; `18acedf2` local).
 - Compressed Worker budgets: ICAI 0.584 MiB, billing 0.069 MiB, web 3.173 MiB; all below repository limits.
 - Wrangler local migration bootstrap now completes through 0091. SSR server startup is blocked in this workspace by `uv_interface_addresses`; the GitHub release workflow runs the required SSR smoke on Ubuntu before deployment.
 - GitHub release rehearsal passed the full repository checks, SSR smoke and production migration ledger through 0091, with clean foreign keys. The first deployment attempt stopped before Worker changes because the CLI was outside the executable path; the corrected workflow uses the installed package runner.
+- The corrected release deployed web and billing Workers and validated/published annual defaults without creating customer charges. The immediate post-deploy health probe met an edge propagation delay; verification now waits for the exact deployed version before continuing. New checkouts remain held until the complete live proof passes.
 - Pre-release public health is healthy but still shows the old release and finite one-year quotes. This is baseline evidence, not evidence of the Phase 6 deployment.
 
 ## Live completion gate
