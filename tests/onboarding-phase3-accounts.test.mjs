@@ -42,6 +42,7 @@ test('verified new accounts choose their login before study setup and completed 
  const next=c.accountEntryDestination('/dashboard',true,false);assert.equal(next,'/account/setup?next='+encodeURIComponent('/onboarding?next='+encodeURIComponent('/dashboard')));
  assert.equal(c.accountEntryDestination('/onboarding',true,false),'/account/setup?next=%2Fonboarding');
  assert.equal(c.accountEntryDestination('/dashboard',false,true),'/dashboard');
+ assert.equal(c.accountEntryDestination('/dashboard',false,false),'/onboarding?next=%2Fdashboard');
  assert.equal(c.accountEntryDestination('/dashboard',true,true),'/account/setup?next=%2Fdashboard');
  assert.equal(c.accountEntryDestination('/account/setup',true,false),'/account/setup');
  assert.equal(c.accountEntryDestination('//external.test',false,true),'/planner/today');
