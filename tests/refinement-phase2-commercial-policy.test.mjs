@@ -37,7 +37,9 @@ test("P2 admin surface is separated into commercial work areas",()=>{
 test("P2 pricing explains today, recurring and cancellation terms",()=>{
   const client=read("components/billing/pricing-client.tsx");
   assert.match(client,/Due today/);
-  assert.match(client,/Then:<\/strong>/);
+  assert.match(client,/subscription-review-renewal/);
+  assert.match(client,/Then yearly/);
+  assert.match(client,/Then monthly/);
   assert.match(client,/Cancellation/);
   assert.match(client,/introRemainingCycles/);
   assert.match(client,/checkoutReady/);
