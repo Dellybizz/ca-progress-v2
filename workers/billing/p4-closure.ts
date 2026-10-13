@@ -73,7 +73,7 @@ export async function freezeUnsafeSubscriptionCreation(request: Request, env: En
   }
   const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits,total_count,billing_duration_value,billing_duration_unit
     FROM razorpay_subscriptions
-    WHERE user_id=?1 AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
+    WHERE user_id=?1 AND gift_id IS NULL AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
     ORDER BY created_at DESC LIMIT 21`).bind(userId).all<Row>();
   let rows = unresolved.results ?? [];
   if (rows.length > 20) {
@@ -82,7 +82,7 @@ export async function freezeUnsafeSubscriptionCreation(request: Request, env: En
 
   if (rows.length === 0) {
     const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits,total_count,billing_duration_value,billing_duration_unit
-      FROM razorpay_subscriptions WHERE user_id=?1 AND COALESCE(provider_verified,0)<>1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
+      FROM razorpay_subscriptions WHERE user_id=?1 AND gift_id IS NULL AND COALESCE(provider_verified,0)<>1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
     if (latest) rows = [latest];
   }
   if (rows.length === 0) return null;

@@ -117,6 +117,7 @@ export async function processAccountDeletion(requestId: string) {
 
   const hash = await subjectHash(request.id, request.user_id);
   const statements = [database.prepare("UPDATE app_users SET auth_provider='deleted',provider_subject=NULL,account_state='deleted',role='student',updated_at=CURRENT_TIMESTAMP WHERE user_id=?1").bind(request.user_id)];
+  statements.push(database.prepare("UPDATE recurring_gifts SET state='cancelled',cancel_requested_at=COALESCE(cancel_requested_at,strftime('%Y-%m-%dT%H:%M:%fZ','now')),cancelled_by=COALESCE(cancelled_by,?1),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE (purchaser_user_id=?1 OR recipient_user_id=?1) AND state IN ('offered','accepted','active','expired')").bind(request.user_id));
   statements.push(...USER_DELETE_STATEMENTS.map((sql) => database.prepare(sql).bind(request.user_id)));
   statements.push(database.prepare("INSERT INTO account_deletion_receipts(request_id,subject_hash,deleted_object_count) VALUES(?1,?2,?3) ON CONFLICT(request_id) DO NOTHING").bind(request.id, hash, objectKeys.length));
   statements.push(database.prepare("UPDATE account_deletion_requests SET status='completed',completed_at=CURRENT_TIMESTAMP,failure_code=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?1 AND status='processing'").bind(request.id));

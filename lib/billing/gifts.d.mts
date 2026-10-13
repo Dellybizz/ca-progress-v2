@@ -1,0 +1,12 @@
+import type {CheckoutInput} from './checkout-engine.mjs';
+type Row=Record<string,unknown>;
+type Statement={bind(...values:unknown[]):Statement;first<T=Row>():Promise<T|null>;all<T=Row>():Promise<{results?:T[]}>;run():Promise<unknown>};
+export type GiftDatabase={prepare(query:string):Statement;batch(statements:Statement[]):Promise<unknown>};
+export type GiftProvider=(path:string,init?:RequestInit)=>Promise<Row>;
+export function offerGift(db:GiftDatabase,purchaser:string,input:{recipientUsername:unknown;planId:unknown;requestId:unknown}):Promise<Row>;
+export function acceptGift(db:GiftDatabase,recipient:string,id:string):Promise<Row>;
+export function giftCheckout(db:GiftDatabase,payer:string,input:CheckoutInput):Promise<Row>;
+export function giftAccessDecision(db:GiftDatabase,local:Row):Promise<{userId:unknown;allowed:boolean;gift?:Row}>;
+export function enforceGiftStops<T extends object>(db:GiftDatabase,local:Row,evidence:T):Promise<T>;
+export function cancelGift(db:GiftDatabase,provider:GiftProvider,actor:string,id:string):Promise<{ok:boolean;beneficiaryUserId:unknown}>;
+export function maintainGifts(db:GiftDatabase,provider:GiftProvider):Promise<void>;

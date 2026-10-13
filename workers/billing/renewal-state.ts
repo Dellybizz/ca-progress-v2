@@ -7,6 +7,7 @@ type Row=Record<string,unknown>;
 type Env={DB?:Database;RAZORPAY_KEY_ID?:string;RAZORPAY_KEY_SECRET?:string};
 export async function renewalEvidence(env:Env,local:Row,subscription:Row,payment:Row|null){
  if(!env.DB||!env.RAZORPAY_KEY_ID||!env.RAZORPAY_KEY_SECRET)throw new RenewalError('Renewal verification is unavailable.');
+ if(local.gift_id){const gift=await env.DB.prepare('SELECT recipient_user_id,purchaser_user_id FROM recurring_gifts WHERE id=?1').bind(local.gift_id).first<Row>();const notes=subscription.notes as Row|undefined;if(!gift||gift.purchaser_user_id!==local.user_id||notes?.ca_progress_user_id!==local.user_id||notes?.ca_progress_gift_id!==local.gift_id||notes?.ca_progress_recipient_user_id!==gift.recipient_user_id)throw new RenewalError('Gift mandate ownership changed.','renewal_contract_mismatch');}
  let contract=local;
  if(local.campaign_claim_id){const claim=await env.DB.prepare('SELECT discount_cycles,provider_offer_id FROM billing_campaign_claims WHERE id=?1').bind(local.campaign_claim_id).first<Row>();if(!claim||claim.provider_offer_id!==local.provider_offer_id)throw new RenewalError('Campaign offer identity changed.','renewal_contract_mismatch');contract={...local,discount_cycles:Number(claim.discount_cycles)};}
  const attempt=await env.DB.prepare('SELECT * FROM payment_checkout_attempts WHERE provider_subscription_id=?1 AND user_id=?2 AND request_key=?3 LIMIT 1').bind(local.provider_subscription_id,local.user_id,local.checkout_key).first<Row>();
