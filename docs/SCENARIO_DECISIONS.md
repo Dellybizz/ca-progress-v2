@@ -199,11 +199,22 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Community share example: Member A shares Notes.pdf to a group. Members B and C with access can each edit their own version, independently. Only Member A or another explicitly authorized source owner can change the source (ordinary recipients cannot).
 - Interaction with earlier policies: S0-014 requires current access before editing; S0-015 discards queued edits **to a file whose access was revoked**. No shared-source overwrite from a recipient is allowed. The handling of pre-existing personal copies and revoked access must be separately decided, rather than assumed.
 - Engineering safeguards: Associate personal versions with source ID and source revision; distinguish source-level vs per-user permissions in both API and database; never treat a personal restore as a source write; record history; enforce isolation on every read/write/restore operation, including offline replay.
-- Open questions: What happens to personal edits when the original source is revised (S0-018); what happens to a personal version when source access is revoked or the original is deleted; whether users can re-share personal versions; how far restore history goes and which file types support direct editing; who may change source ownership.
+- Open questions: What happens to a personal version when source access is revoked or the original is deleted; whether users can re-share personal versions; how far restore history goes and which file types support direct editing; who may change source ownership. Source updates are governed by S0-018.
+- Status: Approved for product specification; implementation not yet verified.
+
+## S0-018 — Updated original shared file leaves personal versions unchanged
+
+- Decision date: 2026-10-13
+- Product owner selection: **B — Keep the student's version**
+- Trigger: An authorized administrator or community source owner publishes a new revision of an original shared file after one or more recipients have created or edited their own personal versions.
+- Policy: **Do not modify, replace, merge, or reset recipients' personal versions automatically.** Existing personal edits, highlights, annotations, revision history and their selected base version remain intact. Students with continuing permission may separately access the latest original shared version.
+- Source ownership: Updating the shared original changes its publisher-controlled source revision only, never another person's private version.
+- Future user actions: A student may choose to read or make a new separate version from the updated original under applicable access permissions; whether to provide explicit rebase/merge controls for existing personal copies is not authorized by this decision.
+- Conflict and offline behavior: Source update notifications or synchronization must not silently overwrite a personal copy. Preserve independence in the website and offline APK; routine background sync is invisible under S0-SYNC-UI-001.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
 
-S0-018: When an admin or community owner updates an original shared file, what should happen to students' existing independently edited personal versions?
+S0-019: If access to the original shared file is revoked or the shared original is deleted, what happens to personal versions already created by the students?
 
 
