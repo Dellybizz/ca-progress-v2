@@ -213,6 +213,17 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Conflict and offline behavior: Source update notifications or synchronization must not silently overwrite a personal copy. Preserve independence in the website and offline APK; routine background sync is invisible under S0-SYNC-UI-001.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-SHARE-001 — Students can revoke edit access to files they share
+
+- Decision date: 2026-10-13
+- Product owner direction: **A student who shares their own file must be able to revoke edit access to that shared file.**
+- Ownership: A student who owns/publishes an original community-shared file can change or revoke the edit permission they granted to recipients. This owner control must be available after sharing, not just during initial sharing.
+- Permission model: Distinguish **view/access rights** from **permission to create/edit a recipient's personal version**. Revoking edit permission stops newly attempted unauthorized edits (enforced server-side) without giving any recipient permission to edit the shared original. Whether view-only access should remain is an independent toggle/decision; do not assume revoking edit rights also removes read access.
+- Relationship to S0-017: The publisher controls the original; a recipient is never permitted to write to the original. Recipients may edit only their own versions **when the publisher currently permits that level of access**.
+- Offline enforcement: Previously queued unauthorized writes must be denied by the server after permission revocation; S0-015 governs rejected offline changes to a file whose edit access has been revoked.
+- Still undecided: Does revocation prohibit editing already-created personal versions, or only prevent creation of new editable versions from the publisher's source? What happens to existing personal copies when all access is revoked or the source deleted? Resolve in S0-019.
+- Status: Approved product-policy amendment; implementation not yet verified.
+
 ## Next pending scenario
 
 S0-019: If access to the original shared file is revoked or the shared original is deleted, what happens to personal versions already created by the students?
