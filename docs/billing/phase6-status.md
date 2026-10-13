@@ -22,8 +22,22 @@ Baseline: Phase 5 (`eb86fdb6` published; `18acedf2` local).
 - Compressed Worker budgets: ICAI 0.584 MiB, billing 0.069 MiB, web 3.173 MiB; all below repository limits.
 - Wrangler local migration bootstrap now completes through 0091. SSR server startup is blocked in this workspace by `uv_interface_addresses`; the GitHub release workflow runs the required SSR smoke on Ubuntu before deployment.
 - GitHub release rehearsal passed the full repository checks, SSR smoke and production migration ledger through 0091, with clean foreign keys. The first deployment attempt stopped before Worker changes because the CLI was outside the executable path; the corrected workflow uses the installed package runner.
-- The corrected release deployed web and billing Workers and validated/published annual defaults without creating customer charges. The immediate post-deploy health probe met an edge propagation delay; verification now waits for the exact deployed version before continuing. New checkouts remain held until the complete live proof passes.
+- The corrected release deployed web and billing Workers and validated/published annual defaults without creating customer charges. The immediate post-deploy health probe met an edge propagation delay; verification now waits for the exact deployed version before continuing. The hold was subsequently cleared after the complete live proof passed.
 - Pre-release public health is healthy but still shows the old release and finite one-year quotes. This is baseline evidence, not evidence of the Phase 6 deployment.
+
+## Production release evidence
+
+Release source: `299e71af25abf16b9d9dc1e98af2e1587716cf1d` on `payment-rules-phase6`.
+[Release workflow 38387784711](https://github.com/Dellybizz/ca-progress-v2/actions/runs/38387784711) succeeded on 13 October 2026.
+
+- Retained migration stages found all 80 required migrations and clean foreign keys.
+- Web Worker version: `4c3f9063-f4d8-410e-9f45-29189ad7a044`.
+- Final billing Worker version: `fdf43659-2ed2-4b56-8f46-68ecf5f6b0d9`.
+- Live verifier passed before and after reopening: four provider products and twelve method-aware quotes, authenticated endpoints, retained financial terms and account data, and signed inbox convergence.
+- Public health independently confirms the exact release SHA, database and billing health, and `billingCheckoutPaused=false`.
+- Annual checkout is enabled at Striver INR 500/year and Ranker INR 1250/year. Existing positive admin pricing remains authoritative.
+- Storage-warning credentials are absent from the GitHub release environment. Email delivery remains unverified and the required receipts continue to block permanent cleanup.
+- Real first/next bank cycles remain unverified; no customer charge was created by release verification.
 
 ## Live completion gate
 

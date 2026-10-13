@@ -15,7 +15,7 @@ Authority: approved-payment-scenarios.md, 47 owner decisions dated 13 October 20
 
 ## Status
 
-Phases 0–5 are implemented and published to the payment-rules branches. Phase 6 adds the complete scenario matrix, migration rehearsal, provider validation, source-specific health proof and a gated release workflow. See phase6-status.md for local evidence and the live completion gate; deployment must be confirmed from the workflow evidence rather than inferred from the published source.
+Phases 0–5 are implemented and published to the payment-rules branches. Phase 6 adds the complete scenario matrix, migration rehearsal, provider validation, source-specific health proof and a gated release workflow. See phase6-status.md for local evidence and the live completion gate; the production release succeeded in workflow 38387784711. Storage email setup and real-bank cycle evidence remain separate verification items.
 
 ## Release constraints
 
