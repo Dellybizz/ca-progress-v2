@@ -6,8 +6,8 @@ Authority: approved-payment-scenarios.md, 47 owner decisions dated 13 October 20
 | Phase | Scope | Scenario coverage | Completion gate |
 | --- | --- | --- | --- |
 | 0 | Preserve baseline, repository rule reference, versioned pure policy foundation | All 47 mapped below | Policy boundary tests; no live financial or deletion operations |
-| 1 | Dynamic admin pricing, monthly/yearly products, INR 500/1250 annual defaults, immutable quotes | 13–17, 24–27, 31, 38–40, 43 | Admin publish to UI to quote; existing contracts protected; yearly mapping verified |
-| 2 | Renewal grace, recovery windows, cancellation, reactivation, daily reminders | 3–5, 18, 21–23, 28–30, 42 | Time-travel tests and replayed verified provider invoices; cancellation race refunds |
+| 1 | Dynamic admin pricing, monthly/yearly products, INR 500/1250 annual defaults, immutable quotes, audited transition scheduling | 13–17, 24–27, 31, 38–40, 43 | Admin publish to UI to quote; existing contracts protected; yearly mapping verified |
+| 2 | Execute price-decrease/retirement jobs, approval grace, renewal recovery, cancellation, reactivation, reminders | 3–5, 18, 21–23, 28–30, 42 | Time-travel tests and replayed verified provider invoices; cancellation race refunds |
 | 3 | Changed-method retries, latest successful mandate, upgrades, mandate-first downgrade, frequency switches, routine refunds | 1–2, 6, 19–20, 32–33, 41 | Ownership, double-success/refund, failed replacement, mandate and payment verification tests |
 | 4 | Storage quota enforcement, seven-day warnings, important protection, ordered permanent cleanup | 7–12, 44–46 | Dry-run evidence, preview matches deletion, email dedupe, upgrade cancels queued cleanup |
 | 5 | Recurring gifts, recipient acceptance, higher-tier eligibility, dual cancellation | 34–37, 47 | Payer/recipient separation; no introductory discounts; verified activation |
@@ -15,7 +15,7 @@ Authority: approved-payment-scenarios.md, 47 owner decisions dated 13 October 20
 
 ## Status
 
-Phase 0 foundation implemented in this branch. Changed-payment-method retry restriction removed in backend and frontend as first Phase 3 slice. Remaining integrations are pending; pure policy functions alone do not change renewal or deletion behaviour.
+Phase 0 foundation is complete locally. Phase 1 commercial configuration and scheduling are implemented locally; see phase1-status.md. Changed-payment-method retries are also implemented as the first Phase 3 slice. Phase 2 must execute pending price-decrease and retirement jobs before release; storage cleanup and gifts remain pending. No live migration or deployment has run.
 
 ## Release constraints
 

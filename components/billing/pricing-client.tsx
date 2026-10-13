@@ -118,7 +118,7 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     const offer=offerFor(plan);
     if(!checkoutMatchesPolicy(plan,cycle,offer,selectedMethod))throw new Error('This plan is currently unavailable for checkout.');
     const candidate=pendingCheckout.current;
-    const retrySource=retryOfAttemptId??(candidate&&!candidate.accessGranted&&!candidate.retrySuperseded&&(candidate.planId!==plan.id||['uncertain','pending'].includes(candidate.state))&&['uncertain','provider_created','ready','pending'].includes(candidate.state)?candidate.attemptId:undefined);
+    const retrySource=retryOfAttemptId??(candidate&&!candidate.accessGranted&&!candidate.retrySuperseded&&(candidate.quoteExpired||candidate.planId!==plan.id||['uncertain','pending'].includes(candidate.state))&&['uncertain','provider_created','ready','pending'].includes(candidate.state)?candidate.attemptId:undefined);
     const startupStarted=performance.now();
     void loadCheckout();
       if(closingCheckout.current&&!retrySource){await closingCheckout.current;closingCheckout.current=null;}
@@ -136,6 +136,7 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
       }
       if(!response.ok){if(result.retryable)clearCheckoutIntent(localStorage,viewerId,input.requestId);throw new Error(result.error||'Payment could not start. Please try again.');}
       if(result.accessGranted){setRetryOfAttemptId(undefined);return result;}
+      if(result.quoteExpired)throw new Error('Your price quote expired. Review the current price and try again.');
       if(!result.subscriptionId)throw new Error("We are confirming your saved checkout. Billing will update automatically.");
       const expected=quoteForMethod({recurring:offer!.recurringPriceSubunits,intro:singleMandate?offer!.upgradeIntroPriceSubunits:offer!.introPriceSubunits,eligible:singleMandate||offer!.introEligible,trialDays:offer!.trialDays},singleMandate?"upi":selectedMethod);
       if(!result.campaignApplied&&(result.initialAmount!==expected.firstChargeSubunits||result.recurringAmount!==expected.recurringPriceSubunits))throw new Error("The existing checkout keeps its original price. Review and resume it below.");

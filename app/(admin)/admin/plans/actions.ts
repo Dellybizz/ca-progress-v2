@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireAdminCapability } from "@/lib/authorization/server";
 import { invokeBillingService } from "@/lib/billing/service-binding";
 import { saveMandateOfferBinding, saveDraftOfferBinding, savePolicyOfferTerms } from "@/lib/billing/commercial-policy";
-import { createPolicyDraft, createUserPromotion, grantEntitlementOverride, publishPolicy, savePolicyBasics, savePolicyFeature, savePolicyPage, scheduleUserPlanChange } from "@/lib/billing/granular-policy";
+import { savePlanAvailability, createPolicyDraft, createUserPromotion, grantEntitlementOverride, publishPolicy, savePolicyBasics, savePolicyFeature, savePolicyPage, scheduleUserPlanChange } from "@/lib/billing/granular-policy";
 const v=(d:FormData,k:string)=>String(d.get(k)??"").trim();
 const done=(notice:string,section="pricing")=>{revalidatePath("/admin/plans");revalidatePath("/pricing");redirect(`/admin/plans?section=${encodeURIComponent(section)}&notice=${encodeURIComponent(notice)}`);};
 export async function createPolicyDraftAction(d:FormData){const a=await requireAdminCapability("billing.plan.configure");await createPolicyDraft({planId:v(d,"planId"),reason:v(d,"reason"),actor:{userId:a.user.id,role:a.role}});done("Draft created");}
@@ -21,3 +21,5 @@ export async function validateProviderPolicyAction(d:FormData){const a=await req
 export async function saveDraftOfferBindingAction(d:FormData){const a=await requireAdminCapability("billing.plan.configure");await saveDraftOfferBinding({policyId:v(d,"policyId"),offerId:v(d,"offerId"),evidence:v(d,"evidence"),confirmed:d.get("confirmed")==="on",reason:v(d,"reason"),actor:{userId:a.user.id,role:a.role}});done("UPI offer dashboard evidence recorded; Razorpay must still validate the offer at authorisation");}
 
 export async function saveMandateOfferBindingAction(d:FormData){const a=await requireAdminCapability("billing.plan.configure");await saveMandateOfferBinding({allowRegularPriceFallback:d.get("allowRegularPriceFallback")==="on",policyId:v(d,"policyId"),method:v(d,"method"),offerId:v(d,"offerId"),evidence:v(d,"evidence"),confirmed:d.get("confirmed")==="on",reason:v(d,"reason"),actor:{userId:a.user.id,role:a.role}});done("Single-mandate offer binding saved; Razorpay validates it at checkout");}
+
+export async function savePlanAvailabilityAction(d:FormData){const a=await requireAdminCapability("billing.plan.configure");await savePlanAvailability({planId:v(d,"planId"),mode:v(d,"mode"),reason:v(d,"reason"),actor:{userId:a.user.id,role:a.role}});done("Plan availability saved; renewal transitions are queued for processing");}

@@ -1,0 +1,1 @@
+export function priceDecreaseStatements<T extends {bind(...values:unknown[]):T}>(db:{prepare(query:string):T},input:{planId:string;policyId:string;priceSubunits:number;actorId:string;reason:string;now:string}):T[];

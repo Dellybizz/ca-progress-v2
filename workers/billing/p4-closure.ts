@@ -1,3 +1,4 @@
+import {supportedMandate} from "../../lib/billing/mandate-schedule.mjs";
 import p4FinalWorker from "./p4-final";
 import {providerFetch} from "./provider-http";
 
@@ -118,7 +119,7 @@ export async function freezeUnsafeSubscriptionCreation(request: Request, env: En
     if (localTerminal !== providerTerminal) {
       return json({ error: "Checkout is frozen because local and Razorpay subscription states disagree. Reconcile the existing subscription before starting another.", code: "subscription_state_mismatch", localStatus, providerStatus }, 409);
     }
-    if (["created","authenticated"].includes(providerStatus) && Math.max(Number(local.total_count)||0,Number(providerState.total_count)||0)*Number(local.billing_duration_value||1)*(local.billing_duration_unit==="year"?12:1)>12) {
+    if (["created","authenticated"].includes(providerStatus) && !supportedMandate(local,providerState.total_count)) {
       return json({error:"This old mandate exceeds the supported duration. Close the unpaid setup in Billing, then start a fresh checkout.",code:"mandate_schedule_unsupported"},409);
     }
     if (!providerTerminal) {

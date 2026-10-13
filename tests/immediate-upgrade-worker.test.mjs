@@ -19,6 +19,8 @@ async function setup({direct=false,method='card',tier='pro'}={}){
  sql.exec("ALTER TABLE plan_policy_versions ADD COLUMN price_subunits INTEGER;ALTER TABLE plan_policy_versions ADD COLUMN currency TEXT;ALTER TABLE plan_policy_versions ADD COLUMN billing_duration_value INTEGER;ALTER TABLE plan_policy_versions ADD COLUMN name TEXT;ALTER TABLE plan_policy_versions ADD COLUMN grace_days INTEGER;INSERT INTO plan_policy_versions VALUES('pvpro','pro',15000,'INR',1,'Ranker',3);");
  sql.exec("INSERT INTO subscription_upgrade_offers(plan_id,intro_price_subunits,currency,state,version) VALUES('pro',5000,'INR','published',1);");
  sql.exec("UPDATE plan_policy_versions SET price_subunits=5000,currency='INR',billing_duration_value=1,name='Striver',grace_days=3 WHERE id='pv1'");
+ // This fixture's earlier Striver purchase is full-price and must preserve introductory eligibility.
+ f.sql.exec("UPDATE razorpay_subscriptions SET initial_price_subunits=5000,intro_billing_cycles=0,provider_offer_id=NULL");f.sub.offer_id=null;f.invoices[0].amount=5000;f.invoices[0].amount_paid=5000;f.payments.get('pay_1').amount=5000;
  await f.sync();sql.exec("UPDATE payment_subscription_cycles SET provider_mode='live';INSERT INTO razorpay_plan_mappings(id,policy_version_id,internal_plan_id,price_kind,provider_plan_id,period,interval_value,amount_subunits,currency,state) VALUES('mappingpro','pvpro','pro','recurring','plan_Pro','monthly',1,15000,'INR','ready');");
  f.env.RAZORPAY_KEY_ID='rzp_live_fixture';f.sub.notes={ca_progress_user_id:'user1'};let order=null,replacement=null,latePayment=null,lateInvoice=null;const calls=[];
  globalThis.fetch=async(url,init={})=>{
