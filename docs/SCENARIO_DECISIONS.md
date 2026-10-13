@@ -462,6 +462,20 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Handle name conflicts or invalid destination folders safely, without dropping references.
 - Status: Approved product specification; implementation not yet verified.
 
+## S0-036 — Student-controlled private file version history
+
+- Decision date: 2026-10-13
+- Product owner selection: **D — Student-controlled history**.
+- Trigger: A student edits their own private notes or files over time and wishes to inspect, restore, or manage earlier versions.
+- Policy: **Preserve private-file revisions by default**, subject to applicable storage quotas, and let students **delete selected past revisions** or **set their own version-retention limit**. Do not impose a mandatory automatic 20-version or 90-day limit on everyone.
+- Default behavior: Unless the student has chosen a retention limit, CA Progress must not silently purge historical private revisions for routine age-, count-, or storage-optimization reasons. Existing data must not be discarded without an authorized user retention/deletion action, except for separately authorized security, legal, or deletion lifecycle rules.
+- User controls: Provide per-file history with revision identification, restoration of a chosen earlier revision, selected-revision deletion, and configurable retention preferences. A restore must affect only that student's private editable copy, must not mutate its immutable publicly published snapshots (S0-FILE-IMMUTABLE-001), and must remain safe under the existing deletion/Trash rules.
+- Quota and capacity: Retained history counts toward applicable storage consumption according to a separately defined quota-accounting rule. At quota or device capacity exhaustion, do not automatically delete revisions to make room; handle the inability to save reliably and visibly under S0-010 and S0-030, offering user-directed cleanup instead.
+- Data model and deduplication: Revisions retain a stable association with their private file identity through renames and moves (S0-035). Reuse verified identical content safely using S0-034, with copy-on-write and reference-safe deletion; removing one revision must not corrupt another entry or snapshot.
+- Sync and permissions: Sync private version history and retention choices among authorized devices under S0-032 while keeping routine sync invisible (S0-SYNC-UI-001). Permit changes only by the student who owns the private file, subject to access rules; offline competing updates follow established conflict policies.
+- Details not decided here: Exact numeric user-selectable retention options, how to treat older revisions immediately after a student changes their limit, and history-storage accounting.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-036: How many past revisions of a privately editable file should remain available to restore?
+S0-037: What should CA Progress do when a student attempts to upload or open a corrupted or unsupported file?
