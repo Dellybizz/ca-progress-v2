@@ -94,8 +94,18 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Implementation guardrails: Show pending/synced/failed states accurately; avoid duplicate replay through idempotent operations; handle authorization/session expiry; do not automatically sync the retained queue under another identity. The actual encryption/key-retention approach and backup import format remain to be designed and tested.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-010 — Local storage full during offline editing
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Display an error**
+- Trigger: A student is editing offline and there is insufficient local device storage to safely save a new change.
+- Policy: Stop accepting or claiming successful saves that cannot be persisted, and promptly show a clear **Storage Full / Unable to Save** error informing the student that the latest change was not saved. Do not silently delete existing student data or cached files to free space under this rule.
+- Relationship to S0-009: Existing safely persisted unsynced data remains protected where technically possible; a new unsaved edit must not appear as safely queued or synced. Avoid falsely describing an in-memory draft as saved.
+- Undecided follow-ups: Whether the student should be offered an explicit retry button, export/copy of the currently unsaved text, or a storage-management shortcut; precise thresholds for early warnings. This choice does **not** approve automatic cleanup, forced deletion of existing content, or a promise that unsaved text survives app closure.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-010: When device storage is nearly full and an offline save cannot be safely persisted, how should the app protect the student's work?
+S0-011: When queued offline changes fail to synchronize because the server is temporarily unavailable or a request fails, should CA Progress retry automatically, require manual retry, or combine both?
 
 
