@@ -158,8 +158,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Presentation: Routine background synchronization remains silent per S0-SYNC-UI-001. The user must not be misled into thinking a denied write changed the server file.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-015 — Discard offline edits rejected after access revocation
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Discard the edits**
+- Trigger: A student edits a shared file offline while their device still appears to permit editing, but the file owner's authorization revocation takes effect before the pending edit synchronizes.
+- Policy: The server must reject the unauthorized modification. On learning that access has been revoked, discard the affected unsynced local edits rather than retaining them for later replay or automatically turning them into a private copy. Do not modify the restricted source file.
+- On regained access: Under S0-014, the student can edit again after access is legitimately restored, but the previously discarded offline edits are **not** automatically reinstated.
+- Precedence: This is an explicit permission-revocation exception to the general preservation of unsynced changes in S0-009, S0-011 and S0-014. It does not overturn S0-008 for separately eligible notes permanently deleted by their owner.
+- Presentation: Treat the rejection as an authorization outcome rather than a transient sync failure. Do not retry the rejected write automatically while access is absent. Routine synchronization remains background-only under S0-SYNC-UI-001. Any legally or technically necessary alert about inaccessible content is an independent decision.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-015: If the student edited a file offline while they still appeared to have access, but their access was revoked before the edit could sync, what should happen to that unsynced edit?
+S0-016: If a student's device is lost or stolen, should they be able to remotely revoke that device's session and locally stored access to their CA Progress data?
 
 
