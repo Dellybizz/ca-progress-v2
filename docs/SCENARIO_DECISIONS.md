@@ -350,8 +350,19 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Presentation: Execute authorization reconciliation and cache cleanup silently in the background under S0-SYNC-UI-001.
 - Status: Approved for product specification; implementation not yet verified.
 
+## S0-028 — Automatic protected offline viewing of restricted private shares
+
+- Decision date: 2026-10-13
+- Product owner final selection: **A — Always allow offline viewing** (the later A selection supersedes an earlier B selection in the conversation).
+- Trigger: A recipient is permitted to view a privately shared file, but the sender has disabled downloading, private saving and chapter tagging. The recipient opens the file online and later reads it offline.
+- Policy: CA Progress **automatically maintains a protected temporary in-app cache for offline reading of authorized files**, even when the sender prohibits normal downloads, permanent private saving and chapter tagging. The recipient does not need a separate offline-viewing toggle from the sender. This temporary cache is not a student-owned independent file.
+- Enforcement: The cache must not enable an ordinary download/export, creation of a private permanent copy, unauthorized chapter attachment, or modifications of the original. Share permissions and server-side access checks remain effective whenever the device is online.
+- Revocation: When reconnection confirms that the recipient no longer has any valid access route, the app silently deletes the temporary original-file cache according to S0-027. An entirely disconnected device may continue to have its previously cached content until it reconnects, which cannot be instantaneously revoked.
+- Security: Use protected app storage and isolate files by account. Offline capability does not promise technical prevention of screenshots, copying from the screen, or other external capture.
+- Status: Approved for product specification; implementation not yet verified.
+
 ## Next pending scenario
 
-S0-028: For a privately shared view-only file whose owner forbids saving/downloading, should the recipient still be allowed to temporarily cache it for offline reading while access remains valid?
+S0-029: When CA Progress caches a file for offline reading, how should it handle a newer version published by the original owner while the student's device is offline?
 
 
