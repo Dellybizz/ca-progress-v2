@@ -3,14 +3,15 @@ import {SetupEntry as OnboardingWizard} from "@/components/auth/onboarding/setup
 import {getSetupState} from "@/lib/profile/setup-state";
 import {resumeLegacySetup,reconcileSavedSetup} from "@/lib/profile/setup-contract";
 import { getProfileForUser, loadAttemptOptions, optionalUser } from "@/lib/auth/server";
-import { loginPathFor, sanitizeReturnPath } from "@/lib/auth/navigation";
+import {setupWorkspaceDestination} from '@/lib/profile/setup-review';
+import { loginPathFor } from "@/lib/auth/navigation";
 import { getOnboardingPreparationState } from "@/lib/profile/onboarding-experience";
 
 export const dynamic = "force-dynamic";
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
-  const next = sanitizeReturnPath(typeof params.next === "string" ? params.next : null, "/planner/today");
+  const next = setupWorkspaceDestination(typeof params.next === "string" ? params.next : null);
   const user = await optionalUser();
   if (!user) redirect(loginPathFor(`/onboarding?next=${encodeURIComponent(next)}`));
   const profile=await getProfileForUser(user.id);
