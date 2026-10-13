@@ -101,8 +101,13 @@ try {
   if ((!httpRedirect&&!streamingRedirect)||/<input[^>]*autoComplete="new-password"/i.test(resetHtml))throw new Error(`Reset without proof did not safely return to recovery (status ${reset.status}).`);
   const unverifiedReset=await fetch(`${base}/api/v1/password-recovery`,{method:"POST",headers:{...headers("desktop"),"Content-Type":"application/json",origin:base},body:JSON.stringify({password:"synthetic-only-password-12"})});
   if(unverifiedReset.status!==403)throw new Error("Unverified password reset was not rejected.");
-  const unverifiedSetup=await fetch(`${base}/api/v1/onboarding`,{method:'POST',headers:{...headers('desktop'),'Content-Type':'application/json',origin:base},body:JSON.stringify({schemaVersion:2,ownerId:'another-account',action:'draft',revision:0,draft:{schemaVersion:2,step:'intro'}})});
-  if(![401,409].includes(unverifiedSetup.status))throw new Error('Setup must reject an unauthenticated or mismatched account owner.');
+  const setupBody=JSON.stringify({schemaVersion:2,ownerId:'another-account',action:'draft',revision:0,draft:{schemaVersion:2,step:'intro'}});
+  // Test account authorization separately from Origin validation: the local
+  // OpenNext adapter can reconstruct the request with its internal origin.
+  const unverifiedSetup=await fetch(`${base}/api/v1/onboarding`,{method:'POST',headers:{...headers('desktop'),'Content-Type':'application/json'},body:setupBody});
+  if(![401,409].includes(unverifiedSetup.status))throw new Error(`Setup must reject an unauthenticated or mismatched account owner (status ${unverifiedSetup.status}: ${(await unverifiedSetup.text()).slice(0,300)}).`);
+  const crossSiteSetup=await fetch(`${base}/api/v1/onboarding`,{method:'POST',headers:{...headers('desktop'),'Content-Type':'application/json',origin:'https://invalid.example','sec-fetch-site':'cross-site'},body:setupBody});
+  if(crossSiteSetup.status!==403)throw new Error(`Cross-site setup mutation was not rejected (status ${crossSiteSetup.status}).`);
   const oauthFailure = await fetch(`${base}/auth/google?next=%2F%2Fevil.example`, { redirect: "manual", headers: headers("desktop") });
   if (oauthFailure.status >= 500) throw new Error(`OAuth failure path returned ${oauthFailure.status}`);
   const webhook = await fetch(`${base}/api/payments/webhook`, { method: "POST", headers: headers("desktop"), body: "{}" });
