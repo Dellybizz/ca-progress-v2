@@ -222,11 +222,22 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - After sharing: Do not provide a separate edit-permission configuration or change/revoke control on an already-shared file under this policy. Whether ending an entire share or creating a new share invitation is supported is a different decision, not implied by this rule.
 - Ownership: Only the source publisher/owner (or authorized administrators where applicable) may change the shared original. A recipient with edit access can modify only their own version, never the canonical shared original or anyone else's version, consistent with S0-017.
 - Security: The backend enforces the permission selected at sharing. An unauthorized recipient cannot bypass view-only by using an API, cached copy, or offline replay.
-- Open items: Whether the shared file itself can subsequently be unshared/revoked entirely; what happens to pre-existing personal versions if the original share is removed or the original deleted; separate treatment of access granted to different recipients.
+- Open items: Exact UI/workflow for unsharing the original, and recipient-by-recipient withdrawal. Under S0-019, already-created personal versions survive ordinary withdrawal or deletion of the original.
 - Status: Approved product policy; implementation not yet verified.
+
+## S0-019 — Personal copies survive withdrawal of original sharing
+
+- Decision date: 2026-10-13
+- Product owner selection: **B — Keep personal versions**
+- Trigger: The publisher stops sharing the original source file or deletes the original after a permitted recipient has already created a personal version.
+- Policy: The recipient loses access to the original shared file, but **retains their previously created personal version** with its content, highlights, notes, personal edit rights, and personal restore/version-history rights. Do not delete, disable editing on, or overwrite the student's existing owned personal copy merely because the publisher withdrew the original.
+- Separation: A personal version is independently owned by its recipient once lawfully created. Do not re-grant access to the withdrawn/deleted original or permit edits to the publisher's source file. Any future source updates or downloads require valid current permission.
+- Interaction with S0-014/S0-015: Revocation denies writes to the shared source and disallows creation of new copies from inaccessible source content. It does **not** revoke ownership or personal editing of copies already lawfully created. Pending unauthorized writes targeting the revoked source still follow S0-015.
+- Exceptions requiring separate design: Administrator-imposed legal/compliance removal, unlawful content, and emergency security takedown; ordinary share withdrawal alone is not grounds for deleting a student's independent personal copy.
+- Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
 
-S0-019: If the owner stops sharing the original file entirely (or deletes it), what happens to recipients' personal versions that were created while access was allowed?
+S0-020: May a student share their edited personal version with other people, creating a new share whose recipients can only view or edit their own copies?
 
 
