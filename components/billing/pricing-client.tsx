@@ -119,7 +119,6 @@ function WebPricingClient({plans,entitlements,authenticated,currentPlanId,offers
     if(!checkoutMatchesPolicy(plan,cycle,offer,selectedMethod))throw new Error('This plan is currently unavailable for checkout.');
     const candidate=pendingCheckout.current;
     const retrySource=retryOfAttemptId??(candidate&&!candidate.accessGranted&&!candidate.retrySuperseded&&(candidate.planId!==plan.id||['uncertain','pending'].includes(candidate.state))&&['uncertain','provider_created','ready','pending'].includes(candidate.state)?candidate.attemptId:undefined);
-    if(retrySource&&candidate&&candidate.paymentMethod!==selectedMethod)throw new Error('Use the original payment method while retrying an unconfirmed payment.');
     const startupStarted=performance.now();
     void loadCheckout();
       if(closingCheckout.current&&!retrySource){await closingCheckout.current;closingCheckout.current=null;}
