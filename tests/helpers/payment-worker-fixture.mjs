@@ -1,6 +1,6 @@
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
-export function fixture(worker,{introMigration=true}={}){
+export function fixture(worker,{introMigration=true,ownerRecoveryMigration=true}={}){
  const sql=new DatabaseSync(':memory:');
  sql.exec(`CREATE TABLE app_users(user_id TEXT PRIMARY KEY);INSERT INTO app_users VALUES('user1');CREATE TABLE subscription_plans(id TEXT PRIMARY KEY,tier_key TEXT,billing_cycle TEXT,currency TEXT);INSERT INTO subscription_plans VALUES('basic','basic','monthly','INR');CREATE TABLE uploaded_resources(id TEXT PRIMARY KEY);CREATE TABLE plan_policy_versions(id TEXT PRIMARY KEY,plan_id TEXT);INSERT INTO plan_policy_versions VALUES('pv1','basic');CREATE TABLE _ca_schema_migrations(version TEXT PRIMARY KEY,description TEXT,source_freeze_commit TEXT);
  CREATE TABLE user_subscriptions(id TEXT PRIMARY KEY,user_id TEXT,plan_id TEXT,status TEXT,starts_at TEXT,ends_at TEXT,source TEXT,source_order_id TEXT,source_payment_id TEXT,created_at TEXT,updated_at TEXT);
@@ -27,6 +27,8 @@ export function fixture(worker,{introMigration=true}={}){
  sql.exec(`CREATE TABLE payment_order_offer_snapshots(payment_order_id TEXT PRIMARY KEY,intro_applied INTEGER,charged_price_subunits INTEGER,recurring_price_subunits INTEGER);`);
  sql.exec(readFileSync('d1/migrations/0085_student_introductory_history.sql','utf8'));
  sql.exec(readFileSync('d1/migrations/0087_commercial_policy_transitions.sql','utf8'));
+ sql.exec(readFileSync('d1/migrations/0073_payment_system_p5_recovery.sql','utf8'));
+ if(ownerRecoveryMigration)sql.exec(readFileSync('d1/migrations/0088_owner_renewal_recovery.sql','utf8'));
  const db={prepare(query){return {values:[],bind(...values){this.values=values;return this;},async first(){return sql.prepare(query).get(...this.values)??null;},async all(){return {results:sql.prepare(query).all(...this.values)};},async run(){return {success:true,meta:{changes:Number(sql.prepare(query).run(...this.values).changes)}};}};},async batch(statements){sql.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());sql.exec('COMMIT');return results;}catch(error){sql.exec('ROLLBACK');throw error;}}};
  const now=Math.floor(Date.now()/1000),start=now-3600,end=now+86400;
  const sub={id:'sub_1',plan_id:'plan_1',offer_id:'offer_1',status:'active',paid_count:1,total_count:12,current_start:start,current_end:end,remaining_count:11};

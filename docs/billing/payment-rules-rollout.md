@@ -15,7 +15,7 @@ Authority: approved-payment-scenarios.md, 47 owner decisions dated 13 October 20
 
 ## Status
 
-Phase 0 foundation is complete locally. Phase 1 commercial configuration and scheduling are implemented locally; see phase1-status.md. Changed-payment-method retries are also implemented as the first Phase 3 slice. Phase 2 must execute pending price-decrease and retirement jobs before release; storage cleanup and gifts remain pending. No live migration or deployment has run.
+Phases 0–2 are implemented locally; see phase1-status.md and phase2-status.md for scope and validation. Phase 2 executes price-decrease/retirement jobs and renewal recovery boundaries. Changed-payment-method retries are also implemented as the first Phase 3 slice. Remaining Phase 3 work, storage cleanup, gifts and release verification remain pending. No live migration or deployment has run.
 
 ## Release constraints
 

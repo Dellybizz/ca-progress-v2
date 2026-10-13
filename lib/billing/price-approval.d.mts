@@ -1,0 +1,2 @@
+import type {CheckoutInput} from './checkout-engine.mjs';
+export function priceApproval<S>(db:{prepare(q:string):S},user:string,input:CheckoutInput):Promise<Record<string,unknown> & {terms:{planId:string;tierKey:string;billingCycle:'monthly'|'annual';name:string;policyVersionId:string;recurringPrice:number;currency:string;durationValue:number;durationUnit:'month'|'year';trialDays:number;graceDays:number;introPrice:null;introCycles:number;introProviderOfferId:null;introOfferVerified:boolean;cancellationMode:'period_end'}}>;

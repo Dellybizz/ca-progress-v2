@@ -13,9 +13,9 @@ Status: local implementation and checks complete for commercial configuration/sc
 - Admin availability choices: enabled, stop new purchases only, or retire and schedule stopping renewals. Checkout availability changes immediately; paid access is not removed. Audited retirement jobs retain paid expiry.
 - Published price decreases schedule idempotent renewal-date jobs with ten-day approval grace. Existing provider price snapshots are not rewritten; increases never create repricing jobs. Superseded unpublished execution plans cannot silently charge a newer higher price. Admin can inspect queued transitions.
 
-## What Phase 2 must execute before release
+## Phase 2 execution dependency
 
-Commercial jobs are scheduling records, not completed provider operations. Price-decrease fresh-mandate approval, stopping old renewal, ten-day approval grace, plan-retirement cancellations, notifications, scheduled-publication jobs, and access projection require worker execution in Phase 2. Do not advertise pending jobs as applied and do not publish this intermediate branch as the full policy rollout.
+Phase 1 created scheduling records rather than provider operations. Phase 2 now implements fresh-mandate lower-price approval, stopping old renewal, ten-day approval grace, retirement cancellations, scheduled-publication jobs and access projection; see phase2-status.md. Pending jobs are not displayed as completed provider operations. Both phases remain local until release verification and deployment.
 
 Feature additions/reductions, storage handling, gifts and switching follow their subsequent phase gates. Existing long-running mandates cannot silently be stretched; any replacement needs approval.
 

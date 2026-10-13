@@ -61,3 +61,14 @@ export async function saveMandateOfferBinding(input:{allowRegularPriceFallback?:
  database.prepare(`INSERT INTO admin_audit_events(id,actor_user_id,actor_role,capability,action,target_type,target_id,reason,previous_value,new_value,trace_id,reversible,created_at) VALUES(?1,?2,?3,'billing.plan.configure','plan.mandate_offer.bind','plan_policy_version',?4,?5,?6,?7,?8,1,?9)`).bind(crypto.randomUUID(),input.actor.userId,input.actor.role,row.id,input.reason,JSON.stringify(previous),JSON.stringify(next),crypto.randomUUID(),now)
  ]);if(results.some(r=>r.success===false))throw new Error('Offer binding could not be saved.');
 }
+
+export type PendingPriceChange={jobId:string;planId:string;policyVersionId:string;priceSubunits:number;billingCycle:string;effectiveAt:string;graceUntil:string;approved:boolean};
+export async function getPendingPriceChange():Promise<PendingPriceChange|null>{
+ const user=await optionalUser();if(!user)return null;
+ const row=await db().prepare(`SELECT j.*,s.plan_id,s.billing_cycle,r.provider_subscription_id replacement_id,n.status replacement_status FROM subscription_policy_change_jobs j
+ JOIN razorpay_subscriptions s ON s.id=j.source_subscription_id LEFT JOIN commercial_checkout_replacements r ON r.job_id=j.id
+ LEFT JOIN razorpay_subscriptions n ON n.provider_subscription_id=r.provider_subscription_id
+ WHERE j.user_id=?1 AND j.kind='price_decrease' AND j.state='awaiting_approval' AND NOT EXISTS(SELECT 1 FROM plan_availability_policies availability WHERE availability.plan_id=s.plan_id AND availability.mode='retire') ORDER BY j.created_at DESC LIMIT 1`).bind(user.id).first<Row>();
+ if(!row)return null;
+ return{jobId:String(row.id),planId:String(row.plan_id),policyVersionId:String(row.target_policy_id),priceSubunits:Number(row.target_price_subunits),billingCycle:String(row.billing_cycle),effectiveAt:String(row.effective_at),graceUntil:new Date(Date.parse(String(row.effective_at))+Number(row.approval_grace_days)*86400000).toISOString(),approved:['authenticated','active','pending','halted'].includes(String(row.replacement_status))};
+}
