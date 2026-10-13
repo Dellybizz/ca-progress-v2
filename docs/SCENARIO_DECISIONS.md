@@ -27,7 +27,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Trigger: An eligible item remains in Trash when its 30-day recovery window ends.
 - Policy: Permanently delete the expired item automatically after 30 days, without an additional reminder, warning, or confirmation request.
 - Relationship to earlier decisions: S0-001 and S0-002 provide the 30-day Trash window and recovery for eligible data, including deleted student-created folders and their contents. This decision defines the end-of-window behavior.
-- Remaining questions: Expiration timestamp/timezone and processing cadence; behavior for legal retention or disaster-recovery backups; nested-item expiration and restoration edge cases; treatment of offline devices that reconnect after purge.
+- Remaining questions: Expiration timestamp/timezone and processing cadence; behavior for legal retention or disaster-recovery backups; nested-item expiration and restoration edge cases. Under S0-008/S0-CONFLICT-006, a genuine offline edit to an ordinarily purged note becomes a new recovered note, **not** a restoration of the erased original; specifically prohibited content cannot be recreated.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## S0-004 — Student-initiated permanent deletion before Trash expiry
@@ -37,7 +37,7 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Trigger: A student wants to permanently remove eligible items from Trash before the normal 30-day expiry.
 - Policy: Provide **Delete Permanently** for individual eligible items and **Empty Trash** for all eligible Trash items. Both actions require a clear confirmation popup informing the student that the content cannot be restored through Trash.
 - Relationship to earlier decisions: S0-001 and S0-002 still move eligible deleted data to Trash by default; S0-003 still removes expired items automatically after 30 days without a further warning.
-- Guardrails / pending details: Permanent deletion is limited to items the authenticated student is authorized to erase. Official ICAI academic source records or independently protected records are not made deletable by this decision. Offline execution, server-confirmation, duplicate requests, cascading deletion, backups/legal retention, and failure messaging must be defined during implementation; do not falsely display successful permanent deletion before it is committed.
+- Guardrails / pending details: Permanent deletion is limited to items the authenticated student is authorized to erase. Official ICAI academic source records or independently protected records are not made deletable by this decision. **Ordinary Delete Permanently does not suppress recovery of genuine edits independently made on an offline device; S0-008 and S0-CONFLICT-006 allow those edits to become a new note while leaving the original erased.** A specific authorized legal/security removal barring re-creation is a different action. Offline execution, server-confirmation, duplicate requests, cascading deletion, backups/legal retention, and failure messaging must be defined during implementation; do not falsely display successful permanent deletion before it is committed.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## S0-005 — Editing a trashed item is recovery
@@ -76,9 +76,9 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Decision date: 2026-10-13
 - Product owner selection: **C — Automatically create a new note**
 - Trigger: The student permanently deletes a note on one device while another device retains an offline copy, edits it while offline, then reconnects to synchronize.
-- Policy: The permanently deleted original remains deleted. Automatically preserve the offline device's new edits as a **separate newly created note** rather than discarding them, prompting for recovery, or reviving the original item.
+- Policy: For an **ordinary student-initiated permanent deletion** (including Delete Permanently or Trash expiration), the original remains deleted and genuine later-offline edits are recovered automatically as a **separate newly created note**. This must **not** recreate content when a specifically authorized, enforceable security or legal removal prohibits its reintroduction (S0-CONFLICT-006). Do not revive the original item.
 - Presentation: Make the new recovered note identifiable to the student without requiring a blocking approval step. Its new identity must not reuse the erased original ID.
-- Precedence: Unlike S0-005 (edits to an item still in Trash restore the original), this applies only when permanent deletion has already occurred under S0-003/S0-004.
+- Precedence: Unlike S0-005 (editing an item still in Trash restores the original), this applies when ordinary permanent deletion occurred under S0-003/S0-004. A verified, scoped security/legal prohibition on recovery takes precedence (S0-CONFLICT-006), without changing ordinary student deletion rights.
 - Safeguards / details to define: Confirm the queued offline content contains genuine edits; ensure one recovered note per unique offline change (idempotency); do not expose permanently deleted content from server storage; preserve edits available on the offline device; handle permanent deletion of folders and non-note record types separately; avoid repeating creation on reconnect/retries.
 - Status: Approved for product specification; implementation not yet verified.
 
@@ -534,6 +534,17 @@ Scope: website and APK scenarios. Onboarding and payment scenarios are excluded.
 - Privacy and history: These are revisions of the student's **private editable file**, not mutations of an immutable published original. File history preserves the competing content under S0-036, subject to explicit owner-chosen history-management actions. Internal unresolved markers may be recorded without exposing routine synchronization indicators.
 - Sync mechanics: Use version IDs/provenance, distinguish current view from preserved alternatives without falsifying chronology, keep retries idempotent, and silently reconcile metadata as far as possible. A student's explicit comparison/restore inside file history is an ordinary feature interaction, not a background sync popup.
 - Reconciliation: Clarifies S0-006, S0-007, S0-SYNC-UI-001 and S0-036. No revision to the user's approved general latest-edit-wins or invisible-background-sync decisions.
+- Status: Approved for product specification; implementation not yet verified.
+
+## S0-CONFLICT-006 — Offline recovery after ordinary deletion, not prohibited removal
+
+- Decision date: 2026-10-13
+- Product owner selection: **A — Recover ordinary deletions only**, conflict-resolution question 6 of 7.
+- Ordinary student deletion: If a student deletes a note permanently through **Delete Permanently** (S0-004) or its 30-day Trash window expires (S0-003), and another device independently made genuine edits while offline, **preserve the offline edits as one new recovered note per unique change** under S0-008. The original note remains permanently deleted with its old ID; do not resurrect it or silently reverse the student's delete action.
+- Authorized exceptional prohibition: If a specific, authenticated and appropriately authorized **security or legal removal order expressly prohibits reintroducing that content**, do **not** create a recovered note containing the prohibited content. Do not treat routine share revocation, ordinary file deletion, or an unverified administrative request as such an exceptional prohibition.
+- Enforcement: Resolve the operation's deletion reason and target before replaying pending offline writes. When recovery is allowed, use a new ID, content-preserving idempotency and separate ownership; never fetch erased original data from server storage. When prohibited, enforce the narrowly scoped restriction without sending prohibited content back into active cloud storage or re-sharing it.
+- Reconciliation: Clarifies S0-003, S0-004 and S0-008 without narrowing ordinary student-controlled deletion recovery, and does not alter existing private-copy protection on ordinary share withdrawal (S0-019/S0-CONFLICT-001).
+- Unresolved legal/security implementation: Authorizing entities, proof/audit of removal orders, handling retained local prohibited copies on offline devices, and student notification/appeals must be specified before production; this entry does not authorize arbitrary administrative content destruction.
 - Status: Approved for product specification; implementation not yet verified.
 
 ## Next pending scenario
