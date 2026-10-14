@@ -23,6 +23,10 @@ export async function POST(request: Request) {
   const database: HotD1Database = getHotD1Database();
   const intent = await database.prepare("SELECT id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at,status FROM r2_upload_intents WHERE id=?1 LIMIT 1").bind(uploadId).first() as Record<string, unknown> | null;
   if (!intent || intent.user_id !== identity.id) return fail("Upload not found.", 404, "UPLOAD_NOT_FOUND");
+  if (intent.status === "completed") {
+    const existing = await database.prepare("SELECT id,moderation_status FROM uploaded_resources WHERE owner_user_id=?1 AND storage_path=?2 LIMIT 1").bind(identity.id,String(intent.object_key)).first<{id:string;moderation_status:string}>();
+    if (existing) return NextResponse.json({id:existing.id,status:existing.moderation_status,storage:RESOURCE_R2_STORAGE_BUCKET,processing:"queued"},{headers:{"Cache-Control":"private, no-store"}});
+  }
   if (intent.status !== "issued") return fail("This upload has already been completed or closed.", 409, "UPLOAD_NOT_ACTIVE");
   if (Date.parse(String(intent.expires_at)) <= Date.now()) {
     await database.prepare("UPDATE r2_upload_intents SET status='abandoned' WHERE id=?1").bind(uploadId).run();

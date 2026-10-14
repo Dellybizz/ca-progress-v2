@@ -44,6 +44,7 @@
 @import "./styles/floating-navigation.css";
 @import "./styles/student-profile.css";
 @import "./styles/resource-hub.css";
+@import "./styles/file-manager.css";
 
 .offline-workspace { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .offline-controls { padding: 16px 0; border-block: 1px solid var(--border, #e5e7eb); margin-bottom: 16px; }

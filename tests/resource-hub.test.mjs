@@ -8,7 +8,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 const dir=await mkdtemp(path.join(process.cwd(),'.resource-hub-test-'));
 let compiled;
 try {
-  const result=await build({stdin:{contents:"export * from './lib/resources/navigation';export * from './lib/resources/library-list';export * from './components/resources/resource-hub-tabs';export * from './components/icai/resource-browser';export {shellNavigation,routeIsActive} from './components/shell/navigation-contract';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'esm',platform:'node',jsx:'automatic',external:['react'],plugins:[{name:'next-link',setup(b){b.onResolve({filter:/^next\/link$/},()=>({path:'link',namespace:'mock'}));b.onLoad({filter:/.*/,namespace:'mock'},()=>({contents:"import React from 'react';export default function Link({prefetch,...props}){return React.createElement('a',props)}"}));}}]});
+  const result=await build({stdin:{contents:"export * from './lib/resources/navigation';export * from './lib/resources/library-list';export * from './components/resources/resource-hub-tabs';export * from './lib/resources/file-manager';export * from './components/resources/file-manager';export {sampleManagerFiles} from './components/resources/resource-layout-sample';export * from './components/icai/resource-browser';export {shellNavigation,routeIsActive} from './components/shell/navigation-contract';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'esm',platform:'node',jsx:'automatic',external:['react'],plugins:[{name:'next-link',setup(b){b.onResolve({filter:/^next\/navigation$/},()=>({path:'nav',namespace:'nav-mock'}));b.onLoad({filter:/.*/,namespace:'nav-mock'},()=>({contents:"export const usePathname=()=>'/resources';export const useRouter=()=>({refresh(){}});"}));b.onResolve({filter:/^next\/image$/},()=>({path:'image',namespace:'image-mock'}));b.onLoad({filter:/.*/,namespace:'image-mock'},()=>({contents:"import React from 'react';export default function Image({fill,unoptimized,priority,...props}){return React.createElement('img',props)}"}));b.onResolve({filter:/^next\/link$/},()=>({path:'link',namespace:'mock'}));b.onLoad({filter:/.*/,namespace:'mock'},()=>({contents:"import React from 'react';export default function Link({prefetch,...props}){return React.createElement('a',props)}"}));}}]});
   const file=path.join(dir,'compiled.mjs');await writeFile(file,result.outputFiles[0].text);compiled=await import('file://'+file);
 } finally {await rm(dir,{recursive:true,force:true});}
 test('legacy resource destinations retain academic and community context without pinning the wrong tab',()=>{
@@ -37,5 +37,23 @@ test('embedded ICAI browser keeps source provenance, search and canonical tab fo
   const resources=Array.from({length:30},(_,i)=>({id:String(i),title:`Material ${i}`,summary:null,type:'rtp',status:'current',officialUrl:'https://icai.org/material',sourceUrl:'https://icai.org',sourceName:'ICAI',firstSeenAt:'2026-01-01',lastVerifiedAt:'2026-10-14',levelCodes:['intermediate'],attemptKeys:['2027-01'],subjects:[]}));
   const catalog={resources,events:[],levels:[{code:'intermediate',name:'Intermediate'}],subjects:[],attempts:[],filters:{level:'intermediate',attempt:'2027-01',subject:'',type:''},verifiedAt:null};
   const html=renderToStaticMarkup(React.createElement(compiled.IcaiResourceBrowser,{catalog,embedded:true,scopeLocked:true}));
-  assert.doesNotMatch(html,/<h1/);assert.match(html,/action="\/resources"/);assert.match(html,/name="tab" value="icai"/);assert.match(html,/Search ICAI resources/);assert.match(html,/First seen/);assert.match(html,/Source page/);assert.equal((html.match(/Open official resource/g)||[]).length,24);assert.match(html,/6 remaining/);
+  assert.match(html,/<h1>ICAI files<\/h1>/);assert.match(html,/action="\/resources"/);assert.match(html,/name="tab" value="icai"/);assert.match(html,/Search files/);assert.equal((html.match(/aria-label="Preview Material /g)||[]).length,24);assert.match(html,/1–24 of 30/);
+});
+test('file types and multi-key sorting retain unknown sizes and stable original data',()=>{
+  const files=compiled.sampleManagerFiles;
+  assert.equal(compiled.fileKind('application/pdf',''),'pdf');assert.equal(compiled.fileKind('image/png',''),'image');assert.equal(compiled.fileKind('application/vnd.openxmlformats-officedocument.wordprocessingml.document','docx'),'document');
+  const sorted=compiled.sortFiles(files,'size','desc','name');assert.equal(sorted[0].id,'pdf');assert.equal(sorted.at(-1).size,null);assert.equal(files[0].id,'note');
+  assert.equal(compiled.sortFiles(files,'name','asc')[0].id,'note');
+  const official=compiled.officialFiles([{id:'icai',title:'Official',officialUrl:'https://icai.org/file.pdf?x=1',subjects:[],lastChangedAt:'',lastVerifiedAt:'2026-10-14',firstSeenAt:'2026-10-01',sourceName:'ICAI',sourceUrl:'https://icai.org',type:'rtp',status:'active'}])[0];
+  assert.equal(official.kind,'pdf');assert.equal(official.previewUrl,undefined);assert.equal(official.firstSeenAt,'2026-10-01');
+});
+test('CSV exports selected metadata safely without URLs or spreadsheet formulas',()=>{
+  const csv=compiled.filesCsv([{...compiled.sampleManagerFiles[0],name:'=SUM(A1:A2)',owner:'A, "B"'}]);
+  assert.match(csv,/'=SUM/);assert.match(csv,/A, ""B""/);assert.doesNotMatch(csv,/https:|\/api\/|storage_path/);
+});
+test('grid list and compact layouts expose accessible previews and identifiable file types',()=>{
+  for(const layout of ['grid','list','compact']){
+    const html=renderToStaticMarkup(React.createElement(compiled.FileManager,{files:compiled.sampleManagerFiles,title:'My files',initialLayout:layout,preview:true}));
+    assert.match(html,new RegExp(`fm-files--${layout}`));assert.match(html,/Select visible files/);assert.match(html,/Preview Framework mind map/);assert.match(html,/\/resources-preview\/study-diagram.svg/);assert.match(html,/DOCX/);assert.match(html,/PDF/);assert.doesNotMatch(html,/YOUR STUDY WORKSPACE|Notes, files and official material, together/);
+  }
 });

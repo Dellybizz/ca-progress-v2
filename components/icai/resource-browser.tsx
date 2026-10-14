@@ -1,5 +1,7 @@
 "use client";
 
+import {FileManager} from "@/components/resources/file-manager";
+import {officialFiles} from "@/lib/resources/file-manager";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -61,46 +63,7 @@ export function IcaiResourceBrowser({
   const matchingAttempts = level
     ? catalog.attempts.filter((attempt) => attempt.levelCode === level)
     : [];
-  return (
-    <div className="icai-page">
-      {!embedded ? <><AcademicBreadcrumbs
-        items={[
-          { label: "Dashboard", href: "/dashboard" },
-          { label: "Resources", href: "/resources" },
-          { label: "ICAI" },
-        ]}
-      />
-      <section className="icai-hero">
-        <div>
-          <Badge tone="success">Official-source verified</Badge>
-          <h1>ICAI Resources</h1>
-          <p>
-            Browse verified ICAI and Board of Studies metadata with direct
-            official links. CA Progress does not mirror ICAI study-material
-            bodies.
-          </p>
-        </div>
-        <div className="icai-verified-panel">
-          <Icon name="shield" size={22} />
-          <span>
-            <strong>Last verified dataset</strong>
-            <small>
-              {catalog.verifiedAt
-                ? dateLabel(catalog.verifiedAt)
-                : "Awaiting first successful source sync"}
-            </small>
-          </span>
-        </div>
-      </section></> : null}
-
-      <AcademicContextBar
-        level={
-          catalog.levels.find((level) => level.code === catalog.filters.level)
-            ?.name ?? "All levels"
-        }
-        attempt={catalog.filters.attempt || null}
-      />
-
+  const filterForm = (
       <form className="icai-filters" method="get" action={embedded ? "/resources" : undefined}>
         {embedded ? <input type="hidden" name="tab" value="icai"/> : null}
         <label>
@@ -177,6 +140,49 @@ export function IcaiResourceBrowser({
           <span>Apply filters</span>
         </button>
       </form>
+  );
+  if (embedded) return <FileManager files={officialFiles(catalog.resources)} title="ICAI files" extraFilters={<details className="fm-official-filters"><summary>Academic & official filters</summary>{filterForm}{catalog.events.length ? <ul>{catalog.events.map(event=><li key={event.id}><a href={event.sourceUrl} target="_blank" rel="noreferrer">{dateLabel(event.eventDate)} · {event.title}</a></li>)}</ul> : null}</details>}/>;
+  return (
+    <div className="icai-page">
+      {!embedded ? <><AcademicBreadcrumbs
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Resources", href: "/resources" },
+          { label: "ICAI" },
+        ]}
+      />
+      <section className="icai-hero">
+        <div>
+          <Badge tone="success">Official-source verified</Badge>
+          <h1>ICAI Resources</h1>
+          <p>
+            Browse verified ICAI and Board of Studies metadata with direct
+            official links. CA Progress does not mirror ICAI study-material
+            bodies.
+          </p>
+        </div>
+        <div className="icai-verified-panel">
+          <Icon name="shield" size={22} />
+          <span>
+            <strong>Last verified dataset</strong>
+            <small>
+              {catalog.verifiedAt
+                ? dateLabel(catalog.verifiedAt)
+                : "Awaiting first successful source sync"}
+            </small>
+          </span>
+        </div>
+      </section></> : null}
+
+      <AcademicContextBar
+        level={
+          catalog.levels.find((level) => level.code === catalog.filters.level)
+            ?.name ?? "All levels"
+        }
+        attempt={catalog.filters.attempt || null}
+      />
+
+      {filterForm}
 
       <label className="resource-hub-official-search"><Icon name="search" size={18}/><input value={query} onChange={event=>{setQuery(event.target.value);setLimit(24);}} aria-label="Search ICAI resources" placeholder="Search official titles, subjects or descriptions"/></label>
 

@@ -120,13 +120,15 @@ export async function getResourceLibraryModel({ includeOfficial = true }: { incl
   const identity = { id: context.userId };
 
   const client = await createD1ServerClient();
-  const [names, tagsByNote, rows, subjects, officialResources] = await Promise.all([
+  const [names, tagsByNote, rows, subjects, officialResources, importanceRows] = await Promise.all([
     nameMaps(client),
     tagsForOwnNotes(client, identity.id),
     getHotResourceLibraryRows(identity.id),
     getPhase6AcademicOptions(identity.id),
     includeOfficial ? getIcaiPublicCatalog({ level: context.selection.level, attempt: context.selection.attemptKey }).then(officialCards) : Promise.resolve([]),
+    getD1RuntimeDatabase().prepare("SELECT resource_id FROM resource_importance WHERE owner_user_id=?1").bind(identity.id).all<{resource_id:string}>(),
   ]);
+  const importantIds = new Set((importanceRows.results ?? []).map(row=>row.resource_id));
   const allNoteIds = [...rows.ownNotes, ...rows.sharedNotes].map((row) => row.id);
   const extras = await getPhase6NoteExtras(allNoteIds, identity.id);
   const subjectIds = new Set(context.subjectIds);
@@ -136,7 +138,7 @@ export async function getResourceLibraryModel({ includeOfficial = true }: { incl
     viewerName: context.displayName,
     subjects: subjects.filter((subject)=>subjectIds.has(subject.id)),
     myNotes: scoped(rows.ownNotes).map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id, extras.get(row.id))),
-    myUploads: scoped(rows.ownUploads).map((row) => uploadDto(row as UploadRow, names, identity.id)),
+    myUploads: scoped(rows.ownUploads).map((row) => ({...uploadDto(row as UploadRow, names, identity.id),important:importantIds.has(row.id)})),
     sharedNotes: scoped(rows.sharedNotes).map((row) => noteDto(row as NoteRow, names, [], identity.id, extras.get(row.id))),
     sharedUploads: scoped(rows.sharedUploads).map((row) => uploadDto(row as UploadRow, names, identity.id)),
     officialResources,

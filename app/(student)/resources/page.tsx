@@ -44,5 +44,5 @@ export default async function ResourcesPage({searchParams}:{searchParams:Promise
       <ResourceLibrary key={tab} model={model} initialTab={tab} hideTabs initialAcademicContext={{subjectId:param(params.subjectId),chapterId:param(params.chapterId)}} initialCommunityDraft={communityDraft}/>
     </> : <div className="resource-hub-guest"><LoginRequired next={resourceDestination(params,tab)} title="Sign in to open your library"/><p>Official study material is available without signing in. <Link href={resourceDestination(params,'icai')}>Browse ICAI resources →</Link></p></div>;
   }
-  return <div className="resource-hub"><header className="resource-hub-heading"><div><p className="eyebrow">Your study workspace</p><h1>Resources</h1><p>Notes, files and official material, together.</p></div><Link href="/updates">ICAI updates <span aria-hidden="true">↗</span></Link></header><ResourceHubTabs tab={tab} params={params}/>{content}</div>;
+  return <div className="resource-hub resource-workspace"><aside className="resource-workspace-sidebar"><div className="fm-sidebar-title"><span>Workspace</span></div><ResourceHubTabs tab={tab} params={params}/><Link href="/updates" className="fm-updates-link">ICAI updates ↗</Link></aside><div className="resource-workspace-content">{content}</div></div>;
 }
