@@ -3,6 +3,7 @@ import "server-only";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getCloudflareApplicationSession } from "./cloudflare";
 import { createPasswordHash, normalizeAccountUsername, validAccountUsername } from "./password";
+import { usernameFromName, availableUsernameSuggestionSql } from "./username-suggestion";
 
 export class AccountSetupError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -16,7 +17,7 @@ function database(): Database {
   return db;
 }
 
-export type AccountSetupState = { eligible: boolean; username: string | null; isTemporary: boolean; hasPassword: boolean };
+export type AccountSetupState = { eligible: boolean; username: string | null; suggestedUsername?: string; isTemporary: boolean; hasPassword: boolean };
 export async function getAccountSetupState(): Promise<AccountSetupState | null> {
   const session = await getCloudflareApplicationSession();
   if (!session) return null;
@@ -30,7 +31,15 @@ export async function getAccountSetupState(): Promise<AccountSetupState | null> 
     .bind(session.applicationUserId, session.sessionId)
     .first<{ username: string; is_temporary: number; has_password: number; verified_provider: number }>();
   if (!row) return { eligible: false, username: null, isTemporary: false, hasPassword: false };
-  return { eligible: row.verified_provider === 1 && row.is_temporary === 1 && row.has_password === 0,
+  const eligible = row.verified_provider === 1 && row.is_temporary === 1 && row.has_password === 0;
+  let suggestedUsername: string | undefined;
+  if (eligible) {
+    const base = usernameFromName(session.displayName);
+    const suggestion = await database().prepare(availableUsernameSuggestionSql)
+      .bind(base, session.applicationUserId).first<{ username: string }>();
+    suggestedUsername = suggestion?.username || base;
+  }
+  return { eligible, suggestedUsername,
     username: row.username, isTemporary: row.is_temporary === 1, hasPassword: row.has_password === 1 };
 }
 

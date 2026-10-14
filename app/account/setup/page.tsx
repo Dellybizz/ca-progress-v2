@@ -13,5 +13,5 @@ export default async function AccountSetupPage({ searchParams }: { searchParams:
   if (!session) redirect(loginPathFor("/account/setup"));
   const state = await getAccountSetupState();
   if (!state?.eligible || !state.username) return <div className="settings-v2-page"><h1>Account login</h1><p>Your initial setup is unavailable or already complete.</p><Link href="/settings">Open Settings</Link></div>;
-  return <AccountSetupForm assignedUsername={state.username} profileName={session.displayName} next={next === "/account/setup" ? "/dashboard" : next}/>;
+  return <AccountSetupForm assignedUsername={state.suggestedUsername || state.username} profileName={session.displayName} next={next === "/account/setup" ? "/dashboard" : next}/>;
 }
