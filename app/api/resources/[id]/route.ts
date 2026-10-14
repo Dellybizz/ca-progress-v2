@@ -18,7 +18,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const title = cleanText(body.title, 160);
   if (!title) return NextResponse.json({ error: "A resource title is required." }, { status: 400 });
-  const description = cleanText(body.description, 4000) || null;
+  const description = Object.hasOwn(body,"description") ? cleanText(body.description, 4000) || null : undefined;
   const subjectId = nullableId(body.subjectId);
   const chapterId = nullableId(body.chapterId);
   const visibility = body.visibility === "shared" ? "shared" : "private";

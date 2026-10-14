@@ -12,3 +12,5 @@
 .fm-trash-note{color:var(--color-text-muted);font-size:13px;margin:8px 0 18px}
 .fm-server-workspace .ui-dialog form{display:grid;gap:16px}.fm-server-workspace .ui-dialog label{display:grid;gap:6px}.fm-server-workspace .ui-dialog input,.fm-server-workspace .ui-dialog select{padding:10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text)}
 @media(max-width:600px){.fm-file-views{flex-wrap:nowrap;overflow:auto;padding-bottom:5px}.fm-file-views button{white-space:nowrap}.fm-real-folders{grid-template-columns:repeat(2,minmax(0,1fr))}.fm-folder-tools{gap:6px}.fm-folder-tools button{font-size:12px}}
+
+.fm-version-options{display:grid;gap:10px;max-height:300px;overflow:auto;margin:12px 0}.fm-version-options label{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere}.fm-history ol,.fm-history ul{padding-left:20px}.fm-history small{display:block;overflow-wrap:anywhere}.fm-file-views{flex-wrap:wrap}.fm-folder-tools{flex-wrap:wrap}

@@ -72,10 +72,16 @@ export async function POST(request: Request) {
     else {
       const real = getD1RuntimeDatabase(); const staged = stageOfflineWrites(real);
       result = await offlineTransaction.run({db:staged.db,afterCommit:[]}, save);
-      await real.batch(staged.writes);
+      if(noteId&&typeof body.expectedRevision==='number'){
+        const guardId=crypto.randomUUID();
+        const guard=real.prepare("INSERT INTO resource_save_guards(id,ok) VALUES(?1,CASE WHEN (SELECT COALESCE(max(id),0) FROM resource_file_activity WHERE entity_kind='note' AND entity_id=?2 AND owner_user_id=?3)=?4 THEN 1 ELSE 0 END)").bind(guardId,noteId,identity.id,body.expectedRevision);
+        await real.batch([guard,...staged.writes,real.prepare('DELETE FROM resource_save_guards WHERE id=?1').bind(guardId)]);
+      }else await real.batch(staged.writes);
     }
-    return NextResponse.json({ id: result.id, status: result.status, visibility: result.visibility }, { status: noteId ? 200 : 201 });
+    const revisionRow=await getHotD1Database().prepare("SELECT COALESCE(max(id),0) revision FROM resource_file_activity WHERE entity_kind='note' AND entity_id=?1 AND owner_user_id=?2").bind(result.id,identity.id).first<{revision:number}>();
+    return NextResponse.json({ id: result.id, status: result.status, visibility: result.visibility,noteRevision:revisionRow?.revision??0 }, { status: noteId ? 200 : 201 });
   } catch (error) {
+    if(/resource_save_guards|CHECK constraint/i.test(String(error)))return NextResponse.json({error:'This note changed on another device. Your draft is retained; reload the saved note before applying your edits.',code:'NOTE_REVISION_CONFLICT'},{status:409});
     return NextResponse.json({ error: error instanceof Error ? error.message : "Note could not be saved." }, { status: 400 });
   }
 }

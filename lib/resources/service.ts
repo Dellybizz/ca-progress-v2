@@ -1,3 +1,4 @@
+import {versionStorage} from './lifecycle';
 import {isWorkspaceTrashed} from './workspace';
 import "server-only";
 import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
@@ -154,6 +155,7 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
   if (noteResponse.error) throw new Error(`Note could not be loaded: ${noteResponse.error.message}`);
   if (!noteResponse.data || await isWorkspaceTrashed("note",noteId)) return { mode: "missing" };
   const row = noteResponse.data as NoteRow;
+  const revisionRow=await getD1RuntimeDatabase().prepare("SELECT COALESCE(max(id),0) revision FROM resource_file_activity WHERE entity_kind='note' AND entity_id=?1 AND owner_user_id=?2").bind(noteId,row.user_id).first<{revision:number}>();
   const canManage = row.user_id === identity.id;
   if (!canManage && !(row.visibility === "shared" && row.moderation_status === "approved")) return { mode: "missing" };
 
@@ -166,7 +168,7 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
   ]);
   return {
     mode: "ready",
-    note: noteDto(row, names, canManage ? tagsByNote.get(row.id) ?? [] : [], identity.id, extras.get(row.id)),
+    note: {...noteDto(row, names, canManage ? tagsByNote.get(row.id) ?? [] : [], identity.id, extras.get(row.id)),revision:revisionRow?.revision??0},
     subjects,
     availableUploads: canManage ? ownedRows.ownUploads.map((upload) => uploadDto(upload as UploadRow, names, identity.id)) : [],
     canManage,
@@ -182,6 +184,8 @@ export async function getResourceDetailModel(resourceId: string): Promise<Resour
   if (!row) return { mode: "missing" };
   const names = await nameMaps(client);
   const canManage = row.owner_user_id === identity.id;
+  if(!canManage&&!(row.visibility==='shared'&&row.moderation_status==='approved'))return {mode:'missing'};
+  if(canManage){const version=await versionStorage(resourceId,identity.id);if(version)Object.assign(row,version);}
   const importance=canManage?await getD1RuntimeDatabase().prepare("SELECT resource_id FROM resource_importance WHERE resource_id=?1 AND owner_user_id=?2").bind(resourceId,identity.id).first():null;
   return { mode: "ready", resource: {...uploadDto(row, names, identity.id),important:Boolean(importance)}, canManage, canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved" };
 }

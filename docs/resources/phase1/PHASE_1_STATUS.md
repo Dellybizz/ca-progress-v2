@@ -19,8 +19,22 @@
 - Next production build passed with webpack. Turbopack rejected the dependency symlink used by this isolated checkout; webpack compiled the same application successfully.
 - No live migrations, deployment, APK build or physical-device checks were performed by this change.
 
-## Open acceptance scope — do not interpret this as full phase closure
+## Completion update — implementation complete, release verification pending
 
-The condensed phase references the larger RN03/RN04/RN07 specification. Notebook sections/pages, private-item duplication, bulk tagging, explicit permanent erase, file-version replacement/activity, richer discovery facets/FTS measurements, offline folder-operation replay and web/native visual verification remain unimplemented or unverified. Phase 1 therefore has a verified core implementation, but its full accepted scope and production rollout are not complete.
+The previously open feature scope is implemented: notebooks and sections with note pages; private note and upload duplication; bulk tags; permanent deletion with confirmed purge claims; owner-scoped activity; private file replacement and restoration with retained source versions; owner/status/tag/date facets; stale-cursor restart; indexed-search prototype; durable browser folder/move/star/Trash/restore queue replay with conflict and predecessor guards.
 
-Before production exposure: verify the authoritative deployed D1/R2 bindings and ledger, rehearse backup/restore in an isolated target, apply additive migration 0095 before the web build, certify runtime/size and perform signed-in web/mobile verification. Rollback retains the additive schema and recoverable content.
+Further preservation fixes include atomic online note revision guards, retaining complete descriptions during metadata-only renames, and preventing quota cleanup from deleting a referenced version. Account deletion explicitly removes version relationships before its owned uploads. Migration 0096 adds the organization/lifecycle tables without changing old content. Existing note/upload identifiers and source metadata remain intact.
+
+Private file versions point to immutable, separately uploaded owned file records. They cannot be made public through the visibility controls. Selecting a replacement searches and pages through the complete eligible file collection. Source files retained by versions cannot be permanently erased until their containing file is erased.
+
+### Release evidence and limits
+
+- Repository suite: 1,328 tests passed after the completion changes, including actual offline API replay, stale-save rollback, description retention and source-version cleanup protection.
+- TypeScript, ESLint, production Next build, native asset bundling and OpenNext build passed locally.
+- Last checked Worker: 3.421 MiB compressed, within the existing 3.75 MiB repository guard; the final release reruns that guard.
+- The SQLite FTS5 prototype inspected 10,001 fixture records and verified owner-safe results. Production search currently retains the safe complete-text SQL path; production D1 FTS rollout is not claimed by the prototype.
+- Local Chromium installation was blocked by a truncated network download. Local Worker runtime smoke was blocked by `uv_interface_addresses` in the restricted host. These checks are not marked passed.
+- `.github/workflows/resources-phase1.yml` runs repository/build/native checks, real-component browser fixtures at 1440/390 px, Worker size/runtime checks, a private D1 export/isolated restore drill, retained migrations, and live authentication-boundary checks before/after web deployment. It never uploads the private database export.
+- Native assets compile; a new APK and physical-device certification are not supplied by this change. Phase 4 remains responsible for the expanded native persistence/jobs and process-kill guarantees. Cached browser views are explicitly limited to their saved pages while disconnected; complete server search requires a connection.
+
+Production rollout is only complete when the exact-commit workflow passes its browser, restore, runtime, migration and live checks. Until then, source implementation is complete and live release remains pending. Rollback keeps both additive migrations and recoverable content.

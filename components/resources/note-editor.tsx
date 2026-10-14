@@ -46,7 +46,7 @@ export function NoteEditor({
   const router = useRouter();
   const editorRef = useRef<HTMLDivElement>(null);
   const savingRef = useRef(false), createIdRef = useRef<string|null>(null), editVersionRef = useRef(0), dirtyRef = useRef(false);
-  const savedIdRef = useRef(note?.id ?? null);
+  const savedIdRef = useRef(note?.id ?? null),savedRevisionRef=useRef(note?.revision);
   const [notice,setNotice] = useState<string|null>(null);
   useEffect(()=>{const guard=(event:BeforeUnloadEvent)=>{if(dirtyRef.current){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[]);
   const [editVersion,setEditVersion]=useState(0);
@@ -173,6 +173,7 @@ export function NoteEditor({
       createIdRef.current??=crypto.randomUUID();
       const {response,queued} = await offlineMutationFetch(context.userId!, "/api/v1/notes", {
           id: savedIdRef.current,
+          expectedRevision:savedRevisionRef.current,
           clientId:createIdRef.current,
           title,
           bodyHtml,
@@ -184,10 +185,10 @@ export function NoteEditor({
           sourceMessageId: communityDraft?.messageId ?? null,
           resourceIds,
         }, {}, note ? { title: note.title, body_html: note.bodyHtml, subject_id: note.subjectId, chapter_id: note.chapterId, visibility: note.visibility, updated_at: note.updatedAt } : null);
-      const payload = await response.json() as { id?: string; error?: string };
-      if(response.status===409&&payload.id)savedIdRef.current=payload.id;
+      const payload = await response.json() as { id?: string; error?: string;noteRevision?:number };
+      if(response.status===409&&payload.id)savedIdRef.current=payload.id;if(typeof payload.noteRevision==='number')savedRevisionRef.current=payload.noteRevision;
       if (!response.ok || !payload.id) throw new Error(payload.error || "Note could not be saved.");
-      savedIdRef.current=payload.id;
+      savedIdRef.current=payload.id;if(typeof payload.noteRevision==='number')savedRevisionRef.current=payload.noteRevision;
       if(savedVersion!==editVersionRef.current){setNotice('Your earlier changes were saved. Save again to include your latest edits.');return;}
       if(context.userId){const owner=context.userId;draftWrites.current=draftWrites.current.then(async()=>{if(savedVersion===editVersionRef.current)await putOfflineMeta(owner,draftKey,null);});await draftWrites.current;}
       if(savedVersion!==editVersionRef.current){setNotice('Your earlier changes were saved. Save again to include your latest edits.');return;}

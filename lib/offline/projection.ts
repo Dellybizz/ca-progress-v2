@@ -4,8 +4,8 @@ import type { ResourceLibraryReady, NoteCard } from "@/lib/resources/types";
 import type { StudyReadyModel, StudyTimerSnapshot } from "@/lib/study/types";
 export type EditBody = Record<string, unknown>;
 export const normalizeOfflineUrl = (url: string) => url.startsWith('/api/v1/') ? `/api/${url.slice(8)}` : url;
-export const snapshotKind = (url: string) => ({ "/api/progress": "progress", "/api/planner/tasks": "planner", "/api/notes": "notes", "/api/study/timer": "study" })[normalizeOfflineUrl(url)];
-export const entityKey = (rawUrl: string, body: EditBody) => { const url=normalizeOfflineUrl(rawUrl); return `${url}:${url === "/api/progress" ? body.chapterId : url === "/api/study/timer" ? "timer" : body.id || body.clientId}`; };
+export const snapshotKind = (url: string) => ({ "/api/progress": "progress", "/api/planner/tasks": "planner", "/api/notes": "notes", "/api/resources/workspace":"resources", "/api/study/timer": "study" })[normalizeOfflineUrl(url)];
+export const entityKey = (rawUrl: string, body: EditBody) => { const url=normalizeOfflineUrl(rawUrl); return `${url}:${url === "/api/resources/workspace" ? (body.id || (Array.isArray(body.keys)?body.keys[0]:"") || body.clientId) : url === "/api/progress" ? body.chapterId : url === "/api/study/timer" ? "timer" : body.id || body.clientId}`; };
 
 export function conflictBaseline(url: string, body: EditBody, data: unknown): Record<string, unknown> | null {
   url = normalizeOfflineUrl(url);

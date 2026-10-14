@@ -384,13 +384,13 @@ export async function saveHotNote(input: { id: string|null; createId?:string|nul
   await db.batch(statements); return {id,status};
 }
 export async function deleteHotNote(id:string,userId:string,db:HotD1Database=getHotD1Database()){const result=await mutateWorkspace(userId,{action:'trash',keys:[`note:${id}`]},db);if('results' in result && !result.results?.[0]?.ok)throw Error(result.results?.[0]?.error??'Note could not be moved to Trash.');return {ok:true};}
-export async function patchHotResource(input:{id:string;userId:string;title:string;description:string|null;subjectId:string|null;chapterId:string|null;visibility:"private"|"shared"},db:HotD1Database=getHotD1Database()){
+export async function patchHotResource(input:{id:string;userId:string;title:string;description?:string|null;subjectId:string|null;chapterId:string|null;visibility:"private"|"shared"},db:HotD1Database=getHotD1Database()){
   if(!input.title||input.title.length>160) throw new Error("A resource title is required.");
   await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
   if(await isWorkspaceTrashed('upload',input.id,db))throw new Error('Restore this file from Trash before editing it.');
   const row=await db.prepare("SELECT id FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(input.id,input.userId).first(); if(!row) throw new Error("Resource not found.");
   const status=input.visibility==="shared"?"pending":"private";
-  await db.prepare("UPDATE uploaded_resources SET title=?1,description=?2,subject_id=?3,chapter_id=?4,visibility=?5,moderation_status=?6,published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?7 AND owner_user_id=?8").bind(input.title,input.description,input.subjectId,input.chapterId,input.visibility,status,input.id,input.userId).run();
+  await db.prepare("UPDATE uploaded_resources SET title=?1,description=CASE WHEN ?9 THEN ?2 ELSE description END,subject_id=?3,chapter_id=?4,visibility=?5,moderation_status=?6,published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?7 AND owner_user_id=?8").bind(input.title,input.description??null,input.subjectId,input.chapterId,input.visibility,status,input.id,input.userId,input.description!==undefined?1:0).run();
   return {id:input.id,status};
 }
 export async function getHotOwnedResource(id:string,userId:string,db:HotD1Database=getHotD1Database()){return db.prepare("SELECT id,owner_user_id,storage_bucket,storage_path FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(id,userId).first<{id:string;owner_user_id:string;storage_bucket:string;storage_path:string}>();}

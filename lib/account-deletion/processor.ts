@@ -38,6 +38,7 @@ const USER_DELETE_STATEMENTS = [
   "DELETE FROM note_tag_map WHERE user_id=?1",
   "DELETE FROM note_tags WHERE user_id=?1",
   "DELETE FROM notes WHERE user_id=?1",
+  "DELETE FROM resource_file_versions WHERE owner_user_id=?1",
   "DELETE FROM uploaded_resources WHERE owner_user_id=?1",
   "DELETE FROM r2_upload_intents WHERE user_id=?1",
   "DELETE FROM planner_task_phase8 WHERE user_id=?1",

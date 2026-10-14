@@ -6,6 +6,7 @@ export type ResourceEntityType = "note" | "upload";
 export type ResourceReportReason = "spam" | "misleading" | "copyright" | "unsafe" | "other";
 
 export type NoteCard = {
+  revision?:number;
   id: string;
   title: string;
   excerpt: string;

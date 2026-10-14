@@ -1,3 +1,4 @@
+import {versionStorage} from '@/lib/resources/lifecycle';
 import {isWorkspaceTrashed} from '@/lib/resources/workspace';
 import {touchStorageFile} from "@/lib/billing/storage-cleanup.mjs";
 import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
@@ -27,6 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const row = response.data;
   const allowed = row.owner_user_id === identity.id || (row.visibility === "shared" && row.moderation_status === "approved");
   if (!allowed) return NextResponse.json({ error: "Resource not found or access denied." }, { status: 404 });
+  if(row.owner_user_id===identity.id){const version=await versionStorage(id,identity.id);if(version)Object.assign(row,version);}
   if (row.storage_bucket !== RESOURCE_R2_STORAGE_BUCKET) return NextResponse.json({ error: "This legacy resource is not stored in Cloudflare R2." }, { status: 409 });
   try {
     const download = new URL(request.url).searchParams.get("download") === "1";

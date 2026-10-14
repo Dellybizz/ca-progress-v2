@@ -5,6 +5,7 @@ export const SYNC_PAGE_LIMIT = 200;
 export const SYNC_TOMBSTONE_RETENTION_DAYS = 45;
 export const SYNC_CHANGE_RETENTION_DAYS = 60;
 export const SYNC_DOMAINS = Object.freeze({
+  "/api/resources/workspace": "workspace_entry",
   "/api/progress": "progress",
   "/api/planner/tasks": "planner_task",
   "/api/planner/goals": "planner_goal",
@@ -25,6 +26,7 @@ export function decodeCursor(value: string | null) {
 }
 
 export function entityIdentity(url: keyof typeof SYNC_DOMAINS, body: Record<string, unknown>) {
+  if(url === "/api/resources/workspace")return String(body.id||(Array.isArray(body.keys)?body.keys[0]:"")||body.clientId);
   if (url === "/api/progress") return String(body.chapterId || "");
   if (url === "/api/planner/tasks") return String(body.action === "create" ? body.clientId : body.id || "");
   if (url === "/api/planner/goals") return String(body.action === "create" ? body.clientId : body.id || "");

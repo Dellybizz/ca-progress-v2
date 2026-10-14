@@ -9,13 +9,14 @@ import { POST as progress } from "@/app/api/progress/route";
 import { POST as tasks } from "@/app/api/planner/tasks/route";
 import { POST as goals } from "@/app/api/planner/goals/route";
 import { POST as revisionSettings } from "@/app/api/planner/revision-settings/route";
+import { POST as workspace } from "@/app/api/resources/workspace/route";
 import { POST as notes } from "@/app/api/notes/route";
 import { POST as timer } from "@/app/api/study/timer/route";
 import { POST as reflection } from "@/app/api/study/reflection/route";
 import { syncJournalStatements, SYNC_DOMAINS } from "@/lib/mobile/sync";
 
 export const dynamic = "force-dynamic";
-const handlers = { "/api/progress": progress, "/api/planner/tasks": tasks, "/api/planner/goals": goals, "/api/planner/revision-settings": revisionSettings, "/api/notes": notes, "/api/study/timer": timer, "/api/study/reflection": reflection };
+const handlers = { "/api/resources/workspace":workspace, "/api/progress": progress, "/api/planner/tasks": tasks, "/api/planner/goals": goals, "/api/planner/revision-settings": revisionSettings, "/api/notes": notes, "/api/study/timer": timer, "/api/study/reflection": reflection };
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "private, no-store" } });
 const conflict = (error: string, expected: Record<string, unknown> | null, current: Record<string, unknown> | null, local: Record<string, unknown>) => json({ error, conflict: { expected, current, local } }, 409);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -56,6 +57,10 @@ export async function POST(request: Request) {
     } else if (input.url === "/api/planner/revision-settings") {
       table = "revision_rules"; where = "user_id=?"; values = [context.userId];
       columns = ["interval_days", "preferred_weekdays", "revision_minutes", "new_chapter_minutes", "test_minutes", "updated_at"];
+    } else if(input.url === "/api/resources/workspace") {
+      const action=String(body.action);if(!['create-folder','rename-folder','move-folder','delete-folder','restore-folder','move','star','trash','restore'].includes(action))return json({error:'This file action needs an online connection.'},400);
+      if(action.endsWith('-folder')){table='resource_folders';where='owner_user_id=? AND id=?';values=[context.userId,body.id||body.clientId];columns=['name','parent_id','trashed_at','trash_expires_at'];}
+      else{const keys=Array.isArray(body.keys)?body.keys:[];if(keys.length!==1||typeof keys[0]!=='string'||!/^(note|upload):.+$/.test(keys[0]))return json({error:'Synchronize one file at a time.'},400);const colon=keys[0].indexOf(':');table='resource_workspace_entries';where='owner_user_id=? AND entity_kind=? AND entity_id=?';values=[context.userId,keys[0].slice(0,colon),keys[0].slice(colon+1)];columns=['folder_id','starred','last_opened_at','trashed_at','trash_expires_at','purge_started_at'];}
     } else if (input.url === "/api/notes") {
       table = "notes"; where = "user_id=? AND id=?"; values = [context.userId, body.id || body.clientId];
       columns = ["title", "body_html", "subject_id", "chapter_id", "visibility", "updated_at"];
@@ -87,6 +92,7 @@ export async function POST(request: Request) {
     })));
     if (!response.ok) return response;
     const responseText = await response.text();
+    if(input.url==='/api/resources/workspace'){const payload=JSON.parse(responseText);if(payload.results?.some((item:{ok:boolean})=>!item.ok))return conflict(payload.results.find((item:{ok:boolean})=>!item.ok)?.error??'File action needs review.',input.expected,currentObject,body);}
     const insert = db.prepare(`INSERT INTO offline_mutation_receipts(user_id,mutation_id,request_hash,response_json,response_status,entity_key,guard_ok)
       VALUES (?,?,?,?,?,?,CASE WHEN COALESCE((${query}),'null')=? THEN 1 ELSE 0 END)`)
       .bind(context.userId, key, hash, responseText, response.status, entity, ...values, current);
