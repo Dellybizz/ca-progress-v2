@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { Modal } from "@/components/ui/overlay";
@@ -18,7 +18,7 @@ import type { AcademicSearchResult } from "@/lib/academic/types";
 
 type Surface = "search" | "notifications" | "account" | null;
 /* Account route manifest: className="profile-menu"; /settings/profile; /settings; /pricing; /billing */
-export function TopbarControls({ area }: { area: ShellArea }) {
+export function TopbarControls({ area, navigation, academicLabel }: { area: ShellArea; navigation?:ReactNode; academicLabel?:string }) {
   const viewer = useViewer();
   const pathname = usePathname();
   const loginHref = loginPathFor(pathname || "/planner/today");
@@ -101,6 +101,8 @@ export function TopbarControls({ area }: { area: ShellArea }) {
           <span>Find anything</span>
           <kbd>⌘K</kbd>
         </button>
+        {navigation?<div className="floating-navigation-slot">{navigation}</div>:null}
+        {academicLabel?<a href="/settings/profile" className="floating-academic-context" aria-label={`Study profile: ${academicLabel}`}>{academicLabel}</a>:null}
         <button
           className="ui-icon-button notification-button"
           onClick={() => setSurface("notifications")}

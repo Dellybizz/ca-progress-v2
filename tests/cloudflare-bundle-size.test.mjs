@@ -46,7 +46,7 @@ test("shared shell receives a server-resolved viewer and never flashes guest ide
   const shell = read("components/shell/app-shell.tsx");
   assert.doesNotMatch(shell, /await loadViewer\(\)/);
   assert.match(shell, /<ViewerProvider viewer=\{viewer\}>/);
-  assert.match(shell, /<TopbarControls area=\{area\}\/>/);
+  assert.match(shell, /<TopbarControls area=\{area\} navigation=/);
   assert.match(read("components/shell/viewer-client.ts"), /createContext/);
   assert.doesNotMatch(read("components/shell/viewer-client.ts"), /Guest|fetch\("\/api\/auth\/viewer"/);
 });
