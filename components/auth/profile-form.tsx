@@ -1,11 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
@@ -54,6 +52,7 @@ export function ProfileForm({
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const pending = useRef(false);
   const effectiveGroup = level === "foundation" ? "not_applicable" : group;
   const prerequisitesReady = Boolean(
     level && (level === "foundation" || group),
@@ -74,128 +73,90 @@ export function ProfileForm({
     : "";
 
   async function saveProfile() {
+    if (pending.current) return;
+    pending.current = true;
     setSaving(true);
     setStatus(null);
-    const response = await fetch("/api/v1/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName: name,
-        level,
-        group: effectiveGroup,
-        attemptKey: selectedAttemptKey,
-        dailyTargetMinutes: Number(target),
-      }),
-    });
-    const result = (await response.json()) as { ok?: boolean; error?: string };
-    setSaving(false);
-    if (!response.ok || !result.ok)
-      return setStatus({ error: result.error || "Could not save profile." });
-    if (selectedAttemptKey !== attemptKey) setAttemptKey(selectedAttemptKey);
-    setStatus({ success: "Profile saved." });
-    router.refresh();
+    try {
+      const response = await fetch("/api/v1/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({displayName:name, level, group:effectiveGroup, attemptKey:selectedAttemptKey, dailyTargetMinutes:Number(target)}),
+      });
+      const result = await response.json() as {ok?:boolean;error?:string};
+      if (!response.ok || !result.ok) {setStatus({error:result.error || "Could not save profile."});return;}
+      if (selectedAttemptKey !== attemptKey) setAttemptKey(selectedAttemptKey);
+      setStatus({success:"Profile saved."});
+      router.refresh();
+    } catch {
+      setStatus({error:"Could not save. Check your connection and try again."});
+    } finally {
+      pending.current = false;
+      setSaving(false);
+    }
   }
 
   async function uploadAvatar(file: File | undefined) {
-    if (!file) return;
+    if (!file || pending.current) return;
+    if (!['image/jpeg','image/png','image/webp'].includes(file.type) || file.size === 0 || file.size > 2 * 1024 * 1024) {
+      setStatus({error:"Choose a JPG, PNG or WebP image up to 2 MB."});
+      return;
+    }
+    pending.current = true;
     setUploading(true);
     setStatus(null);
-    const data = new FormData();
-    data.set("avatar", file);
-    const response = await fetch("/api/v1/profile/avatar", {
-      method: "POST",
-      body: data,
-    });
-    const result = (await response.json()) as {
-      ok?: boolean;
-      error?: string;
-      signedUrl?: string;
-    };
-    setUploading(false);
-    if (!response.ok || !result.ok)
-      return setStatus({ error: result.error || "Could not upload avatar." });
-    setAvatarUrl(result.signedUrl ?? null);
-    setStatus({ success: "Avatar updated." });
-    router.refresh();
+    try {
+      const data = new FormData();
+      data.set("avatar", file);
+      const response = await fetch("/api/v1/profile/avatar", {method:"POST",body:data});
+      const result = await response.json() as {ok?:boolean;error?:string;signedUrl?:string};
+      if (!response.ok || !result.ok) {setStatus({error:result.error || "Could not upload photo."});return;}
+      setAvatarUrl(result.signedUrl ?? null);
+      setStatus({success:"Photo updated."});
+      router.refresh();
+    } catch {
+      setStatus({error:"Could not upload. Check your connection and try again."});
+    } finally {
+      pending.current = false;
+      setUploading(false);
+    }
   }
 
   const initial = (name || identityLabel || "S").trim().charAt(0).toUpperCase();
   return (
-    <div className="profile-v2">
-      <div className="profile-v2__hero">
-        <div
-          className="profile-avatar-large"
-          style={
-            avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined
-          }
-        >
-          {avatarUrl ? (
-            <span className="sr-only">Profile avatar</span>
-          ) : (
-            initial
-          )}
-        </div>
-        <div>
-          <Badge tone="brand">Private profile</Badge>
-          <h1>Your CA Progress profile</h1>
-          <p>
-            These settings are scoped to your authenticated user through
-            database RLS.
-          </p>
-        </div>
-      </div>
-      {status?.error ? (
-        <div className="auth-status auth-status--danger" role="alert">
-          {status.error}
-        </div>
-      ) : null}
-      {status?.success ? (
-        <div className="auth-status auth-status--success" role="status">
-          {status.success}
-        </div>
-      ) : null}
-      <div className="profile-v2__grid">
-        <Card>
-          <CardHeader title="Identity" description={identityLabel} />
-          <CardBody>
-            <div className="profile-form-stack">
-              <Input
-                label="Display name"
-                value={name}
-                maxLength={80}
-                autoComplete="name"
-                onChange={(event) => setName(event.target.value)}
-              />
-              <label className="avatar-upload">
-                <span className="ui-field__label">Avatar</span>
-                <span className="avatar-upload__control">
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    disabled={uploading}
-                    onChange={(event) => uploadAvatar(event.target.files?.[0])}
-                  />
-                  <span>
-                    <Icon name="plus" size={16} />
-                    {uploading ? "Uploading…" : "Choose image"}
-                  </span>
-                </span>
-                <small>
-                  JPEG, PNG or WebP · maximum 2 MB · stored privately.
-                </small>
-              </label>
-            </div>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader
-            title="Study profile"
-            description="Canonical academic selection"
-          />
-          <CardBody>
-            <div className="profile-form-stack">
+    <section className="profile-v3">
+      <header className="profile-v3__heading"><h1>Profile</h1><a href="/settings">Account settings</a></header>
+      <form onSubmit={event => {event.preventDefault();void saveProfile();}}>
+        <fieldset className="profile-v3__grid" disabled={saving || uploading}>
+          <legend className="sr-only">Edit your profile</legend>
+          <Card>
+            <CardHeader title="Personal details"/>
+            <CardBody>
+              <div className="profile-v3__identity">
+                <div className="profile-v3__avatar" style={avatarUrl?{backgroundImage:`url(${avatarUrl})`}:undefined}>
+                  {avatarUrl?<span className="sr-only">Profile photo</span>:initial}
+                </div>
+                <div className="profile-v3__photo">
+                  <p>{identityLabel}</p>
+                  <label className="avatar-upload">
+                    <span className="avatar-upload__control">
+                      <input aria-label="Change profile photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{void uploadAvatar(event.target.files?.[0]);event.target.value='';}}/>
+                      <span>{uploading?'Uploading…':'Change photo'}</span>
+                    </span>
+                    <small>JPG, PNG or WebP · 2 MB max</small>
+                  </label>
+                </div>
+              </div>
+              <Input label="Display name" name="displayName" value={name} maxLength={80} required autoComplete="name" onChange={event=>setName(event.target.value)}/>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Study preferences"/>
+            <CardBody>
+              <div className="profile-v3__study">
               <Select
                 label="CA level"
+                required
                 value={level}
                 onChange={(event) => {
                   const nextLevel = event.target.value as CALevel;
@@ -223,6 +184,7 @@ export function ProfileForm({
               {level !== "foundation" ? (
                 <Select
                   label="Group"
+                  required
                   value={group}
                   onChange={(event) => {
                     const nextGroup = event.target.value as GroupChoice;
@@ -244,13 +206,7 @@ export function ProfileForm({
                   <option value="both">Both groups</option>
                 </Select>
               ) : (
-                <div className="onboarding-na">
-                  <Icon name="check" />
-                  <span>
-                    <strong>Group: not applicable</strong>
-                    <small>Foundation profile</small>
-                  </span>
-                </div>
+                <div className="profile-v3__foundation"><span>Group</span><strong>Not applicable</strong></div>
               )}
               <Select
                 label="Attempt"
@@ -274,22 +230,24 @@ export function ProfileForm({
                 type="number"
                 min={15}
                 max={720}
-                step={15}
+                step={1}
+                required
+                inputMode="numeric"
                 value={target}
                 onChange={(event) => setTarget(event.target.value)}
               />
-              <Button size="lg" isLoading={saving} onClick={saveProfile}>
-                Save profile
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
-      <form action="/auth/signout" method="post" className="profile-signout">
-        <Button variant="ghost" type="submit">
-          Sign out on this device
-        </Button>
+              </div>
+            </CardBody>
+          </Card>
+        </fieldset>
+        <div className="profile-v3__actions">
+          <div aria-live="polite">
+            {status?.error?<p className="auth-status auth-status--danger" role="alert">{status.error}</p>:null}
+            {status?.success?<p className="auth-status auth-status--success" role="status">{status.success}</p>:null}
+          </div>
+          <Button type="submit" isLoading={saving} disabled={uploading}>Save changes</Button>
+        </div>
       </form>
-    </div>
+    </section>
   );
 }

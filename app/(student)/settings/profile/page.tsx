@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { redirect } from "next/navigation";
 import { LoginRequired } from "@/components/auth/login-required";
 import { ProfileForm } from "@/components/auth/profile-form";
@@ -19,8 +20,9 @@ export default async function ProfileSettingsPage() {
   if (!profile) redirect("/onboarding?next=/settings/profile");
   if (!profile.onboarding_completed_at) redirect("/onboarding?next=/settings/profile");
   const avatarAccessUrl = await getProfileAvatarAccessUrl(user.id, profile.avatar_url);
-  return <>
+  return <div className="profile-v3-page">
     <ProfileForm profile={profile} attempts={attempts} avatarSignedUrl={avatarAccessUrl} identityLabel={user.email || user.phone || "Authenticated student"}/>
     <StudyProfilePrivacy ownerUserId={user.id} initialSettings={studyProfileSettings}/>
-  </>;
+    <form action="/auth/signout" method="post" className="profile-v3-signout"><Button type="submit" variant="ghost">Sign out</Button></form>
+  </div>;
 }
