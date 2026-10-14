@@ -20,7 +20,7 @@ function PreviewScreen({screen}:{screen:string}){
  if(screen==='recovery')return <AccountRecovery {...common} onProvider={announce}/>;
  const step=SETUP_STEPS.includes(screen as SetupStep)?screen as SetupStep:'review';
  const draft:SetupDraft={...emptySetupDraft(),step,level:step==='intro'||step==='level'?null:'intermediate',group:step==='intro'||step==='level'?null:'both',attemptDecision:step==='intro'||step==='level'?null:'undecided',preparationState:'studying',support:['progress','planner','notes','consistency'],goalMode:'set',dailyTargetMinutes:147};
- return <SetupScreens initial={{draft,revision:0}} attempts={[]} existingGoal={90} preview localFirst online={false} initialPending={screen==='pending'} onExit={noAction} onSave={async()=>({revision:0})} onComplete={async()=>({pending:true})}/>;
+ return <SetupScreens initial={{draft,revision:0}} attempts={[]} existingGoal={90} preview syncNote="Illustrative pending-sync screen. This layout preview does not save choices." initialPending={screen==='pending'} onExit={noAction} onSave={async()=>({revision:0})} onComplete={async()=>({pending:true})}/>;
 }
 export function OnboardingLayoutPreview({embedded,screen:initialScreen}:{embedded:boolean;screen?:string}){
  const [screen,setScreen]=useState(screens.includes(initialScreen as typeof screens[number])?initialScreen!:'review'),[size,setSize]=useState(1);

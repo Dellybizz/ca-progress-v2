@@ -3,3 +3,5 @@
 .ca-onboarding-progress>button{width:44px;height:44px}
 [data-reduce-motion="true"] .ca-onboarding-panel{animation:none}
 [data-reduce-motion="true"] .ca-onboarding-progress>[role=progressbar]>span,[data-reduce-motion="true"] .ca-onboarding-choice{transition:none}
+/* Onboarding must also fit a narrow viewport with a reserved scrollbar. */
+body:has(.ca-onboarding),body:has(.ca-book-welcome){min-width:0}
