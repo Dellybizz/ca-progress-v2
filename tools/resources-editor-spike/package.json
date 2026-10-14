@@ -1,0 +1,21 @@
+{
+  "name": "ca-progress-resource-editor-evaluation",
+  "private": true,
+  "type": "module",
+  "scripts": { "benchmark": "node benchmark.mjs" },
+  "dependencies": {
+    "@tiptap/core": "3.32.0",
+    "@tiptap/starter-kit": "3.32.0",
+    "@tiptap/extension-table": "3.32.0",
+    "@tiptap/extension-task-list": "3.32.0",
+    "@tiptap/extension-task-item": "3.32.0",
+    "lexical": "0.52.0",
+    "@lexical/headless": "0.52.0",
+    "@lexical/html": "0.52.0",
+    "@lexical/rich-text": "0.52.0",
+    "@lexical/list": "0.52.0",
+    "@lexical/table": "0.52.0",
+    "@lexical/link": "0.52.0",
+    "jsdom": "26.1.0"
+  }
+}

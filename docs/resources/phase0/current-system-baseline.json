@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-14T17:14:41.597Z",
+  "commit": "3bce0be22fb8dc43e992de43718e24c0cbe67810",
+  "sourceSha256": {
+    "components/resources/note-editor.tsx": "854a023b61665e02aa1f4aea82143aa207c02ba51582350baca9166763ab1d7a",
+    "lib/offline/projection.ts": "a1cfdda8f51953475c5526671748799f24c077c358eed18827fad8ea0a500a25",
+    "lib/resources/validation.ts": "dad9b3e724b2259f12b3bea89b3a02f7cac0f99163b3b09574e28a11621b360d",
+    "lib/data/d1/hot-screens.ts": "5ba1f4bc3d07a464e4eb78ce9deac8407f409aafccf566d0f973f76965bd4e64",
+    "app/api/resources/upload-complete/route.ts": "faef6fe2f8c881d0c433f85219133c391c9de60709ce50b1d0446d5d866cada8",
+    "lib/jobs/execute.ts": "b994144b43e3d5bd8096cfac7a2b0a24dcf13abc902eb8e4ec7933e89f403226",
+    "apps/mobile/src/main.tsx": "61f514928b8ca722461dca56b1cbae8d45c8d8b1cbc182a7e757fd07056e1691",
+    "apps/mobile/src/files.ts": "d795ff7efd440dbf1463584de681caa85730f5b2032fd296c29a511f4ca8eeb3",
+    "wrangler.jsonc": "23674f9f56707a194df14d18fb9ca37f1607efcbb1ba9db9f3c091fa2981cd2d",
+    "next.config.ts": "f8816414c3087c9f7e3cd412815badf6a9b2805d2f8a28e95211b69fb27bc76b"
+  },
+  "execution": "Actual source modules bundled in isolation; fake D1 captures SQL and simulates limits. No production query or mutation.",
+  "observations": {
+    "offlineRoutes": {
+      "legacy": "notes",
+      "versioned": null,
+      "sourceMismatch": true,
+      "productionFeatureFlag": "unknown; no deployed build-time flag inspected"
+    },
+    "library": {
+      "fixtureRowsPerCollection": 1001,
+      "returned": {
+        "ownNotes": 250,
+        "ownUploads": 250,
+        "sharedNotes": 150,
+        "sharedUploads": 150
+      },
+      "sqlLimits": [
+        250,
+        250,
+        150,
+        150
+      ],
+      "continuation": "No cursor in current getHotResourceLibraryRows return contract"
+    },
+    "sanitizer": {
+      "inputChars": 200019,
+      "outputChars": 200000,
+      "trailingMarkerSurvives": false,
+      "plainTextOutputChars": 120000
+    },
+    "uploadValidation": {
+      "legacyHelperRejectsBadSignature": true,
+      "directCompletionCallsHelper": false,
+      "interpretation": "Source call-path check only; not a live malware or parser test"
+    },
+    "nativeBundle": {
+      "javascriptBytes": 546097,
+      "cssBytes": 89941
+    },
+    "highestMigration": "0094_onboarding_setup_v2.sql"
+  }
+}

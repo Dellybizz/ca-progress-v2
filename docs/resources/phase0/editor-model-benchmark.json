@@ -1,0 +1,384 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-14T17:16:28.964Z",
+  "node": "v24.19.0",
+  "platform": "linux/x64",
+  "method": "JSDOM model import and serialization; 1 warmup + 7 measured samples; Tiptap creates a view and Lexical is headless: initialization timings are not equivalent workloads and cannot rank typing speed. No layout/paint, Android, IME or palm-rejection claim.",
+  "adapters": {
+    "tiptap": "Explicit mark and direction adapters; one-time table trailing-paragraph canonicalization recorded, then JSON stability tested",
+    "lexical": "Built-in rich-text/list/table/link nodes"
+  },
+  "lockSha256": "34d324e7b869f9943ef472fc8207d0f85ccc4cd91d3d2ad5a1fd48492f1f7ec1",
+  "licenses": {
+    "@tiptap/core": {
+      "version": "3.32.0",
+      "license": "MIT"
+    },
+    "@tiptap/starter-kit": {
+      "version": "3.32.0",
+      "license": "MIT"
+    },
+    "@tiptap/extension-table": {
+      "version": "3.32.0",
+      "license": "MIT"
+    },
+    "@tiptap/extension-task-list": {
+      "version": "3.32.0",
+      "license": "MIT"
+    },
+    "@tiptap/extension-task-item": {
+      "version": "3.32.0",
+      "license": "MIT"
+    },
+    "lexical": {
+      "version": "0.52.0",
+      "license": "MIT"
+    },
+    "@lexical/headless": {
+      "version": "0.52.0",
+      "license": "MIT"
+    },
+    "@lexical/html": {
+      "version": "0.52.0",
+      "license": "MIT"
+    },
+    "@lexical/rich-text": {
+      "version": "0.52.0",
+      "license": "MIT"
+    },
+    "@lexical/list": {
+      "version": "0.52.0",
+      "license": "MIT"
+    },
+    "@lexical/table": {
+      "version": "0.52.0",
+      "license": "MIT"
+    },
+    "@lexical/link": {
+      "version": "0.52.0",
+      "license": "MIT"
+    },
+    "jsdom": {
+      "version": "26.1.0",
+      "license": "MIT"
+    }
+  },
+  "bundles": {
+    "tiptap": {
+      "rawBytes": 434444,
+      "gzipBytes": 137402,
+      "scope": "core + rich text + lists + links + tables; no React toolbar, ink, PDF or collaboration; not a feature-equivalent full application"
+    },
+    "lexical": {
+      "rawBytes": 441971,
+      "gzipBytes": 144124,
+      "scope": "core + rich text + lists + links + tables; no React toolbar, ink, PDF or collaboration; not a feature-equivalent full application"
+    }
+  },
+  "results": [
+    {
+      "engine": "tiptap",
+      "fixture": "legacy-rich",
+      "inputBytes": 358,
+      "jsonBytes": 2032,
+      "import": {
+        "medianMs": 12.175,
+        "p95Ms": 22.059,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 1.734,
+        "p95Ms": 3.173,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": true,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 1,
+        "headings": 1,
+        "highlight": 1,
+        "underline": 1,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "outputSemantics": {
+        "tables": 1,
+        "headings": 1,
+        "highlight": 1,
+        "underline": 1,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "lostSemantics": []
+    },
+    {
+      "engine": "tiptap",
+      "fixture": "mixed-language",
+      "inputBytes": 190,
+      "jsonBytes": 432,
+      "import": {
+        "medianMs": 6.015,
+        "p95Ms": 8.339,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 0.422,
+        "p95Ms": 0.678,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": false,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 0,
+        "headings": 1,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": true
+      },
+      "outputSemantics": {
+        "tables": 0,
+        "headings": 1,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": true
+      },
+      "lostSemantics": []
+    },
+    {
+      "engine": "tiptap",
+      "fixture": "long-1000",
+      "inputBytes": 60890,
+      "jsonBytes": 133916,
+      "import": {
+        "medianMs": 60.472,
+        "p95Ms": 84.479,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 17.695,
+        "p95Ms": 26.722,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": false,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 0,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "outputSemantics": {
+        "tables": 0,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "lostSemantics": []
+    },
+    {
+      "engine": "tiptap",
+      "fixture": "merged-table",
+      "inputBytes": 149,
+      "jsonBytes": 931,
+      "import": {
+        "medianMs": 6.05,
+        "p95Ms": 8.816,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 0.691,
+        "p95Ms": 0.744,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": true,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 1,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": true,
+        "rowspan": true,
+        "rtl": false
+      },
+      "outputSemantics": {
+        "tables": 1,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": true,
+        "rowspan": true,
+        "rtl": false
+      },
+      "lostSemantics": []
+    },
+    {
+      "engine": "lexical",
+      "fixture": "legacy-rich",
+      "inputBytes": 358,
+      "jsonBytes": 3782,
+      "import": {
+        "medianMs": 3.378,
+        "p95Ms": 4.407,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 3.82,
+        "p95Ms": 4.67,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": false,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 1,
+        "headings": 1,
+        "highlight": 1,
+        "underline": 1,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "outputSemantics": {
+        "tables": 1,
+        "headings": 1,
+        "highlight": 1,
+        "underline": 1,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "lostSemantics": []
+    },
+    {
+      "engine": "lexical",
+      "fixture": "mixed-language",
+      "inputBytes": 190,
+      "jsonBytes": 835,
+      "import": {
+        "medianMs": 0.799,
+        "p95Ms": 1.055,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 0.241,
+        "p95Ms": 0.263,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": false,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 0,
+        "headings": 1,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": true
+      },
+      "outputSemantics": {
+        "tables": 0,
+        "headings": 1,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": true
+      },
+      "lostSemantics": []
+    },
+    {
+      "engine": "lexical",
+      "fixture": "long-1000",
+      "inputBytes": 60890,
+      "jsonBytes": 256979,
+      "import": {
+        "medianMs": 51.455,
+        "p95Ms": 59.931,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 31.465,
+        "p95Ms": 49.758,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": false,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 0,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "outputSemantics": {
+        "tables": 0,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": false,
+        "rowspan": false,
+        "rtl": false
+      },
+      "lostSemantics": []
+    },
+    {
+      "engine": "lexical",
+      "fixture": "merged-table",
+      "inputBytes": 149,
+      "jsonBytes": 1866,
+      "import": {
+        "medianMs": 0.775,
+        "p95Ms": 0.981,
+        "samples": 7
+      },
+      "serialization": {
+        "medianMs": 1.272,
+        "p95Ms": 1.475,
+        "samples": 7
+      },
+      "missingText": [],
+      "initialNormalizationChanged": false,
+      "jsonRoundTripEqual": true,
+      "inputSemantics": {
+        "tables": 1,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": true,
+        "rowspan": true,
+        "rtl": false
+      },
+      "outputSemantics": {
+        "tables": 1,
+        "headings": 0,
+        "highlight": 0,
+        "underline": 0,
+        "colspan": true,
+        "rowspan": true,
+        "rtl": false
+      },
+      "lostSemantics": []
+    }
+  ]
+}

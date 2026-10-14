@@ -2,6 +2,8 @@
 
 Date: 14 October 2026. Status: **audit and proposed delivery plan; no application changes made by this document.**
 
+Delivery update: the user selected the [eight-phase implementation grouping](PHASED_IMPLEMENTATION_8_PHASES.md). RN00–RN23 below are retained as detailed scope references, not the current delivery numbering. See [Phase 0 evidence and status](phase0/PHASE_0_STATUS.md) for subsequent completed engineering work and remaining verification gates.
+
 Audited local commit: `4d41d8c3`; source tree: `c57f8a653cb53c5ddb2173e67f04edc1b3660adf`. GitHub feature branch `onboarding-design-phase7` was verified at `b7325c2e916da5ec8e1b496afed9594797a5e2b2` with the same source tree.
 
 This roadmap uses **RN00–RN23** so it does not reset the completed onboarding phases or confuse them with the existing scenario/security plan P00–P33. The earlier [Scenario Implementation Master Plan](https://github.com/Dellybizz/ca-progress-v2/blob/4a9f52760c73d757346e7f5259eb3b996dc525f7/docs/SCENARIO_IMPLEMENTATION_MASTER_PLAN.md) remains the policy reference. Its existence is not evidence that its features have shipped. Reuse verified implementations and record remaining gaps rather than rebuilding everything.
