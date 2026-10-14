@@ -20,6 +20,7 @@ node_modules/
 # test/coverage output
 coverage/
 *.tsbuildinfo
+android/app/src/androidTest/assets/onboarding-sql.json
 
 # OS/editor
 .DS_Store

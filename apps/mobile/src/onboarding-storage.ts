@@ -3,8 +3,8 @@ import {query,execute,transaction} from '../../../packages/mobile-data/src/datab
 import {decodeLocalSetup,indexedSetupStore} from '../../../lib/profile/setup-storage';
 import type {LocalSetup,SetupStore} from '../../../lib/profile/setup-local';
 const key=(scope:string)=>`ca.onboarding.v1:${scope}`;
-export const setupLocalCasSql=`INSERT INTO local_meta(key,value,updated_at) SELECT ?1,?2,?3 WHERE ?4 IS NULL OR EXISTS(SELECT 1 FROM local_meta WHERE key=?1 AND value=?4) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at WHERE local_meta.value=?4`;
-export const setupHandoffSql=`INSERT INTO local_meta(key,value,updated_at) SELECT ?1,?2,?3 WHERE EXISTS(SELECT 1 FROM local_meta WHERE key=?5 AND value=?6) AND (?4 IS NULL OR EXISTS(SELECT 1 FROM local_meta WHERE key=?1 AND value=?4)) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at WHERE local_meta.value=?4`;
+export const setupLocalCasSql=`INSERT OR REPLACE INTO local_meta(key,value,updated_at) SELECT ?1,?2,?3 WHERE (?4 IS NULL AND NOT EXISTS(SELECT 1 FROM local_meta WHERE key=?1)) OR EXISTS(SELECT 1 FROM local_meta WHERE key=?1 AND value=?4)`;
+export const setupHandoffSql=`INSERT OR REPLACE INTO local_meta(key,value,updated_at) SELECT ?1,?2,?3 WHERE EXISTS(SELECT 1 FROM local_meta WHERE key=?5 AND value=?6) AND ((?4 IS NULL AND NOT EXISTS(SELECT 1 FROM local_meta WHERE key=?1)) OR EXISTS(SELECT 1 FROM local_meta WHERE key=?1 AND value=?4))`;
 export const setupHandoffDeleteSql=`DELETE FROM local_meta WHERE key=?1 AND value=?2 AND EXISTS(SELECT 1 FROM local_meta WHERE key=?3 AND value=?4)`;
 export function nativeSetupStore():SetupStore {
  if(!Capacitor.isNativePlatform())return indexedSetupStore();
