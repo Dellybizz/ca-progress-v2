@@ -130,10 +130,11 @@ async function validateLocation(userId: string, subjectId: string | null, chapte
 }
 
 async function validateOwnedResources(userId: string, resourceIds: string[]) {
-  const ids = [...new Set(resourceIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 20);
+  const ids = [...new Set(resourceIds)];
+  if(ids.length>20||ids.some(id=>!/^[0-9a-f-]{36}$/i.test(id)))throw new Error('Choose up to 20 valid note files.');
   if (!ids.length) return [];
   const db = getHotD1Database();
-  const rows = await db.prepare(`SELECT id,extension FROM uploaded_resources WHERE owner_user_id=?1 AND id IN (${ids.map((_, index) => `?${index + 2}`).join(",")})`).bind(userId, ...ids).all<{ id: string; extension: string }>();
+  const rows = await db.prepare(`SELECT id,extension FROM uploaded_resources WHERE owner_user_id=?1 AND id IN (${ids.map((_, index) => `?${index + 2}`).join(",")}) AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL)`).bind(userId, ...ids).all<{ id: string; extension: string }>();
   if ((rows.results ?? []).length !== ids.length) throw new Error("A linked note file is missing or is not owned by you.");
   return (rows.results ?? []).map((row) => ({ id: row.id, kind: ["jpg","jpeg","png","webp"].includes(row.extension.toLowerCase()) ? "image" : row.extension.toLowerCase() === "pdf" ? "pdf" : "file" }));
 }
@@ -204,7 +205,8 @@ export async function savePhase6Note(input: {
 }
 
 export async function getPhase6NoteExtras(noteIds: string[], viewerId: string) {
-  const ids = [...new Set(noteIds)].slice(0, 400);
+  const ids = [...new Set(noteIds)];
+  if(ids.length>80){const combined=new Map<string,NotePhase6Extra>();for(let i=0;i<ids.length;i+=80){const chunk=await getPhase6NoteExtras(ids.slice(i,i+80),viewerId);for(const [id,extra] of chunk)combined.set(id,extra);}return combined;}
   const result = new Map<string, NotePhase6Extra>();
   if (!ids.length) return result;
   const db = getHotD1Database();

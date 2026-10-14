@@ -1,5 +1,5 @@
 import { OFFLINE_ENABLED } from "@/lib/offline/config";
-import { entityKey } from "@/lib/offline/projection";
+import { entityKey, normalizeOfflineUrl } from "@/lib/offline/projection";
 import { NextResponse } from "next/server";
 import { getStudentContext } from "@/lib/academic/student-context";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const text = await request.text();
   if (new TextEncoder().encode(text).length > 350_000) return json({ error: "Offline edit is too large." }, 413);
   let input: { ownerId: string; contextKey: string; url: keyof typeof handlers; body: Record<string, unknown>; expected: Record<string, unknown> | null; predecessor?: string | null };
-  try { input = JSON.parse(text); } catch { return json({ error: "Invalid request." }, 400); }
+  try { input = JSON.parse(text); if (input && typeof input.url === 'string') input.url = normalizeOfflineUrl(input.url) as keyof typeof handlers; } catch { return json({ error: "Invalid request." }, 400); }
   const key = request.headers.get("Idempotency-Key") ?? "";
   if (!input || !UUID.test(key) || !Object.hasOwn(handlers, input.url) || !input.body || typeof input.body !== "object" || Array.isArray(input.body)) return json({ error: "Invalid offline edit." }, 400);
   if (input.ownerId !== context.userId) return json({ error: "This edit belongs to another account." }, 403);

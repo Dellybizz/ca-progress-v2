@@ -34,12 +34,12 @@ export default async function ResourcesPage({searchParams}:{searchParams:Promise
     content = <IcaiResourceBrowser catalog={catalog} embedded scopeLocked={Boolean(selection)}/>;
   } else {
     const [model,communityDraft] = await Promise.all([
-      getResourceLibraryModel({includeOfficial:false}),
+      getResourceLibraryModel({includeOfficial:false,metadataOnly:true}),
       tab === 'my' ? getCommunityNoteDraftForViewer(param(params.communityMessageId)) : Promise.resolve(null),
     ]);
     if (model.mode === 'setup') redirect('/onboarding?next=/resources');
     content = model.mode === 'ready' ? <>
-      <OfflineSnapshot kind="resources" data={model}/><OfflineSnapshot kind="notes" data={model}/>
+      <OfflineSnapshot kind="resources" data={model}/>
       <StorageCleanupWarning/>
       <ResourceLibrary key={tab} model={model} initialTab={tab} hideTabs initialAcademicContext={{subjectId:param(params.subjectId),chapterId:param(params.chapterId)}} initialCommunityDraft={communityDraft}/>
     </> : <div className="resource-hub-guest"><LoginRequired next={resourceDestination(params,tab)} title="Sign in to open your library"/><p>Official study material is available without signing in. <Link href={resourceDestination(params,'icai')}>Browse ICAI resources →</Link></p></div>;

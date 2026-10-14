@@ -1,3 +1,4 @@
+import {isWorkspaceTrashed} from './workspace';
 import "server-only";
 import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 
@@ -113,7 +114,7 @@ async function tagsForOwnNotes(client: Awaited<ReturnType<typeof createD1ServerC
   return tagsByNote;
 }
 
-export async function getResourceLibraryModel({ includeOfficial = true }: { includeOfficial?: boolean } = {}): Promise<ResourceLibraryModel> {
+export async function getResourceLibraryModel({ includeOfficial = true, metadataOnly = false }: { includeOfficial?: boolean; metadataOnly?:boolean } = {}): Promise<ResourceLibraryModel> {
   const context = await getStudentContext();
   if (context.mode === "guest") return { mode: "guest", officialResources: includeOfficial ? officialCards(await getIcaiPublicCatalog({})) : [] };
   if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: context.displayName, officialResources: [] };
@@ -123,7 +124,7 @@ export async function getResourceLibraryModel({ includeOfficial = true }: { incl
   const [names, tagsByNote, rows, subjects, officialResources, importanceRows] = await Promise.all([
     nameMaps(client),
     tagsForOwnNotes(client, identity.id),
-    getHotResourceLibraryRows(identity.id),
+    getHotResourceLibraryRows(identity.id,undefined,metadataOnly),
     getPhase6AcademicOptions(identity.id),
     includeOfficial ? getIcaiPublicCatalog({ level: context.selection.level, attempt: context.selection.attemptKey }).then(officialCards) : Promise.resolve([]),
     getD1RuntimeDatabase().prepare("SELECT resource_id FROM resource_importance WHERE owner_user_id=?1").bind(identity.id).all<{resource_id:string}>(),
@@ -151,7 +152,7 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
   const client = await createD1ServerClient();
   const noteResponse = await client.from("notes").select("*").eq("id", noteId).maybeSingle();
   if (noteResponse.error) throw new Error(`Note could not be loaded: ${noteResponse.error.message}`);
-  if (!noteResponse.data) return { mode: "missing" };
+  if (!noteResponse.data || await isWorkspaceTrashed("note",noteId)) return { mode: "missing" };
   const row = noteResponse.data as NoteRow;
   const canManage = row.user_id === identity.id;
   if (!canManage && !(row.visibility === "shared" && row.moderation_status === "approved")) return { mode: "missing" };

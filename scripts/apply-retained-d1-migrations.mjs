@@ -93,6 +93,7 @@ const migrations = [
   ["0092", "d1/migrations/0092_ranker_first_month_offer.sql"],
   ["0093", "d1/migrations/0093_provider_password_recovery.sql"],
   ["0094", "d1/migrations/0094_onboarding_setup_v2.sql"],
+  ["0095", "d1/migrations/0095_resource_workspace.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
@@ -115,7 +116,7 @@ const mobilePushLedger = query("SELECT version FROM _ca_schema_migrations WHERE 
 for (const row of mobilePushLedger?.[0]?.results ?? []) applied.add(String(row.version));
 const mobileDeletionLedger = query("SELECT version FROM _ca_schema_migrations WHERE version='0062';");
 for (const row of mobileDeletionLedger?.[0]?.results ?? []) applied.add(String(row.version));
-const mobileReleaseLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0063','0064','0065','0066','0067','0068','0069','0070','0071','0072','0073','0074','0075','0076','0077','0078','0079','0080','0081','0082','0083','0084','0085','0086','0087','0088','0089','0090','0091','0092','0093','0094');");
+const mobileReleaseLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0063','0064','0065','0066','0067','0068','0069','0070','0071','0072','0073','0074','0075','0076','0077','0078','0079','0080','0081','0082','0083','0084','0085','0086','0087','0088','0089','0090','0091','0092','0093','0094','0095');");
 for (const row of mobileReleaseLedger?.[0]?.results ?? []) applied.add(String(row.version));
 for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }

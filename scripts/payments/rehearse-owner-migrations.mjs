@@ -19,8 +19,8 @@ export function rehearse(){
   for(const file of files.filter(f=>f.slice(0,4)>'0084')){db.exec(readFileSync('d1/migrations/'+file,'utf8'));applied.push(file.slice(0,4));}
   if(before!==snapshot())throw Error('An owner migration changed a retained paid contract.');
   if(db.prepare('PRAGMA foreign_key_check').all().length)throw Error('Migration rehearsal has foreign-key violations.');
-  const ledger=db.prepare("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0085' AND '0094' ORDER BY version").all().map(r=>r.version);
-  if(ledger.length!==10)throw Error('Owner migration ledger is incomplete.');
+  const ledger=db.prepare("SELECT version FROM _ca_schema_migrations WHERE version >= '0085' ORDER BY version").all().map(r=>r.version);
+  if(ledger.length!==applied.length)throw Error('Owner migration ledger is incomplete.');
   // The retained runner must skip already-applied additive ALTER statements.
   const secondPass=applied.filter(version=>!ledger.includes(version));if(secondPass.length)throw Error('Retained migration replay would repeat an applied migration.');
   return {status:'passed',migrations:applied,retained_contract_unchanged:true,foreign_key_violations:0,second_pass_mutations:0,baseline_fingerprint:createHash('sha256').update(before).digest('hex')};

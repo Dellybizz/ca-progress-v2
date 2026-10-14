@@ -1,3 +1,4 @@
+import {isWorkspaceTrashed} from '@/lib/resources/workspace';
 import {touchStorageFile} from "@/lib/billing/storage-cleanup.mjs";
 import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 import { NextResponse } from "next/server";
@@ -17,6 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Authentication required." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
   const { id } = await params;
+  if(await isWorkspaceTrashed("upload",id))return NextResponse.json({error:"Resource not found."},{status:404});
   const client = await createD1ServerClient();
   const response = await client.from("uploaded_resources")
     .select("id,owner_user_id,visibility,moderation_status,storage_bucket,storage_path,original_filename,mime_type")

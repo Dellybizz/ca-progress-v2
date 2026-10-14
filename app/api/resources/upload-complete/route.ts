@@ -3,7 +3,7 @@ import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess, createResourceMetadataWithinQuota } from "@/lib/billing/service";
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
-import { enqueueBackgroundJob, jobKey } from "@/lib/jobs/queue";
+import {dispatchResourceProcessing} from "@/lib/resources/processing-outbox";
 import { normalizeFilename } from "@/lib/resources/validation";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +23,17 @@ export async function POST(request: Request) {
   const database: HotD1Database = getHotD1Database();
   const intent = await database.prepare("SELECT id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at,status FROM r2_upload_intents WHERE id=?1 LIMIT 1").bind(uploadId).first() as Record<string, unknown> | null;
   if (!intent || intent.user_id !== identity.id) return fail("Upload not found.", 404, "UPLOAD_NOT_FOUND");
-  if (intent.status === "completed") {
+  if (intent.status === "completed" || intent.status === "issued") {
     const existing = await database.prepare("SELECT id,moderation_status FROM uploaded_resources WHERE owner_user_id=?1 AND storage_path=?2 LIMIT 1").bind(identity.id,String(intent.object_key)).first<{id:string;moderation_status:string}>();
-    if (existing) return NextResponse.json({id:existing.id,status:existing.moderation_status,storage:RESOURCE_R2_STORAGE_BUCKET,processing:"queued"},{headers:{"Cache-Control":"private, no-store"}});
+    if (existing) {
+      if(intent.status==='issued') {
+        try { await database.batch([
+          database.prepare("UPDATE r2_upload_intents SET status='completed',completed_at=CURRENT_TIMESTAMP WHERE id=?1").bind(uploadId),
+          database.prepare('INSERT OR IGNORE INTO resource_processing_outbox(resource_id,owner_user_id) VALUES(?1,?2)').bind(existing.id,identity.id),
+        ]); await dispatchResourceProcessing(existing.id); } catch { /* Durable metadata remains valid; the cleanup repair job retries dispatch. */ }
+      }
+      return NextResponse.json({id:existing.id,status:existing.moderation_status,storage:RESOURCE_R2_STORAGE_BUCKET,processing:"queued"},{headers:{"Cache-Control":"private, no-store"}});
+    }
   }
   if (intent.status !== "issued") return fail("This upload has already been completed or closed.", 409, "UPLOAD_NOT_ACTIVE");
   if (Date.parse(String(intent.expires_at)) <= Date.now()) {
@@ -59,6 +67,7 @@ export async function POST(request: Request) {
     return fail(access.upgradeMessage || "Your storage allowance has changed.", 403, "STORAGE_LIMIT_REACHED");
   }
 
+  let committedId:string|null=null;
   try {
     const inserted = await createResourceMetadataWithinQuota({
       userId: identity.id,
@@ -74,10 +83,19 @@ export async function POST(request: Request) {
       sizeBytes: Number(intent.expected_size_bytes),
       visibility: metadata.visibility === "shared" ? "shared" : "private",
     });
-    await database.prepare("UPDATE r2_upload_intents SET status='completed',completed_at=CURRENT_TIMESTAMP WHERE id=?1").bind(uploadId).run();
-    void enqueueBackgroundJob({ type: "attachment-process", idempotencyKey: jobKey("attachment-process", identity.id, String(inserted.id)), payload: { resourceId: inserted.id, userId: identity.id }, createdBy: identity.id }).catch(() => undefined);
+    committedId=String(inserted.id);
+    await database.batch([
+      database.prepare("INSERT OR IGNORE INTO resource_processing_outbox(resource_id,owner_user_id) VALUES(?1,?2)").bind(committedId,identity.id),
+      database.prepare("UPDATE r2_upload_intents SET status='completed',completed_at=CURRENT_TIMESTAMP WHERE id=?1").bind(uploadId),
+    ]);
+    await dispatchResourceProcessing(committedId).catch(()=>undefined);
     return NextResponse.json({ id: inserted.id, status: inserted.moderationStatus, storage: RESOURCE_R2_STORAGE_BUCKET, processing: "queued" }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    if(committedId) return NextResponse.json({id:committedId,processing:'pending',status:'saved'}, {status:201,headers:{'Cache-Control':'private, no-store'}});
+    // A racing completion may already have committed this object. Never remove
+    // referenced bytes merely because the second metadata insert failed.
+    const existing=await database.prepare("SELECT id FROM uploaded_resources WHERE owner_user_id=?1 AND storage_path=?2 LIMIT 1").bind(identity.id,String(intent.object_key)).first<{id:string}>();
+    if(existing)return NextResponse.json({id:existing.id,processing:'pending',status:'saved'}, {status:200,headers:{'Cache-Control':'private, no-store'}});
     await bucket.delete(String(intent.object_key)).catch(() => undefined);
     await database.prepare("UPDATE r2_upload_intents SET status='failed' WHERE id=?1").bind(uploadId).run();
     return fail(error instanceof Error ? error.message : "Resource metadata could not be created.", 400, "RESOURCE_METADATA_FAILED");

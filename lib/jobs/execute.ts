@@ -1,3 +1,5 @@
+import {dispatchResourceProcessing} from '@/lib/resources/processing-outbox';
+import {purgeExpiredResourceTrash} from '@/lib/resources/trash-cleanup';
 import "server-only";
 
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
@@ -112,10 +114,13 @@ export async function executeBackgroundJob(job: BackgroundJob) {
       return processAccountDeletion(requestId);
     }
     case "cleanup": {
+      await purgeExpiredResourceTrash();
+      await db().prepare("INSERT OR IGNORE INTO resource_processing_outbox(resource_id,owner_user_id) SELECT u.id,u.owner_user_id FROM uploaded_resources u WHERE NOT EXISTS(SELECT 1 FROM attachment_processing_jobs j WHERE j.resource_id=u.id) LIMIT 50").run();
+      await dispatchResourceProcessing();
       const days = Math.max(1, Math.min(90, Number(job.payload.retentionDays ?? 30)));
       await db().prepare("DELETE FROM background_jobs WHERE status='succeeded' AND updated_at < datetime('now', ?1)").bind(`-${days} days`).run();
       await db().prepare("DELETE FROM notification_outbox WHERE status='sent' AND created_at < datetime('now', ?1)").bind(`-${days} days`).run();
-      const abandoned = await db().prepare("SELECT id,object_key FROM r2_upload_intents WHERE status='issued' AND expires_at < CURRENT_TIMESTAMP LIMIT 100").all();
+      const abandoned = await db().prepare("SELECT id,object_key FROM r2_upload_intents WHERE status='issued' AND expires_at < CURRENT_TIMESTAMP AND NOT EXISTS(SELECT 1 FROM uploaded_resources u WHERE u.storage_path=r2_upload_intents.object_key) LIMIT 100").all();
       try {
         const bucket = getResourceR2Bucket();
         for (const row of (abandoned.results ?? []) as Array<{id:string;object_key:string}>) {

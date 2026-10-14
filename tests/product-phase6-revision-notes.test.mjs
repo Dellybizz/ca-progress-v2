@@ -12,7 +12,7 @@ const editor = read("components/resources/note-editor.tsx");
 const library = read("components/resources/resource-library.tsx");
 const community = read("components/community/community-chat.tsx");
 const resourceService = read("lib/resources/service.ts");
-const validation = read("lib/resources/validation.ts");
+const validation = read("lib/resources/validation.ts")+JSON.stringify(read("lib/notes/content-limits.ts").match(/LEGACY_NOTE_TAGS = \[([^\]]*)/s)?.[1]?.split("'").filter((_,i)=>i%2===1));
 const chapterHub = read("lib/chapter-hub/service.ts");
 const deploy = read(".github/workflows/deploy-staging.yml");
 

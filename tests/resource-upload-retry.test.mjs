@@ -14,6 +14,7 @@ try{
    '@/lib/data/d1/runtime':`let fixture;export const setFixture=value=>{fixture=value};export const getHotD1Database=()=>({prepare(sql){return {bind(...values){return {async first(){if(sql.includes('r2_upload_intents'))return fixture.intent;if(sql.includes('uploaded_resources')){if(values[0]!=='owner'||values[1]!=='private/key')throw new Error('Missing owner scope');return fixture.resource;}throw new Error('Unexpected query');}}}}}});`,
    '@/lib/billing/service':"export const getResourceStorageAccess=()=>{throw new Error('Must not check quota or insert on completion retry')};export const createResourceMetadataWithinQuota=getResourceStorageAccess;",
    '@/lib/resources/r2':"export const RESOURCE_R2_STORAGE_BUCKET='resources';export const getResourceR2Bucket=()=>{throw new Error('Must not access bytes on completed retry')};",
+   '@/lib/resources/processing-outbox':"export const dispatchResourceProcessing=()=>{throw new Error('Must not enqueue duplicate processing')};",
    '@/lib/jobs/queue':"export const enqueueBackgroundJob=()=>{throw new Error('Must not enqueue duplicate processing')};export const jobKey=()=>'';",
    '@/lib/resources/validation':"export const normalizeFilename=value=>value;",
   };if(!sources[args.path])throw new Error(args.path);return {contents:sources[args.path]};

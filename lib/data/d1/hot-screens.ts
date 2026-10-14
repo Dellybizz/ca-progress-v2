@@ -1,3 +1,4 @@
+import {isWorkspaceTrashed,mutateWorkspace} from '@/lib/resources/workspace';
 import { offlineTransaction } from "@/lib/offline/transaction-context";
 import "server-only";
 
@@ -85,12 +86,12 @@ export async function getHotDashboardProgress(userId: string, chapterIds: string
 export type HotNoteRow = { id: string; user_id: string; title: string; body_text: string; body_html: string; subject_id: string | null; chapter_id: string | null; visibility: string; moderation_status: string; owner_label: string; updated_at: string; published_at: string | null };
 export type HotUploadRow = { id: string; owner_user_id: string; title: string; description: string | null; original_filename: string; mime_type: string; extension: string; size_bytes: number; subject_id: string | null; chapter_id: string | null; visibility: string; moderation_status: string; owner_label: string; updated_at: string; published_at: string | null };
 
-export async function getHotResourceLibraryRows(userId: string, db = getHotD1Database()) {
+export async function getHotResourceLibraryRows(userId: string, db = getHotD1Database(), metadataOnly=false) {
   const result = await db.batch([
-    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE user_id=?1 ORDER BY updated_at DESC LIMIT 250").bind(userId),
-    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE owner_user_id=?1 ORDER BY updated_at DESC LIMIT 250").bind(userId),
-    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE visibility='shared' AND moderation_status='approved' AND user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
-    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE visibility='shared' AND moderation_status='approved' AND owner_user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
+    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE user_id=?1 AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='note' AND w.entity_id=notes.id AND w.trashed_at IS NOT NULL) ORDER BY updated_at DESC LIMIT 250".replace("body_text,body_html",metadataOnly?"substr(body_text,1,180) body_text,'' body_html":"body_text,body_html")).bind(userId),
+    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE owner_user_id=?1 AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL) ORDER BY updated_at DESC LIMIT 250").bind(userId),
+    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='note' AND w.entity_id=notes.id AND w.trashed_at IS NOT NULL) AND visibility='shared' AND moderation_status='approved' AND user_id<>?1 ORDER BY published_at DESC LIMIT 150".replace("body_text,body_html",metadataOnly?"substr(body_text,1,180) body_text,'' body_html":"body_text,body_html")).bind(userId),
+    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL) AND visibility='shared' AND moderation_status='approved' AND owner_user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
   ]);
   return {
     ownNotes: (result[0]?.results ?? []) as HotNoteRow[],
@@ -108,7 +109,7 @@ export async function getHotExamEvents(attemptKey: string, startDate: string, en
 }
 
 export async function getHotResourceDetail(resourceId: string, db = getHotD1Database()) {
-  return db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE id=?1 LIMIT 1").bind(resourceId).first<HotUploadRow>();
+  return db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE id=?1 AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL) LIMIT 1").bind(resourceId).first<HotUploadRow>();
 }
 
 export type HotStudySession = { id: string; subject_id: string | null; chapter_id: string | null; started_at: string; ended_at: string; duration_seconds: number; mode: string; timezone: string };
@@ -367,6 +368,7 @@ export async function saveHotNote(input: { id: string|null; createId?:string|nul
   await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
   const id=input.id ?? input.createId ?? crypto.randomUUID();
   if(!input.id&&input.createId){const replay=await db.prepare("SELECT id,moderation_status AS status FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(input.createId,input.userId).first<{id:string;status:string}>();if(replay)return replay;}
+  if(input.id && await isWorkspaceTrashed('note',input.id,db))throw new Error('Restore this note from Trash before editing it.');
   const existing=input.id ? await db.prepare("SELECT id FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(input.id,input.userId).first() : null;
   if (input.id && !existing) throw new Error("Note not found.");
   const status=input.visibility==="shared"?"pending":"private";
@@ -381,10 +383,11 @@ export async function saveHotNote(input: { id: string|null; createId?:string|nul
   }
   await db.batch(statements); return {id,status};
 }
-export async function deleteHotNote(id:string,userId:string,db:HotD1Database=getHotD1Database()){ await db.prepare("DELETE FROM notes WHERE id=?1 AND user_id=?2").bind(id,userId).run(); return {ok:true}; }
+export async function deleteHotNote(id:string,userId:string,db:HotD1Database=getHotD1Database()){const result=await mutateWorkspace(userId,{action:'trash',keys:[`note:${id}`]},db);if('results' in result && !result.results?.[0]?.ok)throw Error(result.results?.[0]?.error??'Note could not be moved to Trash.');return {ok:true};}
 export async function patchHotResource(input:{id:string;userId:string;title:string;description:string|null;subjectId:string|null;chapterId:string|null;visibility:"private"|"shared"},db:HotD1Database=getHotD1Database()){
   if(!input.title||input.title.length>160) throw new Error("A resource title is required.");
   await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
+  if(await isWorkspaceTrashed('upload',input.id,db))throw new Error('Restore this file from Trash before editing it.');
   const row=await db.prepare("SELECT id FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(input.id,input.userId).first(); if(!row) throw new Error("Resource not found.");
   const status=input.visibility==="shared"?"pending":"private";
   await db.prepare("UPDATE uploaded_resources SET title=?1,description=?2,subject_id=?3,chapter_id=?4,visibility=?5,moderation_status=?6,published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?7 AND owner_user_id=?8").bind(input.title,input.description,input.subjectId,input.chapterId,input.visibility,status,input.id,input.userId).run();

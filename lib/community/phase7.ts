@@ -139,7 +139,7 @@ async function hydratePhase7Messages(rows: MessageRow[], viewerId: string | null
     db.prepare(`SELECT id,session_id,community_message_id,subject_id,chapter_id,status FROM study_session_doubts WHERE community_message_id IN (${placeholders(messageIds.length)})`).bind(...messageIds),
   ];
   if (replyIds.length) statements.push(db.prepare(`SELECT id,author_label,body FROM community_messages WHERE id IN (${placeholders(replyIds.length)})`).bind(...replyIds));
-  if (resourceIds.length) statements.push(db.prepare(`SELECT id,title,original_filename,extension,owner_label FROM uploaded_resources WHERE id IN (${placeholders(resourceIds.length)}) AND visibility='shared' AND moderation_status='approved'`).bind(...resourceIds));
+  if (resourceIds.length) statements.push(db.prepare(`SELECT id,title,original_filename,extension,owner_label FROM uploaded_resources WHERE id IN (${placeholders(resourceIds.length)}) AND visibility='shared' AND moderation_status='approved' AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries rw WHERE rw.entity_kind='upload' AND rw.entity_id=uploaded_resources.id AND rw.trashed_at IS NOT NULL)`).bind(...resourceIds));
   if (viewerId) {
     statements.push(db.prepare(`SELECT message_id FROM community_saved_messages WHERE user_id=?1 AND message_id IN (${placeholders(messageIds.length, 2)})`).bind(viewerId, ...messageIds));
     statements.push(db.prepare(`SELECT followed_user_id FROM community_follows WHERE user_id=?1 AND followed_user_id IN (${placeholders(authorIds.length, 2)})`).bind(viewerId, ...authorIds));

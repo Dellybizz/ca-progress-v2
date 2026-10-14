@@ -3,10 +3,12 @@ import type { PlannerReadyModel } from "@/lib/planner/types";
 import type { ResourceLibraryReady, NoteCard } from "@/lib/resources/types";
 import type { StudyReadyModel, StudyTimerSnapshot } from "@/lib/study/types";
 export type EditBody = Record<string, unknown>;
-export const snapshotKind = (url: string) => ({ "/api/progress": "progress", "/api/planner/tasks": "planner", "/api/notes": "notes", "/api/study/timer": "study" })[url];
-export const entityKey = (url: string, body: EditBody) => `${url}:${url === "/api/progress" ? body.chapterId : url === "/api/study/timer" ? "timer" : body.id || body.clientId}`;
+export const normalizeOfflineUrl = (url: string) => url.startsWith('/api/v1/') ? `/api/${url.slice(8)}` : url;
+export const snapshotKind = (url: string) => ({ "/api/progress": "progress", "/api/planner/tasks": "planner", "/api/notes": "notes", "/api/study/timer": "study" })[normalizeOfflineUrl(url)];
+export const entityKey = (rawUrl: string, body: EditBody) => { const url=normalizeOfflineUrl(rawUrl); return `${url}:${url === "/api/progress" ? body.chapterId : url === "/api/study/timer" ? "timer" : body.id || body.clientId}`; };
 
 export function conflictBaseline(url: string, body: EditBody, data: unknown): Record<string, unknown> | null {
+  url = normalizeOfflineUrl(url);
   if (url === "/api/progress") {
     const row = (data as ProgressReadyModel | null)?.chapters?.find(c => c.id === body.chapterId);
     if (!row) throw new Error("Open this chapter online before editing offline.");
@@ -29,6 +31,7 @@ export function conflictBaseline(url: string, body: EditBody, data: unknown): Re
 }
 
 export function projectOfflineEdit<T>(kind: string, input: T, url: string, body: EditBody, result?: Record<string, unknown>): T {
+  url = normalizeOfflineUrl(url);
   if (!input || typeof input !== "object" || !("mode" in input) || input.mode !== "ready") return input;
   const at = String(body.offlineOccurredAt);
   if (kind === "progress" && url === "/api/progress") {
