@@ -49,14 +49,16 @@ export type StudyBuddyDashboard = {
 };
 
 function currentWeekStart() {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
-  const yyyy = monday.getFullYear();
-  const mm = String(monday.getMonth() + 1).padStart(2, "0");
-  const dd = String(monday.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const date=new Date(`${today}T12:00:00Z`);
+  const day=date.getUTCDay();
+  date.setUTCDate(date.getUTCDate()+(day===0?-6:1-day));
+  return date.toISOString().slice(0,10);
+}
+function timestamp(value:string) {
+  const normalized=/Z$|[+-]\d\d:\d\d$/.test(value)?value:`${value.replace(' ','T')}Z`;
+  const date=new Date(normalized);
+  return Number.isNaN(date.getTime())?'':new Intl.DateTimeFormat('en-IN',{dateStyle:'medium',timeStyle:'short',timeZone:'Asia/Kolkata'}).format(date);
 }
 
 export function StudyBuddyWorkspace({ ownerUserId, initialDashboard, initialComparison=[], initialOwnerSummary, preview=false }: { ownerUserId: string; initialDashboard: StudyBuddyDashboard;initialComparison?:StudyBuddyComparisonItem[];initialOwnerSummary?:StudyBuddyOwnerSummary;preview?:boolean }) {
@@ -203,10 +205,10 @@ export function StudyBuddyWorkspace({ ownerUserId, initialDashboard, initialComp
                 <details><summary>Set goal</summary><form className="buddy-compact-form" onSubmit={event=>createGoal(event,buddy)}><label>Goal<input name="title" placeholder="Audit revision" required maxLength={120}/></label><label>Week starting<input name="weekStart" type="date" defaultValue={currentWeekStart()} required/></label><label>Minutes each<input name="targetMinutesPerPerson" type="number" min={1} max={10080} defaultValue={300} required/></label><Button type="submit" disabled={busy}>Create shared goal</Button></form></details>
               </>:<p className="buddy-muted"><Icon name="lock" size={15}/> Both buddies need to enable shared goals in Sharing settings.</p>}
             </section>
-            <section className="buddy-surface buddy-recent"><h3><Icon name="bell" size={18}/>Recent nudges</h3>{dashboard.recentNudges.filter(nudge=>nudge.sender_user_id===buddy.userId).slice(0,3).map(nudge=><article key={nudge.id}><strong>{nudge.sender_display_name||buddy.displayName}</strong><time dateTime={nudge.created_at}>{new Date(nudge.created_at).toLocaleString('en-IN')}</time><p>{nudge.message}</p></article>)}{!dashboard.recentNudges.some(nudge=>nudge.sender_user_id===buddy.userId)?<p className="buddy-muted">No nudges from this buddy yet.</p>:null}<small>Up to {dashboard.nudgeLimitPer24Hours} nudges per buddy each day.</small></section>
+            <section className="buddy-surface buddy-recent"><h3><Icon name="bell" size={18}/>Recent nudges</h3>{dashboard.recentNudges.filter(nudge=>nudge.sender_user_id===buddy.userId).slice(0,3).map(nudge=><article key={nudge.id}><strong>{nudge.sender_display_name||buddy.displayName}</strong><time dateTime={nudge.created_at}>{timestamp(nudge.created_at)}</time><p>{nudge.message}</p></article>)}{!dashboard.recentNudges.some(nudge=>nudge.sender_user_id===buddy.userId)?<p className="buddy-muted">No nudges from this buddy yet.</p>:null}<small>Up to {dashboard.nudgeLimitPer24Hours} nudges per buddy each day.</small></section>
           </div>
           <section className="buddy-surface buddy-together" id="buddy-together"><h3>Study Together</h3><p className="buddy-muted">A shared study session with no audio/video.</p>
-            {buddy.mySharing.shareStudyStatus&&buddy.buddySharing.shareStudyStatus?buddy.studyTogether?<div className="buddy-together-session"><strong>Session started {new Date(buddy.studyTogether.started_at).toLocaleString('en-IN')}</strong>{buddy.studyTogether.participants.find(item=>item.user_id===ownerUserId)?.joined_at?null:<Button disabled={busy} onClick={()=>void mutate({action:'joinTogether',studyTogetherId:buddy.studyTogether?.id},'Joined Study Together.')}>Join session</Button>}<form className="buddy-compact-form" onSubmit={event=>completeTogether(event,buddy.studyTogether as Together)}><label>Completed study session ID<input name="studySessionId" required/></label><Button type="submit" disabled={busy}>Link completion</Button></form></div>:<Button disabled={busy} onClick={()=>void mutate({action:'startTogether',buddyUserId:buddy.userId},'Study Together started.')}>Start Study Together</Button>:<p className="buddy-muted"><Icon name="lock" size={15}/> Both buddies need to enable Study Together status in Sharing settings.</p>}
+            {buddy.mySharing.shareStudyStatus&&buddy.buddySharing.shareStudyStatus?buddy.studyTogether?<div className="buddy-together-session"><strong>Session started {timestamp(buddy.studyTogether.started_at)}</strong>{buddy.studyTogether.participants.find(item=>item.user_id===ownerUserId)?.joined_at?null:<Button disabled={busy} onClick={()=>void mutate({action:'joinTogether',studyTogetherId:buddy.studyTogether?.id},'Joined Study Together.')}>Join session</Button>}<form className="buddy-compact-form" onSubmit={event=>completeTogether(event,buddy.studyTogether as Together)}><label>Completed study session ID<input name="studySessionId" required/></label><Button type="submit" disabled={busy}>Link completion</Button></form></div>:<Button disabled={busy} onClick={()=>void mutate({action:'startTogether',buddyUserId:buddy.userId},'Study Together started.')}>Start Study Together</Button>:<p className="buddy-muted"><Icon name="lock" size={15}/> Both buddies need to enable Study Together status in Sharing settings.</p>}
           </section>
           <p className="buddy-privacy-note"><Icon name="lock" size={15}/>Only information you choose to share is visible.</p>
           <details className="buddy-report"><summary>Report safety issue</summary><form className="buddy-compact-form" onSubmit={event=>{event.preventDefault();const element=event.currentTarget;const form=new FormData(element);void mutate({action:'report',buddyUserId:buddy.userId,reason:form.get('reason'),details:form.get('details')},'Report submitted for review.').then(ok=>{if(ok)element.reset();});}}><label>Reason<input name="reason" required maxLength={80}/></label><label>Details<textarea name="details" maxLength={600}/></label><Button type="submit" variant="secondary" disabled={busy}>Report</Button></form></details>
