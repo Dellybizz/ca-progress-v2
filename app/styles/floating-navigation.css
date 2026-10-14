@@ -1,8 +1,9 @@
 .floating-brand,.floating-navigation-slot,.floating-academic-context{display:none}
 @media(min-width:900px){
+  body:has(.app-shell--floating){--topbar-height:102px}
   .app-shell.app-shell--r3.app-shell--floating{grid-template-columns:minmax(0,1fr)!important;background:var(--color-bg)}
   .app-shell--floating .app-main{margin-left:0;min-width:0}
-  .app-shell--floating .topbar{display:grid;grid-template-columns:auto 44px minmax(0,1fr) 44px auto;gap:12px;min-height:100px;padding:16px 24px;border:0;background:color-mix(in srgb,var(--color-bg) 94%,transparent);backdrop-filter:blur(16px);isolation:isolate}
+  .app-shell--floating .topbar{display:grid;grid-template-columns:auto 44px minmax(0,1fr) 44px auto;gap:12px;min-height:100px;padding:16px 24px;border:0;background:color-mix(in srgb,var(--color-bg) 94%,transparent);isolation:isolate}
   .app-shell--floating .topbar>.mobile-app-bar,.app-shell--floating .topbar-context{display:none}
   .app-shell--floating .topbar-controls{display:contents}
   .app-shell--floating .floating-brand{display:flex;align-items:center;gap:11px;color:var(--color-text);text-decoration:none;min-height:48px;white-space:nowrap;font-size:18px;font-weight:750;letter-spacing:-.4px}
