@@ -18,8 +18,10 @@ test('offline feature entry keeps previews visible but disables all identity act
  const {module:c,cleanup}=await components();try{
  const props={onGoogle(){},onLinkedIn(){},onLogin(){},onBack(){},online:false};const html=renderToStaticMarkup(React.createElement(c.FeatureSignup,props));
  assert.match(html,/Connect to sign in or create an account/);assert.match(html,/Illustrative feature preview/);assert.match(html,/aria-current="step"/);
- for(const label of ['Continue with Google','Continue with LinkedIn','Already have an account? Log in'])assert.match(html,new RegExp('<button[^>]*disabled=""[^>]*>'+label.replaceAll('?','\\?')+'</button>'));
- const online=renderToStaticMarkup(React.createElement(c.FeatureSignup,{...props,online:true}));assert.doesNotMatch(online,/<button[^>]*disabled=""[^>]*>Continue with Google/);
+ for(const label of ['Continue with Google','Continue with LinkedIn'])assert.match(html,new RegExp('<button[^>]*aria-label="'+label+'"[^>]*disabled=""'));
+ assert.match(html,/<button[^>]*disabled=""[^>]*>Already have an account\? Log in<\/button>/);
+ const online=renderToStaticMarkup(React.createElement(c.FeatureSignup,{...props,online:true}));
+ for(const label of ['Continue with Google','Continue with LinkedIn'])assert.doesNotMatch(online,new RegExp('<button[^>]*aria-label="'+label+'"[^>]*disabled=""'));
  assert.equal(c.onboardingFeatures.length,3);
  }finally{await cleanup();}
 });
