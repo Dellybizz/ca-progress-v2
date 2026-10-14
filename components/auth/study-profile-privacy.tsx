@@ -23,7 +23,7 @@ const visibilityOptions = [
   { value: "public", label: "Everyone" },
 ] as const;
 
-export function StudyProfilePrivacy({ ownerUserId, initialSettings }: { ownerUserId: string; initialSettings: Settings }) {
+export function StudyProfilePrivacy({ ownerUserId, initialSettings, expanded = false }: { ownerUserId: string; initialSettings: Settings; expanded?: boolean }) {
   const [settings, setSettings] = useState(initialSettings);
   const [buddyId, setBuddyId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -79,7 +79,7 @@ export function StudyProfilePrivacy({ ownerUserId, initialSettings }: { ownerUse
   }
 
   return <section className="profile-v3-privacy">
-    <details>
+    <details open={expanded}>
       <summary><span>Privacy & sharing</span><Icon name="chevron" size={18}/></summary>
       <div className="profile-v3-privacy__body">
         <fieldset className="profile-form-stack" disabled={saving || buddyBusy}>

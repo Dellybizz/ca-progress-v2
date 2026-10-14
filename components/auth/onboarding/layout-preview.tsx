@@ -1,4 +1,5 @@
 "use client";
+import {ProfileOverview} from '@/components/profile/profile-overview';
 import {useState} from 'react';
 import {StudyBuddyWorkspace} from '@/components/study-buddy/study-buddy-workspace';
 import {sampleBuddyDashboard,sampleBuddyComparison,sampleOwnerSummary} from '@/components/study-buddy/layout-sample';
@@ -7,7 +8,7 @@ import {AccountLogin,AccountCredentials,AccountRecovery} from './accounts';
 import {SetupScreens} from './setup';
 import {emptySetupDraft,SETUP_STEPS,type SetupDraft,type SetupStep} from '@/lib/profile/setup-contract';
 import './layout-preview.css';
-const screens=['welcome','features','login','credentials','recovery','reset',...SETUP_STEPS,'study-buddy','pending'] as const;
+const screens=['welcome','features','login','credentials','recovery','reset',...SETUP_STEPS,'study-buddy','profile','pending'] as const;
 const sizes=[{name:'Small phone',width:320,height:640},{name:'Phone',width:390,height:844},{name:'Phone landscape',width:844,height:390},{name:'Tablet',width:768,height:1024},{name:'Desktop',width:1280,height:800}] as const;
 const noAction=()=>undefined;
 const rejectAction=async()=>{throw new Error('Preview only. This form does not contact an account service.');};
@@ -15,6 +16,7 @@ function PreviewScreen({screen}:{screen:string}){
  const [notice,setNotice]=useState('');
  const announce=()=>setNotice('Preview only. No account action was performed.');
  const common={onBack:announce,error:notice};
+ if(screen==='profile')return <div style={{padding:12}}><p>Sample profile · preview only</p><div inert><ProfileOverview userId="sample-student" name="Aisha Khan" avatar={null} bio="One chapter at a time." level="Intermediate" group="Both groups" attempt="May 2027" dailyMinutes={147} visibility="private" buddyCount={2} stats={{completed:28,chapters:146,streak:12,totalSeconds:460800,activity:[15000,11160,10080,12960,7560,14400,9000].map((seconds,index)=>({date:`2026-10-${index+8}`,label:['Thu','Fri','Sat','Sun','Mon','Tue','Wed'][index],seconds}))}}/></div></div>;
  if(screen==='study-buddy')return <StudyBuddyWorkspace ownerUserId="preview-owner" initialDashboard={sampleBuddyDashboard} initialComparison={sampleBuddyComparison} initialOwnerSummary={sampleOwnerSummary} preview/>;
  if(screen==='welcome')return <BookWelcome onBegin={announce}/>;
  if(screen==='features')return <FeatureSignup {...common} onGoogle={announce} onLinkedIn={announce} onLogin={announce} onOfflineSetup={announce}/>;
