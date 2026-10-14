@@ -16,7 +16,7 @@ function PreviewScreen({screen}:{screen:string}){
  if(screen==='welcome')return <BookWelcome onBegin={announce}/>;
  if(screen==='features')return <FeatureSignup {...common} onGoogle={announce} onLinkedIn={announce} onLogin={announce} onOfflineSetup={announce}/>;
  if(screen==='login')return <AccountLogin {...common} onLogin={rejectAction} onProvider={announce} onRecovery={announce} onSignup={announce}/>;
- if(screen==='credentials'||screen==='reset')return <AccountCredentials {...common} assignedUsername="preview_only" reset={screen==='reset'} onSave={rejectAction}/>;
+ if(screen==='credentials'||screen==='reset')return <AccountCredentials {...common} assignedUsername="aisha.khan" reset={screen==='reset'} onSave={rejectAction} onProfile={screen==='credentials'?announce:undefined} onLater={screen==='credentials'?announce:undefined}/>;
  if(screen==='recovery')return <AccountRecovery {...common} onProvider={announce}/>;
  const step=SETUP_STEPS.includes(screen as SetupStep)?screen as SetupStep:'review';
  const draft:SetupDraft={...emptySetupDraft(),step,level:step==='intro'||step==='level'?null:'intermediate',group:step==='intro'||step==='level'?null:'both',attemptDecision:step==='intro'||step==='level'?null:'undecided',preparationState:'studying',support:['progress','planner','notes','consistency'],goalMode:'set',dailyTargetMinutes:147};
