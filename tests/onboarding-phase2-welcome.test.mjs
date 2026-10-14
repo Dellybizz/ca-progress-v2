@@ -22,6 +22,7 @@ test('offline feature entry keeps previews visible but disables all identity act
  assert.match(html,/<button[^>]*disabled=""[^>]*>Already have an account\? Log in<\/button>/);
  const online=renderToStaticMarkup(React.createElement(c.FeatureSignup,{...props,online:true}));
  for(const label of ['Continue with Google','Continue with LinkedIn'])assert.doesNotMatch(online,new RegExp('<button[^>]*aria-label="'+label+'"[^>]*disabled=""'));
+ assert.doesNotMatch(online,/Continue as [Gg]uest/);
  assert.equal(c.onboardingFeatures.length,3);
  }finally{await cleanup();}
 });

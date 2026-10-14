@@ -14,8 +14,8 @@ function PreviewScreen({screen}:{screen:string}){
  const announce=()=>setNotice('Preview only. No account action was performed.');
  const common={onBack:announce,error:notice};
  if(screen==='welcome')return <BookWelcome onBegin={announce}/>;
- if(screen==='features')return <FeatureSignup {...common} onGoogle={announce} onLinkedIn={announce} onLogin={announce} onOfflineSetup={announce} onGuest={announce}/>;
- if(screen==='login')return <AccountLogin {...common} onLogin={rejectAction} onProvider={announce} onRecovery={announce} onSignup={announce} onGuest={rejectAction}/>;
+ if(screen==='features')return <FeatureSignup {...common} onGoogle={announce} onLinkedIn={announce} onLogin={announce} onOfflineSetup={announce}/>;
+ if(screen==='login')return <AccountLogin {...common} onLogin={rejectAction} onProvider={announce} onRecovery={announce} onSignup={announce}/>;
  if(screen==='credentials'||screen==='reset')return <AccountCredentials {...common} assignedUsername="preview_only" reset={screen==='reset'} onSave={rejectAction}/>;
  if(screen==='recovery')return <AccountRecovery {...common} onProvider={announce}/>;
  const step=SETUP_STEPS.includes(screen as SetupStep)?screen as SetupStep:'review';
