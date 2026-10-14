@@ -2,6 +2,18 @@ name: Onboarding Phase 7 APK certification
 on:
   push:
     branches: [onboarding-design-phase7]
+    paths:
+      - android/**
+      - apps/mobile/**
+      - components/auth/onboarding/**
+      - packages/mobile-data/**
+      - packages/capacitor-*/**
+      - lib/profile/setup-*.ts
+      - native-shell/**
+      - scripts/mobile/prepare-onboarding-certification.mjs
+      - capacitor.config.ts
+      - package*.json
+      - .github/workflows/onboarding-phase7.yml
   workflow_dispatch:
 permissions:
   contents: read
@@ -74,6 +86,8 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
           script: |
+            adb root
+            adb wait-for-device
             adb install certified-apk/android/app/build/outputs/apk/debug/app-debug.apk
             adb install certified-apk/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
             adb shell svc wifi disable || { adb logcat -d -t 200; exit 1; }
