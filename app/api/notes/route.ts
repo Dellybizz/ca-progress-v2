@@ -7,6 +7,7 @@ import { getD1RuntimeDatabase } from '@/lib/data/d1/client';
 import { stageOfflineWrites } from '@/lib/offline/atomic';
 import { offlineTransaction } from '@/lib/offline/transaction-context';
 import {getHotD1Database} from '@/lib/data/d1/runtime';
+import {getStudentContext} from '@/lib/academic/student-context';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,25 +21,40 @@ export async function POST(request: Request) {
   catch { return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 }); }
   if(!body||typeof body!=='object'||Array.isArray(body))return NextResponse.json({error:'Invalid note request.'},{status:400});
 
+  if(body.expectedOwnerId!==undefined&&body.expectedOwnerId!==identity.id)return NextResponse.json({error:'Your account changed. Reopen this editor before saving.'},{status:409});
+  if(typeof body.expectedContextKey==='string'&&(await getStudentContext()).contextKey!==body.expectedContextKey)return NextResponse.json({error:'Your study profile changed. Reopen this editor before saving.'},{status:409});
   const title = cleanText(body.title, 160);
   const rawHtml = typeof body.bodyHtml === "string" ? body.bodyHtml : "";
   let bodyHtml: string, bodyText: string;
   try { bodyHtml = sanitizeRichTextHtml(rawHtml); bodyText = richTextToPlainText(bodyHtml); assertNoteContentSize(bodyHtml, bodyText); }
   catch (error) { return NextResponse.json({error:error instanceof Error ? error.message : 'Note is too large.', code:'DOCUMENT_TOO_LARGE'}, {status:413}); }
-  const visibility = body.visibility === "shared" ? "shared" : "private";
-  const noteId = typeof body.id === "string" && /^[0-9a-f-]{36}$/i.test(body.id) ? body.id : null;
+  let visibility: "private" | "shared" = body.visibility === "shared" ? "shared" : "private";
+  const noteId = typeof body.id === "string" && body.id.trim() && body.id.length<=160 ? body.id : null;
+  if(body.id!==undefined&&body.id!==null&&!noteId)return NextResponse.json({error:'Invalid note ID.'},{status:400});
   const createId = !noteId && typeof body.clientId === "string" && /^[0-9a-f-]{36}$/i.test(body.clientId) ? body.clientId : null;
-  const subjectId = nullableId(body.subjectId);
-  const chapterId = nullableId(body.chapterId);
-  const topicId = nullableId(body.topicId);
+  let subjectId = nullableId(body.subjectId);
+  let chapterId = nullableId(body.chapterId);
+  let topicId = nullableId(body.topicId);
   const sourceMessageId = nullableId(body.sourceMessageId);
-  const resourceIds = Array.isArray(body.resourceIds) ? body.resourceIds.filter((value): value is string => typeof value === "string") : [];
-  const tags = normalizeTags(body.tags);
+  let resourceIds = Array.isArray(body.resourceIds) ? body.resourceIds.filter((value): value is string => typeof value === "string") : [];
+  let tags = normalizeTags(body.tags);
 
   if (!title) return NextResponse.json({ error: "A note title is required." }, { status: 400 });
   if (!bodyText && !bodyHtml) return NextResponse.json({ error: "Add some note content before saving." }, { status: 400 });
 
   try {
+    if(noteId){
+      const db=getHotD1Database();
+      const existing=await db.prepare('SELECT n.visibility,n.subject_id,n.chapter_id,m.topic_id FROM notes n LEFT JOIN note_revision_metadata m ON m.note_id=n.id AND m.user_id=n.user_id WHERE n.id=?1 AND n.user_id=?2').bind(noteId,identity.id).first<{visibility:string;subject_id:string|null;chapter_id:string|null;topic_id:string|null}>();
+      if(existing){
+        if(body.visibility===undefined)visibility=existing.visibility==='shared'?'shared':'private';
+        if(body.subjectId===undefined)subjectId=existing.subject_id;
+        if(body.chapterId===undefined)chapterId=existing.chapter_id;
+        if(body.topicId===undefined)topicId=existing.topic_id;
+        if(body.tags===undefined){const rows=await db.prepare('SELECT t.name FROM note_tags t JOIN note_tag_map m ON m.tag_id=t.id WHERE m.note_id=?1').bind(noteId).all<{name:string}>();tags=(rows.results??[]).map(row=>row.name);}
+        if(body.resourceIds===undefined){const rows=await db.prepare('SELECT resource_id FROM note_resource_links WHERE note_id=?1 AND user_id=?2').bind(noteId,identity.id).all<{resource_id:string}>();resourceIds=(rows.results??[]).map(row=>row.resource_id);}
+      }
+    }
     const requestHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify({title,bodyHtml,subjectId,chapterId,topicId,tags,visibility,sourceMessageId,resourceIds})))),byte=>byte.toString(16).padStart(2,'0')).join('');
     if(createId){
       const existing=await getHotD1Database().prepare("SELECT n.id,n.moderation_status,n.visibility,r.request_hash FROM notes n LEFT JOIN note_create_receipts r ON r.note_id=n.id AND r.owner_user_id=n.user_id WHERE n.id=?1 AND n.user_id=?2 AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='note' AND w.entity_id=n.id AND w.trashed_at IS NOT NULL)").bind(createId,identity.id).first<{id:string;moderation_status:string;visibility:string;request_hash:string|null}>();

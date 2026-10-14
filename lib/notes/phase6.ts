@@ -1,3 +1,4 @@
+import {isWorkspaceTrashed} from '@/lib/resources/workspace';
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
@@ -129,12 +130,13 @@ async function validateLocation(userId: string, subjectId: string | null, chapte
   return { levelId: row?.level_id ?? null };
 }
 
-async function validateOwnedResources(userId: string, resourceIds: string[]) {
+async function validateOwnedResources(userId: string, resourceIds: string[], existingIds: string[] = []) {
   const ids = [...new Set(resourceIds)];
   if(ids.length>20||ids.some(id=>!/^[0-9a-f-]{36}$/i.test(id)))throw new Error('Choose up to 20 valid note files.');
   if (!ids.length) return [];
   const db = getHotD1Database();
-  const rows = await db.prepare(`SELECT id,extension FROM uploaded_resources WHERE owner_user_id=?1 AND id IN (${ids.map((_, index) => `?${index + 2}`).join(",")}) AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL)`).bind(userId, ...ids).all<{ id: string; extension: string }>();
+  const rows = await db.prepare(`SELECT id,extension FROM uploaded_resources WHERE owner_user_id=?1 AND id IN (${ids.map((_, index) => `?${index + 2}`).join(",")})`).bind(userId, ...ids).all<{ id: string; extension: string }>();
+  for(const id of ids){if(!existingIds.includes(id)&&await isWorkspaceTrashed('upload',id,db))throw new Error('Restore a file from Trash before attaching it.');}
   if ((rows.results ?? []).length !== ids.length) throw new Error("A linked note file is missing or is not owned by you.");
   return (rows.results ?? []).map((row) => ({ id: row.id, kind: ["jpg","jpeg","png","webp"].includes(row.extension.toLowerCase()) ? "image" : row.extension.toLowerCase() === "pdf" ? "pdf" : "file" }));
 }
@@ -156,7 +158,8 @@ export async function savePhase6Note(input: {
   resourceIds: string[];
 }) {
   const location = await validateLocation(input.userId, input.subjectId, input.chapterId, input.topicId);
-  const linkedResources = await validateOwnedResources(input.userId, input.resourceIds);
+  const previousLinks=input.id?(await getHotD1Database().prepare('SELECT resource_id FROM note_resource_links WHERE note_id=?1 AND user_id=?2').bind(input.id,input.userId).all<{resource_id:string}>()).results??[]:[];
+  const linkedResources = await validateOwnedResources(input.userId, input.resourceIds,previousLinks.map(link=>link.resource_id));
   const source = input.sourceMessageId ? await resolveCommunitySource(input.userId, input.sourceMessageId) : null;
   const visibility = source && !input.id ? "private" : input.visibility;
   const result = await saveHotNote({

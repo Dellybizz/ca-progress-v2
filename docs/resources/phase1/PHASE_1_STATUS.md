@@ -38,3 +38,10 @@ Private file versions point to immutable, separately uploaded owned file records
 - Native assets compile; a new APK and physical-device certification are not supplied by this change. Phase 4 remains responsible for the expanded native persistence/jobs and process-kill guarantees. Cached browser views are explicitly limited to their saved pages while disconnected; complete server search requires a connection.
 
 Production rollout is only complete when the exact-commit workflow passes its browser, restore, runtime, migration and live checks. Until then, source implementation is complete and live release remains pending. Rollback keeps both additive migrations and recoverable content.
+
+## Final preservation checks
+
+The release follow-up preserves omitted tags, visibility, academic metadata and linked files when an older client edits a note. Existing owned attachments remain linked while in Trash; newly attaching a Trashed file is rejected. Open editors bind writes and draft persistence to the account and study context in which they opened. Malformed IDs cannot silently create a different note. Existing online revision guards and offline replay protection remain in place.
+
+- Full suite: 1,329 passed before the final attachment regression; all 23 focused workspace tests passed with that regression (expected full total 1,330).
+- TypeScript and production OpenNext build passed. Final CI reruns lint, tests, size and runtime checks for the exact commit.

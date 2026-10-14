@@ -43,6 +43,7 @@ export function NoteEditor({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const context = useStudentContext();
+  const ownerAtOpen=useRef(context.userId),scopeAtOpen=useRef(context.contextKey);
   const router = useRouter();
   const editorRef = useRef<HTMLDivElement>(null);
   const savingRef = useRef(false), createIdRef = useRef<string|null>(null), editVersionRef = useRef(0), dirtyRef = useRef(false);
@@ -72,11 +73,11 @@ export function NoteEditor({
   const draftKey=`legacy-note-draft:${note?.id??communityDraft?.messageId??'new'}`;
   useEffect(()=>{let active=true;if(context.userId)getOfflineMeta<LegacyDraft|null>(context.userId,draftKey).then(draft=>{if(active&&draft&&typeof draft.bodyHtml==='string')setRecoveredDraft(draft);}).catch(()=>{if(active)setError('Device draft recovery is unavailable. Keep this page open until your note is saved.');});return()=>{active=false;};},[context.userId,draftKey]);
   useEffect(()=>{
-    if(!context.userId||!dirtyRef.current)return;
+    if(!context.userId||!dirtyRef.current||context.userId!==ownerAtOpen.current||context.contextKey!==scopeAtOpen.current)return;
     const draft:LegacyDraft={title,bodyHtml:editorRef.current?.innerHTML??'',subjectId,chapterId,topicId,tags,visibility,resourceIds,clientId:createIdRef.current,savedId:savedIdRef.current};
     const owner=context.userId;
     draftWrites.current=draftWrites.current.catch(()=>undefined).then(()=>putOfflineMeta(owner,draftKey,draft)).catch(()=>{setError('Your device could not retain this draft. Keep this page open until saved.');});
-  },[editVersion,title,subjectId,chapterId,topicId,tags,visibility,resourceIds,context.userId,draftKey]);
+  },[editVersion,title,subjectId,chapterId,topicId,tags,visibility,resourceIds,context.userId,context.contextKey,draftKey]);
   function restoreDraft(){if(!recoveredDraft||!editorRef.current)return;if(dirtyRef.current&&!window.confirm('Replace your current unsaved edits with the recovered draft?'))return;const draft=recoveredDraft;editorRef.current.innerHTML=safeLocalHtml(draft.bodyHtml);setTitle(draft.title);setSubjectId(draft.subjectId);setChapterId(draft.chapterId);setTopicId(draft.topicId);setTags(draft.tags);setVisibility(draft.visibility);setResourceIds(draft.resourceIds);createIdRef.current=draft.clientId;savedIdRef.current=draft.savedId;setRecoveredDraft(null);changed();}
 
   function format(command: string, value?: string) {
@@ -162,6 +163,7 @@ export function NoteEditor({
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    if(context.userId!==ownerAtOpen.current||context.contextKey!==scopeAtOpen.current){setError('Your account or study profile changed. Reopen this editor before saving.');return;}
     if(savingRef.current)return;
     savingRef.current=true;
     const savedVersion=editVersionRef.current;
@@ -173,6 +175,8 @@ export function NoteEditor({
       createIdRef.current??=crypto.randomUUID();
       const {response,queued} = await offlineMutationFetch(context.userId!, "/api/v1/notes", {
           id: savedIdRef.current,
+          expectedOwnerId:ownerAtOpen.current,
+          expectedContextKey:scopeAtOpen.current,
           expectedRevision:savedRevisionRef.current,
           clientId:createIdRef.current,
           title,
