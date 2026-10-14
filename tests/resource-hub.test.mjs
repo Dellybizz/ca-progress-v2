@@ -54,6 +54,6 @@ test('CSV exports selected metadata safely without URLs or spreadsheet formulas'
 test('grid list and compact layouts expose accessible previews and identifiable file types',()=>{
   for(const layout of ['grid','list','compact']){
     const html=renderToStaticMarkup(React.createElement(compiled.FileManager,{files:compiled.sampleManagerFiles,title:'My files',initialLayout:layout,preview:true}));
-    assert.match(html,new RegExp(`fm-files--${layout}`));assert.match(html,/Select visible files/);assert.match(html,/Preview Framework mind map/);assert.match(html,/\/resources-preview\/study-diagram.svg/);assert.match(html,/DOCX/);assert.match(html,/PDF/);assert.doesNotMatch(html,/YOUR STUDY WORKSPACE|Notes, files and official material, together/);
+    assert.match(html,new RegExp(`fm-files--${layout}`));assert.match(html,/Select visible files/);for(const name of ['Grid','List','Compact'])assert.match(html,new RegExp(`aria-label="${name} view"`));assert.match(html,/Preview Framework mind map/);assert.match(html,/\/resources-preview\/study-diagram.svg/);assert.match(html,/DOCX/);assert.match(html,/PDF/);assert.doesNotMatch(html,/YOUR STUDY WORKSPACE|Notes, files and official material, together/);
   }
 });
