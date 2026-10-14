@@ -17,7 +17,7 @@ test('review edits return directly or request only invalidated academic prerequi
  }finally{await cleanup();await cleanContract();}
 });
 test('dashboard handoff preserves safe study destinations and avoids external or account-entry loops',async()=>{const {module:r,cleanup}=await moduleAt('lib/profile/setup-review.ts');try{
- for(const next of [null,'//external.example','/\\external.example','/onboarding?next=/onboarding','/onboarding-preview','/account/setup','/account/reset','/login','/auth/google','/api/v1/onboarding'])assert.equal(r.setupWorkspaceDestination(next),'/dashboard',String(next));
+ for(const next of [null,'//external.example','/\\external.example','/onboarding?next=/onboarding','/onboarding-preview','/onboarding-offline-preview','/account/setup','/account/reset','/login','/auth/google','/api/v1/onboarding'])assert.equal(r.setupWorkspaceDestination(next),'/dashboard',String(next));
  assert.equal(r.setupWorkspaceDestination('/progress?view=chapters#saved'),'/progress?view=chapters#saved');assert.equal(r.setupWorkspaceDestination('/planner/today'),'/planner/today');
  }finally{await cleanup();}});
 test('review offers labelled edits for applicable rows while keeping actual goals, tentative state and offline completion truthful',async()=>{const {module:c,cleanup}=await moduleAt('components/auth/onboarding/setup.tsx');try{

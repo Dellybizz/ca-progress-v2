@@ -8,7 +8,7 @@ const host = "127.0.0.1";
 const port = 8787;
 const base = process.env.SMOKE_BASE_URL || `http://${host}:${port}`;
 const isExternal = /^https?:\/\//.test(process.env.SMOKE_BASE_URL || "");
-const routes = ["/welcome", "/login", "/account/recover", "/onboarding-preview", "/dashboard", "/community", "/activity", "/progress", "/planner", "/resources", "/settings", "/admin"];
+const routes = ["/welcome", "/login", "/account/recover", "/onboarding-preview", "/onboarding-offline-preview", "/dashboard", "/community", "/activity", "/progress", "/planner", "/resources", "/settings", "/admin"];
 const userAgents = {
   desktop: "CA-Progress-Synthetic/Desktop",
   mobile: "CA-Progress-Synthetic/Mobile",

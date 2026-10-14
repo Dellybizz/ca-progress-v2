@@ -10,10 +10,23 @@ import { invalidateUserFeatureCache } from "@/lib/cache/public";
 import {assertSameOriginMutation} from '@/lib/auth/csrf';
 import {getSetupState} from '@/lib/profile/setup-state';
 import {persistSetup,SetupError} from '@/lib/profile/setup-service';
+import {resumeLegacySetup,reconcileSavedSetup} from '@/lib/profile/setup-contract';
+import {getOnboardingPreparationState} from '@/lib/profile/onboarding-experience';
+import {nativeCorsHeaders,nativeOptions} from '@/lib/auth/native-cors';
 
 export const dynamic = "force-dynamic";
 
-export async function GET(){const user=await optionalUser();if(!user)return NextResponse.json({ok:false,error:'Sign in to read setup.'},{status:401,headers:{'Cache-Control':'private, no-store'}});return NextResponse.json({ok:true,state:await getSetupState(user.id)},{headers:{'Cache-Control':'private, no-store'}});}
+export const OPTIONS=(request:Request)=>nativeOptions(request);
+export async function GET(request:Request){
+ const headers={...nativeCorsHeaders(request),'Cache-Control':'private, no-store'},user=await optionalUser();
+ if(!user)return NextResponse.json({ok:false,error:'Sign in to read setup.'},{status:401,headers});
+ const profile=await getProfileForUser(user.id);if(!profile)return NextResponse.json({ok:false,error:'Your profile could not load.'},{status:503,headers});
+ const saved=await getSetupState(user.id),completed=Boolean(profile.onboarding_completed_at);
+ if(completed)return NextResponse.json({ok:true,ownerId:user.id,completed:true,state:saved,attempts:[],existingGoal:profile.daily_target_minutes},{headers});
+ const [attempts,preparation_state]=await Promise.all([loadAttemptOptions(),getOnboardingPreparationState(user.id)]);
+ const state=saved?{...saved,draft:reconcileSavedSetup(saved.draft,attempts)}:{draft:resumeLegacySetup({...profile,preparation_state},attempts),revision:0};
+ return NextResponse.json({ok:true,ownerId:user.id,completed:false,state,attempts,existingGoal:profile.daily_target_minutes},{headers});
+}
 
 export async function POST(request: Request) {
   if(!request.headers.get('authorization')?.startsWith('Bearer ')){try{assertSameOriginMutation(request);}catch{return NextResponse.json({ok:false,error:'Invalid request origin.'},{status:403});}}

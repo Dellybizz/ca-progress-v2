@@ -14,6 +14,6 @@ export function reviewEditDestination(draft: SetupDraft, attempts: AttemptOption
 export function setupWorkspaceDestination(value: string | null | undefined) {
   const next = sanitizeReturnPath(value, '/dashboard');
   const pathname = new URL(next, 'https://ca-progress-v2.invalid').pathname;
-  if (/^\/(?:onboarding(?:-preview)?|login|account\/(?:setup|recover|reset)|auth|api)(?:\/|$)/.test(pathname)) return '/dashboard';
+  if (/^\/(?:onboarding(?:-(?:offline-)?preview)?|login|account\/(?:setup|recover|reset)|auth|api)(?:\/|$)/.test(pathname)) return '/dashboard';
   return next;
 }
