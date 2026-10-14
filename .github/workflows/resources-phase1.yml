@@ -34,6 +34,7 @@ jobs:
         with: {node-version: 22, cache: npm}
       - run: npm ci --no-audit --no-fund
       - run: npm run ci
+      - run: npm run d1:hot-indexes:validate
       - run: npm run native:bundle
       - run: node scripts/resources/phase1-search-benchmark.mjs
       - name: Install browser test runtime

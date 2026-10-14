@@ -1,5 +1,6 @@
+import {d1TransportSql} from "./payments/d1-sql-transport.mjs";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync,readFileSync,readdirSync,mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -59,6 +60,8 @@ const plans = [
 ];
 
 try {
+  const transportDir=join(persistTo,"migration-sql");mkdirSync(transportDir);
+  for(const file of readdirSync("d1/migrations").filter(file=>file.endsWith(".sql")))writeFileSync(join(transportDir,file),d1TransportSql(readFileSync(join("d1/migrations",file),"utf8")));
   writeFileSync(configPath, JSON.stringify({
     name: "ca-progress-v2-d1-validation",
     compatibility_date: "2026-08-29",
@@ -66,7 +69,7 @@ try {
       binding: "DB",
       database_name: database,
       database_id: "6f002cbe-fe40-4d1b-9cf4-df6faaf52350",
-      migrations_dir: "d1/migrations",
+      migrations_dir: transportDir,
       migrations_table: "d1_migrations",
     }],
   }, null, 2));
