@@ -1,22 +1,48 @@
-import {StorageCleanupWarning} from "@/components/billing/storage-cleanup-warning";
-import type { Metadata } from "next";
-import Link from "next/link";
-import { LoginRequired } from "@/components/auth/login-required";
-import { ResourceLibrary } from "@/components/resources/resource-library";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Icon } from "@/components/ui/icon";
-import { PageHeader } from "@/components/ui/page-header";
-import { getResourceLibraryModel } from "@/lib/resources/service";
-import { OfflineSnapshot } from "@/components/offline/offline-snapshot";
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { StorageCleanupWarning } from '@/components/billing/storage-cleanup-warning';
+import { LoginRequired } from '@/components/auth/login-required';
+import { ResourceLibrary } from '@/components/resources/resource-library';
+import { ResourceHubTabs } from '@/components/resources/resource-hub-tabs';
+import { IcaiResourceBrowser } from '@/components/icai/resource-browser';
+import { OfflineSnapshot } from '@/components/offline/offline-snapshot';
+import { getResourceLibraryModel } from '@/lib/resources/service';
+import { getCommunityNoteDraftForViewer } from '@/lib/notes/phase6';
+import { getStudentContext } from '@/lib/academic/student-context';
+import { getIcaiPublicCatalog } from '@/lib/icai/query';
+import { resourceDestination, resourceTab } from '@/lib/resources/navigation';
 
-export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Resources | CA Progress" };
+export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {title:'Resources | CA Progress'};
+const param = (value:string|string[]|undefined) => typeof value === 'string' ? value : undefined;
 
-export default async function ResourcesPage({ searchParams }: { searchParams: Promise<{ subjectId?: string; chapterId?: string }> }) {
-  const { subjectId, chapterId } = await searchParams;
-  const model = await getResourceLibraryModel();
-  if (model.mode === "ready") return <div className="phase7-page"><OfflineSnapshot kind="resources" data={model}/><PageHeader preview={false} eyebrow="Phase 7 · Resource library" title="My, Community and ICAI resources in one library." description="Private files use signed access; Community items are moderated; official ICAI metadata stays visibly separate from user uploads."/><StorageCleanupWarning/><ResourceLibrary model={model} initialTab="my" initialAcademicContext={{ subjectId, chapterId }}/></div>;
-  return <div className="phase7-page"><PageHeader preview={false} eyebrow="Resource library" title="Verified ICAI resources remain available without a private workspace." description="Sign in to create notes, upload private files and access approved Community resources."/><LoginRequired next="/resources" title="Sign in for My Notes & Files"/><Card className="phase7-icai-card"><CardHeader title="ICAI official resources" description="Verified official-source metadata from the Phase 8 engine." action={<Badge tone="success">Official · Verified</Badge>}/><CardBody>{model.officialResources.length ? <div className="phase7-document-list">{model.officialResources.slice(0, 20).map((resource) => <a href={resource.officialUrl} target="_blank" rel="noreferrer" className="phase7-document-card phase7-document-card--icai" key={resource.id}><div className="phase7-document-icon"><Icon name="shield"/></div><div className="phase7-document-copy"><div className="phase7-document-title"><strong>{resource.title}</strong><Badge tone="success">ICAI Official</Badge></div><p>{resource.summary || resource.resourceType.replaceAll("_", " ")}</p><div className="phase7-document-meta"><span>{resource.sourceName}</span><span>Verified {new Date(resource.lastVerifiedAt).toLocaleDateString()}</span></div></div><Icon name="arrow" size={17}/></a>)}</div> : <EmptyState icon="shield" title="No verified ICAI resources yet" description="The official-source feed is currently empty."/>}<Link href="/resources/icai" className="ui-text-link">Open ICAI resource browser →</Link></CardBody></Card></div>;
+export default async function ResourcesPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
+  const params = await searchParams;
+  const tab = param(params.communityMessageId) ? 'my' : resourceTab(param(params.tab));
+  let content;
+  if (tab === 'icai') {
+    const context = await getStudentContext();
+    const selection = context.mode === 'ready' ? context.selection : null;
+    const requestedSubject = param(params.subject) ?? param(params.subjectId);
+    const catalog = await getIcaiPublicCatalog({
+      level: selection?.level ?? param(params.level),
+      attempt: selection?.attemptKey ?? param(params.attempt),
+      subject: selection && requestedSubject && !context.subjectIds.includes(requestedSubject) ? '__not_applicable__' : requestedSubject,
+      type: param(params.type),
+    });
+    content = <IcaiResourceBrowser catalog={catalog} embedded scopeLocked={Boolean(selection)}/>;
+  } else {
+    const [model,communityDraft] = await Promise.all([
+      getResourceLibraryModel({includeOfficial:false}),
+      tab === 'my' ? getCommunityNoteDraftForViewer(param(params.communityMessageId)) : Promise.resolve(null),
+    ]);
+    if (model.mode === 'setup') redirect('/onboarding?next=/resources');
+    content = model.mode === 'ready' ? <>
+      <OfflineSnapshot kind="resources" data={model}/><OfflineSnapshot kind="notes" data={model}/>
+      <StorageCleanupWarning/>
+      <ResourceLibrary key={tab} model={model} initialTab={tab} hideTabs initialAcademicContext={{subjectId:param(params.subjectId),chapterId:param(params.chapterId)}} initialCommunityDraft={communityDraft}/>
+    </> : <div className="resource-hub-guest"><LoginRequired next={resourceDestination(params,tab)} title="Sign in to open your library"/><p>Official study material is available without signing in. <Link href={resourceDestination(params,'icai')}>Browse ICAI resources →</Link></p></div>;
+  }
+  return <div className="resource-hub"><header className="resource-hub-heading"><div><p className="eyebrow">Your study workspace</p><h1>Resources</h1><p>Notes, files and official material, together.</p></div><Link href="/updates">ICAI updates <span aria-hidden="true">↗</span></Link></header><ResourceHubTabs tab={tab} params={params}/>{content}</div>;
 }

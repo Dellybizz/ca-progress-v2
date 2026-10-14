@@ -7,7 +7,8 @@ const root = new URL("../", import.meta.url).pathname; const read = (path) => re
 test("all Phase 7 product and moderation routes are real server-backed surfaces", () => {
   const routes = ["app/(student)/notes/page.tsx", "app/(student)/notes/[id]/page.tsx", "app/(student)/resources/page.tsx", "app/(student)/resources/[id]/page.tsx", "app/(admin)/admin/resources/moderation/page.tsx"];
   for (const route of routes) { assert.equal(existsSync(join(root, route)), true, route); assert.doesNotMatch(read(route), /ProductPreviewPage/); }
-  assert.match(read("app/(student)/notes/page.tsx"), /getResourceLibraryModel/);
+  assert.match(read("app/(student)/notes/page.tsx"), /redirect\(resourceDestination/);
+  assert.match(read("app/(student)/resources/page.tsx"), /getResourceLibraryModel/);
   assert.match(read("app/(student)/resources/[id]/page.tsx"), /getResourceDetailModel/);
 });
 

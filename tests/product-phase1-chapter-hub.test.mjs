@@ -40,10 +40,10 @@ test("Product Phase 1 destinations consume and validate Chapter Hub academic con
   assert.match(progressRoute, /initialChapterId=\{chapterId\}/);
   assert.match(progressPage, /initialChapterId=\{initialChapterId\}/);
   assert.match(progressTracker, /model\.chapters\.find\(\(chapter\) => chapter\.id === initialChapterId\)/);
-  for (const route of [notesRoute, resourcesRoute]) {
-    assert.match(route, /subjectId\?: string; chapterId\?: string/);
-    assert.match(route, /initialAcademicContext=\{\{ subjectId, chapterId \}\}/);
-  }
+  assert.match(notesRoute, /redirect\(resourceDestination/);
+  assert.match(resourcesRoute, /initialAcademicContext=/);
+  assert.match(resourcesRoute, /subjectId:param\(params\.subjectId\)/);
+  assert.match(resourcesRoute, /chapterId:param\(params\.chapterId\)/);
   assert.match(library, /function resolveAcademicContext/);
   assert.match(library, /model\.subjects\.find\(\(item\) => item\.id === context\.subjectId\)/);
   assert.match(library, /subject\.chapters\.some\(\(chapter\) => chapter\.id === context\.chapterId\)/);

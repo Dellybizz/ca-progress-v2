@@ -55,7 +55,7 @@ test("Phase 7 upload drawer tolerates empty or non-JSON proxy responses", () => 
   assert.doesNotMatch(library, /await response\.json\(\)/);
   assert.match(library, /CLIENT_UPLOAD_MAX_BYTES = 10 \* 1024 \* 1024/);
   assert.match(library, /uploadFallbackMessage/);
-  assert.match(library, /stored in Cloudflare R2/);
+  assert.match(library, /Only you can open your private files/);
 });
 
 test("Phase 7 sanitizes filenames and rich note content server-side", () => {

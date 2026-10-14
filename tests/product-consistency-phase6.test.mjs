@@ -73,7 +73,9 @@ test("offline timers retain actual time and pauses instead of the reconnect dura
 });
 
 test("supported routes snapshot real models and the offline shell has no server identity", () => {
-  for (const page of ["dashboard", "syllabus", "progress", "study", "planner", "notes", "resources"]) assert.match(read(`app/(student)/${page}/page.tsx`), /OfflineSnapshot/);
+  for (const page of ["dashboard", "syllabus", "progress", "study", "planner", "resources"]) assert.match(read(`app/(student)/${page}/page.tsx`), /OfflineSnapshot/);
+  assert.match(read("app/(student)/resources/page.tsx"), /OfflineSnapshot kind="notes"/);
+  assert.match(read("app/(student)/notes/page.tsx"), /redirect\(resourceDestination/);
   assert.match(read("app/offline/page.tsx"), /force-static/);
   assert.doesNotMatch(read("app/offline/page.tsx"), /getStudentContext|cookies\(|optionalUser/);
   const sw = read("public/sw.js");

@@ -113,19 +113,19 @@ async function tagsForOwnNotes(client: Awaited<ReturnType<typeof createD1ServerC
   return tagsByNote;
 }
 
-export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
+export async function getResourceLibraryModel({ includeOfficial = true }: { includeOfficial?: boolean } = {}): Promise<ResourceLibraryModel> {
   const context = await getStudentContext();
-  if (context.mode === "guest") return { mode: "guest", officialResources: officialCards(await getIcaiPublicCatalog({})) };
+  if (context.mode === "guest") return { mode: "guest", officialResources: includeOfficial ? officialCards(await getIcaiPublicCatalog({})) : [] };
   if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: context.displayName, officialResources: [] };
-  const officialResources = officialCards(await getIcaiPublicCatalog({ level: context.selection.level, attempt: context.selection.attemptKey }));
   const identity = { id: context.userId };
 
   const client = await createD1ServerClient();
-  const [names, tagsByNote, rows, subjects] = await Promise.all([
+  const [names, tagsByNote, rows, subjects, officialResources] = await Promise.all([
     nameMaps(client),
     tagsForOwnNotes(client, identity.id),
     getHotResourceLibraryRows(identity.id),
     getPhase6AcademicOptions(identity.id),
+    includeOfficial ? getIcaiPublicCatalog({ level: context.selection.level, attempt: context.selection.attemptKey }).then(officialCards) : Promise.resolve([]),
   ]);
   const allNoteIds = [...rows.ownNotes, ...rows.sharedNotes].map((row) => row.id);
   const extras = await getPhase6NoteExtras(allNoteIds, identity.id);

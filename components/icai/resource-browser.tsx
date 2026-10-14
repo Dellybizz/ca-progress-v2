@@ -49,18 +49,21 @@ function resourceState(
 }
 
 export function IcaiResourceBrowser({
-  catalog,
+  catalog, embedded = false, scopeLocked = false,
 }: {
-  catalog: IcaiPublicCatalog;
+  catalog: IcaiPublicCatalog; embedded?: boolean; scopeLocked?: boolean;
 }) {
   const [view, setView] = useState<"folders" | "list">("folders");
+  const [query,setQuery] = useState("");
+  const [limit,setLimit] = useState(24);
+  const results = catalog.resources.filter(resource=>!query.trim() || `${resource.title} ${resource.summary || ""} ${resource.subjects.map(subject=>subject.title).join(" ")}`.toLowerCase().includes(query.trim().toLowerCase()));
   const [level, setLevel] = useState(catalog.filters.level);
   const matchingAttempts = level
     ? catalog.attempts.filter((attempt) => attempt.levelCode === level)
     : [];
   return (
     <div className="icai-page">
-      <AcademicBreadcrumbs
+      {!embedded ? <><AcademicBreadcrumbs
         items={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Resources", href: "/resources" },
@@ -88,7 +91,7 @@ export function IcaiResourceBrowser({
             </small>
           </span>
         </div>
-      </section>
+      </section></> : null}
 
       <AcademicContextBar
         level={
@@ -98,12 +101,14 @@ export function IcaiResourceBrowser({
         attempt={catalog.filters.attempt || null}
       />
 
-      <form className="icai-filters" method="get">
+      <form className="icai-filters" method="get" action={embedded ? "/resources" : undefined}>
+        {embedded ? <input type="hidden" name="tab" value="icai"/> : null}
         <label>
           <span>Level</span>
           <select
             name="level"
             value={level}
+            disabled={scopeLocked}
             onChange={(event) => setLevel(event.target.value)}
           >
             <option value="">All levels</option>
@@ -118,8 +123,9 @@ export function IcaiResourceBrowser({
           <span>Attempt</span>
           <select
             name="attempt"
+            key={level}
             defaultValue={level ? catalog.filters.attempt : ""}
-            disabled={!level}
+            disabled={scopeLocked || !level}
           >
             <option value="">
               {level ? "All available attempts" : "Select level first"}
@@ -138,13 +144,13 @@ export function IcaiResourceBrowser({
         </label>
         <label>
           <span>Subject</span>
-          <select name="subject" defaultValue={catalog.filters.subject}>
+          <select name="subject" key={level} defaultValue={catalog.subjects.some(subject=>subject.id===catalog.filters.subject && subject.levelCode===level) ? catalog.filters.subject : ""}>
             <option value="">All subjects</option>
             {catalog.subjects
               .filter(
                 (subject) =>
-                  !catalog.filters.level ||
-                  subject.levelCode === catalog.filters.level,
+                  !level ||
+                  subject.levelCode === level,
               )
               .map((subject) => (
                 <option key={subject.id} value={subject.id}>
@@ -172,8 +178,10 @@ export function IcaiResourceBrowser({
         </button>
       </form>
 
+      <label className="resource-hub-official-search"><Icon name="search" size={18}/><input value={query} onChange={event=>{setQuery(event.target.value);setLimit(24);}} aria-label="Search ICAI resources" placeholder="Search official titles, subjects or descriptions"/></label>
+
       {catalog.events.length ? (
-        <section className="icai-section">
+        <details className="resource-hub-events"><summary>Exam dates · {catalog.events.length} events</summary><section className="icai-section">
           <div className="icai-section-heading">
             <div>
               <span className="eyebrow">Verified dates</span>
@@ -199,7 +207,7 @@ export function IcaiResourceBrowser({
               </article>
             ))}
           </div>
-        </section>
+        </section></details>
       ) : null}
 
       <section className="icai-section">
@@ -227,14 +235,14 @@ export function IcaiResourceBrowser({
             >
               List
             </button>
-            <Badge tone="neutral">{catalog.resources.length} results</Badge>
+            <Badge tone="neutral">{results.length} results</Badge>
           </div>
         </div>
-        {catalog.resources.length ? (
+        {results.length ? (
           <div
             className={`icai-resource-grid ${view === "list" ? "is-list" : ""}`}
           >
-            {catalog.resources.map((resource) => (
+            {results.slice(0,limit).map((resource) => (
               <article className="icai-resource-card" key={resource.id}>
                 <div className="icai-resource-card__top">
                   <AcademicEntityMark
@@ -300,6 +308,7 @@ export function IcaiResourceBrowser({
           />
         )}
       </section>
+      {results.length > limit ? <button type="button" className="ui-button ui-button--secondary resource-hub-load-more" onClick={()=>setLimit(value=>value+24)}>Show more ({results.length-limit} remaining)</button> : null}
     </div>
   );
 }
