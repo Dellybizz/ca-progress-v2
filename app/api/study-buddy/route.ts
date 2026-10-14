@@ -20,6 +20,8 @@ import {
   updateStudyBuddySharing,
 } from "@/lib/study-buddy/service";
 
+import {getStudyBuddyComparison,getStudyBuddyOwnerSummary} from "@/lib/study-buddy/comparison";
+
 export const dynamic = "force-dynamic";
 const privateHeaders = { "cache-control": "private, no-store" };
 const ADVANCED_ACTIONS = new Set(["sharing", "nudge", "createGoal", "contributeGoal", "startTogether", "joinTogether", "completeTogether"]);
@@ -28,7 +30,8 @@ export async function GET() {
   const user = await optionalUser();
   if (!user) return NextResponse.json({ ok: false, error: "Sign in to use Study Buddy." }, { status: 401, headers: privateHeaders });
   try {
-    return NextResponse.json({ ok: true, dashboard: await getStudyBuddyDashboard(user.id) }, { headers: privateHeaders });
+    const [dashboard,comparison,ownerSummary]=await Promise.all([getStudyBuddyDashboard(user.id),getStudyBuddyComparison(user.id),getStudyBuddyOwnerSummary(user.id)]);
+    return NextResponse.json({ ok: true, dashboard, comparison, ownerSummary }, { headers: privateHeaders });
   } catch {
     return NextResponse.json({ ok: false, error: "Study Buddy could not be loaded." }, { status: 500, headers: privateHeaders });
   }
