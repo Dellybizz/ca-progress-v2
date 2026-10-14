@@ -12,7 +12,7 @@ export function prepareTestAccount({ username, displayName = "CA Progress Tester
   const name = username?.trim().toLowerCase();
   if (!/^[a-z][a-z0-9._]{2,29}$/.test(name || "")) throw new Error("Use a username of 3–30 letters, numbers, dots or underscores, starting with a letter.");
   if (typeof displayName !== "string" || !displayName.trim() || displayName.length > 80) throw new Error("Display name must be 1–80 characters.");
-  if (typeof password !== "string" || password.length < 12 || password.length > 128) throw new Error("Set CA_TEST_ACCOUNT_PASSWORD to 12–128 characters.");
+  if (typeof password !== "string" || password.length < 8 || password.length > 128) throw new Error("Set CA_TEST_ACCOUNT_PASSWORD to 8–128 characters.");
   const hash = pbkdf2Sync(password, salt, 310000, 32, "sha256").toString("hex");
   const id = quote(userId), alias = quote(name), label = quote(displayName.trim());
   // Phase 1 automatically assigns a temporary alias, and the credential trigger replaces it.

@@ -35,7 +35,7 @@ export async function verifyPassword(password: string, credential: { salt: strin
 }
 
 export async function createPasswordHash(password: string) {
-  if (password.length < 12 || password.length > 128) throw new PasswordAuthError("INVALID_INPUT", "Use a password of 12–128 characters.");
+  if (password.length < 8 || password.length > 128) throw new PasswordAuthError("INVALID_INPUT", "Use a password of 8–128 characters.");
   const salt = crypto.getRandomValues(new Uint8Array(16));
   return { salt: hex(salt), hash: await passwordHash(password, salt), iterations: ITERATIONS };
 }
