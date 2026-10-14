@@ -18,8 +18,8 @@ test("web and Android offer verified provider onboarding and username login", ()
   const mobile = read("apps/mobile/src/main.tsx") + read("components/auth/onboarding/accounts.tsx");
   const transport = read("apps/mobile/src/native-auth.ts");
   for (const screen of [web, mobile]) {
-    assert.match(screen, /Continue with Google/);
-    assert.match(screen, /Continue with LinkedIn/);
+    assert.match(screen + read("components/auth/onboarding/provider-tile.tsx"), /Continue with Google/);
+    assert.match(screen + read("components/auth/onboarding/provider-tile.tsx"), /Continue with LinkedIn/);
     assert.doesNotMatch(screen, /Create username account|action: "register"/);
   }
   assert.match(transport, /action: "login", username, password/);

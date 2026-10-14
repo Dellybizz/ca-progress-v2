@@ -3,6 +3,7 @@ on:
   push:
     branches: [onboarding-design-phase7]
     paths:
+      - tests/**
       - android/**
       - apps/mobile/**
       - components/auth/onboarding/**
