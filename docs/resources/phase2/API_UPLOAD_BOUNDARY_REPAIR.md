@@ -18,3 +18,9 @@ Five new executable tests use real NextRequest/NextResponse and actual middlewar
 The deployment adds live negative probes for small/full binary parts and the native envelope: each must reach application authentication and return 401, rather than middleware 413/415. A separate ordinary JSON probe must retain 413. Synthetic bytes use no account or real intent and cannot create stored files.
 
 Release status: pending CI and deployment. No migration or new APK is included; this repair does not complete the Phase 3 editor.
+
+## Initial production verification and rollout guard
+
+The runtime repair was deployed from `1343b680341617c612928aa34f8dfa20877fe764` in run `38669326308`, web Worker version `000b771b-42d0-4912-ac0d-ee5e8564cd9d`. Its first immediate post-deploy small-part probe still received 415. Once rollout settled, app-config reported that exact source and running all four live probes directly passed: small/full binary and native JSON each reached application authentication (401), and ordinary JSON retained 413. The deployment job was correctly left failed by its immediate probe rather than silently declaring success.
+
+The verification script now checks the expected deployed commit and allows at most seven bounded attempts for known old-edge 413/415 responses and transient edge/network failures, with 12 seconds between attempts. Unexpected unauthenticated success (200) fails immediately; persistent rejection still fails. Three executable tests cover old/new-version transitions, immediate security failure and bounded exhaustion. All **1,363 tests** pass locally. The follow-up release must complete CI and live verification before its evidence is finalized.
