@@ -1,4 +1,5 @@
 import 'server-only';
+import {workspaceErrorMessage} from './workspace-errors';
 import {getHotD1Database,type HotD1Database} from '@/lib/data/d1/runtime';
 export async function ownedFile(owner:string,key:string,db:HotD1Database=getHotD1Database(),allowTrash=false){
  const match=/^(note|upload):(.+)$/.exec(key);if(!match)throw Error('Invalid file.');const kind=match[1] as 'note'|'upload',id=match[2];
@@ -50,7 +51,7 @@ export async function lifecycleAction(owner:string,input:Record<string,unknown>,
   await db.batch([db.prepare('INSERT OR IGNORE INTO resource_file_versions(id,owner_user_id,resource_id,version_resource_id) VALUES(?1,?2,?3,?3)').bind(crypto.randomUUID(),owner,id),db.prepare('UPDATE resource_file_versions SET active=0 WHERE resource_id=?1 AND owner_user_id=?2').bind(id,owner),db.prepare('INSERT OR IGNORE INTO resource_file_versions(id,owner_user_id,resource_id,version_resource_id) VALUES(?1,?2,?3,?4)').bind(versionId,owner,id,sourceId),db.prepare('UPDATE resource_file_versions SET active=1 WHERE resource_id=?1 AND version_resource_id=?2 AND owner_user_id=?3').bind(id,sourceId,owner),log(sourceId)]);
  }else throw Error('Unsupported file action.');
  results.push({key,ok:true});
- }catch(error){results.push({key,ok:false,error:error instanceof Error?error.message:'File action failed.'});}}
+ }catch(error){results.push({key,ok:false,error:workspaceErrorMessage(error)});}}
  return {results};
 }
 export async function versionStorage(resourceId:string,owner:string,db:HotD1Database=getHotD1Database()){

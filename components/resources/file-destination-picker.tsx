@@ -1,0 +1,11 @@
+'use client';
+import {useMemo,useState} from 'react';
+import type {WorkspaceFolder} from '@/lib/resources/workspace';
+/** Native buttons keep every hierarchy level available to keyboard and touch users. */
+export function FileDestinationPicker({folders,value,onChange,eligibility}:{folders:WorkspaceFolder[];value:string;onChange:(id:string)=>void;eligibility:(id:string)=>{allowed:boolean;reason?:string}}){
+ const [search,setSearch]=useState('');
+ const paths=useMemo(()=>new Map(folders.map(folder=>{const path:WorkspaceFolder[]=[];const seen=new Set<string>();let at:WorkspaceFolder|undefined=folder;while(at&&!seen.has(at.id)){seen.add(at.id);path.unshift(at);at=folders.find(item=>item.id===at?.parent_id);}return[folder.id,path] as const;})),[folders]);
+ const path=paths.get(value)??[];const eligible=eligibility(value);
+ const children=search.trim()?folders.filter(item=>(paths.get(item.id)??[]).map(node=>node.name).join(' / ').toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())):folders.filter(item=>item.parent_id===(value||null));
+ return <div className="fm-destination-picker"><label>Find a folder<input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Folder name or path"/></label><nav aria-label="Destination path"><button type="button" onClick={()=>{onChange('');setSearch('');}}>My files</button>{path.map(item=><button key={item.id} type="button" aria-current={item.id===value?'location':undefined} onClick={()=>{onChange(item.id);setSearch('');}}>{item.name}</button>)}</nav><ul aria-label="Destination folders">{children.map(item=><li key={item.id}><button type="button" onClick={()=>{onChange(item.id);setSearch('');}}><span aria-hidden="true">{item.kind==='notebook'?'📓':'📁'}</span><span>{item.name}{search?<small>{(paths.get(item.id)??[]).map(node=>node.name).join(' / ')}</small>:null}</span><span aria-hidden="true">›</span></button></li>)}</ul>{!children.length?<p>{search?'No folders match this search.':'No subfolders here.'}</p>:null}<p role="status">Destination: <strong>{path.length?path.map(item=>item.name).join(' / '):'My files'}</strong>{!eligible.allowed?<span className="fm-destination-reason">{eligible.reason}</span>:null}</p></div>;
+}

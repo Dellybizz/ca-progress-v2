@@ -35,3 +35,4 @@ jobs:
           node scripts/resources/phase1-browser-check.mjs
           node scripts/resources/file-manager-navigation-browser-check.mjs
           node scripts/resources/file-manager-interactions-browser-check.mjs
+          node scripts/resources/file-manager-dialogs-browser-check.mjs

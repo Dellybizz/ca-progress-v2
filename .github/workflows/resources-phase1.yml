@@ -52,6 +52,7 @@ jobs:
           node scripts/resources/phase1-browser-check.mjs
           node scripts/resources/file-manager-navigation-browser-check.mjs
           node scripts/resources/file-manager-interactions-browser-check.mjs
+          node scripts/resources/file-manager-dialogs-browser-check.mjs
           node scripts/resources/phase2-preview-build.mjs
           node scripts/resources/phase2-browser-check.mjs
       - uses: actions/upload-artifact@v4

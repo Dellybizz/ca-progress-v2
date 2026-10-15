@@ -16,6 +16,7 @@ export function actionEligibility(action:WorkspaceAction,files:readonly ManagedF
   const trashAction=action==='restore'||action==='erase';
   if(files.some(file=>Boolean(file.trashedAt)!==trashAction))return{allowed:false,reason:trashAction?'Choose files in Trash.':'Restore files before changing them.'};
   if(['rename','duplicate','replace-version'].includes(action)&&files.length!==1)return{allowed:false,reason:'Choose one file.'};
+  if(['rename','duplicate','replace-version'].includes(action)&&files.some(file=>file.visibility!=='private'))return{allowed:false,reason:'This action requires a private original.'};
   if(action==='replace-version'&&files.some(file=>file.kind==='note'))return{allowed:false,reason:'Choose an uploaded file.'};
   if(!context.online&&['rename','tag','erase','duplicate','replace-version'].includes(action))return{allowed:false,reason:'This action needs a connection.'};
   return{allowed:true};

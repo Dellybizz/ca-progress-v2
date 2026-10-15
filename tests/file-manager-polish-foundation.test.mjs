@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 const bundle=await build({entryPoints:['lib/resources/workspace-foundation.ts'],bundle:true,write:false,format:'esm',platform:'node'});
 const f=await import('data:text/javascript;base64,'+Buffer.from(bundle.outputFiles[0].text).toString('base64'));
-const file=(extra={})=>({key:'upload:a',canManage:true,trashedAt:null,...extra});
+const file=(extra={})=>({key:'upload:a',canManage:true,visibility:'private',trashedAt:null,...extra});
 const context={collection:'my',online:true};
 test('action rules reject mixed ownership, read-only collections and incompatible Trash selections',()=>{
  for(const action of ['move','rename','tag','star','trash','restore','erase']){
@@ -59,3 +59,5 @@ test('selection uses entity keys for duplicate filenames and never retains unloa
  const both=f.toggleFileSelection(first,'note:two',['note:one','note:two']);assert.deepEqual(both.keys,['note:one','note:two']);
  const next=f.toggleFileSelection(both,'upload:one',['upload:one']);assert.deepEqual(next,{keys:['upload:one'],anchor:'upload:one',rangeBase:[]});
 });
+
+test('private original capabilities match server restrictions',()=>{for(const action of ['rename','duplicate','replace-version'])assert.equal(f.actionEligibility(action,[file({visibility:'shared',kind:'pdf'})],context).allowed,false);});

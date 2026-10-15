@@ -1,4 +1,5 @@
 import 'server-only';
+import {workspaceErrorMessage} from './workspace-errors';
 import {getHotD1Database,type HotD1Database} from '@/lib/data/d1/runtime';
 import {lifecycleAction} from './lifecycle';
 import type {ManagedFile,FileKind,FileSort} from './file-manager';
@@ -35,8 +36,21 @@ export async function listWorkspace(owner:string,subjectIds:readonly string[],qu
  const [count,result]=await Promise.all([db.prepare(`${base} SELECT count(*) total FROM scoped`).bind(...countValues).first<{total:number}>(),db.prepare(`${base} SELECT * FROM scoped ${cursorWhere} ORDER BY sort_group ASC,sort_null ASC,sort_primary ${direction},sort_secondary ${direction},entry_key ASC LIMIT ${limit+1}`).bind(...values).all<Row>()]);
  const rows=result.results??[],visible=rows.slice(0,limit),last=visible.at(-1);return {total:count?.total??0,folders,path,trashFolders,nextCursor:rows.length>limit&&last?btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify({scope:scopeKey,group:last.sort_group,null:last.sort_null,primary:last.sort_primary,secondary:last.sort_secondary,key:last.entry_key})))):null,files:visible.map(row=>({key:row.entry_key,id:row.id,name:row.name,filename:row.filename,kind:row.entity_kind==='note'?'note':row.mime==='application/pdf'?'pdf':row.mime.startsWith('image/')?'image':['DOC','DOCX','XLS','XLSX','PPT','PPTX','TXT','CSV'].includes(row.extension)?'document':'other',extension:row.extension,size:row.size,modified:row.modified,subjectIds:row.subject_id?[row.subject_id]:[],subject:row.subject,chapterId:row.chapter_id,chapter:row.chapter,owner:row.owner,status:row.status,processingState:row.processing_state??undefined,important:!!row.important,starred:!!row.starred,folderId:row.folder_id,trashedAt:row.trashed_at,trashExpiresAt:row.trash_expires_at,canManage:row.owner_id===owner,workspaceBaseline:row.workspace_state?JSON.parse(row.workspace_state):null,excerpt:row.excerpt,href:`/${row.entity_kind==='note'?'notes':'resources'}/${encodeURIComponent(row.id)}`,visibility:row.visibility,previewUrl:row.entity_kind==='upload'&&!row.trashed_at?`/api/resources/${encodeURIComponent(row.id)}/preview`:undefined}))};
 }
-export async function mutateWorkspace(owner:string,input:Record<string,unknown>,db:HotD1Database=getHotD1Database()){
- const action=String(input.action);if(['rename','tag','erase','duplicate','replace-version','restore-version'].includes(action))return lifecycleAction(owner,input,db);const folderId=typeof input.folderId==='string'&&input.folderId?input.folderId:null;
+export type WorkspaceMutationResult={id?:string;results?:{key:string;ok:boolean;id?:string;error?:string;undo?:{action:'move'|'restore';folderId:string|null;revision:number}}[]};
+export async function mutateWorkspace(owner:string,input:Record<string,unknown>,db:HotD1Database=getHotD1Database()):Promise<WorkspaceMutationResult>{
+ const action=String(input.action);
+ if(action==='undo'){
+  const items=Array.isArray(input.items)?input.items:[];
+  if(!items.length||items.length>96)throw Error('Choose 1–96 undo receipts.');
+  const results=[];
+  for(const item of items){
+   if(!item||!['move','restore'].includes(item.action)||typeof item.key!=='string'||!Number.isSafeInteger(item.revision)||item.revision<0)throw Error('Invalid undo receipt.');
+   try{const result=await mutateWorkspace(owner,{action:item.action,keys:[item.key],folderId:item.folderId,expectedRevisions:{[item.key]:item.revision}},db);results.push(...(result.results??[]));}
+   catch(error){results.push({key:item.key,ok:false,error:workspaceErrorMessage(error,'Undo could not be completed.')});}
+  }
+  return {results};
+ }
+if(['rename','tag','erase','duplicate','replace-version','restore-version'].includes(action))return lifecycleAction(owner,input,db);const folderId=typeof input.folderId==='string'&&input.folderId?input.folderId:null;
  if(folderId&&!await db.prepare('SELECT id FROM resource_folders WHERE id=?1 AND owner_user_id=?2 AND trashed_at IS NULL').bind(folderId,owner).first())throw Error('Folder not found.');
  if(['create-folder','rename-folder','move-folder','delete-folder','restore-folder'].includes(action)){
   const id=action==='create-folder'?(typeof input.clientId==='string'&&/^[0-9a-f-]{36}$/i.test(input.clientId)?input.clientId:crypto.randomUUID()):String(input.id??'');const name=typeof input.name==='string'?input.name.trim():'';
@@ -52,18 +66,31 @@ export async function mutateWorkspace(owner:string,input:Record<string,unknown>,
  }
  if(!['move','star','trash','restore','opened'].includes(action))throw Error('Unsupported file action.');
  const keys=Array.isArray(input.keys)?[...new Set(input.keys)].filter((key):key is string=>typeof key==='string'):[];if(!keys.length||keys.length>96)throw Error('Select 1–96 files.');
- const results: {key:string;ok:boolean;error?:string}[]=[];
+ const results: {key:string;ok:boolean;error?:string;undo?:{action:'move'|'restore';folderId:string|null;revision:number}}[]=[];
  for(const key of keys){try{const match=/^(note|upload):(.+)$/.exec(key);if(!match)throw Error('Invalid file.');const kind=match[1],id=match[2],table=kind==='note'?'notes':'uploaded_resources',ownerColumn=kind==='note'?'user_id':'owner_user_id';
   if(!await db.prepare(`SELECT id FROM ${table} WHERE id=?1 AND ${ownerColumn}=?2`).bind(id,owner).first())throw Error('File not found or not owned by you.');
   if(action==='trash'&&await isWorkspaceTrashed(kind as 'note'|'upload',id,db)){results.push({key,ok:true});continue;}
   if(action==='restore'&&!await db.prepare('SELECT entity_id FROM resource_workspace_entries WHERE entity_kind=?1 AND entity_id=?2 AND owner_user_id=?3 AND trashed_at IS NOT NULL AND purge_started_at IS NULL AND trash_expires_at> CURRENT_TIMESTAMP').bind(kind,id,owner).first())throw Error('This file is no longer recoverable from Trash.');
   if(!['restore','trash'].includes(action)&&await isWorkspaceTrashed(kind as 'note'|'upload',id,db))throw Error('Restore this file before changing it.');
+  // Capture a baseline before reversible edits. The SQL below compares it inside the write,
+  // and the receipt is read in the same D1 batch transaction as the change.
+  const reversible=action==='move'||action==='trash';
+  const baseline=reversible?await db.prepare('SELECT (SELECT folder_id FROM resource_workspace_entries WHERE entity_kind=?1 AND entity_id=?2 AND owner_user_id=?3) folderId,COALESCE((SELECT max(id) FROM resource_file_activity WHERE entity_kind=?1 AND entity_id=?2 AND owner_user_id=?3),0) revision').bind(kind,id,owner).first<{folderId:string|null;revision:number}>():null;
+  const supplied=input.expectedRevisions&&typeof input.expectedRevisions==='object'?(input.expectedRevisions as Record<string,unknown>)[key]:undefined;
+  if(supplied!==undefined&&(!Number.isSafeInteger(supplied)||Number(supplied)<0))throw Error('Invalid undo receipt.');
+  const expected=supplied===undefined?(reversible?baseline?.revision:undefined):Number(supplied);
   const columns=action==='move'?'folder_id':action==='star'?'starred':action==='opened'?'last_opened_at':'trashed_at,trash_expires_at';
   const assignments=action==='move'?'folder_id=excluded.folder_id':action==='star'?'starred=excluded.starred':action==='opened'?'last_opened_at=excluded.last_opened_at':'trashed_at=excluded.trashed_at,trash_expires_at=excluded.trash_expires_at';
   const literal=action==='opened'?'CURRENT_TIMESTAMP':action==='trash'?"CURRENT_TIMESTAMP,datetime('now','+30 days')":action==='restore'?'NULL,NULL':'?4';
   const args:unknown[]=[owner,kind,id];if(action==='move')args.push(folderId);if(action==='star')args.push(input.starred===true?1:0);
-  const changed=await db.prepare(`INSERT INTO resource_workspace_entries(owner_user_id,entity_kind,entity_id,${columns}) VALUES(?1,?2,?3,${literal}) ON CONFLICT(entity_kind,entity_id) DO UPDATE SET ${assignments},updated_at=CURRENT_TIMESTAMP WHERE owner_user_id=excluded.owner_user_id${action==='restore'?' AND trashed_at IS NOT NULL AND purge_started_at IS NULL AND trash_expires_at>CURRENT_TIMESTAMP':''}`).bind(...args).run() as {changes?:number;meta?:{changes?:number}};
-  if((changed?.meta?.changes??changed?.changes)===0)throw Error('The file changed while saving. Refresh and retry.');results.push({key,ok:true});
- }catch(error){results.push({key,ok:false,error:error instanceof Error?error.message:'File could not be changed.'});}}
+  const guard=expected===undefined?'1':`COALESCE((SELECT max(id) FROM resource_file_activity WHERE entity_kind=?2 AND entity_id=?3 AND owner_user_id=?1),0)=?${args.push(expected)}`;
+  const statement=db.prepare(`INSERT INTO resource_workspace_entries(owner_user_id,entity_kind,entity_id,${columns}) SELECT ?1,?2,?3,${literal} WHERE ${guard} ON CONFLICT(entity_kind,entity_id) DO UPDATE SET ${assignments},updated_at=CURRENT_TIMESTAMP WHERE owner_user_id=excluded.owner_user_id AND ${guard}${action==='restore'?' AND trashed_at IS NOT NULL AND purge_started_at IS NULL AND trash_expires_at>CURRENT_TIMESTAMP':''}`).bind(...args);
+  const receipt=db.prepare('SELECT COALESCE(max(id),0) revision FROM resource_file_activity WHERE owner_user_id=?1 AND entity_kind=?2 AND entity_id=?3').bind(owner,kind,id);
+  const batch=reversible?await db.batch([statement,receipt]):[await statement.run()];
+  const changed=batch[0] as {changes?:number;meta?:{changes?:number}};
+  if((changed?.meta?.changes??changed?.changes)===0)throw Error('This file changed after the operation. Refresh before trying again.');
+  const revision=(batch[1] as {results?:{revision:number}[]}).results?.[0]?.revision;
+  results.push({key,ok:true,...(reversible&&revision!==undefined?{undo:{action:action==='trash'?'restore' as const:'move' as const,folderId:baseline?.folderId??null,revision}}:{})});
+ }catch(error){results.push({key,ok:false,error:workspaceErrorMessage(error)});}}
  return {results};
 }
