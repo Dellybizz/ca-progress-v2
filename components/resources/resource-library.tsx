@@ -2,7 +2,7 @@
 import { OfflineDownload } from "@/components/offline/offline-download";
 import { useOfflineModel } from "@/components/offline/use-offline-model";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -39,6 +39,7 @@ function UploadCardView({ resource }: { resource: UploadCard }) {
 
 
 export function ResourceLibrary({ model: serverModel, initialTab = "my", initialAcademicContext, initialCommunityDraft = null, hideTabs = false }: { model: ResourceLibraryReady; initialTab?: "my" | "shared" | "icai"; initialAcademicContext?: AcademicContext; initialCommunityDraft?: CommunityNoteDraft | null; hideTabs?: boolean }) {
+  useEffect(()=>{const preventFileNavigation=(event:DragEvent)=>{if(Array.from(event.dataTransfer?.types??[]).includes('Files'))event.preventDefault();};document.addEventListener('dragover',preventFileNavigation);document.addEventListener('drop',preventFileNavigation);return()=>{document.removeEventListener('dragover',preventFileNavigation);document.removeEventListener('drop',preventFileNavigation);};},[]);
   const model = useOfflineModel("notes", serverModel);
   const initialContext = resolveAcademicContext(model, { subjectId: initialCommunityDraft?.subjectId ?? initialAcademicContext?.subjectId, chapterId: initialAcademicContext?.chapterId });
   const [droppedFiles,setDroppedFiles]=useState<File[]>([]);
