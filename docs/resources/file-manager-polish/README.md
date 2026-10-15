@@ -10,3 +10,5 @@ Next Resources feature phases are paused at the user's request. The professional
 FMP-00 is complete: [baseline, live reliability evidence and next-package gate](phase0/PHASE_0_STATUS.md).
 
 Recommended implementation order is FMP-00 reliability closure, FMP-01 shared interaction/state specification, FMP-02 shell/navigation/layout, FMP-03 selection/menus, FMP-04 dialogs/inspector/organization, FMP-05 app-level transfer management, FMP-06 search/preview/recovery, FMP-07 measured accessibility/performance polish, and FMP-08 end-to-end certification. These work-package names do not renumber the existing eight-phase roadmap.
+
+Phase 1 implementation: [interaction foundation and drag contract](phase1/PHASE_1_STATUS.md). Drag upload and internal move are mandatory acceptance journeys; UI integration follows the navigation and selection phases.

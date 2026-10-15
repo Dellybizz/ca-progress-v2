@@ -10,7 +10,8 @@ import {FileThumbnail} from './file-thumbnail';
 import {fileTimestamp,filesCsv,sortFiles,type FileKind,type FileSort,type ManagedFile} from '@/lib/resources/file-manager';
 import type {NoteSubjectOption} from '@/lib/notes/types';
 type Context={subjectId:string;chapterId:string};
-export type ManagerQuery={query:string;types:FileKind[];sort:FileSort;secondary:FileSort|'none';direction:'asc'|'desc';subjectId:string;chapterId:string;important:boolean;limit:number;group:'none'|'type'|'subject';tag?:string;status?:string;owner?:string;after?:string;before?:string};
+export type {ManagerQuery} from '@/lib/resources/workspace-foundation';
+import {toggleFileSelection,type ManagerQuery} from '@/lib/resources/workspace-foundation';
 export type ManagerRemote={total:number;page:number;hasMore:boolean;onQueryChange:(value:ManagerQuery)=>void;onPageChange:(page:number)=>void};
 const typeLabels:Record<FileKind,string>={note:'Notes',pdf:'PDF',image:'Images',document:'Documents',link:'Official links',other:'Other'};
 const sizeLabel=(bytes:number|null)=>bytes===null?'—':bytes<1048576?`${Math.max(1,Math.round(bytes/1024))} KB`:`${(bytes/1048576).toFixed(1)} MB`;
@@ -32,7 +33,7 @@ export function FileManager({files,title,actions,subjects=[],academicContext,onC
   const selectedFiles=(remote?files:filtered).filter(file=>selected.includes(file.key));
   const detail=files.find(file=>file.key===details);
   const selectionAnchor=useRef<string|null>(null);
-  const toggle=(key:string,range=false)=>{const first=displayed.findIndex(file=>file.key===selectionAnchor.current),last=displayed.findIndex(file=>file.key===key);if(range&&first>=0&&last>=0)setSelected(values=>[...new Set([...values,...displayed.slice(Math.min(first,last),Math.max(first,last)+1).map(file=>file.key)])]);else setSelected(values=>values.includes(key)?values.filter(value=>value!==key):[...values,key]);selectionAnchor.current=key;};
+  const toggle=(key:string,range=false)=>{const anchor=selectionAnchor.current;const visible=displayed.map(file=>file.key);setSelected(keys=>toggleFileSelection({keys,anchor},key,visible,range).keys);if(!range||!visible.includes(anchor??''))selectionAnchor.current=key;};
   const reset=()=>{setTag('');setStatus('');setOwner('');setAfter('');setBefore('');setQuery('');setTypes([]);setImportant(false);onContextChange?.({subjectId:'',chapterId:''});setPage(1);setSelected([]);};
   function keyboard(event:KeyboardEvent<HTMLElement>){
     const target=event.target as HTMLElement;if(target.matches('input:not([type="checkbox"]),textarea,select,[contenteditable="true"]'))return;
