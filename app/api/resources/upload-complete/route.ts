@@ -4,7 +4,7 @@ import { getResourceStorageAccess, createResourceMetadataWithinQuota } from "@/l
 import { getResourceR2Bucket, RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
 import {dispatchResourceProcessing} from "@/lib/resources/processing-outbox";
-import {boundedBytes,contentHash,inspectBytes} from "@/lib/resources/inspection";
+import {inspectResourceSource,InvalidResourceBytes,LARGE_PREVIEW_UNAVAILABLE} from "@/lib/resources/source-inspection";
 import { normalizeFilename } from "@/lib/resources/validation";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   if (intent.status !== "issued") return fail("This upload has already been completed or closed.", 409, "UPLOAD_NOT_ACTIVE");
   const completionToken=crypto.randomUUID();
   await database.prepare("DELETE FROM resource_completion_claims WHERE intent_id=?1 AND julianday(expires_at)<julianday('now')").bind(uploadId).run();
-  const claimed=await database.prepare('INSERT OR IGNORE INTO resource_completion_claims(intent_id,token,expires_at) VALUES(?1,?2,?3)').bind(uploadId,completionToken,new Date(Date.now()+120000).toISOString()).run() as {meta?:{changes?:number}};
+  const claimed=await database.prepare('INSERT OR IGNORE INTO resource_completion_claims(intent_id,token,expires_at) VALUES(?1,?2,?3)').bind(uploadId,completionToken,new Date(Date.now()+1800000).toISOString()).run() as {meta?:{changes?:number}};
   if(Number(claimed.meta?.changes??0)!==1)return fail('This file is being verified. Retry shortly.',409,'UPLOAD_VERIFYING');
   try {
   const transferState=await database.prepare('SELECT state FROM resource_transfers WHERE intent_id=?1').bind(uploadId).first<{state:string}>();
@@ -67,28 +67,30 @@ export async function POST(request: Request) {
     return fail("Uploaded file MIME type does not match the issued descriptor.", 400, "OBJECT_MIME_MISMATCH");
   }
 
+  let largeSource=false;
   let verifiedHash:string;
   let verifiedEtag=String(object.httpEtag);
   try {
     const stored=await bucket.get(String(intent.object_key));
     if(!stored)throw Error('Upload bytes are unavailable.');
-    const bytes=await boundedBytes(stored.body,Number(intent.expected_size_bytes));
-    if(bytes.length!==Number(intent.expected_size_bytes))throw Error('Upload bytes changed during verification.');
-    inspectBytes(bytes,String(intent.filename).split('.').pop()?.toLowerCase()??'');
-    verifiedHash=await contentHash(bytes);
+    const inspected=await inspectResourceSource(stored.body,Number(intent.expected_size_bytes),String(intent.filename).split('.').pop()?.toLowerCase()??'',async()=>{const renewed=await database.prepare('UPDATE resource_completion_claims SET expires_at=?1 WHERE intent_id=?2 AND token=?3').bind(new Date(Date.now()+1800000).toISOString(),uploadId,completionToken).run() as {meta?:{changes?:number}};if(Number(renewed.meta?.changes??0)!==1)throw Error('Verification lease changed. Retry this file.');});
+    if(stored.httpEtag!==object.httpEtag)throw new InvalidResourceBytes('Upload bytes changed during verification.');
+    largeSource=inspected.large;verifiedHash=inspected.hash;
     const expected=await database.prepare('SELECT content_sha256 FROM resource_transfers WHERE intent_id=?1').bind(uploadId).first<{content_sha256:string}>();
-    if(expected&&expected.content_sha256!==verifiedHash)throw Error('Upload bytes do not match the selected file.');
+    if(expected&&expected.content_sha256!==verifiedHash)throw new InvalidResourceBytes('Upload bytes do not match the selected file.');
     // Freeze accepted bytes under a key that was never exposed in a PUT URL.
     const immutableKey=`files/${identity.id}/${uploadId}/${normalizeFilename(String(intent.filename))}`;
     if(String(intent.object_key)!==immutableKey){
       const stagedKey=String(intent.object_key);
-      await bucket.put(immutableKey,bytes,{httpMetadata:{contentType:String(intent.mime_type)},customMetadata:{owner:identity.id,sha256:verifiedHash}});
+      if(!inspected.bytes)throw Error('Large files must use the resumable transfer path. Retry this file.');
+      await bucket.put(immutableKey,inspected.bytes,{httpMetadata:{contentType:String(intent.mime_type)},customMetadata:{owner:identity.id,sha256:verifiedHash}});
       const frozen=await bucket.head(immutableKey);if(!frozen)throw Error('Verified file could not be frozen.');verifiedEtag=String(frozen.httpEtag);
       await database.prepare("UPDATE r2_upload_intents SET object_key=?1 WHERE id=?2 AND status='issued'").bind(immutableKey,uploadId).run();
       intent.object_key=immutableKey;
       await database.prepare('INSERT OR IGNORE INTO resource_derivative_cleanup(object_key,owner_user_id) VALUES(?1,?2)').bind(stagedKey,identity.id).run();
     }
   } catch(error) {
+    if(!(error instanceof InvalidResourceBytes))return fail(error instanceof Error?error.message:'Verification temporarily unavailable. Retry this file.',503,'VERIFICATION_RETRY');
     await database.batch([
       database.prepare("UPDATE r2_upload_intents SET status='failed' WHERE id=?1").bind(uploadId),
       database.prepare("UPDATE resource_transfers SET state='quarantined',lease_token=NULL,lease_until=NULL WHERE intent_id=?1").bind(uploadId),
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
     });
     committedId=String(inserted.id);
     await database.batch([
-      database.prepare("INSERT OR IGNORE INTO resource_inspections(resource_id,owner_user_id,source_key,source_etag,content_sha256,state) VALUES(?1,?2,?3,?4,?5,'queued')").bind(committedId,identity.id,String(intent.object_key),verifiedEtag,verifiedHash),
+      database.prepare("INSERT OR IGNORE INTO resource_inspections(resource_id,owner_user_id,source_key,source_etag,content_sha256,state,last_error) VALUES(?1,?2,?3,?4,?5,?6,?7)").bind(committedId,identity.id,String(intent.object_key),verifiedEtag,verifiedHash,largeSource?'unsupported':'queued',largeSource?LARGE_PREVIEW_UNAVAILABLE:null),
       database.prepare("INSERT OR IGNORE INTO resource_processing_outbox(resource_id,owner_user_id) VALUES(?1,?2)").bind(committedId,identity.id),
       database.prepare("UPDATE r2_upload_intents SET status='completed',completed_at=CURRENT_TIMESTAMP WHERE id=?1").bind(uploadId),
     ]);

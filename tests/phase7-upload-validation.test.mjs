@@ -8,7 +8,7 @@ test("Phase 7 validates descriptors server-side and uses direct private R2 URLs"
   const validation = read("lib/resources/validation.ts");
   const issue = read("app/api/resources/upload-url/route.ts");
   const complete = read("app/api/resources/upload-complete/route.ts");
-  assert.match(validation, /RESOURCE_MAX_BYTES/);
+  assert.doesNotMatch(validation, /file.size > RESOURCE_MAX_BYTES/);
   assert.match(validation, /MIME_BY_EXTENSION/);
   assert.match(validation, /magicMatches/);
   assert.match(validation, /%PDF|0x25, 0x50, 0x44, 0x46/);
@@ -16,7 +16,9 @@ test("Phase 7 validates descriptors server-side and uses direct private R2 URLs"
   assert.match(validation, /0xd0, 0xcf, 0x11, 0xe0/);
   assert.match(issue, /getResourceStorageAccess/);
   assert.match(issue, /createR2PresignedUrl/);
-  assert.match(issue, /RESOURCE_MAX_BYTES/);
+  assert.match(issue, /Number\.isSafeInteger\(sizeBytes\)/);
+  assert.match(issue, /maxBytes: null/);
+  assert.doesNotMatch(issue, /sizeBytes > RESOURCE_MAX_BYTES|FILE_SIZE_LIMIT_REACHED/);
   assert.match(issue, /crypto\.randomUUID\(\)/);
   assert.match(complete, /bucket\.head/);
   assert.match(complete, /OBJECT_SIZE_MISMATCH/);
@@ -47,12 +49,13 @@ test("Phase 7 upload API returns stable JSON errors and checks direct-upload rea
   assert.match(route, /optionalUser/);
 });
 
-test("upload drawer handles invalid receipts and retains a bounded per-file device queue", () => {
+test("upload drawer handles invalid receipts and retains a count-bounded device queue without a per-file size cap", () => {
   const client = read("lib/resources/transfer-client.ts");
   const queue = read("lib/resources/transfer-queue.ts");
   assert.match(client, /response\.json\(\)\.catch/);
   assert.match(client, /Upload receipt is missing/);
-  assert.match(queue, /10\*1024\*1024/);
+  assert.match(queue, /Number\.isSafeInteger\(file.size\)/);
+  assert.doesNotMatch(queue, /file.size>10\*1024\*1024/);
   assert.match(queue, /saveOfflineFile/);
 });
 

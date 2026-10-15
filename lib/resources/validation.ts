@@ -1,7 +1,7 @@
 import "server-only";
 import { assertNoteContentSize, LEGACY_NOTE_TAGS } from '@/lib/notes/content-limits';
 
-export const RESOURCE_MAX_BYTES = 10 * 1024 * 1024;
+// Resources have no application per-file upload cap.
 export const RESOURCE_BUCKET = "user-resources";
 export const SIGNED_URL_SECONDS = 120;
 
@@ -59,7 +59,6 @@ export async function validateUploadFile(file: File): Promise<ValidatedUpload> {
   if (!(file instanceof File)) throw new Error("A file is required.");
   if (!file.name || file.name.length > 180) throw new Error("File name is invalid.");
   if (file.size <= 0) throw new Error("Empty files are not allowed.");
-  if (file.size > RESOURCE_MAX_BYTES) throw new Error("File exceeds the 10 MB upload limit.");
 
   const extension = extensionOf(file.name);
   const acceptedMimes = MIME_BY_EXTENSION[extension];

@@ -11,7 +11,7 @@ export async function processResource(resourceId:string,owner:string,db:HotD1Dat
  if(!row)return {state:'missing'};row.extension=row.extension.toLowerCase();
  const stored=await bucket.get(row.storage_path);if(!stored)throw Error('Source bytes are unavailable.');
  const old=await db.prepare('SELECT * FROM resource_inspections WHERE resource_id=?1').bind(resourceId).first<{source_key:string;source_etag:string;state:string;thumbnail_key:string|null}>();
- if(old&&old.source_key===row.storage_path&&old.source_etag===stored.httpEtag&&['ready','unsupported','quarantined'].includes(old.state))return {state:old.state};
+ if(old&&old.source_key===row.storage_path&&old.source_etag===stored.httpEtag&&['ready','unsupported','quarantined'].includes(old.state)){await stored.body.cancel();return {state:old.state};}
  await db.prepare("INSERT INTO resource_inspections(resource_id,owner_user_id,source_key,source_etag,content_sha256,state,attempts) VALUES(?1,?2,?3,?4,'','processing',1) ON CONFLICT(resource_id) DO UPDATE SET state='processing',attempts=resource_inspections.attempts+1,last_error=NULL,updated_at=CURRENT_TIMESTAMP").bind(resourceId,owner,row.storage_path,stored.httpEtag).run();
  try{
   const bytes=await boundedBytes(stored.body,INSPECTION_MAX_BYTES);if(bytes.length!==row.size_bytes)throw Error('Source size changed.');const inspected=inspectBytes(bytes,row.extension.toLowerCase());const hash=await contentHash(bytes);let text=inspected.text,state:'ready'|'unsupported'='unsupported';

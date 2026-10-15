@@ -10,7 +10,7 @@ test("Phase 8 opens supported private resources inside the adaptive app shell", 
   assert.match(page, /getResourceDetailModel/);
   assert.match(viewer, /application\/pdf/);
   assert.match(viewer, /mimeType\.startsWith\("image\/"\)/);
-  assert.match(viewer, /Preview is not available for this file type/);
+  assert.match(viewer, /Preview is not available for this file/);
 });
 
 test("Phase 8 keeps document access signed, authorized and disposition-safe", () => {

@@ -3,6 +3,7 @@ import {getHotD1Database,type HotD1Database} from '@/lib/data/d1/runtime';
 import {getResourceR2Bucket,type ResourceR2Bucket} from './r2';
 import {createR2PresignedUrl} from './r2-presign';
 import {boundedBytes,contentHash} from './inspection';
+import {normalizeFilename} from './validation';
 export const TRANSFER_PART_BYTES=5*1024*1024;
 export type Transfer={intent_id:string;owner_user_id:string;client_id:string;content_sha256:string;multipart_id:string|null;state:string;lease_until:string|null;lease_token:string|null;object_key:string;expected_size_bytes:number;filename:string;mime_type:string;expires_at:string;request_hash:string;intent_status:string};
 export class TransferError extends Error{constructor(message:string,public status=409){super(message);}}
@@ -22,9 +23,10 @@ export async function initializeTransfer(owner:string,id:string,db:HotD1Database
  const token=crypto.randomUUID();const lease=new Date(Date.now()+60000).toISOString();
  const lock=await db.prepare("UPDATE resource_transfers SET lease_token=?1,lease_until=?2 WHERE intent_id=?3 AND state='initializing' AND (lease_until IS NULL OR julianday(lease_until)<julianday('now'))").bind(token,lease,id).run();if(!changed(lock))throw new TransferError('Transfer is being prepared. Retry shortly.');
  let multipartId:string|null=null;
- try{if(row.expected_size_bytes>TRANSFER_PART_BYTES)multipartId=(await bucket.createMultipartUpload(row.object_key,{httpMetadata:{contentType:row.mime_type}})).uploadId;
-  await db.prepare("UPDATE resource_transfers SET multipart_id=?1,state='active',lease_until=NULL,lease_token=NULL WHERE intent_id=?2 AND lease_token=?3").bind(multipartId,id,token).run();
- }catch(error){if(multipartId)await bucket.resumeMultipartUpload(row.object_key,multipartId).abort().catch(()=>undefined);await db.prepare('UPDATE resource_transfers SET lease_until=NULL,lease_token=NULL WHERE intent_id=?1 AND lease_token=?2').bind(id,token).run();throw error;}
+ const targetKey=row.expected_size_bytes>TRANSFER_PART_BYTES?`files/${owner}/${id}/${normalizeFilename(row.filename)}`:row.object_key;
+ try{if(row.expected_size_bytes>TRANSFER_PART_BYTES)multipartId=(await bucket.createMultipartUpload(targetKey,{httpMetadata:{contentType:row.mime_type}})).uploadId;
+  await db.batch([db.prepare("UPDATE r2_upload_intents SET object_key=?1 WHERE id=?2 AND status='issued'").bind(targetKey,id),db.prepare("UPDATE resource_transfers SET multipart_id=?1,state='active',lease_until=NULL,lease_token=NULL WHERE intent_id=?2 AND lease_token=?3").bind(multipartId,id,token)]);
+ }catch(error){if(multipartId)await bucket.resumeMultipartUpload(targetKey,multipartId).abort().catch(()=>undefined);await db.prepare('UPDATE resource_transfers SET lease_until=NULL,lease_token=NULL WHERE intent_id=?1 AND lease_token=?2').bind(id,token).run();throw error;}
  return transferStatus(owner,id,db);
 }
 export async function renewSingleTransfer(owner:string,id:string){const row=await ownedTransfer(owner,id);assertActive(row);if(row.multipart_id||row.state!=='active')throw new TransferError('Transfer is not a single upload.');const signed=await createR2PresignedUrl({key:row.object_key,method:'PUT',contentType:row.mime_type,expiresInSeconds:300});return {uploadUrl:signed.url,headers:{'Content-Type':row.mime_type},expiresAt:signed.expiresAt};}

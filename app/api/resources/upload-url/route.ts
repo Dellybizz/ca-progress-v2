@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess } from "@/lib/billing/service";
 import { createR2PresignedUrl } from "@/lib/resources/r2-presign";
-import { RESOURCE_MAX_BYTES, normalizeFilename } from "@/lib/resources/validation";
+import { normalizeFilename } from "@/lib/resources/validation";
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +28,13 @@ async function createUploadIntent(request: Request) {
   const mimeType = typeof body?.mimeType === "string" ? body.mimeType.trim().toLowerCase() : "";
   const sizeBytes = Number(body?.sizeBytes);
   const ext = extension(filename);
-  if (!filename || filename.length > 180 || !Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > RESOURCE_MAX_BYTES) return error("File name or size is invalid.", 400, "UPLOAD_DESCRIPTOR_INVALID");
+  if (!filename || filename.length > 180 || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) return error("File name or size is invalid.", 400, "UPLOAD_DESCRIPTOR_INVALID");
   if (!MIME_BY_EXTENSION[ext]?.includes(mimeType)) return error("File MIME type does not match the allowed extension.", 400, "UPLOAD_MIME_INVALID");
 
   let access;
   try { access = await getResourceStorageAccess(identity.id); }
   catch { return error("Resource storage access is temporarily unavailable.", 503, "STORAGE_ACCESS_UNAVAILABLE"); }
   if (!access.allowed) return error(access.upgradeMessage || "Your plan does not allow file storage.", 403, "ENTITLEMENT_REQUIRED");
-  if(access.fileSizeLimitBytes!=null&&sizeBytes>access.fileSizeLimitBytes)return error("This file exceeds your plan file-size allowance.",403,"FILE_SIZE_LIMIT_REACHED");
   if (access.limitBytes !== null && access.usedBytes + sizeBytes > access.limitBytes) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
 
   const objectKey = `uploads/${identity.id}/${crypto.randomUUID()}/${normalizeFilename(filename)}`;
@@ -63,7 +62,7 @@ async function createUploadIntent(request: Request) {
   } catch {
     return error("Upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");
   }
-  return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: RESOURCE_MAX_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: null }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request) {

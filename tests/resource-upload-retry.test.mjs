@@ -16,6 +16,7 @@ try{
    '@/lib/resources/r2':"export const RESOURCE_R2_STORAGE_BUCKET='resources';export const getResourceR2Bucket=()=>{throw new Error('Must not access bytes on completed retry')};",
    '@/lib/resources/processing-outbox':"export const dispatchResourceProcessing=()=>{throw new Error('Must not enqueue duplicate processing')};",
    '@/lib/jobs/queue':"export const enqueueBackgroundJob=()=>{throw new Error('Must not enqueue duplicate processing')};export const jobKey=()=>'';",
+   '@/lib/resources/source-inspection':"export const inspectResourceSource=()=>{throw Error('No bytes needed on completed retry')};export class InvalidResourceBytes extends Error{};export const LARGE_PREVIEW_UNAVAILABLE='Large-file preview is unavailable.';",
    '@/lib/resources/inspection':"export const boundedBytes=()=>{throw Error('No bytes needed on completed retry')};export const contentHash=()=>'';export const inspectBytes=()=>{};",
    '@/lib/resources/validation':"export const normalizeFilename=value=>value;",
   };if(!sources[args.path])throw new Error(args.path);return {contents:sources[args.path]};

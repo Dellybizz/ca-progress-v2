@@ -151,7 +151,6 @@ export async function createResourceMetadataWithinQuota(input: { userId: string;
   const client = db();
   const access = await getResourceStorageAccess(input.userId);
   if (!access.allowed) throw new Error(access.upgradeMessage || "Resource storage is not available on this plan.");
-  if(access.fileSizeLimitBytes!=null&&input.sizeBytes>access.fileSizeLimitBytes)throw new Error("This file exceeds your plan file-size allowance.");
   if (access.limitBytes!==null && access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
   const duplicateResult = await client.from("uploaded_resources").select("id").eq("storage_path", input.storagePath).maybeSingle();
   if (duplicateResult.error) throw new Error(duplicateResult.error.message);

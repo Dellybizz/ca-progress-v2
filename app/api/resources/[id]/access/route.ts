@@ -23,7 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if(await isWorkspaceTrashed("upload",id))return NextResponse.json({error:"Resource not found."},{status:404});
   const client = await createD1ServerClient();
   const response = await client.from("uploaded_resources")
-    .select("id,owner_user_id,visibility,moderation_status,storage_bucket,storage_path,original_filename,mime_type")
+    .select("id,owner_user_id,visibility,moderation_status,storage_bucket,storage_path,original_filename,mime_type,size_bytes")
     .eq("id", id).maybeSingle();
   if (response.error || !response.data) return NextResponse.json({ error: "Resource not found or access denied." }, { status: 404 });
   const row = response.data;
@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if((!inspected&&(String(row.storage_path).startsWith('files/')||String(row.storage_path).includes('/copies/')))||inspected&&['queued','processing'].includes(inspected.state))return NextResponse.json({error:'This file is still being checked. Retry shortly.'},{status:425,headers:{'Cache-Control':'private, no-store','Retry-After':'5'}});
   if (row.storage_bucket !== RESOURCE_R2_STORAGE_BUCKET) return NextResponse.json({ error: "This legacy resource is not stored in Cloudflare R2." }, { status: 409 });
   try {
-    const download = new URL(request.url).searchParams.get("download") === "1";
+    const download = new URL(request.url).searchParams.get("download") === "1" || Number(row.size_bytes)>10*1024*1024;
     const filename = safeDownloadName(row.original_filename);
     const signed = await createR2PresignedUrl({
       key: row.storage_path,

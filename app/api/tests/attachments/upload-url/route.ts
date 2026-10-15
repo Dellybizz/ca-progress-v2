@@ -3,12 +3,13 @@ import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess } from "@/lib/billing/service";
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 import { createR2PresignedUrl } from "@/lib/resources/r2-presign";
-import { RESOURCE_MAX_BYTES, normalizeFilename } from "@/lib/resources/validation";
+import { normalizeFilename } from "@/lib/resources/validation";
 import { getOwnedPhase5Attempt, parsePhase5AttachmentKind } from "@/lib/tests/phase5";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const TEST_ATTACHMENT_MAX_BYTES=10*1024*1024;
 const MIME_BY_EXTENSION: Record<string, string[]> = {
   pdf: ["application/pdf"],
   jpg: ["image/jpeg"],
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
   const sizeBytes = Number(body?.sizeBytes);
   const ext = extension(filename);
   if (!attemptId) return fail("Attempt id is required.", 400, "ATTEMPT_REQUIRED");
-  if (!filename || filename.length > 180 || !Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > RESOURCE_MAX_BYTES) return fail("File name or size is invalid.", 400, "UPLOAD_DESCRIPTOR_INVALID");
+  if (!filename || filename.length > 180 || !Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > TEST_ATTACHMENT_MAX_BYTES) return fail("File name or size is invalid.", 400, "UPLOAD_DESCRIPTOR_INVALID");
   if (!MIME_BY_EXTENSION[ext]?.includes(mimeType)) return fail("Use a PDF, JPG, PNG or WebP file whose MIME type matches its extension.", 400, "UPLOAD_MIME_INVALID");
 
   let kind;
@@ -71,5 +72,5 @@ export async function POST(request: Request) {
     return fail("Test upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");
   }
 
-  return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: RESOURCE_MAX_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: TEST_ATTACHMENT_MAX_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
 }

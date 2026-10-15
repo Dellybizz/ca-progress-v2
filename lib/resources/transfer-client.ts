@@ -1,8 +1,9 @@
+import {sha256} from '@noble/hashes/sha256';
 export type TransferDescriptor={filename:string;mimeType:string;sizeBytes:number;title:string;description?:string;subjectId?:string;chapterId?:string;visibility:'private'|'shared'};
 export type QueuedUpload={id:string;idempotencyId?:string;owner:string;descriptor:TransferDescriptor;sha256:string;uploadId?:string;state:'queued'|'uploading'|'paused'|'failed'|'duplicate'|'complete'|'reselect';progress:number;error?:string;allowDuplicate?:boolean;resourceId?:string;createdAt:string};
 export type TransferApi=(url:string,init?:RequestInit)=>Promise<Record<string,unknown>>;
 export class UploadClientError extends Error{constructor(message:string,public status:number,public code=''){super(message);}}
-export async function fileHash(file:Blob){return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await file.arrayBuffer())),v=>v.toString(16).padStart(2,'0')).join('');}
+export async function fileHash(file:Blob){const hash=sha256.create();for(let offset=0;offset<file.size;offset+=5*1024*1024)hash.update(new Uint8Array(await file.slice(offset,offset+5*1024*1024).arrayBuffer()));return Array.from(hash.digest(),v=>v.toString(16).padStart(2,'0')).join('');}
 export async function browserTransferApi(url:string,init:RequestInit={}){const response=await fetch(url,{...init,credentials:'same-origin',cache:'no-store'});const payload=await response.json().catch(()=>null);if(!response.ok)throw new UploadClientError(typeof payload?.error==='string'?payload.error:'Upload failed. Retry to continue.',response.status,payload?.code??'');if(!payload||typeof payload!=='object')throw new UploadClientError('Upload receipt is missing. Retry to verify this file.',503);return payload as Record<string,unknown>;}
 async function directPut(url:string,headers:Record<string,string>,file:Blob,signal:AbortSignal,progress:(value:number)=>void){
  return new Promise<void>((resolve,reject)=>{const xhr=new XMLHttpRequest();const abort=()=>xhr.abort();const done=()=>signal.removeEventListener('abort',abort);if(signal.aborted){reject(new DOMException('Paused','AbortError'));return;}signal.addEventListener('abort',abort,{once:true});xhr.open('PUT',url);xhr.timeout=45000;for(const [key,value] of Object.entries(headers))xhr.setRequestHeader(key,value);xhr.upload.onprogress=e=>{if(e.lengthComputable)progress(e.loaded/e.total);};xhr.onload=()=>{done();if(xhr.status>=200&&xhr.status<300)resolve();else reject(new UploadClientError('Upload connection expired or failed. Retry this file.',xhr.status));};xhr.onerror=()=>{done();reject(new UploadClientError('Connection lost. Your file is retained for retry.',0));};xhr.ontimeout=()=>{done();reject(new UploadClientError('Direct upload timed out. Trying secure upload.',0));};xhr.onabort=()=>{done();reject(new DOMException('Paused','AbortError'));};xhr.send(file);});
@@ -38,6 +39,7 @@ export async function runQueuedUpload(row:QueuedUpload,file:File,input:{api:Tran
  }catch(error){row.state=(error as {code?:string}).code==='DUPLICATE_FILE'?'duplicate':signal.aborted?'paused':'failed';row.error=error instanceof Error?error.message:'Upload failed. Retry this file.';await save(row);throw error;}
 }
 export async function imageThumbnail(file:File){
+ if(file.size>10*1024*1024)return null;
  if(file.type==='application/pdf'){
   if(typeof Worker==='undefined'||typeof OffscreenCanvas==='undefined')return null;
   const worker=new Worker(new URL('/resource-preview/pdf-thumbnail-worker.mjs',location.href),{type:'module'});

@@ -1,3 +1,4 @@
+import {LARGE_PREVIEW_UNAVAILABLE} from '@/lib/resources/source-inspection';
 import {nativeCorsHeaders,nativeOptions} from '@/lib/auth/native-cors';
 import {NextResponse} from 'next/server';
 import {optionalUser} from '@/lib/auth/server';
@@ -10,7 +11,7 @@ export const OPTIONS=(request:Request)=>nativeOptions(request);
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Cross-Origin-Resource-Policy':'same-origin'};
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
  const user=await optionalUser();if(!user)return NextResponse.json({error:'Authentication required.'},{status:401,headers});const {id}=await params;const allowed=await authorizedPreview(user.id,id);if(!allowed)return NextResponse.json({error:'File not found.'},{status:404,headers});
- const inspection=allowed.inspection;if(new URL(request.url).searchParams.get('text')==='1')return NextResponse.json({state:inspection?.state??'queued',text:['ready','unsupported'].includes(inspection?.state??'')?inspection?.text_content??'':'',message:inspection?.state==='unsupported'?'A visual preview is unavailable for this file.':inspection?.state==='quarantined'?'This file did not pass inspection.':undefined},{headers});
+ const inspection=allowed.inspection;if(new URL(request.url).searchParams.get('text')==='1')return NextResponse.json({state:inspection?.state??'queued',downloadOnly:inspection?.last_error===LARGE_PREVIEW_UNAVAILABLE,text:['ready','unsupported'].includes(inspection?.state??'')?inspection?.text_content??'':'',message:inspection?.state==='unsupported'?(inspection.last_error===LARGE_PREVIEW_UNAVAILABLE?LARGE_PREVIEW_UNAVAILABLE:'A visual preview is unavailable for this file.'):inspection?.state==='quarantined'?'This file did not pass inspection.':undefined},{headers});
  if(!inspection||inspection.state!=='ready'||!inspection.thumbnail_key)return new Response(null,{status:404,headers});const object=await getResourceR2Bucket().get(inspection.thumbnail_key);if(!object)return new Response(null,{status:404,headers});return new Response(object.body,{headers:{...headers,'Content-Type':inspection.thumbnail_mime??'image/png','Content-Length':String(object.size)}});
 }
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
