@@ -14,10 +14,12 @@ try{
   await page.goto('http://127.0.0.1:8770/');await page.getByRole('button',{name:'Select Image screenshot',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.fm-thumbnail.has-preview img')?.naturalWidth>0);await page.waitForFunction(()=>!document.body.textContent.includes('Preparing preview'));
   for(let count=0;count<30&&!repairs;count++)await page.waitForTimeout(100);assert.equal(repairs,1,'missing owner thumbnail repaired once');assert.deepEqual(blockedRequests,[],'blocked images never requested');
-  await page.getByRole('button',{name:'Select Image screenshot',exact:true}).click();assert.equal(await page.locator('.fm-primary-action').count(),5);
+  await page.getByRole('button',{name:'Select Image screenshot',exact:true}).click();assert.equal(await page.locator('.fm-primary-action').count(),3);
   const more=page.getByRole('button',{name:'More actions',exact:true});await more.click();await page.getByRole('menuitem',{name:'Export file list',exact:true}).waitFor();await page.keyboard.press('Escape');assert.equal(await more.evaluate(node=>node===document.activeElement),true);
+  await page.getByRole('button',{name:'Clear selection',exact:true}).click();
   await page.locator('.fm-filter-menu>summary').click();await page.getByRole('combobox',{name:'Group files by',exact:true}).waitFor();await page.locator('.fm-filter-menu>summary').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'no page overflow');
+  await page.getByRole('button',{name:'Select Image screenshot',exact:true}).click();
   const target=await more.boundingBox();assert.ok(target.height>=(width===390?44:40),'readable touch targets');
   for(const badge of await page.locator('.fm-preview-unavailable').all()){const bounds=await badge.boundingBox(),parent=await badge.locator('..').boundingBox();assert.ok(bounds.x>=parent.x-1&&bounds.x+bounds.width<=parent.x+parent.width+1,'status stays inside preview');}
   assert.deepEqual(errors,[]);await page.screenshot({path:`/tmp/resources-phase1-preview/workspace-visual-${width}.png`,fullPage:false,animations:'disabled'});console.log('PASS polished file cards, real image load, bounded thumbnail repair, blocked images, compact actions, filters and overflow at '+width);await page.close();
