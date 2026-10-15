@@ -1,10 +1,11 @@
 'use client';
-import {useEffect,useRef,useState,type FormEvent} from 'react';
+import {useEffect,useEffectEvent,useRef,useState,type FormEvent} from 'react';
 import type {ManagedFile} from '@/lib/resources/file-manager';
 import type {NoteSubjectOption} from '@/lib/notes/types';
 export function FileOrganization({file,subjects,onSaved,onDirtyChange,onBusyChange}:{file:ManagedFile;subjects:NoteSubjectOption[];onSaved:()=>void;onDirtyChange?:(dirty:boolean)=>void;onBusyChange?:(busy:boolean)=>void}) {
   const pending=useRef(false);const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false),[name,setName]=useState(file.name),[subjectId,setSubjectId]=useState(file.subjectIds[0]||''),[chapterId,setChapterId]=useState(file.chapterId||'');
-  useEffect(()=>()=>onDirtyChange?.(false),[onDirtyChange]);
+  const notifyUnmount=useEffectEvent(()=>onDirtyChange?.(false));
+  useEffect(()=>()=>notifyUnmount(),[]);
   function edited(){setSaved(false);onDirtyChange?.(true);}
   const subject=subjects.find(item=>item.id===subjectId);
   async function save(event:FormEvent<HTMLFormElement>){event.preventDefault();if(pending.current)return;if(!navigator.onLine){setError('Connect to save these details. Your edits are retained.');return;}pending.current=true;setBusy(true);onBusyChange?.(true);setError('');setSaved(false);try{

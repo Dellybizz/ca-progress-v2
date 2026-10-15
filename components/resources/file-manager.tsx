@@ -43,7 +43,7 @@ export function FileManager({files,title,actions,subjects=[],academicContext,onC
   const selectionDetails=details==='__selection__';
   const detail=selectionDetails?(selectedFiles.length===1?selectedFiles[0]:undefined):files.find(file=>file.key===details);
   const detailKey=detail?.key;
-  const detailEditing=useCallback((dirty:boolean)=>{setDetailDirty(dirty);if(dirty&&detailKey)setDetails(detailKey);},[detailKey]);
+  const detailEditing=(dirty:boolean)=>{setDetailDirty(dirty);if(dirty&&detailKey)setDetails(detailKey);};
   const router=useRouter();
   const menuId=useId();
   const [menu,setMenu]=useState<{origin:string;scope:string;keys:string[];x:number;y:number;trigger:HTMLElement}|null>(null);
