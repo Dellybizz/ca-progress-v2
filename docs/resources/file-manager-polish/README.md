@@ -18,3 +18,7 @@ Phase 2 implementation: [navigation, history and scoped layouts](phase2/PHASE_2_
 Phase 3 implementation: [selection, shared action menus and drag](phase3/PHASE_3_STATUS.md).
 
 FMP-03 is complete and deployed: selection, shared action menus, desktop file/folder drag moves, and external file staging passed 1,383 tests, desktop/mobile interaction checks and live storage gates. See the Phase 3 report for exact source/run evidence and supported-capability boundaries. Next: FMP-04 dialogs, inspector and destination picker.
+
+Phase 4 implementation: [inspector, destination picker, dialogs, results and safe undo](phase4/PHASE_4_STATUS.md).
+
+FMP-04 is complete and deployed. Source `e8cdfb7f` passed 1,386 tests, desktop/mobile interaction and upload recovery journeys, and the signed-in live upload/download plus actual D1 move/Trash/stale-undo checks. See the report for exact release, Worker and scoped cleanup evidence. Next: FMP-05 app-shell transfer coordination. The remaining polish packages and the paused typed-note editor have not been started automatically.
