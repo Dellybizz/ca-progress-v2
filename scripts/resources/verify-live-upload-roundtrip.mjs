@@ -22,7 +22,17 @@ const transfer=(body,expected=200)=>request('/api/v1/resources/transfers',{owner
 try{
  const file=join(folder,'fixture.sql');writeFileSync(file,fixture.sql,{mode:0o600});created=true;cli(['d1','execute','ca-progress-v2-phase4-shadow','--remote','--config=wrangler.jsonc',`--file=${file}`]);
  console.log('PASS isolated normal upload test account provisioned');stage='normal account login';const login=await request('/api/v1/password-auth',{action:'login',username:fixture.username,password,remember:true});cookie=login.headers.get('set-cookie')?.match(/(?:^|,\s*)(ca_session=[A-Za-z0-9_-]+)/)?.[1]||'';assert.ok(cookie,'Session cookie missing');await login.body?.cancel();
- console.log('PASS live normal account signed in');const bytes=Buffer.alloc(12*1024*1024+123,32);bytes.write('%PDF-1.7\n');bytes.write('\n%%EOF',bytes.length-6);const sha256=digest(bytes);
+ console.log('PASS live normal account signed in');
+ if(process.env.VERIFY_FILE_MANAGER_PHASE4==='true'){
+  stage='complete normal student onboarding';
+  const setup=await(await request('/api/onboarding')).json();
+  const mapped=query("SELECT DISTINCT asm.attempt_key FROM course_levels l JOIN attempt_syllabus_map asm ON asm.level_id=l.id JOIN course_groups g ON g.id=asm.group_id JOIN subjects s ON s.id=asm.subject_id AND s.level_id=l.id AND s.group_id=g.id AND s.is_active=1 JOIN syllabus_versions sv ON sv.id=asm.syllabus_version_id AND sv.subject_id=s.id WHERE l.code='foundation' AND l.is_active=1");
+  const attempt=setup.attempts?.find(option=>option.levels?.includes('foundation')&&mapped.some(row=>row.attempt_key===option.key));assert.ok(attempt,'No verified, published Foundation setup option.');
+  await(await request('/api/onboarding',{action:'complete',level:'foundation',group:'not_applicable',attemptKey:attempt.key,preparationState:'starting'})).body?.cancel();
+  const workspace=await(await request('/api/v1/resources/workspace')).json();assert.ok(Array.isArray(workspace.files));
+  console.log('PASS live fixture completed normal verified student setup and entered its owned workspace');
+ }
+ const bytes=Buffer.alloc(12*1024*1024+123,32);bytes.write('%PDF-1.7\n');bytes.write('\n%%EOF',bytes.length-6);const sha256=digest(bytes);
  stage='create blank-location transfer';const issued=await(await request('/api/v1/resources/transfers',{action:'create',ownerId:fixture.userId,clientId:randomUUID(),sha256,filename:'upload-verification.pdf',mimeType:'application/pdf',sizeBytes:bytes.length,title:'Private upload verification',description:'',subjectId:'',chapterId:'',visibility:'private'},201)).json();uploadId=issued.uploadId;assert.ok(uploadId);console.log('PASS live blank-location transfer created');
  for(let offset=0,part=1;offset<bytes.length;offset+=5*1024*1024,part++){stage=`upload part ${part}`;const chunk=bytes.subarray(offset,offset+5*1024*1024);const response=await request(`/api/v1/resources/transfers/${uploadId}/parts/${part}`,undefined,200,{method:'PUT',headers:{Origin:base,Cookie:cookie,'Content-Type':'application/octet-stream','X-CA-Owner':fixture.userId,'X-Part-SHA256':digest(chunk)},body:chunk});await response.body?.cancel();console.log(`PASS live upload part ${part}`);}
  stage='verify three durable receipts';const status=await(await request(`/api/v1/resources/transfers?id=${uploadId}`)).json();assert.equal(status.parts.length,3);
