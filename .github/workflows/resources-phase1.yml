@@ -6,6 +6,7 @@ on:
       - app/**
       - components/resources/**
       - lib/resources/**
+      - lib/auth/proxy.ts
       - lib/billing/service.ts
       - workers/resources-preview/**
       - apps/mobile/**
@@ -111,3 +112,5 @@ jobs:
       - name: Verify live resource authentication boundary
         run: |
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://ca-progress-v2.habeebaasif622.workers.dev/api/resources/workspace)" = "401"
+      - name: Verify live upload middleware and authentication boundaries
+        run: node scripts/resources/verify-live-upload-boundary.mjs

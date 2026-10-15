@@ -49,12 +49,18 @@ export async function updateAuthSession(request: NextRequest) {
   }
   if (isVersionedApi && isMutation) {
     const contentLength = Number(request.headers.get("content-length") || 0);
-    if (Number.isFinite(contentLength) && contentLength > MAX_API_BODY_BYTES) {
+    const contentType = request.headers.get("content-type")?.toLowerCase().split(";")[0].trim() || "";
+    // File bytes use a bounded, authenticated part handler rather than the
+    // ordinary JSON mutation protocol. Keep this exception scoped to PUTs on
+    // real upload-intent IDs; owner/hash checks and streamed limits still run
+    // inside the handler, including requests with no Content-Length.
+    const isResourcePart = method === "PUT" && /^\/api\/v1\/resources\/transfers\/[0-9a-f-]{36}\/parts\/(?:[1-9]\d{0,3}|10000)$/.test(request.nextUrl.pathname);
+    const bodyLimit = isResourcePart ? (contentType === "application/json" ? 7 : 5) * 1024 * 1024 : MAX_API_BODY_BYTES;
+    if (Number.isFinite(contentLength) && contentLength > bodyLimit) {
       return NextResponse.json({ error: { code: "PAYLOAD_TOO_LARGE", message: "The request body is too large.", retryable: false } }, { status: 413 });
     }
-    const contentType = request.headers.get("content-type")?.toLowerCase() || "";
-    if (contentLength > 0 && !contentType.includes("application/json") && !contentType.includes("multipart/form-data")) {
-      return NextResponse.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: "Use JSON or multipart form data.", retryable: false } }, { status: 415 });
+    if (isResourcePart ? !["application/octet-stream", "application/json"].includes(contentType) : contentLength > 0 && !contentType.includes("application/json") && !contentType.includes("multipart/form-data")) {
+      return NextResponse.json({ error: { code: "UNSUPPORTED_MEDIA_TYPE", message: isResourcePart ? "Use binary file bytes or the native JSON part envelope." : "Use JSON or multipart form data.", retryable: false } }, { status: 415 });
     }
   }
   const requestHeaders = new Headers(request.headers);
