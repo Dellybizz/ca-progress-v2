@@ -21,11 +21,11 @@ export function FileActionMenu({id,actions,x,y,anchor,onClose}:{anchor:HTMLEleme
   node.style.left=`${left}px`;node.style.top=`${top}px`;
  },[x,y,actions,anchor]);
  useEffect(()=>{
-  menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+  menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({preventScroll:true});
   const outside=(event:PointerEvent)=>{if(!menu.current?.contains(event.target as Node)&&(event.target as Element).closest?.('[aria-controls]')?.getAttribute('aria-controls')!==id)onClose(false);};
-  const close=(event:Event)=>{if(event.type==='scroll'&&menu.current?.contains(event.target as Node))return;onClose(false);};
-  document.addEventListener('pointerdown',outside);window.addEventListener('resize',close);window.addEventListener('scroll',close,true);
-  return()=>{document.removeEventListener('pointerdown',outside);window.removeEventListener('resize',close);window.removeEventListener('scroll',close,true);};
+  const close=(event:Event)=>{if(menu.current?.contains(event.target as Node))return;onClose(false);};
+  document.addEventListener('pointerdown',outside);window.addEventListener('resize',close);document.addEventListener('wheel',close,{passive:true});document.addEventListener('touchmove',close,{passive:true});
+  return()=>{document.removeEventListener('pointerdown',outside);window.removeEventListener('resize',close);document.removeEventListener('wheel',close);document.removeEventListener('touchmove',close);};
  },[onClose,id]);
  function keyboard(event:KeyboardEvent){
   event.stopPropagation();
