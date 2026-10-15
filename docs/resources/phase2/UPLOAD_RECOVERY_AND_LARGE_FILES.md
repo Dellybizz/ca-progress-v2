@@ -30,3 +30,5 @@ Local verification: 25 behavioral transfer/inspection tests passed, including 10
 - Native source was bundled and checked; no new APK was built or delivered.
 
 The Resources per-file application cap is removed on the live site. Phase 3 remains in progress and is not declared complete by this repair.
+
+Subsequent integration repair: [versioned upload middleware](API_UPLOAD_BOUNDARY_REPAIR.md). This closes the general API byte/type rejection that the earlier mocked browser transport omitted; its final release includes real middleware in browser checks and live transport probes.

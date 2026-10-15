@@ -33,5 +33,5 @@ Implementation command names in later conversation refer to these eight phases. 
 - Phase 0: complete.
 - Phase 1: implemented and deployed; [production evidence](phase1/PHASE_1_STATUS.md).
 - Phase 2: implemented and deployed; [scope, validation and production evidence](phase2/PHASE_2_STATUS.md).
-- Phase 3: next — professional typed notes, including its required durable local-draft foundation.
+- Phase 3: started — professional typed notes and its required durable local-draft foundation; editor not yet released. Upload recovery, larger-file support and the API transport integration repair were prioritized first; [verified release evidence](phase2/API_UPLOAD_BOUNDARY_REPAIR.md).
 - Phases 4–7: planned; their remaining native/background, history, handwriting, protected-sharing and certification guarantees are not claimed by the Phase 2 web release.
