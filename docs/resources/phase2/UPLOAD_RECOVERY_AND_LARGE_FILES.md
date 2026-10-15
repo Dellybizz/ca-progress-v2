@@ -19,4 +19,14 @@ The application cap removal does not remove underlying service, device storage, 
 
 Local verification: 25 behavioral transfer/inspection tests passed, including 100 MiB intent acceptance despite a former per-file policy value, exact 128 MiB streamed hash without retaining the whole source, above-cap finalization, bounded multipart copying, quota enforcement and retry preservation. TypeScript and targeted lint passed. The browser regression now uses a 12 MiB file plus a blocked small PUT at 1440px and 390px.
 
-Follow-up release status: pending CI and deployment. Phase 3 remains in progress and is not declared complete by this repair.
+## Verified follow-up release
+
+- Deployed source: `70573159c5bbb24053d15fc1619a736faabd6700`.
+- Release: [38667603883](https://github.com/Dellybizz/ca-progress-v2/actions/runs/38667603883), verification job `116203431989` and deployment job `116204769604`, both successful.
+- All **1,355 tests**, TypeScript, lint, production build, D1 index checks, native bundle, real 12 MiB browser upload/resume and blocked-R2 recovery at 1440px/390px passed.
+- Production Worker size/smoke checks, private D1 backup/restore, retained migration ledger and live authentication boundary passed. No new migration was added by this release.
+- Web Worker version: `261c0a35-092b-45b3-a98a-f87c1a7a93d5`, gzip **3601.60 KiB**, within the 3.75 MiB guard.
+- Preview processor version: `79b8a2d6-4b0c-48e3-8e85-6198ef9162d3`, gzip **509.67 KiB**, within the 0.75 MiB guard.
+- Native source was bundled and checked; no new APK was built or delivered.
+
+The Resources per-file application cap is removed on the live site. Phase 3 remains in progress and is not declared complete by this repair.
