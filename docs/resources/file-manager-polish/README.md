@@ -14,3 +14,5 @@ Recommended implementation order is FMP-00 reliability closure, FMP-01 shared in
 Phase 1 implementation: [interaction foundation and drag contract](phase1/PHASE_1_STATUS.md). Drag upload and internal move are mandatory acceptance journeys; UI integration follows the navigation and selection phases.
 
 Phase 2 implementation: [navigation, history and scoped layouts](phase2/PHASE_2_STATUS.md).
+
+Phase 3 implementation: [selection, shared action menus and drag](phase3/PHASE_3_STATUS.md).

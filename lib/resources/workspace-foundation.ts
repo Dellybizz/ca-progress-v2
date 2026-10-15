@@ -5,7 +5,7 @@ export type ManagerQuery={query:string;types:FileKind[];sort:FileSort;secondary:
 export const FILE_LAYOUTS=['grid','list','compact'] as const;
 export type FileLayout=typeof FILE_LAYOUTS[number];
 export const INTERNAL_FILE_DRAG_TYPE='application/x-ca-progress-workspace+json';
-export type WorkspaceAction='open'|'details'|'move'|'rename'|'tag'|'star'|'trash'|'restore'|'erase';
+export type WorkspaceAction='open'|'details'|'move'|'rename'|'tag'|'star'|'trash'|'restore'|'erase'|'duplicate'|'replace-version';
 export type ActionContext={collection:'my'|'shared'|'official';online:boolean;preview?:boolean};
 /** UI eligibility only. The API must independently authorize every mutation. */
 export function actionEligibility(action:WorkspaceAction,files:readonly ManagedFile[],context:ActionContext):{allowed:boolean;reason?:string}{
@@ -15,19 +15,21 @@ export function actionEligibility(action:WorkspaceAction,files:readonly ManagedF
   if(context.preview||context.collection!=='my'||files.some(file=>!file.canManage))return{allowed:false,reason:'Only your own files can be changed here.'};
   const trashAction=action==='restore'||action==='erase';
   if(files.some(file=>Boolean(file.trashedAt)!==trashAction))return{allowed:false,reason:trashAction?'Choose files in Trash.':'Restore files before changing them.'};
-  if(action==='rename'&&files.length!==1)return{allowed:false,reason:'Choose one file.'};
-  if(!context.online&&['rename','tag','erase'].includes(action))return{allowed:false,reason:'This action needs a connection.'};
+  if(['rename','duplicate','replace-version'].includes(action)&&files.length!==1)return{allowed:false,reason:'Choose one file.'};
+  if(action==='replace-version'&&files.some(file=>file.kind==='note'))return{allowed:false,reason:'Choose an uploaded file.'};
+  if(!context.online&&['rename','tag','erase','duplicate','replace-version'].includes(action))return{allowed:false,reason:'This action needs a connection.'};
   return{allowed:true};
 }
 
-export type SelectionState={keys:string[];anchor:string|null};
-/** Range selection retains its original anchor; selection never includes unloaded IDs. */
+export type SelectionState={keys:string[];anchor:string|null;rangeBase?:string[]};
+/** Preserve explicit additive choices while replacing the previous Shift range. */
 export function toggleFileSelection(state:SelectionState,key:string,visible:readonly string[],range=false):SelectionState{
   const keys=state.keys.filter(id=>visible.includes(id));
-  if(!visible.includes(key))return{keys,anchor:visible.includes(state.anchor??'')?state.anchor:null};
+  if(!visible.includes(key))return{keys,anchor:visible.includes(state.anchor??'')?state.anchor:null,rangeBase:(state.rangeBase??[]).filter(id=>visible.includes(id))};
   const start=visible.indexOf(state.anchor??''),end=visible.indexOf(key);
-  if(range&&start>=0)return{keys:[...new Set([...keys,...visible.slice(Math.min(start,end),Math.max(start,end)+1)])],anchor:state.anchor};
-  return{keys:keys.includes(key)?keys.filter(id=>id!==key):[...keys,key],anchor:key};
+  if(range&&start>=0){const rangeBase=(state.rangeBase??[]).filter(id=>visible.includes(id));return{keys:[...new Set([...rangeBase,...visible.slice(Math.min(start,end),Math.max(start,end)+1)])],anchor:state.anchor,rangeBase};}
+  const next=keys.includes(key)?keys.filter(id=>id!==key):[...keys,key];
+  return{keys:next,anchor:key,rangeBase:next.filter(id=>id!==key)};
 }
 
 export type DragEntity={id:string;kind:'file'|'folder';parentId:string|null};

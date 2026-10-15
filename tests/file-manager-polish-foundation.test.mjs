@@ -18,9 +18,9 @@ test('action rules reject mixed ownership, read-only collections and incompatibl
 });
 test('successive range selections retain anchor and prune unloaded files',()=>{
  const visible=['a','b','c','d'];let state=f.toggleFileSelection({keys:['stale'],anchor:null},'b',visible);
- state=f.toggleFileSelection(state,'d',visible,true);assert.deepEqual(state,{keys:['b','c','d'],anchor:'b'});
- state=f.toggleFileSelection(state,'a',visible,true);assert.equal(state.anchor,'b');assert.deepEqual(state.keys,['b','c','d','a']);
- assert.deepEqual(f.toggleFileSelection(state,'missing',['c']),{keys:['c'],anchor:null});
+ state=f.toggleFileSelection(state,'d',visible,true);assert.deepEqual(state,{keys:['b','c','d'],anchor:'b',rangeBase:[]});
+ state=f.toggleFileSelection(state,'a',visible,true);assert.equal(state.anchor,'b');assert.deepEqual(state.keys,['a','b']);
+ assert.deepEqual(f.toggleFileSelection(state,'missing',['c']),{keys:[],anchor:null,rangeBase:[]});
 });
 const drag={version:1,ownerId:'alice',scope:'academic-a',entities:[{kind:'folder',id:'parent',parentId:null}]};
 test('internal drag payload is bounded and scoped to owner and academic context',()=>{
@@ -46,4 +46,16 @@ test('canonical location clears incompatible folders and separates owner cache i
  const location=f.normalizeWorkspaceLocation({view:'folder'});assert.equal(location.view,'folder');
  assert.notEqual(f.workspaceLocationKey('alice','ctx',location),f.workspaceLocationKey('bob','ctx',location));
  assert.notEqual(f.workspaceLocationKey('alice','ctx',location),f.workspaceLocationKey('alice','ctx2',location));
+});
+test('duplicate and version actions obey the same single-item and offline gates as menus',()=>{
+ assert.equal(f.actionEligibility('duplicate',[file(),file()],context).allowed,false);
+ assert.equal(f.actionEligibility('duplicate',[file()],{...context,online:false}).allowed,false);
+ assert.equal(f.actionEligibility('replace-version',[file({kind:'note'})],context).allowed,false);
+ assert.equal(f.actionEligibility('replace-version',[file({kind:'pdf'})],context).allowed,true);
+ assert.equal(f.actionEligibility('rename',[file(),file()],context).allowed,false);
+});
+test('selection uses entity keys for duplicate filenames and never retains unloaded pages',()=>{
+ const first=f.toggleFileSelection({keys:[],anchor:null},'note:one',['note:one','note:two']);
+ const both=f.toggleFileSelection(first,'note:two',['note:one','note:two']);assert.deepEqual(both.keys,['note:one','note:two']);
+ const next=f.toggleFileSelection(both,'upload:one',['upload:one']);assert.deepEqual(next,{keys:['upload:one'],anchor:'upload:one',rangeBase:[]});
 });
