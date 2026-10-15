@@ -56,7 +56,7 @@ export async function createR2PresignedUrl(input: { key: string; method: "GET" |
   const queryValues: Record<string, string> = { ...signedHeaders };
   if (input.method === "GET" && input.responseContentDisposition) queryValues["response-content-disposition"] = input.responseContentDisposition;
   if (input.method === "GET" && input.responseContentType) queryValues["response-content-type"] = input.responseContentType;
-  const query = Object.entries(queryValues).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${encoded(key)}=${encoded(value)}`).join("&");
+  const query = Object.entries(queryValues).map(([key,value]) => [encoded(key),encoded(value)]).sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0).map(([key,value]) => `${key}=${value}`).join("&");
   const lineBreak = String.fromCharCode(10);
   const canonicalHeaders = input.method === "PUT"
     ? [`content-type:${input.contentType ?? "application/octet-stream"}`, `host:${url.host}`, ""].join(lineBreak)
