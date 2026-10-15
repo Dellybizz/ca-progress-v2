@@ -41,3 +41,5 @@ The actual Chromium journeys passed at both 1440px and 390px, including the prev
 The full Resources release run is `38786434760`; verification/deployment results follow below once complete.
 
 Final interaction follow-up: non-interactive metadata cells and blank card/row space participate in the same click/double-click selection/open policy, without intercepting checkboxes, links or action buttons. The browser journey explicitly checks desktop date-cell selection and three-dot menu toggling. Passive drag feedback dismisses after six seconds once no drag is active; active dragging keeps its textual feedback stable.
+
+The metadata follow-up passed the complete desktop interaction journey. The expanded mobile menu-toggle test caught another geometry change: switching multi-selection to a single file wrapped additional toolbar actions and moved the originating row. The selection toolbar now reserves a stable height with horizontal action scrolling, preserving source/trigger geometry across selection changes. This correction is verified by rerunning the same mobile journey rather than removing its assertion.
