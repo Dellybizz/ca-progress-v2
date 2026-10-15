@@ -1,3 +1,4 @@
+import {resourceLocationId} from './location';
 import type {HotD1Database} from '@/lib/data/d1/runtime';
 export type ResourceMetadataInput={userId:string;title:string;description:string|null;subjectId:string|null;chapterId:string|null;originalFilename:string;safeFilename:string;storagePath:string;mimeType:string;extension:string;sizeBytes:number;visibility:'private'|'shared'};
 export async function insertResourceWithinQuota(database:HotD1Database,input:ResourceMetadataInput,limitBytes:number|null,ownerLabel:string,storageBucket:string){
@@ -11,5 +12,5 @@ export async function insertResourceWithinQuota(database:HotD1Database,input:Res
       + COALESCE((SELECT SUM(expected_size_bytes) FROM test_attachment_upload_intents WHERE user_id=?2 AND status='issued' AND julianday(expires_at)>julianday('now')),0)+?14<=COALESCE(?17,9223372036854775807)
       AND NOT EXISTS(SELECT 1 FROM uploaded_resources WHERE owner_user_id=?2 AND storage_path=?11)
     RETURNING id,moderation_status
-  `).bind(crypto.randomUUID(),input.userId,ownerLabel,input.title,input.description,input.subjectId,input.chapterId,input.originalFilename,input.safeFilename,storageBucket,input.storagePath,input.mimeType,input.extension,input.sizeBytes,input.visibility,moderationStatus,limitBytes).first<{id:string;moderation_status:string}>();
+  `).bind(crypto.randomUUID(),input.userId,ownerLabel,input.title,input.description,resourceLocationId(input.subjectId),resourceLocationId(input.chapterId),input.originalFilename,input.safeFilename,storageBucket,input.storagePath,input.mimeType,input.extension,input.sizeBytes,input.visibility,moderationStatus,limitBytes).first<{id:string;moderation_status:string}>();
 }

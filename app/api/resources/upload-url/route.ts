@@ -1,3 +1,4 @@
+import {validateResourceLocation} from '@/lib/resources/location';
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess } from "@/lib/billing/service";
@@ -37,6 +38,10 @@ async function createUploadIntent(request: Request) {
   if (!access.allowed) return error(access.upgradeMessage || "Your plan does not allow file storage.", 403, "ENTITLEMENT_REQUIRED");
   if (access.limitBytes !== null && access.usedBytes + sizeBytes > access.limitBytes) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
 
+  let location;
+  try { location=await validateResourceLocation(getHotD1Database(),body?.subjectId,body?.chapterId); }
+  catch(error) { return NextResponse.json({error:error instanceof Error?error.message:'Invalid file location.',code:'UPLOAD_LOCATION_INVALID'},{status:400}); }
+
   const objectKey = `uploads/${identity.id}/${crypto.randomUUID()}/${normalizeFilename(filename)}`;
   let signed;
   try { signed = await createR2PresignedUrl({ key: objectKey, method: "PUT", expiresInSeconds: 300, contentType: mimeType }); }
@@ -57,7 +62,7 @@ async function createUploadIntent(request: Request) {
         + ?6
       ) <= COALESCE(?10,9223372036854775807)
     `)
-      .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt, issuedAt, access.limitBytes).run() as D1RunResult;
+      .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: location.subjectId, chapterId: location.chapterId, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt, issuedAt, access.limitBytes).run() as D1RunResult;
     if (Number(reservation.meta?.changes ?? 0) !== 1) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
   } catch {
     return error("Upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");

@@ -1,3 +1,4 @@
+import {validateResourceLocation} from '@/lib/resources/location';
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess, createResourceMetadataWithinQuota } from "@/lib/billing/service";
@@ -37,6 +38,11 @@ export async function POST(request: Request) {
     }
   }
   if (intent.status !== "issued") return fail("This upload has already been completed or closed.", 409, "UPLOAD_NOT_ACTIVE");
+  let metadata: Record<string, unknown> = {};
+  try { metadata=JSON.parse(String(intent.metadata_json)) as Record<string,unknown>; } catch { /* safe defaults */ }
+  let location;
+  try { location=await validateResourceLocation(database,metadata.subjectId,metadata.chapterId); }
+  catch(error) { return fail(error instanceof Error?error.message:'Invalid file location.',409,'UPLOAD_LOCATION_INVALID'); }
   const completionToken=crypto.randomUUID();
   await database.prepare("DELETE FROM resource_completion_claims WHERE intent_id=?1 AND julianday(expires_at)<julianday('now')").bind(uploadId).run();
   const claimed=await database.prepare('INSERT OR IGNORE INTO resource_completion_claims(intent_id,token,expires_at) VALUES(?1,?2,?3)').bind(uploadId,completionToken,new Date(Date.now()+1800000).toISOString()).run() as {meta?:{changes?:number}};
@@ -98,8 +104,6 @@ export async function POST(request: Request) {
     return fail(error instanceof Error?error.message:'Upload inspection failed.',400,'OBJECT_QUARANTINED');
   }
 
-  let metadata: Record<string, unknown> = {};
-  try { metadata = JSON.parse(String(intent.metadata_json)) as Record<string, unknown>; } catch { /* safe defaults */ }
   const access = await getResourceStorageAccess(identity.id);
   if (!access.allowed || (access.limitBytes !== null && access.usedBytes + Number(intent.expected_size_bytes) > access.limitBytes)) {
     await bucket.delete(String(intent.object_key)).catch(() => undefined);
@@ -113,8 +117,8 @@ export async function POST(request: Request) {
       userId: identity.id,
       title: typeof metadata.title === "string" && metadata.title.trim() ? metadata.title.trim().slice(0, 160) : String(intent.filename).replace(/\.[^.]+$/, ""),
       description: typeof metadata.description === "string" ? metadata.description.trim().slice(0, 4000) || null : null,
-      subjectId: typeof metadata.subjectId === "string" ? metadata.subjectId : null,
-      chapterId: typeof metadata.chapterId === "string" ? metadata.chapterId : null,
+      subjectId: location.subjectId,
+      chapterId: location.chapterId,
       originalFilename: String(intent.filename),
       safeFilename: normalizeFilename(String(intent.filename)),
       storagePath: String(intent.object_key),
@@ -137,9 +141,9 @@ export async function POST(request: Request) {
     // referenced bytes merely because the second metadata insert failed.
     const existing=await database.prepare("SELECT id FROM uploaded_resources WHERE owner_user_id=?1 AND storage_path=?2 LIMIT 1").bind(identity.id,String(intent.object_key)).first<{id:string}>();
     if(existing)return NextResponse.json({id:existing.id,processing:'pending',status:'saved'}, {status:200,headers:{'Cache-Control':'private, no-store'}});
-    await bucket.delete(String(intent.object_key)).catch(() => undefined);
-    await database.prepare("UPDATE r2_upload_intents SET status='failed' WHERE id=?1").bind(uploadId).run();
-    return fail(error instanceof Error ? error.message : "Resource metadata could not be created.", 400, "RESOURCE_METADATA_FAILED");
+    // A database/classification failure does not invalidate verified file bytes.
+    // Keep the source and its receipt so the same upload can be retried.
+    return fail(error instanceof Error && !/FOREIGN KEY/i.test(error.message) ? error.message : "File details could not be saved. Your file is retained for retry.", 503, "RESOURCE_METADATA_FAILED");
   }
   } finally { await database.prepare('DELETE FROM resource_completion_claims WHERE intent_id=?1 AND token=?2').bind(uploadId,completionToken).run(); }
 

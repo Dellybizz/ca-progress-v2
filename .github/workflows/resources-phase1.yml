@@ -102,7 +102,7 @@ jobs:
       - name: Apply retained additive migrations
         run: npm run cf:migrate:retained
       - name: Verify workspace migration ledger
-        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config wrangler.jsonc --command "SELECT version FROM _ca_schema_migrations WHERE version IN ('0095','0096','0097'); PRAGMA foreign_key_check;"
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config wrangler.jsonc --command "SELECT version FROM _ca_schema_migrations WHERE version IN ('0095','0096','0097','0098'); PRAGMA foreign_key_check;"
       - name: Deploy isolated resource preview processor
         run: |
           node scripts/check-cloudflare-size-budget.mjs --config workers/resources-preview/wrangler.jsonc --budget-mib 0.75
@@ -114,3 +114,5 @@ jobs:
           test "$(curl --silent --output /dev/null --write-out '%{http_code}' https://ca-progress-v2.habeebaasif622.workers.dev/api/resources/workspace)" = "401"
       - name: Verify live upload middleware and authentication boundaries
         run: node scripts/resources/verify-live-upload-boundary.mjs
+      - name: Verify real signed-in upload through D1 and R2
+        run: node scripts/resources/verify-live-upload-roundtrip.mjs
