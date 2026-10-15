@@ -42,7 +42,8 @@ test("Phase 11 data views retain every labeled field in purpose-built mobile row
 test("Phase 11 overlays trap and restore focus and honor reduced motion", () => {
   const overlay = read("components/ui/overlay.tsx");
   const components = read("app/styles/components.css");
-  assert.match(overlay, /previous\?\.focus\(\)/);
+  assert.match(overlay, /previous\?\.isConnected/);
+  assert.match(overlay, /previous\.focus\(\{preventScroll:true\}\)/);
   assert.match(overlay, /event\.key !== "Tab"/);
   assert.match(overlay, /aria-labelledby=/);
   assert.match(components, /prefers-reduced-motion:\s*reduce/);
