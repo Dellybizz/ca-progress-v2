@@ -18,7 +18,7 @@ function Overlay({ open, onClose, title, children, kind }: OverlayProps & { kind
     if (!open) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if(overlayLocks===0)unlockedOverflow=document.body.style.overflow;
-    overlayLocks+=1;document.body.style.overflow="hidden";
+    overlayLocks+=1;document.body.style.overflow = "hidden";
     const dialog = dialogRef.current;
     const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? []);
     (focusable()[0] ?? dialog)?.focus();

@@ -42,7 +42,7 @@ test("Phase 4 overlays retain accessible focus, scroll and back behavior", () =>
   assert.match(overlay, /event\.key === "Escape"/);
   assert.match(overlay, /document\.body\.style\.overflow = "hidden"/);
   assert.match(overlay, /addEventListener\("popstate", onBack\)/);
-  assert.match(overlay, /previous\?\.focus\(\)/);
+  assert.match(overlay, /previous\.focus\(\{preventScroll:true\}\)/);
 });
 
 test("Phase 4 reports connectivity while preserving offline ownership isolation", () => {
