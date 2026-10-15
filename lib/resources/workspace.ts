@@ -42,9 +42,9 @@ export async function mutateWorkspace(owner:string,input:Record<string,unknown>,
  if(action==='undo'){
   const items=Array.isArray(input.items)?input.items:[];
   if(!items.length||items.length>96)throw Error('Choose 1–96 undo receipts.');
+  if(items.some(item=>!item||!['move','restore'].includes(item.action)||typeof item.key!=='string'||!Number.isSafeInteger(item.revision)||item.revision<0))throw Error('Invalid undo receipt.');
   const results=[];
   for(const item of items){
-   if(!item||!['move','restore'].includes(item.action)||typeof item.key!=='string'||!Number.isSafeInteger(item.revision)||item.revision<0)throw Error('Invalid undo receipt.');
    try{const result=await mutateWorkspace(owner,{action:item.action,keys:[item.key],folderId:item.folderId,expectedRevisions:{[item.key]:item.revision}},db);results.push(...(result.results??[]));}
    catch(error){results.push({key:item.key,ok:false,error:workspaceErrorMessage(error,'Undo could not be completed.')});}
   }
@@ -89,7 +89,7 @@ if(['rename','tag','erase','duplicate','replace-version','restore-version'].incl
   const batch=reversible?await db.batch([statement,receipt]):[await statement.run()];
   const changed=batch[0] as {changes?:number;meta?:{changes?:number}};
   if((changed?.meta?.changes??changed?.changes)===0)throw Error('This file changed after the operation. Refresh before trying again.');
-  const revision=(batch[1] as {results?:{revision:number}[]}).results?.[0]?.revision;
+  const revision=(batch[1] as {results?:{revision:number}[]}|undefined)?.results?.[0]?.revision;
   results.push({key,ok:true,...(reversible&&revision!==undefined?{undo:{action:action==='trash'?'restore' as const:'move' as const,folderId:baseline?.folderId??null,revision}}:{})});
  }catch(error){results.push({key,ok:false,error:workspaceErrorMessage(error)});}}
  return {results};
