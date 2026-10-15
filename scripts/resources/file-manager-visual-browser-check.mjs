@@ -15,7 +15,7 @@ try{
   await page.waitForFunction(()=>document.querySelector('.fm-thumbnail.has-preview img')?.naturalWidth>0);await page.waitForFunction(()=>!document.body.textContent.includes('Preparing preview'));
   for(let count=0;count<30&&!repairs;count++)await page.waitForTimeout(100);assert.equal(repairs,1,'missing owner thumbnail repaired once');assert.deepEqual(blockedRequests,[],'blocked images never requested');
   await page.getByRole('button',{name:'Select Image screenshot',exact:true}).click();assert.equal(await page.locator('.fm-primary-action').count(),5);
-  const more=page.getByRole('button',{name:'More actions',exact:true});await more.click();await page.getByRole('menuitem',{name:'Export file list',exact:true}).waitFor();await page.keyboard.press('Escape');await more.focus();assert.equal(await more.evaluate(node=>node===document.activeElement),true);
+  const more=page.getByRole('button',{name:'More actions',exact:true});await more.click();await page.getByRole('menuitem',{name:'Export file list',exact:true}).waitFor();await page.keyboard.press('Escape');assert.equal(await more.evaluate(node=>node===document.activeElement),true);
   await page.locator('.fm-filter-menu>summary').click();await page.getByRole('combobox',{name:'Group files by',exact:true}).waitFor();await page.locator('.fm-filter-menu>summary').click();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'no page overflow');
   const target=await more.boundingBox();assert.ok(target.height>=(width===390?44:40),'readable touch targets');

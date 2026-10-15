@@ -5,6 +5,9 @@ import {Icon} from '@/components/ui/icon';
 import {repairImageThumbnail} from '@/lib/resources/thumbnail-repair';
 import type {ManagedFile} from '@/lib/resources/file-manager';
 export function FileThumbnail({file,small=false}:{file:ManagedFile;small?:boolean}) {
+ return <Thumbnail key={`${file.key}:${file.modified}:${file.processingState??""}`} file={file} small={small}/>;
+}
+function Thumbnail({file,small=false}:{file:ManagedFile;small?:boolean}) {
  const [failed,setFailed]=useState(false),[loaded,setLoaded]=useState(false),[retry,setRetry]=useState(0);const repaired=useRef(false);
  const blocked=['failed','quarantined','unsupported'].includes(file.processingState??'');
  useEffect(()=>{if(!failed||blocked||retry>=3)return;const timer=setTimeout(()=>{setRetry(value=>value+1);setFailed(false);},5000);return()=>clearTimeout(timer);},[failed,retry,blocked]);
