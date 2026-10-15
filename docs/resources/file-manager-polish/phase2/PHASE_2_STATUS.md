@@ -17,3 +17,17 @@ Implemented against the existing authenticated workspace API; no database migrat
 Domain tests cover root versus All files, complete filter/Unicode round trips, host parameter preservation, malformed URLs, shared-folder isolation and preference identity collisions. A real-component Chromium journey checks nested folders, breadcrumbs, Back/Forward, reload, search focus, layout restoration, navigation selection reset and horizontal overflow at 1440px and 390px. It is included in the existing Resources release workflow after preview compilation. Browser tests use intercepted fixture APIs; authenticated production integrity remains covered by the existing signed-in upload/deployment gates.
 
 Local browser download was unavailable in this environment; report CI browser results separately rather than claiming local execution. Repository tests, lint, TypeScript and preview bundling are run locally. Production deployment must pass the existing release workflow and live gates before being called verified live.
+
+## CI evidence
+
+Source commit: `d2657f405e1be15fd70974fe4e89c482f12791f8`.
+Resources release run: `38781540890`; verification job: `116582908616` succeeded.
+
+- 1,381 tests passed; no failures. Production build, TypeScript and lint passed.
+- Retained D1 migrations/query-index validation, foreign-key checks, native bundling and search benchmark passed.
+- Existing workspace controls and new navigation/Back/Forward/reload/search-focus/layout/selection-reset browser journeys passed at 1440px and 390px.
+- Existing real middleware/R2 fallback/upload-queue/independent-batch/resume browser regressions passed at both widths.
+
+Deployment job `116585062463` follows this verified source; its live result is tracked separately.
+
+Deployment gates passed for the same source: Worker build/size/runtime checks, private backup restore, retained migration application and ledger/foreign-key checks, preview processor and web deployment, live authentication/middleware boundaries, and the normal-account signed-in D1/R2 upload roundtrip with exact private-download verification. Phase 2 is deployed at https://ca-progress-v2.habeebaasif622.workers.dev/resources .
