@@ -27,6 +27,7 @@ function WorkspaceBrowserContent({model,collection,academicContext,onContextChan
  const student=useStudentContext();
  const online=useSyncExternalStore(subscribeOnline,onlineSnapshot,serverOnlineSnapshot);
  const [drag,setDrag]=useState<WorkspaceDrag|null>(null),[drop,setDrop]=useState<{id:string;allowed:boolean}|null>(null),[notice,setNotice]=useState('');
+ useEffect(()=>{if(!notice||drag)return;const timer=window.setTimeout(()=>setNotice(''),6000);return()=>clearTimeout(timer);},[notice,drag]);
  const initial=readWorkspaceNavigation(routeSearch,collection);
  const preferenceKey=workspacePreferenceKey(student.userId??'guest',student.contextKey);
  const storageKey=`ca-resource-views:${student.userId??'guest'}`;

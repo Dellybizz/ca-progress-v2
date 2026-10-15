@@ -21,6 +21,9 @@ try{
   await select(0).click();assert.equal(await page.getByRole('dialog').count(),0,'single click selects');assert.equal(await select(0).getAttribute('aria-pressed'),'true');
   await select(1).click({modifiers:['Control']});assert.equal(await select(0).getAttribute('aria-pressed'),'true');assert.equal(await select(1).getAttribute('aria-pressed'),'true');
   await page.getByRole('button',{name:'List view',exact:true}).click();assert.equal(await select(1).getAttribute('aria-pressed'),'true','layout preserves selection');
+  if(width>=600){await page.locator('[data-file-key="note:n3"] .fm-file-date').click();assert.equal(await select(3).getAttribute('aria-pressed'),'true','metadata belongs to the selectable row');assert.equal(await select(0).getAttribute('aria-pressed'),'false');}
+  await page.getByRole('button',{name:'Actions for Revision 3',exact:true}).click();await page.getByRole('menu',{name:'File actions'}).waitFor();await page.getByRole('button',{name:'Actions for Revision 3',exact:true}).click();assert.equal(await page.getByRole('menu').count(),0,'menu trigger toggles without reopening');
+  await select(0).click();await select(1).click({modifiers:['Control']});
   await select(0).click({button:'right'});let menu=page.getByRole('menu',{name:'File actions'});await menu.waitFor();assert.equal(await menu.getByRole('menuitem',{name:'Rename',exact:true}).count(),0,'multi context preserves selection');
   await page.keyboard.press('Escape');assert.equal(await page.getByRole('button',{name:'Actions for Revision 0'}).evaluate(node=>node===document.activeElement),true);
   await select(3).click({button:'right'});await menu.waitFor();assert.equal(await select(0).getAttribute('aria-pressed'),'false');await menu.getByRole('menuitem',{name:'Rename',exact:true}).waitFor();

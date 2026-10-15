@@ -31,3 +31,13 @@ The release workflow additionally runs a real-component Chromium journey at 1440
 ## Browser gate correction
 
 The first release candidate (`5a1feab5`, run `38785253976`) passed 1,383 tests, the full CI build and existing desktop/mobile navigation checks, but the new file-drag journey failed. Drag feedback was inserted in normal document flow, changing the destination geometry during an active drag. Feedback now uses a fixed, pointer-transparent status surface so highlighting/announcements do not move sources or targets. A lightweight interaction workflow supplies faster browser feedback alongside the unchanged full release gate. The Resources host also prevents document-level external file drops from navigating the browser away; supported drop targets still stage their own files.
+
+## Verified interaction candidate
+
+Source: `df9f3291e4dfc24f7c6c77aecc28620d902d52c8`.
+Dedicated interaction run `38786434830`, job `116599497993`: **success**.
+The actual Chromium journeys passed at both 1440px and 390px, including the previously failing native multi-file drag, real folder move, failure retention, owner-payload/self-drop rejection, staged external upload, Home/End/Page navigation and menu focus. Phase 2 history/reload/layout tests and existing workspace controls also passed. These are fixture-backed browser results, not a claim of physical-device or all-browser certification.
+
+The full Resources release run is `38786434760`; verification/deployment results follow below once complete.
+
+Final interaction follow-up: non-interactive metadata cells and blank card/row space participate in the same click/double-click selection/open policy, without intercepting checkboxes, links or action buttons. The browser journey explicitly checks desktop date-cell selection and three-dot menu toggling. Passive drag feedback dismisses after six seconds once no drag is active; active dragging keeps its textual feedback stable.
