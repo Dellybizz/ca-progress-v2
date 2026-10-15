@@ -47,3 +47,22 @@ The metadata follow-up passed the complete desktop interaction journey. The expa
 The same toggle assertion subsequently exposed an independent placement bug: viewport clamping could put a tall menu over its own trigger. Menu placement now measures both menu and trigger, chooses above/below without intersection, and limits the menu height with internal scrolling when neither side fits the full menu. Measured width and border-box sizing also keep it within viewport edges. The original toggle assertion remains unchanged.
 
 The anchored version passed the full desktop journey. Mobile then exposed a delayed native-scroll race when the first menu opened: focus/scroll-into-view could deliver a scroll event after the menu registered its dismissal listener. Opening focus now prevents page scrolling. Outside scrolling dismisses through user wheel/touch-move events, while programmatic focus scrolling no longer dismisses a newly opened menu. Outside pointer, Escape, Tab and resize dismissal remain supported; internal menu scrolling remains available.
+
+## Final source verification
+
+Final source: `82e62798f0efc84caa1de6710c8b5e0fc1cc9674`.
+Dedicated interaction run `38789214695`, job `116609094777`: **success** at 1440px and 390px. This version includes metadata-cell selection, menu trigger toggling, resize dismissal, keyboard and touch alternatives, native multi-file/folder drag, failure retention, invalid payload rejection and external upload staging. Menu dismissal guards non-Node resize event targets; the resize regression is exercised while the menu is open and the journey asserts no browser page errors.
+
+The full release run for this exact source is `38789214614`. Earlier candidates and runs above are historical evidence, not the final deployment source.
+
+Full release verification job `116609698322` succeeded for final source `82e62798`: 1,383 tests passed with zero failures; production build, TypeScript, lint, retained D1/index/foreign-key checks, native bundle and search benchmark passed. The full release workflow independently passed existing workspace controls, Phase 2 history, Phase 3 selection/menu/drag/resize journeys, and real middleware/R2-fallback/upload-queue/independent-batch/resume browser tests at 1440px and 390px. Deployment job `116612135371` follows this verified source.
+
+## Deployed and verified
+
+Full release run `38789214614`: verification job `116609698322` and deployment job `116612135371` both completed successfully for source `82e62798f0efc84caa1de6710c8b5e0fc1cc9674`.
+
+Worker size/runtime checks, private backup restore, retained additive migration/ledger/foreign-key checks, preview processor/web deployment and live authentication/middleware boundaries passed. The normal-account live test passed all three real upload parts with blank location, finalization, idempotent retry and an exact private download; fixture resources and original bytes were removed afterward.
+
+File-manager polish Phase 3 is complete and live at https://ca-progress-v2.habeebaasif622.workers.dev/resources . The next package is Phase 4: non-modal inspector, destination picker, richer dialogs, operation results and safe undo. The paused typed-notes feature roadmap has not resumed.
+
+Web Worker version: `9f18663b-adaf-4167-8bf6-57aa487727ef`; gzip 3,643.61 KiB within the existing 3.75 MiB guard. Preview processor version: `c63605de-baf5-418f-9d23-a0beebb13073`; gzip 509.67 KiB. No new APK was published as part of this web release.

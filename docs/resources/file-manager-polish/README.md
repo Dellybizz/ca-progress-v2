@@ -16,3 +16,5 @@ Phase 1 implementation: [interaction foundation and drag contract](phase1/PHASE_
 Phase 2 implementation: [navigation, history and scoped layouts](phase2/PHASE_2_STATUS.md).
 
 Phase 3 implementation: [selection, shared action menus and drag](phase3/PHASE_3_STATUS.md).
+
+FMP-03 is complete and deployed: selection, shared action menus, desktop file/folder drag moves, and external file staging passed 1,383 tests, desktop/mobile interaction checks and live storage gates. See the Phase 3 report for exact source/run evidence and supported-capability boundaries. Next: FMP-04 dialogs, inspector and destination picker.
