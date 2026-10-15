@@ -11,13 +11,13 @@ try{
    if(match){const row=transfers.get(match[1]),number=Number(match[2]);if(number===2&&failSecond){failSecond=false;await route.fulfill({status:503,json:{error:'Connection lost. Retry to continue.'}});return;}row.parts.push({part_number:number});if(row.multipart)partWrites.push(number);else{fallbackWrites++;assert.equal(number,1);assert.equal(request.headers()['x-ca-owner'],'alice');assert.equal(request.postDataBuffer().length,512);assert.match(request.headers()['x-part-sha256'],/^[a-f0-9]{64}$/);}await route.fulfill({json:{etag:'part-'+number}});return;}
    if(request.method()==='GET'){await route.fulfill({json:transfers.get(url.searchParams.get('id'))});return;}
    const body=request.postDataJSON();if(body.action==='create'){const id=body.clientId;const row={uploadId:id,state:'active',expiresAt:'2099-01-01',multipart:body.sizeBytes>5*1024*1024,partBytes:5*1024*1024,parts:[]};transfers.set(id,row);await route.fulfill({json:row});return;}
-   const row=transfers.get(body.uploadId);if(body.action==='renew'){await route.fulfill({json:{uploadUrl:'http://127.0.0.1:8767/fixture-put/'+body.uploadId,headers:{'Content-Type':'application/msword'}}});return;}
+   const row=transfers.get(body.uploadId);if(body.action==='renew'){await route.fulfill({json:{uploadUrl:'http://localhost:8767/fixture-put/'+body.uploadId,headers:{'Content-Type':'application/msword'}}});return;}
    if(body.action==='complete'){row.state='completed';row.resourceId='saved-'+body.uploadId;await route.fulfill({json:{id:row.resourceId}});return;}
    if(body.action==='cancel'){row.state='cancelled';await route.fulfill({json:{cancelled:true}});return;}
    await route.fulfill({status:400,json:{error:'Unexpected action'}});
   });
   await page.route('**/fixture-put/**',route=>route.abort('failed'));
-  await page.goto('http://127.0.0.1:8767');await page.getByRole('dialog',{name:'Upload files'}).waitFor();
+  await page.goto('http://localhost:8767');await page.getByRole('dialog',{name:'Upload files'}).waitFor();
   await page.locator('input[type=file]').first().setInputFiles([{name:'Large revision.doc',mimeType:'application/msword',buffer:Buffer.alloc(12*1024*1024,7)},{name:'Small revision.doc',mimeType:'application/msword',buffer:Buffer.alloc(512,9)}]);
   await page.getByRole('button',{name:'Upload selected files',exact:true}).click();await page.getByText('Needs retry',{exact:true}).waitFor();await page.getByText('Saved',{exact:true}).waitFor();assert.deepEqual(partWrites,[1]);assert.equal(fallbackWrites,1,'blocked direct PUT recovered through authenticated origin');
   await page.reload();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();assert.equal(await page.getByText('Saved',{exact:true}).count(),1);await page.getByRole('button',{name:'Retry',exact:true}).click();await page.waitForFunction(()=>[...document.querySelectorAll('.fm-transfer-row small')].filter(el=>el.textContent==='Saved').length===2);assert.deepEqual(partWrites,[1,2,3]);
