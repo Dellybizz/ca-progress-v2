@@ -5,14 +5,18 @@ on:
     paths:
       - scripts/resources/verify-live-upload-roundtrip.mjs
       - .github/workflows/resources-live-upload-check.yml
+  pull_request:
+    branches: [main]
+    types: [synchronize]
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: resources-live-upload-certification
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   certify:
+    if: github.event_name != 'pull_request' || (github.head_ref == 'onboarding-design-phase7' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: v2-staging
     timeout-minutes: 10
@@ -21,6 +25,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v5
         with: {node-version: 22, cache: npm}
       - run: npm ci --no-audit --no-fund
