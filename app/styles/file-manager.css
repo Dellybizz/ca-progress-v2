@@ -117,3 +117,4 @@
 }
 @media(max-width:1099px){.file-manager>.fm-controls{min-height:48px}.file-manager.has-selection>.fm-selection-bar{grid-row:auto}}
 @media(max-width:600px){.file-manager>.fm-controls{min-height:52px}}
+@media(max-width:600px){.file-manager .fm-selection-bar button{min-height:44px}}
