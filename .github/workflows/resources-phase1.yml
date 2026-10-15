@@ -118,4 +118,6 @@ jobs:
       - name: Verify live upload middleware and authentication boundaries
         run: node scripts/resources/verify-live-upload-boundary.mjs
       - name: Verify real signed-in upload through D1 and R2
+        env:
+          VERIFY_FILE_MANAGER_PHASE4: "true"
         run: node scripts/resources/verify-live-upload-roundtrip.mjs

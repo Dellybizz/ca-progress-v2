@@ -30,6 +30,19 @@ try{
  const rows=query(`SELECT u.id,u.subject_id,u.chapter_id,u.size_bytes,i.content_sha256,i.state FROM uploaded_resources u JOIN resource_inspections i ON i.resource_id=u.id WHERE u.owner_user_id=${owner}`);assert.equal(rows.length,1);assert.equal(rows[0].subject_id,null);assert.equal(rows[0].chapter_id,null);assert.equal(rows[0].size_bytes,bytes.length);assert.equal(rows[0].content_sha256,sha256);assert.equal(rows[0].state,'unsupported');
  stage='download exact private original';const access=await request(`/api/resources/${completed.id}/access?download=1`,undefined,307);const signed=access.headers.get('location');assert.ok(signed);await access.body?.cancel();const downloaded=await fetch(signed,{signal:AbortSignal.timeout(120000)});assert.equal(downloaded.status,200);assert.equal(digest(Buffer.from(await downloaded.arrayBuffer())),sha256);
  console.log('PASS live normal-account upload: three real parts, blank location, finalization, idempotent retry and exact private download');
+ if(process.env.VERIFY_FILE_MANAGER_PHASE4==='true'){
+  const key='upload:'+completed.id,folderId=randomUUID();const workspace=async body=>await(await request('/api/v1/resources/workspace',body)).json();
+  stage='Phase 4 create isolated destination';await workspace({action:'create-folder',clientId:folderId,name:'Verification destination',kind:'folder'});
+  stage='Phase 4 acknowledged move';const move=await workspace({action:'move',keys:[key],folderId});assert.equal(move.results[0].ok,true);assert.ok(Number.isSafeInteger(move.results[0].undo?.revision));
+  const moved=await(await request('/api/v1/resources/workspace?view=folder&folder='+folderId)).json();assert.ok(moved.files.some(file=>file.key===key));
+  stage='Phase 4 move undo';assert.equal((await workspace({action:'undo',items:[{key,...move.results[0].undo}]})).results[0].ok,true);
+  stage='Phase 4 stale undo safety';const again=await workspace({action:'move',keys:[key],folderId});assert.equal((await workspace({action:'star',keys:[key],starred:true})).results[0].ok,true);assert.equal((await workspace({action:'undo',items:[{key,...again.results[0].undo}]})).results[0].ok,false);
+  assert.equal(query(`SELECT folder_id FROM resource_workspace_entries WHERE owner_user_id=${owner} AND entity_kind='upload' AND entity_id=${quote(completed.id)}`)[0].folder_id,folderId);
+  stage='Phase 4 Trash undo';const trash=await workspace({action:'trash',keys:[key]});assert.equal(trash.results[0].ok,true);assert.equal((await workspace({action:'undo',items:[{key,...trash.results[0].undo}]})).results[0].ok,true);
+  assert.equal(query(`SELECT trashed_at FROM resource_workspace_entries WHERE owner_user_id=${owner} AND entity_kind='upload' AND entity_id=${quote(completed.id)}`)[0].trashed_at,null);
+  console.log('PASS live Phase 4 owned hierarchy, acknowledged move undo, stale revision refusal and Trash undo through deployed D1');
+ }
+
 }catch(error){console.error(`FAIL live upload stage: ${stage}; ${error instanceof Error?error.message:'verification failed'}`);throw Error(`Live upload roundtrip failed during ${stage}`);}finally{
  try{
   if(created){
@@ -37,7 +50,7 @@ try{
    // Use the deployed binding through authenticated cancellation, so cleanup
    // needs no broader R2 account permissions. Restrict every SQL change to this
    // newly provisioned manual-test owner and preserve intents until bytes go.
-   query(`DELETE FROM uploaded_resources WHERE owner_user_id=${owner}; UPDATE resource_transfers SET state='uploaded',lease_token=NULL,lease_until=NULL WHERE owner_user_id=${owner} AND state='completed';`);
+   query(`DELETE FROM uploaded_resources WHERE owner_user_id=${owner}; DELETE FROM resource_folders WHERE owner_user_id=${owner}; UPDATE resource_transfers SET state='uploaded',lease_token=NULL,lease_until=NULL WHERE owner_user_id=${owner} AND state='completed';`);
    const intents=query(`SELECT t.intent_id FROM resource_transfers t JOIN r2_upload_intents i ON i.id=t.intent_id WHERE i.user_id=${owner} AND t.owner_user_id=${owner}`);
    for(const intent of intents){uploadId=intent.intent_id;const result=await(await transfer({action:'cancel'})).json();assert.equal(result.cancelled,true);}
    query(`DELETE FROM r2_upload_intents WHERE user_id=${owner};`);
