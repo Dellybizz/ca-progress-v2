@@ -33,5 +33,6 @@ Implementation command names in later conversation refer to these eight phases. 
 - Phase 0: complete.
 - Phase 1: implemented and deployed; [production evidence](phase1/PHASE_1_STATUS.md).
 - Phase 2: implemented and deployed; [scope, validation and production evidence](phase2/PHASE_2_STATUS.md).
-- Phase 3: started — professional typed notes and its required durable local-draft foundation; editor not yet released. Upload recovery, larger-file support and the API transport integration repair were prioritized first; [verified release evidence](phase2/API_UPLOAD_BOUNDARY_REPAIR.md).
+- File-manager polish checkpoint: next feature phases paused at the user’s request; [research and detailed implementation plan](file-manager-polish/RESEARCH_AND_IMPLEMENTATION_PLAN.md), [104 acceptance cases](file-manager-polish/INTERACTION_ACCEPTANCE_MATRIX.md), and [latest verified upload/database/sidebar release](phase2/UPLOAD_DATABASE_AND_SIDEBAR_REPAIR.md).
+- Phase 3: paused after initial groundwork — professional typed notes and its required durable local-draft foundation; editor not yet released. Upload recovery, larger-file support and the API transport integration repair were prioritized first; [verified release evidence](phase2/API_UPLOAD_BOUNDARY_REPAIR.md).
 - Phases 4–7: planned; their remaining native/background, history, handwriting, protected-sharing and certification guarantees are not claimed by the Phase 2 web release.
