@@ -28,7 +28,7 @@ test("Phase 2 publishes every required student API domain", () => {
 });
 
 test("Phase 2 moves student website consumers onto the mobile API namespace", () => {
-  for (const path of ["components/dashboard/dashboard-interactions.tsx", "components/progress/progress-tracker.tsx", "components/chapter-hub/chapter-hub.tsx", "components/planner/today-plan-client.tsx", "components/community/community-chat.tsx", "components/resources/resource-library.tsx", "components/billing/pricing-client.tsx"]) {
+  for (const path of ["components/dashboard/dashboard-interactions.tsx", "components/progress/progress-tracker.tsx", "components/chapter-hub/chapter-hub.tsx", "components/planner/today-plan-client.tsx", "components/community/community-chat.tsx", "components/resources/upload-panel.tsx", "components/billing/pricing-client.tsx"]) {
     assert.match(read(path), /\/api\/v1\//, path);
   }
 });

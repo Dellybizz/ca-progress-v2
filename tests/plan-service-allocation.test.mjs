@@ -55,7 +55,7 @@ test('resource and test upload reservations share actual usage and concurrent pe
  CREATE TABLE r2_upload_intents(id TEXT,user_id TEXT,object_key TEXT,filename TEXT,mime_type TEXT,expected_size_bytes INTEGER,metadata_json TEXT,expires_at TEXT,status TEXT DEFAULT 'issued');
  CREATE TABLE test_attachment_upload_intents(id TEXT,user_id TEXT,attempt_id TEXT,attachment_kind TEXT,object_key TEXT,filename TEXT,mime_type TEXT,expected_size_bytes INTEGER,expires_at TEXT,status TEXT DEFAULT 'issued');
  INSERT INTO uploaded_resources VALUES('owner',30),('other',999999);INSERT INTO test_attempt_attachments VALUES('owner',20);`);
- const resource=readFileSync('app/api/resources/upload-url/route.ts','utf8').match(/INSERT INTO r2_upload_intents[\s\S]*?<= \?10/)[0];
+ const resource=readFileSync('app/api/resources/upload-url/route.ts','utf8').match(/INSERT INTO r2_upload_intents[\s\S]*?<= COALESCE\(\?10,9223372036854775807\)/)[0];
  const attachment=readFileSync('app/api/tests/attachments/upload-url/route.ts','utf8').match(/INSERT INTO test_attachment_upload_intents[\s\S]*?\+\?8<=\?11/)[0];
  const reserveResource=(size)=>sql.prepare(resource).run('resource','owner','key','file','application/pdf',size,'{}','2042-01-01','2026-01-01',100).changes;
  const reserveAttachment=(size)=>sql.prepare(attachment).run('attachment','owner','attempt','paper','key','file','application/pdf',size,'2042-01-01','2026-01-01',100).changes;

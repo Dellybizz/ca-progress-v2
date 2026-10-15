@@ -27,7 +27,7 @@ export function ResourceAccessButtons({ resource, canManage, canReport }: { reso
 
   function download() {
     setError(null);
-    const target = `/api/v1/resources/${resource.id}/access?download=1`;
+    const target = `/api/resources/${resource.id}/access?download=1`;
     const opened = window.open(target, "_blank", "noopener,noreferrer");
     if (!opened) setError("Your browser blocked the file window. Allow pop-ups for this site and try again.");
   }

@@ -10,6 +10,9 @@ const output = path.join(root, "native-shell");
 await rm(output, { recursive: true, force: true });
 await mkdir(path.join(output, "assets"), { recursive: true });
 await cp(path.join(source, "index.html"), path.join(output, "index.html"));
+await mkdir(path.join(output,'resource-preview'),{recursive:true});
+await cp(path.join(root,'public/resource-preview/pdf-thumbnail-worker.mjs'),path.join(output,'resource-preview/pdf-thumbnail-worker.mjs'));
+await cp(path.join(root,'node_modules/unpdf/dist/pdfjs.mjs'),path.join(output,'resource-preview/pdfjs.mjs'));
 // Account screens now use bundled onboarding illustrations.
 await cp(path.join(root,"public/onboarding"),path.join(output,"assets/onboarding"),{recursive:true});
 const manifest=[];

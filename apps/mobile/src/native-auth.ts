@@ -25,7 +25,7 @@ async function jsonRequest(path: string, init: RequestInit = {}, authenticated =
   const token = authenticated ? decodeSession(await secureGet("session"))?.token : null;
   const response = await fetch(`${API_ORIGIN}${path}`, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", "X-CA-API-Version": String(MOBILE_BUILD.apiVersion), "X-CA-App-Build": String(MOBILE_BUILD.build), "X-CA-Native-App": MOBILE_BUILD.applicationId, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers } });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new NativeRequestError((typeof body?.error==='string'?body.error:body?.error?.message) || "The request could not be completed.", response.status, body?.error?.code || "REQUEST_FAILED");
+  if (!response.ok) throw new NativeRequestError((typeof body?.error==='string'?body.error:body?.error?.message) || "The request could not be completed.", response.status, body?.code || body?.error?.code || "REQUEST_FAILED");
   return body;
 }
 export async function nativeApiRequest(path:string,init:RequestInit={}){
@@ -57,7 +57,7 @@ export async function nativeApiRequest(path:string,init:RequestInit={}){
   }
   const body=typeof response.data==="string"?(()=>{try{return JSON.parse(response.data);}catch{return null;}})():response.data;
   if(response.status<200||response.status>=300)
-    throw new NativeRequestError((typeof body?.error==='string'?body.error:body?.error?.message)||`Server returned HTTP ${response.status}. Tap Retry.`,response.status,body?.error?.code||"REQUEST_FAILED");
+    throw new NativeRequestError((typeof body?.error==='string'?body.error:body?.error?.message)||`Server returned HTTP ${response.status}. Tap Retry.`,response.status,body?.code||body?.error?.code||"REQUEST_FAILED");
   if(body===null||typeof body!=="object")
     throw new NativeRequestError("The server returned an invalid response. Tap Retry.",response.status,"INVALID_RESPONSE");
   return body;

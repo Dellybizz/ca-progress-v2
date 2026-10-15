@@ -18,6 +18,7 @@
   }],
   "r2_buckets": [{ "binding": "USER_RESOURCES_R2", "bucket_name": "ca-progress-v2-staging-user-resources" }],
   "services": [
+    { "binding": "RESOURCE_PROCESSOR", "service": "ca-progress-v2-resources-preview" },
     { "binding": "ICAI_SYNC_SERVICE", "service": "ca-progress-v2-icai-sync" },
     { "binding": "BILLING_SERVICE", "service": "ca-progress-v2-billing" }
   ],

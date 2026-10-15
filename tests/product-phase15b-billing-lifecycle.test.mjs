@@ -65,7 +65,7 @@ test("upload authorization atomically reserves committed plus in-flight bytes", 
   assert.match(route, /INSERT INTO r2_upload_intents[\s\S]*SELECT \?1,\?2,\?3,\?4,\?5,\?6,\?7,\?8/);
   assert.match(route, /SELECT SUM\(size_bytes\) FROM uploaded_resources WHERE owner_user_id=\?2/);
   assert.match(route, /SELECT SUM\(expected_size_bytes\) FROM r2_upload_intents WHERE user_id=\?2 AND status='issued' AND expires_at>\?9/);
-  assert.match(route, /\+ \?6[\s\S]*\) <= \?10/);
+  assert.match(route, /\+ \?6[\s\S]*\) <= COALESCE\(\?10/);
   assert.match(route, /reservation\.meta\?\.changes/);
   assert.match(route, /optionalUser\(\)/);
   assert.match(route, /getResourceStorageAccess\(identity\.id\)/);

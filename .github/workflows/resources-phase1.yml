@@ -1,4 +1,4 @@
-name: Resources Phase 1 verification and web release
+name: Resources verification and web release
 on:
   push:
     branches: [onboarding-design-phase7]
@@ -6,6 +6,10 @@ on:
       - app/**
       - components/resources/**
       - lib/resources/**
+      - lib/billing/service.ts
+      - workers/resources-preview/**
+      - apps/mobile/**
+      - public/resource-preview/**
       - lib/notes/**
       - lib/offline/**
       - d1/**
@@ -45,11 +49,15 @@ jobs:
         run: |
           node scripts/resources/phase1-preview-build.mjs
           node scripts/resources/phase1-browser-check.mjs
+          node scripts/resources/phase2-preview-build.mjs
+          node scripts/resources/phase2-browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: resources-phase1-browser-${{ github.event.pull_request.head.sha || github.sha }}
-          path: /tmp/resources-phase1-preview/workspace-*.png
+          path: |
+            /tmp/resources-phase1-preview/workspace-*.png
+            /tmp/resources-phase2-preview/transfers-*.png
           if-no-files-found: ignore
   deploy:
     needs: verify
@@ -93,7 +101,11 @@ jobs:
       - name: Apply retained additive migrations
         run: npm run cf:migrate:retained
       - name: Verify workspace migration ledger
-        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config wrangler.jsonc --command "SELECT version FROM _ca_schema_migrations WHERE version IN ('0095','0096'); PRAGMA foreign_key_check;"
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config wrangler.jsonc --command "SELECT version FROM _ca_schema_migrations WHERE version IN ('0095','0096','0097'); PRAGMA foreign_key_check;"
+      - name: Deploy isolated resource preview processor
+        run: |
+          node scripts/check-cloudflare-size-budget.mjs --config workers/resources-preview/wrangler.jsonc --budget-mib 0.75
+          npx wrangler deploy -c workers/resources-preview/wrangler.jsonc
       - name: Deploy verified web build
         run: npm run cf:deploy:web
       - name: Verify live resource authentication boundary

@@ -13,7 +13,7 @@ test("all Phase 7 product and moderation routes are real server-backed surfaces"
 });
 
 test("Phase 7 notes library includes rich editing, My Shared and ICAI resource views", () => {
-  const library = read("components/resources/resource-library.tsx");
+  const library = read("components/resources/resource-library.tsx") + read("lib/resources/transfer-client.ts") + read("components/resources/upload-panel.tsx");
   const editor = read("components/resources/note-editor.tsx");
   assert.match(library, /My Notes & Files/);
   assert.match(library, /Shared/);
@@ -30,7 +30,7 @@ test("Phase 7 notes library includes rich editing, My Shared and ICAI resource v
 test("Phase 7 routes include loading error empty permission and independent mobile contracts", () => {
   for (const path of ["app/(student)/notes/loading.tsx", "app/(student)/notes/error.tsx", "app/(student)/resources/loading.tsx", "app/(student)/resources/error.tsx", "app/(admin)/admin/resources/moderation/loading.tsx", "app/(admin)/admin/resources/moderation/error.tsx"]) assert.equal(existsSync(join(root, path)), true, path);
   const css = read("app/styles/phase7.css");
-  const library = read("components/resources/resource-library.tsx");
+  const library = read("components/resources/resource-library.tsx") + read("lib/resources/transfer-client.ts") + read("components/resources/upload-panel.tsx");
   const admin = read("app/(admin)/admin/resources/moderation/page.tsx");
   assert.match(css, /@media\(max-width:720px\)/);
   assert.match(css, /@media\(max-width:430px\)/);

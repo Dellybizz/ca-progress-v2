@@ -1,4 +1,5 @@
 import "server-only";
+import {insertResourceWithinQuota} from "@/lib/resources/metadata-quota";
 import {storageAllowance} from "./storage-allowance.mjs";
 import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 
@@ -23,7 +24,6 @@ type CurrentPlanRow = { plan_id: string; status: string; starts_at: string; ends
 type StorageRow = { size_bytes: number };
 type IdRow = { id: string };
 type ProfileLabelRow = { display_name: string | null };
-type CreatedResourceRow = { id: string; moderation_status: string };
 type SubscriptionRow = { id: string; plan_id: string; status: string; starts_at: string; ends_at: string | null; source: string; created_at?: string };
 type PaymentRow = { id: string; plan_id: string; provider_order_id: string; provider_payment_id: string | null; amount_subunits: number; currency: string; status: string; created_at: string; paid_at: string | null };
 type SubscriptionEventRow = { id: string; plan_id: string; event_type: string; source: string; starts_at: string | null; ends_at: string | null; created_at: string };
@@ -152,18 +152,17 @@ export async function createResourceMetadataWithinQuota(input: { userId: string;
   const access = await getResourceStorageAccess(input.userId);
   if (!access.allowed) throw new Error(access.upgradeMessage || "Resource storage is not available on this plan.");
   if(access.fileSizeLimitBytes!=null&&input.sizeBytes>access.fileSizeLimitBytes)throw new Error("This file exceeds your plan file-size allowance.");
-  if (access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
+  if (access.limitBytes!==null && access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
   const duplicateResult = await client.from("uploaded_resources").select("id").eq("storage_path", input.storagePath).maybeSingle();
   if (duplicateResult.error) throw new Error(duplicateResult.error.message);
   if (asRow<IdRow>(duplicateResult.data)) throw new Error("This resource upload has already been recorded.");
   const profileResult = await client.from("profiles").select("display_name").eq("user_id", input.userId).maybeSingle();
   if (profileResult.error) throw new Error(profileResult.error.message);
   const profile = asRow<ProfileLabelRow>(profileResult.data);
-  const moderationStatus = input.visibility === "shared" ? "pending" : "private";
-  const createdResult = await client.from("uploaded_resources").insert({ owner_user_id: input.userId, owner_label: profile?.display_name?.trim() || "CA Progress student", title: input.title, description: input.description, subject_id: input.subjectId, chapter_id: input.chapterId, original_filename: input.originalFilename, safe_filename: input.safeFilename, storage_bucket: RESOURCE_R2_STORAGE_BUCKET, storage_path: input.storagePath, mime_type: input.mimeType, extension: input.extension, size_bytes: input.sizeBytes, visibility: input.visibility, moderation_status: moderationStatus, published_at: null }).select("id,moderation_status").single();
-  if (createdResult.error) throw new Error(createdResult.error.message);
-  const created = asRow<CreatedResourceRow>(createdResult.data);
-  if (!created) throw new Error("Resource metadata could not be created within the plan allowance.");
+  // D1 serializes this single INSERT/SELECT, so concurrent copies and
+  // completions cannot both spend the same remaining storage allowance.
+  const created=await insertResourceWithinQuota(getD1RuntimeDatabase(),input,access.limitBytes,profile?.display_name?.trim()||"CA Progress student",RESOURCE_R2_STORAGE_BUCKET);
+  if(!created)throw new Error('Storage allowance changed or this file is already saved.');
   const usedBytes = access.usedBytes + input.sizeBytes;
   return { id: created.id, moderationStatus: created.moderation_status, usedBytes, limitBytes: access.limitBytes };
 }

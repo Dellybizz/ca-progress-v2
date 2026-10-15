@@ -45,7 +45,7 @@ async function createUploadIntent(request: Request) {
 
   const uploadId = crypto.randomUUID();
   const issuedAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+  const expiresAt = new Date(Date.now() + (body?.durable === true ? 24 * 60 * 60_000 : 5 * 60_000)).toISOString();
   try {
     const reservation = await getHotD1Database().prepare(`
       INSERT INTO r2_upload_intents(id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at)
@@ -56,7 +56,7 @@ async function createUploadIntent(request: Request) {
         + COALESCE((SELECT SUM(size_bytes) FROM test_attempt_attachments WHERE user_id=?2), 0)
         + COALESCE((SELECT SUM(expected_size_bytes) FROM test_attachment_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?9), 0)
         + ?6
-      ) <= ?10
+      ) <= COALESCE(?10,9223372036854775807)
     `)
       .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt, issuedAt, access.limitBytes).run() as D1RunResult;
     if (Number(reservation.meta?.changes ?? 0) !== 1) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");

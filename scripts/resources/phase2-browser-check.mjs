@@ -1,0 +1,24 @@
+import {chromium} from 'playwright';import assert from 'node:assert/strict';import http from 'node:http';import fs from 'node:fs';
+const server=http.createServer((req,res)=>{const file=req.url==='/app.js'?'app.js':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':'text/html');res.end(fs.readFileSync('/tmp/resources-phase2-preview/'+file));});let browser;
+try{
+ await new Promise(resolve=>server.listen(8767,'127.0.0.1',resolve));browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ for(const width of [1440,390]){
+  const context=await browser.newContext({viewport:{width,height:1000}});const page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));const transfers=new Map();let failSecond=true;const partWrites=[];
+  await page.route('**/api/v1/resources/transfers**',async route=>{
+   const request=route.request(),url=new URL(request.url());const match=/\/transfers\/(.+)\/parts\/(\d+)/.exec(url.pathname);
+   if(match){const row=transfers.get(match[1]),number=Number(match[2]);if(number===2&&failSecond){failSecond=false;await route.fulfill({status:503,json:{error:'Connection lost. Retry to continue.'}});return;}row.parts.push({part_number:number});partWrites.push(number);await route.fulfill({json:{etag:'part-'+number}});return;}
+   if(request.method()==='GET'){await route.fulfill({json:transfers.get(url.searchParams.get('id'))});return;}
+   const body=request.postDataJSON();if(body.action==='create'){const id=body.clientId;const row={uploadId:id,state:'active',expiresAt:'2099-01-01',multipart:body.sizeBytes>5*1024*1024,partBytes:5*1024*1024,parts:[]};transfers.set(id,row);await route.fulfill({json:row});return;}
+   const row=transfers.get(body.uploadId);if(body.action==='renew'){await route.fulfill({json:{uploadUrl:'http://127.0.0.1:8767/fixture-put/'+body.uploadId,headers:{'Content-Type':'application/msword'}}});return;}
+   if(body.action==='complete'){row.state='completed';row.resourceId='saved-'+body.uploadId;await route.fulfill({json:{id:row.resourceId}});return;}
+   if(body.action==='cancel'){row.state='cancelled';await route.fulfill({json:{cancelled:true}});return;}
+   await route.fulfill({status:400,json:{error:'Unexpected action'}});
+  });
+  await page.route('**/fixture-put/**',route=>route.fulfill({status:200,body:''}));
+  await page.goto('http://127.0.0.1:8767');await page.getByRole('dialog',{name:'Upload files'}).waitFor();
+  await page.locator('input[type=file]').first().setInputFiles([{name:'Large revision.doc',mimeType:'application/msword',buffer:Buffer.alloc(6*1024*1024,7)},{name:'Small revision.doc',mimeType:'application/msword',buffer:Buffer.alloc(512,9)}]);
+  await page.getByRole('button',{name:'Upload selected files',exact:true}).click();await page.getByText('Needs retry',{exact:true}).waitFor();await page.getByText('Saved',{exact:true}).waitFor();assert.deepEqual(partWrites,[1]);
+  await page.reload();await page.getByRole('button',{name:'Retry',exact:true}).waitFor();assert.equal(await page.getByText('Saved',{exact:true}).count(),1);await page.getByRole('button',{name:'Retry',exact:true}).click();await page.waitForFunction(()=>[...document.querySelectorAll('.fm-transfer-row small')].filter(el=>el.textContent==='Saved').length===2);assert.deepEqual(partWrites,[1,2]);
+  await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),0);await page.getByRole('button',{name:'Manage uploads'}).click();await page.getByRole('dialog').waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false,'horizontal overflow at '+width);await page.screenshot({path:'/tmp/resources-phase2-preview/transfers-'+width+'.png',fullPage:true});assert.deepEqual(errors,[]);console.log('PASS persistent upload queue, independent batch outcomes and part-resume after reload at '+width+'px');await context.close();
+ }
+}finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

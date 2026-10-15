@@ -28,3 +28,7 @@ android/app/src/androidTest/assets/onboarding-sql.json
 
 # generated Cloudflare types
 cloudflare-env.d.ts
+
+/public/resource-preview/pdfjs.mjs
+
+/native-shell/resource-preview/

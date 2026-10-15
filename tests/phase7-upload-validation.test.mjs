@@ -47,15 +47,13 @@ test("Phase 7 upload API returns stable JSON errors and checks direct-upload rea
   assert.match(route, /optionalUser/);
 });
 
-test("Phase 7 upload drawer tolerates empty or non-JSON proxy responses", () => {
-  const library = read("components/resources/resource-library.tsx");
-  assert.match(library, /await response\.text\(\)/);
-  assert.match(library, /if \(!body\.trim\(\)\) return \{\}/);
-  assert.match(library, /JSON\.parse\(body\)/);
-  assert.doesNotMatch(library, /await response\.json\(\)/);
-  assert.match(library, /CLIENT_UPLOAD_MAX_BYTES = 10 \* 1024 \* 1024/);
-  assert.match(library, /uploadFallbackMessage/);
-  assert.match(library, /Only you can open your private files/);
+test("upload drawer handles invalid receipts and retains a bounded per-file device queue", () => {
+  const client = read("lib/resources/transfer-client.ts");
+  const queue = read("lib/resources/transfer-queue.ts");
+  assert.match(client, /response\.json\(\)\.catch/);
+  assert.match(client, /Upload receipt is missing/);
+  assert.match(queue, /10\*1024\*1024/);
+  assert.match(queue, /saveOfflineFile/);
 });
 
 test("Phase 7 sanitizes filenames and rich note content server-side", () => {

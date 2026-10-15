@@ -21,7 +21,9 @@ export type R2ObjectBodyLike = {
   writeHttpMetadata(headers: Headers): void;
 };
 
-type ResourceR2Bucket = {
+export type ResourceR2Bucket = {
+  createMultipartUpload(key:string,options?:{httpMetadata?:R2HttpMetadata}):Promise<{uploadId:string}>;
+  resumeMultipartUpload(key:string,uploadId:string):{uploadPart(partNumber:number,value:Uint8Array|ReadableStream<Uint8Array>):Promise<{partNumber:number;etag:string}>;complete(parts:{partNumber:number;etag:string}[]):Promise<unknown>;abort():Promise<void>};
   put(
     key: string,
     value: Uint8Array | ArrayBuffer | ReadableStream<Uint8Array> | Blob | string,
