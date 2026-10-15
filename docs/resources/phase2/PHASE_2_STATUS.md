@@ -24,4 +24,15 @@
 
 The inspection decision is structural-only, not a third-party antivirus certification. Legacy binary DOC, encrypted/image-only PDF text extraction and unsupported formats report unavailable previews; their originals are not converted into invented content. PDF extraction is bounded to 300-page documents and the first 20 pages/128,000 characters for search text. Full source PDF viewing remains explicit through the protected original route. Browser storage can be evicted by the OS; missing source bytes require exact-hash reselection. Native sources and foreground recovery are implemented, but this release does not certify OS background scheduling, physical-device process-kill behaviour or a new signed APK. Expanded native job guarantees remain Phase 4.
 
-Production status remains pending until the exact-commit release workflow and live checks pass. Both migrations and originals are retained on application rollback.
+## Verified production release
+
+Deployed 15 October 2026 from `609c97402f234ea4c74878a49f11e9790ddfdb8d`.
+
+- [Exact-commit release workflow](https://github.com/Dellybizz/ca-progress-v2/actions/runs/38664254966): verification and deployment succeeded.
+- Web Worker version: `7b56bdb8-dd39-49be-bcff-4181efb8bb4c`; compressed upload 3,572.66 KiB, below the 3.75 MiB guard.
+- Private preview Worker version: `a40e9a02-2033-47b1-8412-25e41e3de32b`; compressed upload 509.66 KiB, below the 0.75 MiB guard.
+- All 1,344 tests, TypeScript, lint, native bundling, desktop/mobile browser recovery fixtures, Worker build/runtime checks, private production restore rehearsal, migration 0097 and live resource authentication checks passed.
+- Restore rehearsal kept existing notes/uploads unchanged with zero foreign-key violations. Retained production migration verification passed.
+- [Live Resources](https://ca-progress-v2.habeebaasif622.workers.dev/resources).
+
+Phase 2 web release is complete. The explicit native/format/inspection boundaries above remain in effect. Phase 3 (professional typed notes) is next. Both migrations and originals are retained on application rollback; inspection/delivery safeguards must remain enforced for quarantined content.

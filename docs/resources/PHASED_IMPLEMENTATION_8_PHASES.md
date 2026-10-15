@@ -27,3 +27,11 @@ Separate checkpoints remain for D1/R2 provisioning, isolated processing, key man
 - [Isolated editor model benchmark](phase0/editor-model-benchmark.json).
 
 Implementation command names in later conversation refer to these eight phases. This does not relabel or reopen completed onboarding/payment phases.
+
+## Current progress — 15 October 2026
+
+- Phase 0: complete.
+- Phase 1: implemented and deployed; [production evidence](phase1/PHASE_1_STATUS.md).
+- Phase 2: implemented and deployed; [scope, validation and production evidence](phase2/PHASE_2_STATUS.md).
+- Phase 3: next — professional typed notes, including its required durable local-draft foundation.
+- Phases 4–7: planned; their remaining native/background, history, handwriting, protected-sharing and certification guarantees are not claimed by the Phase 2 web release.

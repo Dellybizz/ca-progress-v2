@@ -45,3 +45,7 @@ The release follow-up preserves omitted tags, visibility, academic metadata and 
 
 - Full suite: 1,329 passed before the final attachment regression; all 23 focused workspace tests passed with that regression (expected full total 1,330).
 - TypeScript and production OpenNext build passed. Final CI reruns lint, tests, size and runtime checks for the exact commit.
+
+## Verified production release — 15 October 2026
+
+Phase 1 was deployed from `9241d031ba3f83172135e8fb389f163c17860449` after [release verification](https://github.com/Dellybizz/ca-progress-v2/actions/runs/38653602500) passed. Its web Worker version was `f075d20c-cd50-4269-979c-6102645a03c1`. The earlier pending-release sections above describe pre-release checkpoints. The [Phase 2 release record](../phase2/PHASE_2_STATUS.md) now supersedes this deployment.
