@@ -43,7 +43,7 @@ test('file drops are distinct from internal moves and untrusted text or links',(
 });
 test('canonical location clears incompatible folders and separates owner cache identity',()=>{
  assert.deepEqual(f.normalizeWorkspaceLocation({collection:'shared',view:'folder',folder:'private',layout:'compact'}),{collection:'shared',view:'all',folder:'',layout:'compact'});
- const location=f.normalizeWorkspaceLocation({view:'folder'});assert.equal(location.view,'all');
+ const location=f.normalizeWorkspaceLocation({view:'folder'});assert.equal(location.view,'folder');
  assert.notEqual(f.workspaceLocationKey('alice','ctx',location),f.workspaceLocationKey('bob','ctx',location));
  assert.notEqual(f.workspaceLocationKey('alice','ctx',location),f.workspaceLocationKey('alice','ctx2',location));
 });

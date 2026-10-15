@@ -16,7 +16,7 @@ Implements shared query/location types, action eligibility, selection rules, dra
 | Dialog, inspector, context menu | Separate surface state; Escape closes top surface before clearing selection |
 | Transfers | Durable owner-scoped queue; independent of location and selection |
 
-Location keys include user and academic context. Shared/official collections cannot inherit a personal folder. A folder view without an ID normalizes to All files. Route serialization, account-switch integration and owner-scoped layout persistence remain Phase 2 gates.
+Location keys include user and academic context. Shared/official collections cannot inherit a personal folder. Phase 2 defines a folder view without an ID as the real folder root, distinct from recursive All files. Route serialization, account-switch integration and owner-scoped layout persistence are integrated in Phase 2.
 
 ## Interaction contract
 
