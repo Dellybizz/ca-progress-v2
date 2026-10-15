@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-10-15T17:36:53.887Z",
+  "deployed_commit": "aa07463d1544ba6a19af6aa0d364e4ab088ac087",
+  "live_upload_boundaries": "passed",
+  "database": {
+    "versions": [
+      "0095",
+      "0096",
+      "0097",
+      "0098"
+    ],
+    "foreign_key_violations": 0,
+    "totals": {
+      "notes": 0,
+      "uploads": 2,
+      "transfers": 3
+    }
+  },
+  "fixture_audit_before": {
+    "mode": "audit",
+    "fixture_accounts": 1,
+    "objects_seen": 0,
+    "verified_orphans": 0,
+    "deleted": 0,
+    "retained": 0,
+    "remaining_verified_orphans": 0
+  },
+  "fixture_cleanup": null,
+  "fixture_audit_after": {
+    "mode": "audit",
+    "fixture_accounts": 1,
+    "objects_seen": 0,
+    "verified_orphans": 0,
+    "deleted": 0,
+    "retained": 0,
+    "remaining_verified_orphans": 0
+  },
+  "scope": "Narrow disabled manual-test account window, exact synthetic size/hash, no references; no general user-object sweep"
+}

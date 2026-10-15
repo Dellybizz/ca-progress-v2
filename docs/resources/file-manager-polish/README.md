@@ -7,4 +7,6 @@ Next Resources feature phases are paused at the user's request. The professional
 - [Source register](SOURCE_REGISTER.md): official Google help, MEGA's published web-client implementation and its historical desktop-transfer article, plus accessibility/performance standards. Evidence limitations and product/platform differences are explicit.
 - [Completed upload foundation and live evidence](../phase2/UPLOAD_DATABASE_AND_SIDEBAR_REPAIR.md): simple untagged private upload picker, separate real-progress sidebar, database/receipt repair and signed-download fix.
 
+FMP-00 is complete: [baseline, live reliability evidence and next-package gate](phase0/PHASE_0_STATUS.md).
+
 Recommended implementation order is FMP-00 reliability closure, FMP-01 shared interaction/state specification, FMP-02 shell/navigation/layout, FMP-03 selection/menus, FMP-04 dialogs/inspector/organization, FMP-05 app-level transfer management, FMP-06 search/preview/recovery, FMP-07 measured accessibility/performance polish, and FMP-08 end-to-end certification. These work-package names do not renumber the existing eight-phase roadmap.

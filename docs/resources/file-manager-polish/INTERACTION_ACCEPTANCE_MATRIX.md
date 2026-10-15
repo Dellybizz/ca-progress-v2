@@ -64,7 +64,7 @@ Each implemented case needs an evidence link, result, browser/device, source com
 | ORG-09 | Retag item out of active filter | Explain disappearance, update counts and offer locating the item | 04,06 |
 | ORG-10 | Drag files onto valid/invalid folder | Visible destination and eligibility; accessible Move alternative; no browser navigation | 04 |
 | ORG-11 | Filename conflict in copy/upload | Explicit skip/keep-both/version choice; apply-to-remaining limited to this batch | 04–05 |
-| ORG-12 | Nonempty folder Trash (conditional capability) | Server-owned descendant operation, accurate counts/recovery; otherwise honest unsupported action | 04 |
+| ORG-12 | Attempt to delete a nonempty folder | Block deletion and explain that its files must be moved elsewhere first; no recursive client/server deletion | 04 |
 
 ## Uploads and transfer sidebar
 
@@ -142,4 +142,4 @@ Each implemented case needs an evidence link, result, browser/device, source com
 
 For each case record: ID; implementation commit; supported surface; fixture description; browser/device/network; test or manual reproduction; expected/actual outcome; screenshot/trace/log link where relevant; accessibility evidence; status; unresolved issue. Never place passwords, session cookies, private document content or signed object URLs in evidence.
 
-A package is complete only when its cases have results, not when the UI controls exist. Query-wide selection, folder upload and recursive Trash remain conditional until explicitly included in that release's supported-capability list; their absence must not produce misleading controls.
+A package is complete only when its cases have results, not when the UI controls exist. Query-wide selection and folder upload remain conditional until explicitly included in that release's supported-capability list; their absence must not produce misleading controls. Nonempty folder deletion remains blocked under the existing product decision.

@@ -211,7 +211,7 @@ Preview opening preserves the underlying query and position. Previous/next is li
 
 Use a recoverable Trash operation with an acknowledged result and Undo. Permanent deletion requires explicit scope and conflict checks. The app's current policy hides trashed items from shared access; retain that policy even where competitor semantics differ. Display expiry and storage impact using real backend policy, not copied marketing text.
 
-For nonempty folders, design recursive Trash as a server-owned, bounded operation with explicit descendant counts, recovery rules, cycle checks and partial-failure handling. Until that exists, keep “Delete empty folder” honest and explain why a nonempty folder cannot be deleted. Never simulate recursive success with client-only removal.
+Preserve the existing decision: folders may be deleted only after their files have been moved elsewhere. Keep “Delete empty folder” honest and explain why a nonempty folder cannot be deleted. Recursive folder Trash is outside this polish authorization; never simulate it with client-only removal.
 
 Bulk operations return per-item outcome, affected IDs, new revision and retryability. A snackbar summarizes “8 moved; 2 need attention” and opens a result sheet. Retrying operates only on failures. Undo uses a server operation token/baseline and refuses to overwrite a later conflicting edit. Permissions may change between menu display and execution; preserve context and report the affected item.
 
@@ -312,10 +312,10 @@ Release gates: zero known data-loss, cross-owner access, false-success or unreco
 
 This polish pass does not silently expand into collaborative Google Docs, Drive ACL inheritance, MEGA-equivalent end-to-end encryption, cloud sync daemons, native background transfer guarantees, arbitrary file-format rendering, full malware scanning, OCR, AI organization, handwriting, or the Phase 3 rich-text editor. Their entry points stay absent or honestly labeled until their server/client contracts exist.
 
-Folder uploads, recursive folder Trash and query-wide “select all results” are specified here because they affect interaction design. They must either ship with their acceptance cases or remain visibly unsupported without suggesting success. Direct protected-sharing features remain subject to the existing later roadmap rather than being implied by a copied Share dialog.
+Folder uploads and query-wide “select all results” are specified here because they affect interaction design. Nonempty folder deletion remains blocked under the existing decision. They must either ship with their acceptance cases or remain visibly unsupported without suggesting success. Direct protected-sharing features remain subject to the existing later roadmap rather than being implied by a copied Share dialog.
 
 ## 14. Definition of done before resuming phases
 
 A student can find, select, upload, download, move, rename, tag, inspect and recover their files using mouse, keyboard or touch without guessing what happened. The same action has the same meaning everywhere. Network and permission failures preserve data and give a recovery path. Transfers remain independently visible while browsing. Large-library performance is measured. All mandatory acceptance cases have linked evidence and no open integrity blockers.
 
-Until that gate is satisfied, the next Resources feature phases remain paused. The signed-in upload/download gate in FMP-00 has now passed (see the linked release evidence). Finish its baseline/isolated-test-object inventory, then begin the shared state and shell work in FMP-01/FMP-02; this document itself is research and planning, not a claim that the proposed redesign has shipped.
+Until that gate is satisfied, the next Resources feature phases remain paused. The signed-in upload/download gate in FMP-00 has passed (see the linked release evidence). The [Phase 0 checkpoint](phase0/PHASE_0_STATUS.md) records its new baseline and historical-fixture audit; then begin the shared state and shell work in FMP-01/FMP-02; this document itself is research and planning, not a claim that the proposed redesign has shipped.
