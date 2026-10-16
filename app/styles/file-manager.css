@@ -137,3 +137,4 @@
  .fm-filter-content{top:52px;right:0}.fm-heading>.fm-actions{width:auto}
 }
 .fm-folder-options{position:relative;font-size:12px}.fm-folder-options>summary{cursor:pointer;color:var(--color-text-muted);min-height:32px;padding:6px 0;list-style:none}.fm-folder-options>summary:after{content:' ⌄'}.fm-folder-options .fm-folder-tools{display:flex;flex-wrap:wrap;padding:10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg-subtle)}.fm-location-content .fm-folder-options .fm-folder-tools>button{display:inline-flex}
+@media(max-width:800px){.fm-controls{gap:4px}.fm-filter-menu>summary{padding-inline:7px}.fm-type-filter select{padding-left:7px}.fm-layout-switch button[aria-label="Compact view"]{display:none}}
