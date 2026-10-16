@@ -27,10 +27,11 @@ test('combined note/file pagination sorts the full collection before slicing and
   assert.equal(compiled.libraryPage([],[],{kind:'all',sort:'recent',page:3}).current,1);
   assert.equal(notes[0].id,'n1');
 });
-test('navigation has one Resources destination and still recognizes note detail pages',()=>{
+test('Resources and Notes have separate destinations and active routes',()=>{
   const knowledge=compiled.shellNavigation.student.find(s=>s.label==='Knowledge').items;
-  assert.equal(knowledge.filter(x=>x.href==='/resources').length,1);assert.equal(knowledge.some(x=>['/notes','/resources/icai'].includes(x.href)),false);
-  assert.equal(compiled.routeIsActive({href:'/resources'},'/notes/n1'),true);
+  assert.equal(knowledge.filter(x=>x.href==='/resources').length,1);assert.equal(knowledge.filter(x=>x.href==='/notes').length,1);assert.equal(knowledge.some(x=>x.href==='/resources/icai'),false);
+  assert.equal(compiled.routeIsActive({href:'/resources'},'/notes/n1'),false);
+  assert.equal(compiled.routeIsActive({href:'/notes'},'/notes/n1'),true);
   const html=renderToStaticMarkup(React.createElement(compiled.ResourceHubTabs,{tab:'icai',params:{}}));assert.equal((html.match(/aria-current="page"/g)||[]).length,1);assert.match(html,/ICAI official/);
 });
 test('embedded ICAI browser keeps source provenance, search and canonical tab form without a second page heading',()=>{
