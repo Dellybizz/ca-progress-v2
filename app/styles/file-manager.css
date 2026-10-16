@@ -118,3 +118,17 @@
 @media(max-width:1099px){.file-manager>.fm-controls{min-height:48px}.file-manager.has-selection>.fm-selection-bar{grid-row:auto}}
 @media(max-width:600px){.file-manager>.fm-controls{min-height:52px}}
 @media(max-width:600px){.file-manager .fm-selection-bar button{min-height:44px}}
+/* Shell-owned transfer dock: bounded rows and independent, reachable controls. */
+.fm-upload-sidebar{width:min(400px,calc(100vw - 24px));padding:12px;overflow:hidden;display:flex;flex-direction:column;gap:8px}
+.fm-upload-sidebar .fm-transfer-list{overflow:auto;min-height:0;overscroll-behavior:contain;margin:0}
+.fm-upload-sidebar>progress{width:100%;height:6px;flex-shrink:0}
+.fm-upload-sidebar .fm-upload-help{margin:0}
+.fm-transfer-bytes{display:block;font-size:11px;color:var(--color-text-muted);margin:4px 0}
+.fm-upload-sidebar .fm-transfer-row{flex-shrink:0;gap:8px}
+.fm-upload-sidebar .fm-transfer-row strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fm-upload-sidebar footer{display:flex;gap:6px;flex-wrap:wrap;margin:0;flex-shrink:0}
+.fm-upload-sidebar--minimized{max-height:64px}
+body:has(.fm-inspector) .fm-upload-sidebar{bottom:16px;right:16px;width:min(360px,35vw);max-height:56px}
+body:has(.fm-inspector) .fm-upload-sidebar>:not(header){display:none}
+body:has(.fm-inspector) .fm-inspector{bottom:82px}
+@media(max-width:600px){.fm-upload-sidebar button{min-height:44px}.fm-upload-sidebar .fm-transfer-row{flex-direction:row}.fm-upload-sidebar .fm-transfer-row>div:last-child{flex:0 0 98px}.fm-upload-sidebar{max-height:55dvh}.fm-upload-sidebar .fm-transfer-list{flex:1}}
