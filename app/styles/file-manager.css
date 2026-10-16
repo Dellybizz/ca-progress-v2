@@ -220,3 +220,41 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 @media(max-width:899px){body:has(.app-shell--floating .resource-workspace){--topbar-height:calc(64px + env(safe-area-inset-top))}.app-shell--floating:has(.resource-workspace) .topbar{padding-top:calc(4px + env(safe-area-inset-top))}}
 @media(max-width:800px){#fm-transfer-indicator:not(:empty){position:fixed;right:8px;bottom:calc(var(--bottom-nav-height,64px) + env(safe-area-inset-bottom) + 54px);z-index:50} .file-manager #fm-transfer-indicator .fm-upload-sidebar button{min-height:44px}}
 @media(max-width:800px){.file-manager.has-selection .fm-heading>.fm-actions,.file-manager .fm-heading--searching>.fm-actions{display:contents}.file-manager.has-selection .fm-heading>.fm-actions>.fm-new-menu,.file-manager .fm-heading--searching>.fm-actions>.fm-new-menu{display:none}}
+/* Resource browsing controls: visible mobile navigation, a short filter dialog, and zoom. */
+.app-shell .content-wrap:has(>.resource-workspace){height:var(--fm-page-height,calc(100dvh - var(--topbar-height,84px) - var(--fm-bottom-inset)))}
+.resource-workspace-sidebar>.fm-sidebar-title{order:0}.resource-workspace-sidebar>#fm-view-navigation{order:1}.resource-workspace-sidebar>.fm-collections{order:2}.resource-workspace-sidebar>.fm-updates-link{order:3}
+.file-manager .ui-dialog .fm-filter-content{position:static;inset:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:100%;max-width:none;max-height:none;padding:0;border:0;border-radius:0;box-shadow:none;overflow:visible;background:transparent}
+.file-manager .ui-dialog .fm-filter-content>fieldset,.file-manager .ui-dialog .fm-filter-content>.fm-checkbox,.fm-advanced-filters,.fm-filter-actions{grid-column:1/-1}
+.file-manager .ui-dialog .fm-filter-content fieldset{margin:0;border:0;padding:10px 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.file-manager .ui-dialog .fm-filter-content legend{font-size:12px;font-weight:600;margin-bottom:8px}
+.file-manager .ui-dialog .fm-filter-content fieldset label{display:flex;align-items:center;gap:6px;min-height:32px;font-size:12px}
+.file-manager .ui-dialog .fm-filter-content :is(input:not([type=checkbox]),select){width:100%;min-height:40px;border:1px solid var(--color-border);border-radius:8px;padding:8px;background:var(--color-surface);color:var(--color-text);font:inherit;font-size:13px;box-sizing:border-box}
+.fm-advanced-filters{border-top:1px solid var(--color-border);padding-top:10px}.fm-advanced-filters>summary{cursor:pointer;min-height:36px;font-size:12px;color:var(--color-text-muted)}
+.fm-advanced-filters>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding-top:8px}.fm-advanced-filters label{display:grid;gap:6px;font-size:12px}.fm-advanced-filters .fm-saved-view-tools{grid-column:1/-1}
+.fm-filter-actions{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--color-border);padding-top:12px}.fm-filter-actions button{min-height:44px;padding:8px 16px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font:inherit;font-size:13px}.fm-filter-actions button:last-child{background:var(--color-brand);color:white;border-color:var(--color-brand)}
+.file-manager>.fm-footer{height:52px;min-height:52px;flex-wrap:nowrap;gap:8px;padding:4px 0;z-index:25;position:relative;box-sizing:border-box}
+.file-manager>.fm-footer>span{display:block;flex-shrink:0;white-space:nowrap;font-size:11px}
+.fm-zoom-controls{display:flex;align-items:center;justify-content:center;gap:5px;margin-left:auto;margin-right:auto;min-width:0}
+.file-manager .fm-zoom-controls button,.file-manager .fm-pagination button{display:grid;place-items:center;width:36px;height:44px;min-height:44px;padding:0;font-size:20px;line-height:1;border:1px solid var(--color-border);border-radius:7px;background:var(--color-surface);color:var(--color-text)}
+.fm-zoom-controls input{width:100px;min-width:40px;accent-color:var(--color-brand);cursor:pointer}.fm-zoom-controls output{width:37px;text-align:center;font-size:11px;color:var(--color-text-muted)}
+.fm-pagination{display:flex;align-items:center;gap:5px;flex-shrink:0}.fm-pagination>span{font-size:11px;white-space:nowrap}
+.file-manager .fm-files--grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(var(--fm-base-card,180px) * var(--fm-zoom,1))),1fr))}
+.file-manager .fm-file-copy strong{font-size:clamp(11px,calc(13px * var(--fm-zoom,1)),18px)}
+.file-manager .fm-files--list .fm-file,.file-manager .fm-files--compact .fm-file{min-height:var(--fm-row-size,52px)}
+.file-manager .fm-files--list .fm-thumbnail--small{width:clamp(24px,calc(32px * var(--fm-zoom,1)),52px);height:clamp(28px,calc(36px * var(--fm-zoom,1)),58px)}
+@media(max-width:800px){
+ .resource-workspace{grid-template-rows:auto minmax(0,1fr)!important}
+ .resource-workspace .resource-workspace-sidebar{display:flex!important;flex-direction:column;height:auto;padding:4px 8px!important;border-bottom:1px solid var(--color-border);overflow:hidden;gap:2px}
+ .resource-workspace .resource-workspace-sidebar>.fm-collections{display:flex!important;order:0;padding:0;border:0;min-height:44px;overflow-x:auto;flex-wrap:nowrap;gap:4px;scrollbar-width:thin}
+ .resource-workspace .resource-workspace-sidebar>.fm-collections a,.resource-workspace:has(#fm-view-navigation:not(:empty)) .fm-collections [data-collection=my]{display:flex!important;flex:1 0 auto;justify-content:center;gap:6px;min-height:44px;padding:8px;font-size:12px;text-decoration:none}
+ .resource-workspace .resource-workspace-sidebar>#fm-view-navigation{display:block!important;order:1;min-width:0}
+ .resource-workspace #fm-view-navigation .fm-file-views{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:2px;margin:0;padding:0;border:0;scrollbar-width:thin}
+ .resource-workspace #fm-view-navigation .fm-file-views>button{min-height:40px;flex:1 0 auto;padding:6px 10px;font-size:12px;white-space:nowrap}
+ .resource-workspace .resource-workspace-content{grid-row:2;padding:6px 8px;min-height:0}
+ .file-manager{--fm-base-card:128px;grid-template-columns:auto 44px 40px minmax(0,1fr);grid-template-rows:28px 48px auto minmax(0,1fr) 52px}
+ .file-manager .fm-heading>.fm-actions{grid-column:1}.file-manager .fm-search-toggle{grid-column:2}.file-manager>.fm-controls>.fm-filter-menu{grid-column:3}.file-manager>.fm-controls>.fm-layout-switch{grid-column:4}
+ .file-manager .ui-dialog .fm-filter-content fieldset{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.file-manager .ui-dialog .fm-filter-content{gap:10px}
+ .file-manager>.fm-footer{grid-row:5;height:52px;min-height:52px;gap:3px;padding:4px 0}
+ .fm-zoom-controls{gap:2px;margin:0 0 0 auto}.fm-zoom-controls input{width:60px}.file-manager .fm-zoom-controls button,.file-manager .fm-pagination button{width:30px;min-width:30px;font-size:18px}.fm-zoom-controls output{width:30px;font-size:10px}.fm-pagination{gap:2px}.fm-pagination>span{display:none}
+ .file-manager>.fm-footer>span{font-size:10px}.fm-advanced-filters>div{gap:10px}
+}
