@@ -17,7 +17,7 @@ try{
    await route.fulfill({json:{files:[file],total:1,nextCursor:null,folders,path:folder==='child'?folders:folder==='parent'?[folders[0]]:[],trashFolders:[]}});
   });
   await page.goto('http://127.0.0.1:8767/');
-  await page.locator('.fm-filter-menu>summary').click();await page.getByRole('button',{name:'Folders',exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
+  if(await page.getByRole('button',{name:'Clear selection',exact:true}).isVisible())await page.getByRole('button',{name:'Clear selection',exact:true}).click();await page.locator('.fm-filter-menu>summary').click();await page.getByRole('button',{name:'Folders',exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
   await page.locator('.fm-real-folders').waitFor();
   assert.equal(new URL(page.url()).searchParams.get('fmView'),'folder');
   await page.getByRole('button',{name:'Parent',exact:false}).click();
