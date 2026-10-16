@@ -18,7 +18,7 @@ import {actionEligibility,INTERNAL_FILE_DRAG_TYPE,parseWorkspaceDrag,moveDropEli
 import {createPortal} from 'react-dom';
 import {FileActionMenu,type FileAction} from './file-action-menu';
 import {Icon} from '@/components/ui/icon';
-import {loadWorkspacePage,peekWorkspacePage,previewWorkspacePage,invalidateWorkspacePages,workspaceRequestUrl} from '@/lib/resources/workspace-page-cache';
+import {loadWorkspacePage,canRestoreWorkspaceSnapshot,peekWorkspacePage,previewWorkspacePage,invalidateWorkspacePages,workspaceRequestUrl} from '@/lib/resources/workspace-page-cache';
 const subscribeOnline=(callback:()=>void)=>{window.addEventListener('online',callback);window.addEventListener('offline',callback);return()=>{window.removeEventListener('online',callback);window.removeEventListener('offline',callback);};};
 const onlineSnapshot=()=>navigator.onLine;
 const serverOnlineSnapshot=()=>true;
@@ -68,11 +68,17 @@ function WorkspaceBrowserContent({filesOnly=false,model,collection,academicConte
  useEffect(()=>{if(revision>0)invalidateWorkspacePages(requestScope);},[revision,requestScope]);
  const requestUrl=workspaceRequestUrl(collection,view,folder,queryString?JSON.parse(queryString):startingQuery,cursor,filesOnly);
  useEffect(()=>{
-  const controller=new AbortController(),cached=peekWorkspacePage(requestScope,requestUrl);
+  const controller=new AbortController(),cached=peekWorkspacePage(requestScope,requestUrl);let received=false;
   Promise.resolve().then(()=>{if(!controller.signal.aborted){if(cached){setData(cached.data);setResolvedUrl(requestUrl);}setLoading(!cached);}});
+  if(!cached&&student.userId&&!refresh&&!revision&&canRestoreWorkspaceSnapshot(requestScope)){
+   const owner=student.userId;
+   void Promise.all([getOfflineMeta<WorkspacePage>(owner,cacheKey),getOfflineMeta<number>(owner,cacheKey+':saved-at'),getPendingMutations(owner)]).then(([snapshot,savedAt,pending])=>{
+    if(snapshot&&savedAt&&Date.now()-savedAt<30000&&!received&&!controller.signal.aborted&&canRestoreWorkspaceSnapshot(requestScope)&&!pending.some(item=>item.contextKey===student.contextKey)){setData(snapshot);setLoading(false);}
+   }).catch(()=>undefined);
+  }
   loadWorkspacePage(requestScope,requestUrl,refresh>0||revision>0).then(payload=>{
-   if(controller.signal.aborted)return;setData(payload);setResolvedUrl(requestUrl);if(student.userId)void putOfflineMeta(student.userId,cacheKey,payload).catch(()=>undefined);setError('');setLoading(false);
-  }).catch(async cause=>{if(controller.signal.aborted)return;setLoading(false);if(cause instanceof Error&&cause.message.includes('page expired')){setPage(1);setCursors(['']);}if(student.userId&&!navigator.onLine){const cached=await getOfflineMeta<WorkspacePage>(student.userId,cacheKey).catch(()=>null);if(cached&&!controller.signal.aborted){let projected=cached;for(const pending of await getPendingMutations(student.userId)){if(pending.contextKey!==student.contextKey||pending.status==='blocked')continue;const edit=JSON.parse(pending.body);if(edit.url==='/api/resources/workspace')projected=projectWorkspaceOperation(projected,edit.body,view,folder);}setData(projected);}else if(!controller.signal.aborted)setData({files:[],total:0,folders:[],path:[],nextCursor:null});}setError(navigator.onLine?(cause instanceof Error?cause.message:'Files could not be loaded.'):'Offline: this view shows its previously saved page. Complete search needs a connection.');});
+   if(controller.signal.aborted)return;received=true;setData(payload);setResolvedUrl(requestUrl);if(student.userId)void Promise.all([putOfflineMeta(student.userId,cacheKey,payload),putOfflineMeta(student.userId,cacheKey+':saved-at',Date.now())]).catch(()=>undefined);setError('');setLoading(false);
+  }).catch(async cause=>{if(controller.signal.aborted)return;received=true;setLoading(false);if(cause instanceof Error&&cause.message.includes('page expired')){setPage(1);setCursors(['']);}if(student.userId&&!navigator.onLine){const cached=await getOfflineMeta<WorkspacePage>(student.userId,cacheKey).catch(()=>null);if(cached&&!controller.signal.aborted){let projected=cached;for(const pending of await getPendingMutations(student.userId)){if(pending.contextKey!==student.contextKey||pending.status==='blocked')continue;const edit=JSON.parse(pending.body);if(edit.url==='/api/resources/workspace')projected=projectWorkspaceOperation(projected,edit.body,view,folder);}setData(projected);}else if(!controller.signal.aborted)setData({files:[],total:0,folders:[],path:[],nextCursor:null});}setError(navigator.onLine?(cause instanceof Error?cause.message:'Files could not be loaded.'):'Offline: this view shows its previously saved page. Complete search needs a connection.');});
   return()=>controller.abort();
  },[requestScope,requestUrl,refresh,revision,cacheKey,student.userId,student.contextKey,view,folder]);
  // Preload only a few immediate destinations. Hover/focus warms any other folder.
