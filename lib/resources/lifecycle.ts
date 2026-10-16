@@ -18,7 +18,13 @@ export async function lifecycleAction(owner:string,input:Record<string,unknown>,
  const results:{key:string;ok:boolean;id?:string;error?:string}[]=[];
  for(const key of keys){try{
  const {kind,id,row}=await ownedFile(owner,key,db,action==='erase');const log=(detail='')=>db.prepare('INSERT INTO resource_file_activity(owner_user_id,entity_kind,entity_id,action,detail) VALUES(?1,?2,?3,?4,?5)').bind(owner,kind,id,action,detail);
- if(action==='rename'){
+ if(action==='share'){
+  if(input.confirm!==true)throw Error('Confirm sharing with Community.');
+  if(row.visibility==='shared'){results.push({key,ok:true});continue;}
+  if(kind==='upload'&&await db.prepare('SELECT id FROM resource_file_versions WHERE owner_user_id=?2 AND ((resource_id=?1 AND active=1 AND version_resource_id<>resource_id) OR (version_resource_id=?1 AND resource_id<>?1))').bind(id,owner).first())throw Error('Restore the original version before sharing this file.');
+  if(kind==='upload'){const inspection=await db.prepare('SELECT state FROM resource_inspections WHERE source_key=?1 AND owner_user_id=?2').bind(row.storage_path,owner).first<{state:string}>();if(inspection&&['quarantined','failed'].includes(inspection.state))throw Error('This file must pass inspection before sharing.');}
+  await db.batch([db.prepare(`UPDATE ${kind==='note'?'notes':'uploaded_resources'} SET visibility='shared',moderation_status='pending',published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?1 AND ${kind==='note'?'user_id':'owner_user_id'}=?2 AND visibility='private' AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries WHERE entity_kind=?3 AND entity_id=?1 AND (trashed_at IS NOT NULL OR purge_started_at IS NOT NULL))`).bind(id,owner,kind),log('Submitted for Community review')]);
+ }else if(action==='rename'){
   const name=typeof input.name==='string'?input.name.trim():'';if(!name||name.length>160||keys.length!==1)throw Error('Select one file and use a name of 1–160 characters.');
   if(row.visibility!=='private')throw Error('Rename private files here; shared originals retain their published identity.');
   await db.batch([db.prepare(`UPDATE ${kind==='note'?'notes':'uploaded_resources'} SET title=?1,updated_at=CURRENT_TIMESTAMP WHERE id=?2 AND ${kind==='note'?'user_id':'owner_user_id'}=?3 AND visibility='private'`).bind(name,id,owner),log(name)]);
