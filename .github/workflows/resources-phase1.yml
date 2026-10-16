@@ -124,4 +124,5 @@ jobs:
       - name: Verify real signed-in upload through D1 and R2
         env:
           VERIFY_FILE_MANAGER_PHASE4: "true"
+          VERIFY_RESOURCE_SHARING: "true"
         run: node scripts/resources/verify-live-upload-roundtrip.mjs
