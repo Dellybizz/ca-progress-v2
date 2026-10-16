@@ -32,11 +32,11 @@ test("Phase 8 opens saved files only from the active offline account", () => {
 });
 
 test("Phase 8 uploads directly to R2 with progress and cancellation", () => {
-  const library = read("lib/resources/transfer-client.ts") + read("components/resources/upload-panel.tsx");
+  const library = read("lib/resources/transfer-client.ts") + read("components/resources/upload-panel.tsx") + read("lib/resources/transfer-coordinator.ts");
   assert.match(library, /new XMLHttpRequest\(\)/);
   assert.match(library, /xhr\.open\('PUT',url\)/);
   assert.match(library, /xhr\.upload\.onprogress/);
-  assert.match(library, /active\.current\?\.abort\(\)/);
+  assert.match(library, /this\.controller\?\.abort\(\)/);
   assert.match(library, /action:'complete'/);
 });
 
