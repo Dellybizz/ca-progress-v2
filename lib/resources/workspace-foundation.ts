@@ -5,7 +5,7 @@ export type ManagerQuery={query:string;types:FileKind[];sort:FileSort;secondary:
 export const FILE_LAYOUTS=['grid','list','compact'] as const;
 export type FileLayout=typeof FILE_LAYOUTS[number];
 export const INTERNAL_FILE_DRAG_TYPE='application/x-ca-progress-workspace+json';
-export type WorkspaceAction='open'|'details'|'move'|'rename'|'tag'|'star'|'trash'|'restore'|'erase'|'duplicate'|'replace-version';
+export type WorkspaceAction='open'|'details'|'move'|'rename'|'tag'|'star'|'trash'|'restore'|'erase'|'duplicate'|'replace-version'|'share';
 export type ActionContext={collection:'my'|'shared'|'official';online:boolean;preview?:boolean};
 /** UI eligibility only. The API must independently authorize every mutation. */
 export function actionEligibility(action:WorkspaceAction,files:readonly ManagedFile[],context:ActionContext):{allowed:boolean;reason?:string}{
@@ -18,7 +18,8 @@ export function actionEligibility(action:WorkspaceAction,files:readonly ManagedF
   if(['rename','duplicate','replace-version'].includes(action)&&files.length!==1)return{allowed:false,reason:'Choose one file.'};
   if(['rename','duplicate','replace-version'].includes(action)&&files.some(file=>file.visibility!=='private'))return{allowed:false,reason:'This action requires a private original.'};
   if(action==='replace-version'&&files.some(file=>file.kind==='note'))return{allowed:false,reason:'Choose an uploaded file.'};
-  if(!context.online&&['rename','tag','erase','duplicate','replace-version'].includes(action))return{allowed:false,reason:'This action needs a connection.'};
+  if(!context.online&&['rename','tag','erase','duplicate','replace-version','share'].includes(action))return{allowed:false,reason:'This action needs a connection.'};
+  if(action==='share'&&files.every(file=>file.visibility==='shared'))return{allowed:false,reason:'These files are already shared.'};
   return{allowed:true};
 }
 
