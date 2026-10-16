@@ -20,8 +20,8 @@ export function FileActionMenu({id,actions,x,y,anchor,onClose}:{anchor:HTMLEleme
   }
   node.style.left=`${left}px`;node.style.top=`${top}px`;
  },[x,y,actions,anchor]);
+ useLayoutEffect(()=>{menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({preventScroll:true});},[id]);
  useEffect(()=>{
-  menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({preventScroll:true});
   const outside=(event:PointerEvent)=>{if(!menu.current?.contains(event.target as Node)&&(event.target as Element).closest?.('[aria-controls]')?.getAttribute('aria-controls')!==id)onClose(false);};
   const close=(event:Event)=>{if(event.target instanceof Node&&menu.current?.contains(event.target))return;onClose(false);};
   document.addEventListener('pointerdown',outside);window.addEventListener('resize',close);document.addEventListener('wheel',close,{passive:true});document.addEventListener('touchmove',close,{passive:true});
