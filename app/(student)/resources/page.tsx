@@ -19,6 +19,7 @@ const param = (value:string|string[]|undefined) => typeof value === 'string' ? v
 
 export default async function ResourcesPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
   const params = await searchParams;
+  if(param(params.communityMessageId)){const next=new URLSearchParams();for(const [key,value] of Object.entries(params))if(typeof value==='string')next.set(key,value);redirect(`/notes?${next}`);}
   const tab = param(params.communityMessageId) ? 'my' : resourceTab(param(params.tab));
   let content;
   if (tab === 'icai') {
