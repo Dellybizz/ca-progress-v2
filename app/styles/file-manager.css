@@ -425,3 +425,30 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 .file-manager .fm-filter-compact .fm-filter-actions{position:static;flex-shrink:0;padding:10px 0 0}
 
 .file-manager .ui-dialog .fm-filter-fields>.fm-checkbox{display:flex;align-items:center;gap:8px;margin:0}
+
+/* Direct destinations and highlight-only selection. */
+.fm-selection-rectangle{position:fixed;pointer-events:none;z-index:65;border:1px solid var(--color-brand);background:color-mix(in srgb,var(--color-brand) 14%,transparent)}
+.fm-drag-preview{position:fixed;pointer-events:none;z-index:150;padding:8px 12px;border-radius:8px;background:var(--color-brand);color:white;font-size:12px;box-shadow:0 4px 18px #0002}
+body[data-resource-touchdrag=true]{user-select:none;-webkit-user-select:none}
+.file-manager .fm-file.is-selected{background:var(--color-brand-soft);border-color:var(--color-brand);box-shadow:inset 0 0 0 1px var(--color-brand)}
+.file-manager .fm-files--grid .fm-file.is-selected{background:var(--color-brand-soft)}
+.file-manager .fm-file-select{display:none!important}
+.file-manager .fm-selection-count{font-size:12px;font-weight:600;white-space:nowrap;margin-right:4px}
+.file-manager .fm-selection-bar .fm-select-all{flex:0 0 32px;width:32px;padding:6px;min-height:40px}
+.resource-workspace [data-workspace-drop][data-drop-state=allowed]{outline:2px solid var(--color-brand);outline-offset:-2px;background:var(--color-brand-soft)}
+.resource-workspace [data-workspace-drop][data-drop-state=blocked]{outline:2px dashed var(--color-danger,#b42318);outline-offset:-2px}
+.fm-sidebar-folders{display:grid;gap:2px;max-height:38dvh;overflow:auto;margin-top:12px;border-top:1px solid var(--color-border);padding-top:10px}
+.fm-sidebar-folders>span{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-muted);padding:4px 10px}
+.fm-sidebar-folders button{display:flex;align-items:center;gap:7px;min-width:0;min-height:36px;padding:7px 10px;border:0;border-radius:7px;background:transparent;color:var(--color-text);text-align:left;font:inherit;font-size:12px;cursor:pointer}
+.fm-sidebar-folders button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fm-sidebar-folders button[aria-current=page],.fm-sidebar-folders button:hover{background:var(--color-brand-soft);color:var(--color-brand)}
+.resource-workspace-sidebar #fm-view-navigation:has(.fm-sidebar-folders){order:3}
+@media(max-width:800px){.fm-sidebar-folders{display:none}.resource-workspace .fm-collections .fm-trash-link{flex:0 0 auto!important;min-width:60px!important}.resource-workspace .fm-collections{gap:2px!important}.resource-workspace .fm-collections a{font-size:10px!important;padding-inline:4px!important}.resource-workspace .fm-collections a svg{width:15px;height:15px}}
+@media(max-width:719px){.file-manager .fm-selection-bar .fm-primary-action{min-width:36px;padding:6px}.file-manager .fm-selection-bar .fm-clear-selection{width:36px;flex-basis:36px}.file-manager .fm-selection-bar .fm-select-all{width:28px;flex-basis:28px}.file-manager .fm-selection-count{font-size:11px}.file-manager .fm-selection-bar{gap:2px}}
+
+.fm-collection-label-short{display:none}@media(max-width:800px){.fm-collection-label-full{display:none}.fm-collection-label-short{display:inline}.resource-workspace .fm-collections a{white-space:nowrap}}
+
+.file-manager .fm-primary-action[data-action=trash]{color:var(--color-danger,#b42318)}
+@media(max-width:719px){.file-manager .fm-selection-bar .fm-primary-action{min-width:32px;padding:6px}.file-manager .fm-selection-bar .fm-clear-selection{width:32px;flex-basis:32px}.file-manager .fm-selection-bar .fm-select-all{width:24px;flex-basis:24px}.file-manager .fm-selection-bar .fm-more-actions{width:32px;min-width:32px;padding:6px}.file-manager .fm-more-actions>span{display:none}}
+
+.resource-workspace .fm-sidebar-folders [data-drop-state=allowed]{outline:2px solid var(--color-brand);outline-offset:-2px;background:var(--color-brand-soft)}.resource-workspace .fm-sidebar-folders [data-drop-state=blocked]{outline:2px dashed var(--color-danger,#b42318);outline-offset:-2px}
