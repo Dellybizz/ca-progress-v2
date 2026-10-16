@@ -219,3 +219,4 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 }
 @media(max-width:899px){body:has(.app-shell--floating .resource-workspace){--topbar-height:calc(64px + env(safe-area-inset-top))}.app-shell--floating:has(.resource-workspace) .topbar{padding-top:calc(4px + env(safe-area-inset-top))}}
 @media(max-width:800px){#fm-transfer-indicator:not(:empty){position:fixed;right:8px;bottom:calc(var(--bottom-nav-height,64px) + env(safe-area-inset-bottom) + 54px);z-index:50} .file-manager #fm-transfer-indicator .fm-upload-sidebar button{min-height:44px}}
+@media(max-width:800px){.file-manager.has-selection .fm-heading>.fm-actions,.file-manager .fm-heading--searching>.fm-actions{display:contents}.file-manager.has-selection .fm-heading>.fm-actions>.fm-new-menu,.file-manager .fm-heading--searching>.fm-actions>.fm-new-menu{display:none}}
