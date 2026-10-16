@@ -423,3 +423,5 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 .file-manager .fm-filter-fields{display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 2px 12px 0;scrollbar-gutter:stable}
 .file-manager .fm-filter-fields>.fm-checkbox{min-height:32px}
 .file-manager .fm-filter-compact .fm-filter-actions{position:static;flex-shrink:0;padding:10px 0 0}
+
+.file-manager .ui-dialog .fm-filter-fields>.fm-checkbox{display:flex;align-items:center;gap:8px;margin:0}
