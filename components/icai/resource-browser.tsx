@@ -55,6 +55,7 @@ export function IcaiResourceBrowser({
 }: {
   catalog: IcaiPublicCatalog; embedded?: boolean; scopeLocked?: boolean;
 }) {
+  const [officialFilter,setOfficialFilter]=useState({subject:catalog.filters.subject,type:catalog.filters.type});
   const [view, setView] = useState<"folders" | "list">("folders");
   const [query,setQuery] = useState("");
   const [limit,setLimit] = useState(24);
@@ -64,7 +65,7 @@ export function IcaiResourceBrowser({
     ? catalog.attempts.filter((attempt) => attempt.levelCode === level)
     : [];
   const filterForm = (
-      <form className="icai-filters" method="get" action={embedded ? "/resources" : undefined}>
+      <form className="icai-filters" onSubmit={embedded?event=>{event.preventDefault();const values=new FormData(event.currentTarget);setOfficialFilter({subject:String(values.get('subject')??''),type:String(values.get('type')??'') as typeof catalog.filters.type});}:undefined} method="get" action={embedded ? "/resources" : undefined}>
         {embedded ? <input type="hidden" name="tab" value="icai"/> : null}
         <label>
           <span>Level</span>
@@ -141,7 +142,7 @@ export function IcaiResourceBrowser({
         </button>
       </form>
   );
-  if (embedded) return <FileManager files={officialFiles(catalog.resources)} title="ICAI files" extraFilters={<details className="fm-official-filters"><summary>Academic & official filters</summary>{filterForm}{catalog.events.length ? <ul>{catalog.events.map(event=><li key={event.id}><a href={event.sourceUrl} target="_blank" rel="noreferrer">{dateLabel(event.eventDate)} · {event.title}</a></li>)}</ul> : null}</details>}/>;
+  if (embedded) return <FileManager files={officialFiles(catalog.resources.filter(item=>(!officialFilter.subject||item.subjects.some(subject=>subject.id===officialFilter.subject))&&(!officialFilter.type||item.type===officialFilter.type)))} title="ICAI files" extraFilters={<details className="fm-official-filters"><summary>Academic & official filters</summary>{filterForm}{catalog.events.length ? <ul>{catalog.events.map(event=><li key={event.id}><a href={event.sourceUrl} target="_blank" rel="noreferrer">{dateLabel(event.eventDate)} · {event.title}</a></li>)}</ul> : null}</details>}/>;
   return (
     <div className="icai-page">
       {!embedded ? <><AcademicBreadcrumbs
