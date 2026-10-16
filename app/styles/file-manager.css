@@ -187,3 +187,34 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 .resource-workspace-content{display:flex;flex-direction:column;overflow:auto}
 .resource-workspace-content>.fm-library-root{flex:1;height:auto;min-height:0;overflow:hidden}
 @media(max-width:800px){.resource-workspace:not(:has(#fm-mobile-navigation)){grid-template-rows:auto minmax(0,1fr)}.resource-workspace:not(:has(#fm-mobile-navigation)) .resource-workspace-sidebar{display:block;height:auto;padding:6px 8px}.resource-workspace:not(:has(#fm-mobile-navigation)) .resource-workspace-sidebar>.fm-mobile-collection{display:block!important;width:100%}.resource-workspace:not(:has(#fm-mobile-navigation)) .resource-workspace-content{grid-row:2}.resource-workspace:not(:has(#fm-mobile-navigation)) .fm-mobile-collection select{width:100%;font-size:14px;color:var(--color-text);padding:8px 12px}.resource-workspace:not(:has(#fm-mobile-navigation)) .fm-mobile-collection:before{display:none}}
+/* Mobile has one location line and one action line. */
+@media(max-width:800px){
+ .file-manager{display:grid;grid-template-columns:44px auto 44px 40px minmax(0,1fr);grid-template-rows:28px 48px auto minmax(0,1fr) 48px;gap:6px 4px}
+ .file-manager>.fm-heading,.file-manager .fm-heading>.fm-current-location{display:contents}
+ .file-manager .fm-current-location>.fm-breadcrumbs,.file-manager .fm-current-location>span{grid-column:1/-1;grid-row:1;align-self:center;min-width:0}
+ .file-manager .fm-current-location>.fm-breadcrumbs button{min-height:28px;padding-top:3px;padding-bottom:3px}
+ .file-manager .fm-current-location>#fm-mobile-navigation{display:block;grid-column:1;grid-row:2;align-self:center}
+ .file-manager .fm-mobile-collection,.file-manager .fm-mobile-collection select{width:44px}.file-manager .fm-mobile-collection select{appearance:none}.file-manager .fm-mobile-collection:before{padding-left:13px}
+ .file-manager .fm-heading>.fm-actions{grid-column:2;grid-row:2;justify-self:start;align-self:center}
+ .file-manager .fm-search-toggle{grid-column:3;grid-row:2;align-self:center}
+ .file-manager:not(.has-selection)>.fm-controls{display:contents}
+ .file-manager>.fm-controls>.fm-type-filter{display:none}
+ .file-manager>.fm-controls>.fm-filter-menu{grid-column:4;grid-row:2;position:relative;align-self:center}
+ .file-manager>.fm-controls>.fm-filter-menu>summary{width:40px;min-height:44px;padding:0;justify-content:center;font-size:0;gap:0}
+ .file-manager>.fm-controls>.fm-filter-menu>summary svg{width:18px;height:18px}
+ .file-manager>.fm-controls>.fm-layout-switch{grid-column:5;grid-row:2;align-self:center;margin:0;justify-self:end;gap:0;padding:2px}
+ .file-manager .fm-layout-switch button{min-width:30px;min-height:38px;padding:4px}
+ .file-manager .fm-filter-content{position:fixed;left:8px;right:8px;top:calc(var(--topbar-height,64px) + 88px);width:auto;max-width:none;max-height:calc(100dvh - var(--topbar-height,64px) - 180px)}
+ .file-manager>.fm-location-content,.file-manager>.fm-folders,.file-manager>.fm-folder-path{grid-column:1/-1;grid-row:3}
+ .file-manager>.fm-groups,.file-manager>.fm-empty{grid-column:1/-1;grid-row:4;min-height:0;overflow:auto}
+ .file-manager>.fm-footer{grid-column:1/-1;grid-row:5;height:48px;min-height:48px;margin:0}
+ .file-manager.has-selection .fm-heading>.fm-actions,.file-manager.has-selection .fm-search-toggle,.file-manager.has-selection #fm-mobile-navigation{display:none}
+ .file-manager.has-selection>.fm-selection-bar{grid-column:1/-1;grid-row:2}
+ .file-manager:has(.fm-heading--searching)>.fm-controls,.file-manager:has(.fm-heading--searching) #fm-mobile-navigation,.file-manager .fm-heading--searching>.fm-actions{display:none}
+ .file-manager .fm-heading--searching>.fm-current-location{display:contents}
+ .file-manager .fm-heading--searching>.fm-toolbar{display:flex;grid-column:1/-1;grid-row:2;align-self:center}
+ .file-manager .fm-heading--searching>.fm-search-toggle{display:none}
+ .file-manager #fm-transfer-indicator .fm-upload-sidebar header{gap:0}
+ .file-manager #fm-transfer-indicator .fm-upload-sidebar button{font-size:10px;padding:4px;min-height:40px}
+}
+@media(max-width:899px){body:has(.app-shell--floating .resource-workspace){--topbar-height:calc(64px + env(safe-area-inset-top))}.app-shell--floating:has(.resource-workspace) .topbar{padding-top:calc(4px + env(safe-area-inset-top))}}
