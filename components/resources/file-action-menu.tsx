@@ -21,6 +21,7 @@ export function FileActionMenu({id,actions,x,y,anchor,onClose}:{anchor:HTMLEleme
   node.style.left=`${left}px`;node.style.top=`${top}px`;
  },[x,y,actions,anchor]);
  useLayoutEffect(()=>{menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({preventScroll:true});},[id]);
+ useLayoutEffect(()=>{const escape=(event:globalThis.KeyboardEvent)=>{if(event.key!=='Escape')return;event.preventDefault();event.stopPropagation();onClose(true);};document.addEventListener('keydown',escape,true);return()=>document.removeEventListener('keydown',escape,true);},[onClose]);
  useEffect(()=>{
   const outside=(event:PointerEvent)=>{if(!menu.current?.contains(event.target as Node)&&(event.target as Element).closest?.('[aria-controls]')?.getAttribute('aria-controls')!==id)onClose(false);};
   const close=(event:Event)=>{if(event.target instanceof Node&&menu.current?.contains(event.target))return;onClose(false);};
