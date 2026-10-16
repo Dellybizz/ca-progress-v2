@@ -160,7 +160,7 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 .fm-current-location .fm-breadcrumbs button+button:before{content:'/';margin:0 8px;color:var(--color-text-muted)}
 .fm-heading{grid-template-columns:minmax(120px,1fr) minmax(180px,360px) auto;gap:10px;min-height:44px}
 .fm-search-toggle,.fm-search-close{display:none}
-.fm-location-content:not(:has(.fm-real-folders>button)):has(.fm-folder-options){display:grid}
+.fm-location-content:not(:has(.fm-real-folders>.fm-folder-tile)):has(.fm-folder-options){display:grid}
 .fm-location-content{gap:4px}.fm-location-content .fm-real-folders{grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr))}
 .fm-folder-options>summary{min-height:28px;padding:4px 0}
 .fm-utility-dock{min-height:0;height:100%;border-radius:0;overflow:hidden}
@@ -378,3 +378,24 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 @media(max-width:719px){.file-manager .fm-files--grid .fm-file-copy{height:44px;padding-right:30px;gap:4px}.file-manager .fm-files--grid .fm-card-kind{flex-basis:16px}.file-manager .fm-files--grid .fm-file-copy strong{font-size:11px}.file-manager .fm-files--grid .fm-file-info{top:0;right:0;width:36px;height:44px}.fm-real-folders button{height:44px;padding:7px 9px;gap:7px}.fm-folder-glyph{width:20px;flex-basis:20px}}
 
 @media(pointer:coarse){.file-manager .fm-files--grid .fm-file-copy{padding-right:40px}.file-manager .fm-files--grid .fm-file-info{top:0;width:44px;height:44px}}
+
+/* Reference adaptation, Phase 3: grouped actions and direct folder controls. */
+.fm-action-menu{padding:5px;width:min(264px,calc(100vw - 16px));border-radius:10px;gap:0}
+.fm-action-menu button{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:0;min-height:40px;padding:8px 10px;font-size:12px;line-height:1.4}
+.fm-action-menu button>svg{opacity:.8;flex-shrink:0}
+.fm-action-menu .fm-menu-label{min-width:0;overflow-wrap:anywhere}
+.fm-action-menu .fm-menu-label small{display:block;margin-top:3px;font-size:10px;line-height:1.4}
+.fm-action-menu kbd{font-family:inherit;font-size:10px;line-height:1.3;color:var(--color-text-muted);white-space:nowrap;padding:2px 0 2px 8px}
+.fm-menu-separator{height:1px;background:var(--color-border);margin:4px 5px}
+.fm-folder-tile{position:relative;min-width:0;display:flex;align-items:center;height:48px;border:1px solid var(--color-border);border-radius:10px;background:var(--color-surface)}
+.fm-real-folders .fm-folder-open{width:100%;height:100%;min-height:44px;padding:8px 42px 8px 10px;border:0;background:transparent;border-radius:inherit}
+.fm-real-folders .fm-folder-menu{position:absolute;right:2px;top:2px;display:grid;place-items:center;min-width:40px;width:40px;min-height:42px;height:42px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--color-text-muted)}
+.fm-real-folders .fm-folder-menu:hover,.fm-folder-tile:has(.fm-folder-open:hover){background:var(--color-brand-soft)}
+.fm-real-folders .fm-folder-menu:focus-visible{outline:2px solid var(--color-brand);outline-offset:-2px}
+@media(max-width:719px){.fm-folder-tile{height:44px}.fm-real-folders .fm-folder-open{padding-left:8px;padding-right:38px}.fm-real-folders .fm-folder-menu{width:36px;min-width:36px;height:40px;min-height:40px;top:1px;right:1px}}
+@media(pointer:coarse){.fm-action-menu button{min-height:44px}.fm-real-folders .fm-folder-menu{top:0;right:0;width:44px;min-width:44px;height:44px;min-height:44px}.fm-real-folders .fm-folder-open{padding-right:46px}.fm-action-menu kbd{display:none}}
+
+.file-manager .fm-selection-bar .fm-clear-selection{flex:0 0 40px;width:40px;min-height:40px;padding:8px}.file-manager .fm-selection-bar>label{white-space:nowrap}
+@media(pointer:coarse){.file-manager .fm-selection-bar .fm-clear-selection{min-height:44px}}
+
+@media(max-width:719px){.file-manager .fm-selection-bar .fm-primary-action{min-width:40px;min-height:44px;padding:8px}.file-manager .fm-selection-bar .fm-primary-action>span{display:none}}
