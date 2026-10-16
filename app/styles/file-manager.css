@@ -263,3 +263,23 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 
 .file-manager .ui-dialog .fm-filter-content>.fm-checkbox{display:flex;align-items:center;gap:8px;min-height:40px}
 .file-manager .ui-dialog .fm-filter-content input[type=checkbox]{width:16px;height:16px;min-height:16px;padding:0;margin:0;flex-shrink:0;accent-color:var(--color-brand)}
+
+/* Apply-only filters and a footer anchored to real app navigation. */
+.app-shell .content-wrap:has(>.resource-workspace){flex:none;display:grid;grid-template-rows:minmax(0,1fr)}
+.resource-workspace #fm-view-navigation{display:none!important}
+.file-manager .fm-controls{justify-content:space-between}
+.file-manager .fm-filter-compact{display:flex!important;flex-direction:column;gap:12px!important}
+.file-manager .ui-dialog:has(.fm-filter-compact){max-width:480px}
+.file-manager .ui-dialog .fm-filter-chips{display:flex!important;flex-wrap:wrap;gap:6px!important;padding:0!important}
+.file-manager .ui-dialog .fm-filter-chips legend{margin:0 0 7px;font-weight:600}
+.file-manager .ui-dialog .fm-filter-chips button,.file-manager .ui-dialog .fm-filter-chips label{display:inline-flex;align-items:center;gap:6px;width:auto;min-height:36px;margin:0;padding:7px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);font:inherit;font-size:12px;cursor:pointer}
+.file-manager .ui-dialog .fm-filter-chips button[aria-pressed=true],.file-manager .ui-dialog .fm-filter-chips label:has(:checked){background:var(--color-brand-soft);color:var(--color-brand-strong);border-color:var(--color-brand)}
+.fm-filter-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}.fm-filter-pair label{min-width:0;font-size:12px}
+.file-manager .ui-dialog .fm-filter-compact :is(select,input:not([type=checkbox])){min-height:36px;padding:6px 8px;font-size:12px}
+.file-manager .fm-filter-compact>.fm-checkbox{min-height:30px!important}
+.file-manager .fm-filter-compact .fm-advanced-filters{padding-top:8px}.file-manager .fm-filter-compact .fm-advanced-filters summary{min-height:28px}
+.file-manager .fm-filter-compact .fm-filter-actions{position:sticky;bottom:-18px;background:var(--color-surface);padding:10px 0 0;margin-top:0;z-index:2}
+.file-manager>.fm-groups{touch-action:pan-x pan-y}
+.app-shell .content-wrap:has(>.resource-workspace) .file-manager{padding-bottom:52px}
+.app-shell .content-wrap:has(>.resource-workspace) .file-manager>.fm-footer{position:fixed;bottom:var(--fm-nav-inset,0px);left:var(--fm-footer-left,0px);width:var(--fm-footer-width,100%);height:48px;min-height:48px;margin:0;padding:4px 0;z-index:40;background:var(--color-surface);justify-content:space-between}
+@media(max-width:800px){.resource-workspace .resource-workspace-sidebar{gap:0}.file-manager{grid-template-rows:28px 48px auto minmax(0,1fr) 48px}.app-shell .content-wrap:has(>.resource-workspace) .file-manager{grid-template-rows:28px 48px auto minmax(0,1fr);padding-bottom:52px}}
