@@ -38,7 +38,7 @@ test('embedded ICAI browser keeps source provenance, search and canonical tab fo
   const resources=Array.from({length:30},(_,i)=>({id:String(i),title:`Material ${i}`,summary:null,type:'rtp',status:'current',officialUrl:'https://icai.org/material',sourceUrl:'https://icai.org',sourceName:'ICAI',firstSeenAt:'2026-01-01',lastVerifiedAt:'2026-10-14',levelCodes:['intermediate'],attemptKeys:['2027-01'],subjects:[]}));
   const catalog={resources,events:[],levels:[{code:'intermediate',name:'Intermediate'}],subjects:[],attempts:[],filters:{level:'intermediate',attempt:'2027-01',subject:'',type:''},verifiedAt:null};
   const html=renderToStaticMarkup(React.createElement(compiled.IcaiResourceBrowser,{catalog,embedded:true,scopeLocked:true}));
-  assert.match(html,/<h1>ICAI files<\/h1>/);assert.match(html,/action="\/resources"/);assert.match(html,/name="tab" value="icai"/);assert.match(html,/Search files/);assert.equal((html.match(/class="fm-file-open"[^>]*aria-label="Select Material /g)||[]).length,24);assert.match(html,/1–24 of 30/);
+  assert.match(html,/class="fm-current-location"[\s\S]*?<span>ICAI files<\/span>/);assert.doesNotMatch(html,/<h1>/);assert.match(html,/action="\/resources"/);assert.match(html,/name="tab" value="icai"/);assert.match(html,/Search files/);assert.equal((html.match(/class="fm-file-open"[^>]*aria-label="Select Material /g)||[]).length,24);assert.match(html,/1–24 of 30/);
 });
 test('file types and multi-key sorting retain unknown sizes and stable original data',()=>{
   const files=compiled.sampleManagerFiles;
