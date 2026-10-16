@@ -51,7 +51,7 @@ export async function mutateWorkspace(owner:string,input:Record<string,unknown>,
   }
   return {results};
  }
-if(['rename','tag','erase','duplicate','replace-version','restore-version'].includes(action))return lifecycleAction(owner,input,db);const folderId=typeof input.folderId==='string'&&input.folderId?input.folderId:null;
+if(['rename','tag','erase','duplicate','replace-version','restore-version','share'].includes(action))return lifecycleAction(owner,input,db);const folderId=typeof input.folderId==='string'&&input.folderId?input.folderId:null;
  if(folderId&&!await db.prepare('SELECT id FROM resource_folders WHERE id=?1 AND owner_user_id=?2 AND trashed_at IS NULL').bind(folderId,owner).first())throw Error('Folder not found.');
  if(['create-folder','rename-folder','move-folder','delete-folder','restore-folder'].includes(action)){
   const id=action==='create-folder'?(typeof input.clientId==='string'&&/^[0-9a-f-]{36}$/i.test(input.clientId)?input.clientId:crypto.randomUUID()):String(input.id??'');const name=typeof input.name==='string'?input.name.trim():'';
