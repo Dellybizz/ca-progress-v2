@@ -414,3 +414,12 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 @media(pointer:coarse){.file-manager .ui-dialog .fm-filter-chips button,.file-manager .ui-dialog .fm-filter-chips label{min-height:40px}}
 
 .file-manager .fm-filter-compact .fm-filter-actions{bottom:0;flex-wrap:wrap;padding:10px 0 6px}.file-manager .fm-filter-actions .fm-filter-error{flex-basis:100%;margin:0}
+
+/* Keep filter actions outside the scrolling fields, including with validation. */
+.file-manager .ui-dialog:has(.fm-filter-compact){display:flex;flex-direction:column;overflow:hidden}
+.file-manager .ui-dialog:has(.fm-filter-compact)>header{flex-shrink:0}
+.file-manager .ui-dialog:has(.fm-filter-compact)>.ui-dialog__body{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.file-manager .fm-filter-compact{min-height:0;overflow:hidden!important;gap:0!important}
+.file-manager .fm-filter-fields{display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 2px 12px 0;scrollbar-gutter:stable}
+.file-manager .fm-filter-fields>.fm-checkbox{min-height:32px}
+.file-manager .fm-filter-compact .fm-filter-actions{position:static;flex-shrink:0;padding:10px 0 0}
