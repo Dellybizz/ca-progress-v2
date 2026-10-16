@@ -35,7 +35,7 @@ try{
   await page.reload();await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Child',exact:true}).waitFor();
   if(width<=800)await page.getByRole('button',{name:'Search resources',exact:true}).click();assert.equal(await page.getByRole('textbox',{name:'Search files',exact:true}).inputValue(),'revision tax');
   if(width<=800)await page.getByRole('button',{name:'Close search',exact:true}).click();assert.equal(await page.getByRole('button',{name:'List view',exact:true}).getAttribute('aria-pressed'),'true');
-  await page.getByRole('checkbox',{name:'Select Revision',exact:true}).check();
+  await page.getByRole('button',{name:'Select Revision',exact:true}).click();
   await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Resources',exact:true}).click();
   await page.locator('.fm-breadcrumbs button[aria-current=page]').filter({hasText:'Resources'}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Clear selection',exact:true}).count(),0);
