@@ -113,8 +113,14 @@ export const shellNavigation: Record<ShellArea, readonly ShellNavSection[]> = {
           icon: "bell",
         },
         {
+          label: "Notes",
+          description: "Write and organize revision notes",
+          href: "/notes",
+          icon: "notes",
+        },
+        {
           label: "Resources",
-          description: "Notes, files, Community and ICAI material",
+          description: "Files, Community and ICAI material",
           href: "/resources",
           icon: "book",
         },
@@ -348,7 +354,6 @@ export function routeIsActive(
   item: Pick<ShellNavItem, "href" | "exact">,
   pathname: string,
 ) {
-  if (item.href === "/resources" && (pathname === "/notes" || pathname.startsWith("/notes/"))) return true;
   if (item.exact) return pathname === item.href;
   if (
     item.href === "/progress" &&
