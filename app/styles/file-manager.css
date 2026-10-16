@@ -412,3 +412,5 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 .file-manager .fm-filter-compact .fm-saved-view-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .file-manager .fm-filter-compact .fm-saved-view-tools>:is(button,select){min-height:36px;font-size:12px;max-width:100%}
 @media(pointer:coarse){.file-manager .ui-dialog .fm-filter-chips button,.file-manager .ui-dialog .fm-filter-chips label{min-height:40px}}
+
+.file-manager .fm-filter-compact .fm-filter-actions{bottom:0;flex-wrap:wrap;padding:10px 0 6px}.file-manager .fm-filter-actions .fm-filter-error{flex-basis:100%;margin:0}
