@@ -17,8 +17,8 @@ try{
    await route.fulfill({json:{files:[file],total:1,nextCursor:null,folders,path:folder==='child'?folders:folder==='parent'?[folders[0]]:[],trashFolders:[]}});
   });
   await page.goto('http://127.0.0.1:8767/');
-  await page.getByRole('button',{name:'Folders',exact:true}).click();
-  await page.getByRole('navigation',{name:'Folder path'}).waitFor();
+  await page.getByRole('button',{name:'My resources',exact:true}).click();
+  await page.locator('.fm-real-folders').waitFor();
   assert.equal(new URL(page.url()).searchParams.get('fmView'),'folder');
   await page.getByRole('button',{name:'Parent',exact:false}).click();
   await page.getByRole('heading',{name:'Parent',exact:true}).waitFor();
@@ -37,7 +37,7 @@ try{
   assert.equal(await page.getByRole('button',{name:'List view',exact:true}).getAttribute('aria-pressed'),'true');
   await page.getByRole('checkbox',{name:'Select Revision',exact:true}).check();
   await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'My files',exact:true}).click();
-  await page.getByRole('heading',{name:'My files',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'My resources',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Clear selection',exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
   assert.deepEqual(errors,[]);console.log(`PASS navigation/back/forward/reload/search focus/layout/selection reset at ${width}px`);
