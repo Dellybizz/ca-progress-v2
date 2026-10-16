@@ -346,3 +346,33 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 .resource-workspace .file-manager{height:100%}
 .resource-workspace .file-manager>.fm-empty{height:100%;align-self:stretch;place-content:center}
 .resource-workspace .fm-new-menu>div{left:0;right:auto;max-width:calc(100vw - 16px)}
+
+/* Reference adaptation, Phase 2: compact folders and preview-first cards. */
+.fm-card-kind{display:none}
+.fm-real-folders button{display:flex;align-items:center;gap:10px;text-align:left;min-width:0;height:48px;flex-shrink:0}
+.fm-folder-glyph{flex:0 0 22px;color:var(--color-brand)}
+.fm-real-folders .fm-folder-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600}
+.file-manager .fm-files--grid .fm-file{padding:0;border-radius:10px;background:var(--color-bg-subtle)}
+.file-manager .fm-files--grid .fm-file-open{display:flex;flex-direction:column;padding:0 6px 6px;gap:0;height:100%;border-radius:inherit}
+.file-manager .fm-files--grid .fm-file-copy{order:-1;display:flex;align-items:center;gap:7px;width:100%;height:44px;min-height:44px;padding:0 32px 0 3px;min-width:0}
+.file-manager .fm-files--grid .fm-file-copy strong{font-size:12px;line-height:1.4;font-weight:600;min-width:0;flex:1}
+.file-manager .fm-files--grid .fm-card-kind{display:flex;align-items:center;justify-content:center;flex:0 0 20px;color:var(--color-brand)}
+.file-manager .fm-files--grid .fm-card-kind--pdf{color:#bd5148}
+.file-manager .fm-files--grid .fm-card-kind--image{color:#2d8064}
+.file-manager .fm-files--grid .fm-file-subject{display:none}
+.file-manager .fm-files--grid .fm-thumbnail{width:100%;height:auto;aspect-ratio:4/3;min-height:0;border-radius:6px;background:var(--color-surface);flex-shrink:0}
+.file-manager .fm-files--grid .fm-thumbnail img{object-fit:contain}
+.file-manager .fm-files--grid .fm-file-info{top:5px;right:3px;bottom:auto;width:34px;height:34px;padding:7px;border-radius:6px;color:var(--color-text-muted)}
+.file-manager .fm-files--grid .fm-file-info:hover{background:var(--color-brand-soft);color:var(--color-brand)}
+.file-manager .fm-files--grid .fm-file-select{top:52px;left:12px;margin:0;padding:5px;min-width:24px;min-height:24px;border:1px solid var(--color-border);background:var(--color-surface);border-radius:5px}
+.file-manager .fm-files--grid .fm-important{top:auto;bottom:12px;right:13px;line-height:1;background:var(--color-surface);border-radius:4px;padding:3px}
+.file-manager .fm-files--grid .fm-file-glyph{gap:8px;opacity:.8}
+.file-manager .fm-files--grid .fm-file-glyph b{font-size:10px;font-weight:600}
+.file-manager .fm-files--grid .fm-note-paper{width:88%;height:88%;padding:12px;transform:none;box-shadow:none;background:var(--color-surface);color:var(--color-text)}
+.file-manager .fm-files--grid .fm-note-paper>span{font-size:8px;letter-spacing:.06em;color:var(--color-brand)}
+.file-manager .fm-files--grid .fm-note-paper>strong{font-family:inherit;font-size:12px;font-weight:600;line-height:1.5;margin:9px 0 6px;overflow-wrap:anywhere}
+.file-manager .fm-files--grid .fm-note-paper p{font-size:11px;line-height:1.6;color:var(--color-text-muted);overflow-wrap:anywhere}
+.file-manager .fm-files--grid .fm-preview-unavailable{bottom:8px;left:6px;right:6px;text-align:center;font-size:10px;line-height:1.4;padding:4px 2px;background:var(--color-surface);border-radius:4px}
+.file-manager .fm-files--grid .fm-file-open:focus-visible{outline:2px solid var(--color-brand);outline-offset:-3px}
+@media(hover:hover) and (pointer:fine){.file-manager .fm-files--grid .fm-file-select{opacity:0}.file-manager .fm-files--grid .fm-file:is(:hover,:focus-within,.is-selected) .fm-file-select{opacity:1}}
+@media(max-width:719px){.file-manager .fm-files--grid .fm-file-copy{height:44px;padding-right:30px;gap:4px}.file-manager .fm-files--grid .fm-card-kind{flex-basis:16px}.file-manager .fm-files--grid .fm-file-copy strong{font-size:11px}.file-manager .fm-files--grid .fm-file-info{top:0;right:0;width:36px;height:44px}.fm-real-folders button{height:44px;padding:7px 9px;gap:7px}.fm-folder-glyph{width:20px;flex-basis:20px}}
