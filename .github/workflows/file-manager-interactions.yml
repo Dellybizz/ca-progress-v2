@@ -37,9 +37,14 @@ jobs:
           node scripts/resources/file-manager-interactions-browser-check.mjs
           node scripts/resources/file-manager-dialogs-browser-check.mjs
           node scripts/resources/file-manager-visual-browser-check.mjs
+          node scripts/resources/phase2-preview-build.mjs
+          node scripts/resources/phase2-browser-check.mjs
+          node scripts/resources/file-manager-transfers-browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: file-manager-browser-${{ github.event.pull_request.head.sha || github.sha }}
-          path: /tmp/resources-phase1-preview/workspace-*.png
+          path: |
+            /tmp/resources-phase1-preview/workspace-*.png
+            /tmp/resources-phase2-preview/transfers-*.png
           if-no-files-found: ignore
