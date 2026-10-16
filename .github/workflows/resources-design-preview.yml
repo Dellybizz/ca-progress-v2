@@ -1,0 +1,34 @@
+name: Resources design reset preview
+on:
+  push:
+    branches: [design/resources-notes-reset-phase1]
+    paths:
+      - docs/resources/design-reset/phase1/**
+      - .github/workflows/resources-design-preview.yml
+permissions:
+  contents: read
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: {node-version: 22}
+      - name: Prepare isolated design runtime
+        run: |
+          mkdir -p /tmp/design-runtime
+          cd /tmp/design-runtime
+          npm init -y
+          npm install --no-audit --no-fund playwright lucide@0.468.0
+          npx playwright install --with-deps chromium
+          cp "$GITHUB_WORKSPACE/docs/resources/design-reset/phase1/VERIFY_DESIGN.mjs" verify-design.mjs
+      - name: Verify mock screens and connected journeys
+        env:
+          DESIGN_FRAGMENT: ${{ github.workspace }}/docs/resources/design-reset/phase1/INTERACTIVE_DESIGN.html
+        run: node /tmp/design-runtime/verify-design.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: resources-notes-design-review
+          path: /tmp/caprogress-design-review/*.png
