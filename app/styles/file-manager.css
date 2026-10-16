@@ -311,7 +311,7 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
  .resource-workspace .file-manager>.fm-heading,.resource-workspace .file-manager>.fm-controls{display:contents}
  .resource-workspace .fm-heading>.fm-current-location{display:flex;grid-column:1/-1;grid-row:1;align-self:center}
  .resource-workspace .fm-heading>.fm-actions{display:flex;grid-column:1;grid-row:2;align-self:center;justify-self:start}
- .resource-workspace .fm-heading>.fm-toolbar{display:flex;grid-column:2;grid-row:2;align-self:center;width:100%;min-width:0}
+ .resource-workspace .file-manager .fm-heading>.fm-toolbar{display:flex;grid-column:2;grid-row:2;align-self:center;width:100%;min-width:0}
  .resource-workspace .fm-heading .fm-search{min-height:44px;max-width:none}
  .resource-workspace .fm-new-menu>summary{min-height:44px}
  .resource-workspace .fm-controls>.fm-filter-menu{grid-column:3;grid-row:2;align-self:center}
