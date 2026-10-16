@@ -5,6 +5,7 @@ const subscribe=(callback:()=>void)=>{const media=window.matchMedia('(min-width:
 const snapshot=()=>window.matchMedia('(min-width: 1000px)').matches;
 /** Desktop utility panel is deliberately non-modal: no backdrop, body lock, or focus trap. */
 export function FileInspector({open,onClose,children}:{open:boolean;onClose:()=>void;children:ReactNode}){
+ useEffect(()=>{if(!open)return;window.dispatchEvent(new Event('resource-inspector-open'));const transfers=()=>onClose();window.addEventListener('resource-transfer-open',transfers);return()=>{window.dispatchEvent(new Event('resource-inspector-close'));window.removeEventListener('resource-transfer-open',transfers);};},[open,onClose]);
  const desktop=useSyncExternalStore(subscribe,snapshot,()=>false);const panel=useRef<HTMLElement>(null);
  useEffect(()=>{if(!open||!desktop)return;const previous=document.activeElement instanceof HTMLElement?document.activeElement:null;panel.current?.querySelector<HTMLButtonElement>('button')?.focus({preventScroll:true});return()=>{if(previous?.isConnected)previous.focus({preventScroll:true});};},[open,desktop]);
  if(!desktop)return <Drawer open={open} onClose={onClose} title="File details">{children}</Drawer>;
