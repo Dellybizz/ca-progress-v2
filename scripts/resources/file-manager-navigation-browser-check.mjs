@@ -25,7 +25,7 @@ try{
   await page.getByRole('button',{name:'Child',exact:true}).click();
   await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Child',exact:true}).waitFor();
   const path=page.getByRole('navigation',{name:'Folder path'});
-  assert.equal(await path.getByRole('button').count(),3);
+  assert.equal(await path.locator('button:not([aria-label="Current folder actions"])').count(),3);
   await page.goBack();await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Parent',exact:true}).waitFor();
   await page.goForward();await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Child',exact:true}).waitFor();
   if(width<=800)await page.getByRole('button',{name:'Search resources',exact:true}).click();const search=page.getByRole('textbox',{name:'Search files',exact:true});await search.fill('revision tax');
