@@ -290,3 +290,44 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 
 /* Resources has an internal scrolling canvas; override the legacy document-scroll contract. */
 .app-shell .content-wrap:has(>.resource-workspace){height:var(--fm-page-height,calc(100dvh - var(--topbar-height,84px) - var(--fm-bottom-inset)))!important;padding:0!important}
+
+/* Reference adaptation, Phase 1: CA Progress workspace geometry. */
+.resource-workspace{--fm-inset:16px;--fm-grid-gap:12px}
+.resource-workspace .resource-workspace-content{padding:12px var(--fm-inset);overflow:hidden}
+.resource-workspace .file-manager{gap:8px}
+.resource-workspace .file-manager>.fm-groups{padding:0;scrollbar-gutter:stable;overscroll-behavior:contain}
+.resource-workspace .file-manager>.fm-location-content{min-width:0;max-height:min(24dvh,180px);overflow:auto;scrollbar-gutter:stable;overscroll-behavior:contain}
+.resource-workspace .fm-files--grid,.resource-workspace .fm-location-content .fm-real-folders{grid-template-columns:repeat(auto-fill,minmax(min(100%,calc(var(--fm-base-card,180px) * var(--fm-zoom,1))),1fr));gap:var(--fm-grid-gap)}
+.resource-workspace .fm-location-content .fm-real-folders{margin:0}
+.resource-workspace .fm-current-location{min-width:0}
+.resource-workspace .fm-current-location .fm-breadcrumbs{max-width:100%;scrollbar-width:thin}
+.resource-workspace .file-manager>.fm-empty{border:0;border-radius:0;background:var(--color-surface);margin:0;min-width:0;overflow:auto;text-align:center}
+.resource-workspace .fm-empty h2{font-size:18px;margin:12px 0 6px}
+.resource-workspace .fm-empty p{max-width:36ch;margin:0 auto;font-size:13px;line-height:1.6}
+.resource-workspace .fm-empty>svg{justify-self:center}
+.app-shell .content-wrap:has(>.resource-workspace) .file-manager>.fm-footer{padding-inline:var(--fm-inset)}
+@media(min-width:801px){
+ .resource-workspace .file-manager{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;grid-template-rows:28px 48px auto minmax(0,1fr);gap:8px;padding-bottom:52px}
+ .resource-workspace .file-manager>.fm-heading,.resource-workspace .file-manager>.fm-controls{display:contents}
+ .resource-workspace .fm-heading>.fm-current-location{display:flex;grid-column:1/-1;grid-row:1;align-self:center}
+ .resource-workspace .fm-heading>.fm-actions{display:flex;grid-column:1;grid-row:2;align-self:center;justify-self:start}
+ .resource-workspace .fm-heading>.fm-toolbar{display:flex;grid-column:2;grid-row:2;align-self:center;width:100%;min-width:0}
+ .resource-workspace .fm-heading .fm-search{min-height:44px;max-width:none}
+ .resource-workspace .fm-new-menu>summary{min-height:44px}
+ .resource-workspace .fm-controls>.fm-filter-menu{grid-column:3;grid-row:2;align-self:center}
+ .resource-workspace .fm-filter-menu>summary{min-height:44px}
+ .resource-workspace .fm-controls>.fm-layout-switch{grid-column:4;grid-row:2;align-self:center;margin:0}
+ .resource-workspace .fm-layout-switch button{min-height:36px}
+ .resource-workspace .file-manager>.fm-location-content,.resource-workspace .file-manager>.fm-folders,.resource-workspace .file-manager>.fm-folder-path{grid-column:1/-1;grid-row:3}
+ .resource-workspace .file-manager>.fm-groups,.resource-workspace .file-manager>.fm-empty{grid-column:1/-1;grid-row:4;min-height:0;align-self:stretch}
+ .resource-workspace .file-manager.has-selection>.fm-selection-bar{grid-column:1/-1;grid-row:2;height:48px;min-height:48px;max-height:48px;flex-wrap:nowrap;padding-block:0;overflow-x:auto}
+ .resource-workspace .file-manager.has-selection>.fm-controls,.resource-workspace .file-manager.has-selection .fm-toolbar,.resource-workspace .file-manager.has-selection .fm-actions>.fm-new-menu{display:none}
+ .resource-workspace .file-manager.has-selection .fm-heading>.fm-current-location{grid-column:1/4}
+ .resource-workspace .file-manager.has-selection .fm-heading>.fm-actions{grid-column:4;grid-row:1;justify-self:end}
+}
+@media(max-width:800px){
+ .resource-workspace{--fm-inset:8px;--fm-grid-gap:8px}
+ .resource-workspace .resource-workspace-content{padding:8px var(--fm-inset)}
+ .resource-workspace .file-manager{gap:6px 4px}
+ .resource-workspace .file-manager>.fm-location-content{max-height:min(24dvh,160px)}
+}
