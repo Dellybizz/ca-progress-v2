@@ -1,0 +1,9 @@
+'use client';
+import {useEffect} from 'react';
+/** Measure the actual app chrome, including browser/keyboard and safe-area changes. */
+export function ResourceViewport(){
+ useEffect(()=>{const frame=document.querySelector<HTMLElement>('.content-wrap:has(>.resource-workspace)');if(!frame)return;let pending=0;
+ const measure=()=>{cancelAnimationFrame(pending);pending=requestAnimationFrame(()=>{const viewport=window.visualViewport;const bottom=(viewport?.offsetTop??0)+(viewport?.height??window.innerHeight);const nav=document.querySelector<HTMLElement>('.mobile-bottom-nav');const bounds=nav?.getBoundingClientRect();const inset=bounds&&bounds.width>window.innerWidth/2&&bounds.top>bottom/2?Math.max(0,bottom-bounds.top):0;frame.style.setProperty('--fm-page-height',`${Math.max(0,bottom-frame.getBoundingClientRect().top-inset)}px`);});};
+ const observer=new ResizeObserver(measure);for(const node of [document.querySelector('.topbar'),document.querySelector('.mobile-bottom-nav')])if(node)observer.observe(node);measure();window.addEventListener('resize',measure);window.visualViewport?.addEventListener('resize',measure);window.visualViewport?.addEventListener('scroll',measure);return()=>{cancelAnimationFrame(pending);observer.disconnect();window.removeEventListener('resize',measure);window.visualViewport?.removeEventListener('resize',measure);window.visualViewport?.removeEventListener('scroll',measure);frame.style.removeProperty('--fm-page-height');};},[]);
+ return null;
+}
