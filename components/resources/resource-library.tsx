@@ -40,7 +40,7 @@ function UploadCardView({ resource }: { resource: UploadCard }) {
 
 export function ResourceLibrary({ model: serverModel, initialTab = "my", initialAcademicContext, initialCommunityDraft = null, hideTabs = false }: { model: ResourceLibraryReady; initialTab?: "my" | "shared" | "icai"; initialAcademicContext?: AcademicContext; initialCommunityDraft?: CommunityNoteDraft | null; hideTabs?: boolean }) {
   useEffect(()=>{const preventFileNavigation=(event:DragEvent)=>{if(Array.from(event.dataTransfer?.types??[]).includes('Files'))event.preventDefault();};document.addEventListener('dragover',preventFileNavigation);document.addEventListener('drop',preventFileNavigation);return()=>{document.removeEventListener('dragover',preventFileNavigation);document.removeEventListener('drop',preventFileNavigation);};},[]);
-  const model = useOfflineModel("notes", serverModel);
+  const model = useOfflineModel(hideTabs?"resources":"notes", serverModel);
   const initialContext = resolveAcademicContext(model, { subjectId: initialCommunityDraft?.subjectId ?? initialAcademicContext?.subjectId, chapterId: initialAcademicContext?.chapterId });
   const [droppedFiles,setDroppedFiles]=useState<File[]>([]);
   const [workspaceRevision,setWorkspaceRevision]=useState(0),[noteDirty,setNoteDirty]=useState(false);
@@ -58,7 +58,7 @@ export function ResourceLibrary({ model: serverModel, initialTab = "my", initial
   const list = libraryPage(tab === "shared" ? sharedNotes : myNotes, tab === "shared" ? sharedUploads : myUploads, {kind,sort,page});
 
   if (hideTabs) return <div className="fm-library-root">
-    <WorkspaceBrowser filesOnly onExternalFiles={files=>{setDroppedFiles(files);setUpload(true);}} model={model} collection={tab === "shared" ? "shared" : "my"} academicContext={academicFilter} onContextChange={setAcademicFilter} revision={workspaceRevision} actions={<button type="button" className="fm-upload-button" onClick={()=>setUpload(true)}><Icon name="plus" size={17}/>Upload files</button>}/>
+    <WorkspaceBrowser onExternalFiles={files=>{setDroppedFiles(files);setUpload(true);}} model={model} collection={tab === "shared" ? "shared" : "my"} academicContext={academicFilter} onContextChange={setAcademicFilter} revision={workspaceRevision} actions={<button type="button" className="fm-upload-menu-item" onClick={()=>setUpload(true)}><Icon name="plus" size={17}/>Upload files</button>}/>
     <DurableUploadPanel initialFiles={droppedFiles} open={upload} close={()=>{setUpload(false);setDroppedFiles([]);}} onChanged={()=>setWorkspaceRevision(value=>value+1)}/>
   </div>;
 
