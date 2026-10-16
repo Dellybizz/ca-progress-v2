@@ -96,7 +96,7 @@ function WorkspaceBrowserContent({filesOnly=false,model,collection,academicConte
  const dropFolders=(data?.folders??[]).map(item=>({id:item.id,parentId:item.parent_id,trashed:Boolean(item.trashed_at)}));
  function startDrag(event:React.DragEvent,entities:WorkspaceDrag['entities']){
   if(collection!=='my'||view==='trash'||busy||loading||!student.userId){event.preventDefault();return;}
-  const value:WorkspaceDrag={version:1,ownerId:student.userId,scope:student.contextKey,entities};setDrag(value);event.dataTransfer.effectAllowed='move';event.dataTransfer.setData(INTERNAL_FILE_DRAG_TYPE,JSON.stringify(value));setNotice(`${entities.length} item${entities.length===1?'':'s'} selected to move.`);
+  const value:WorkspaceDrag={version:1,ownerId:student.userId,scope:student.contextKey,entities};setDrag(value);event.dataTransfer.effectAllowed='copyMove';event.dataTransfer.setData(INTERNAL_FILE_DRAG_TYPE,JSON.stringify(value));setNotice(`${entities.length} item${entities.length===1?'':'s'} selected to move.`);
  }
  function destinationEligibility(value:WorkspaceDrag,id:string|null){
   if(collection!=='my'||view==='trash'||busy||loading)return{allowed:false,reason:'Choose an available folder in My files.'};
