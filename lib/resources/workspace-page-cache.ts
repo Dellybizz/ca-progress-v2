@@ -14,6 +14,7 @@ export function workspaceRequestUrl(collection:string,view:string,folder:string,
 }
 const keyFor=(scope:string,url:string)=>JSON.stringify([scope,url]);
 export function peekWorkspacePage(scope:string,url:string){return typeof window==='undefined'?undefined:pages.get(keyFor(scope,url));}
+export function canRestoreWorkspaceSnapshot(scope:string){return !generations.has(scope);}
 /** A complete unfiltered page can paint simple filters before the authoritative response. */
 export function previewWorkspacePage(scope:string,url:string):WorkspacePage|undefined{
  if(typeof window==='undefined')return;const target=new URL(url,'https://workspace.invalid').searchParams;
