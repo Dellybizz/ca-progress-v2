@@ -114,13 +114,13 @@ export const shellNavigation: Record<ShellArea, readonly ShellNavSection[]> = {
         },
         {
           label: "Notes",
-          description: "Write and organize revision notes",
+          description: "Create and edit revision notes",
           href: "/notes",
           icon: "notes",
         },
         {
           label: "Resources",
-          description: "Files, Community and ICAI material",
+          description: "Files, saved notes and official material",
           href: "/resources",
           icon: "book",
         },
