@@ -399,3 +399,16 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 @media(pointer:coarse){.file-manager .fm-selection-bar .fm-clear-selection{min-height:44px}}
 
 @media(max-width:719px){.file-manager .fm-selection-bar .fm-primary-action{min-width:40px;min-height:44px;padding:8px}.file-manager .fm-selection-bar .fm-primary-action>span{display:none}}
+
+/* Reference adaptation, Phase 4: compact discovery with explicit draft application. */
+.file-manager .fm-filter-compact{gap:14px!important}
+.file-manager .ui-dialog .fm-filter-chips{gap:6px!important}
+.file-manager .ui-dialog .fm-filter-chips button,.file-manager .ui-dialog .fm-filter-chips label{border-radius:18px;min-height:36px;padding:6px 10px}
+.file-manager .ui-dialog .fm-filter-chips .fm-sort-direction{border-radius:8px;background:var(--color-bg-subtle);font-size:11px;white-space:nowrap}
+.file-manager .fm-filter-compact .fm-filter-pair label{display:grid;gap:5px}
+.fm-filter-error{margin:0;color:var(--color-danger,#b42318);font-size:12px;line-height:1.5}
+.file-manager .fm-filter-actions button:disabled{opacity:.5;cursor:not-allowed}
+.file-manager .fm-filter-compact input[aria-invalid=true]{border-color:var(--color-danger,#b42318)}
+.file-manager .fm-filter-compact .fm-saved-view-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.file-manager .fm-filter-compact .fm-saved-view-tools>:is(button,select){min-height:36px;font-size:12px;max-width:100%}
+@media(pointer:coarse){.file-manager .ui-dialog .fm-filter-chips button,.file-manager .ui-dialog .fm-filter-chips label{min-height:40px}}
