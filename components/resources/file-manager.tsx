@@ -15,7 +15,7 @@ import type {NoteSubjectOption} from '@/lib/notes/types';
 type Context={subjectId:string;chapterId:string};
 export type {ManagerQuery} from '@/lib/resources/workspace-foundation';
 import {toggleFileSelection,actionEligibility,type SelectionState,type ManagerQuery} from '@/lib/resources/workspace-foundation';
-export type ManagerRemote={total:number;page:number;hasMore:boolean;onQueryChange:(value:ManagerQuery)=>void;onPageChange:(page:number)=>void};
+export type ManagerRemote={pending?:boolean;total:number;page:number;hasMore:boolean;onQueryChange:(value:ManagerQuery)=>void;onPageChange:(page:number)=>void};
 const typeLabels:Record<FileKind,string>={note:'Notes',pdf:'PDF',image:'Images',document:'Documents',link:'Official links',other:'Other'};
 const sizeLabel=(bytes:number|null)=>bytes===null?'—':bytes<1048576?`${Math.max(1,Math.round(bytes/1024))} KB`:`${(bytes/1048576).toFixed(1)} MB`;
 const dateLabel=(value:string)=>Number.isFinite(fileTimestamp(value))?new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'}).format(new Date(fileTimestamp(value))):'—';
@@ -49,9 +49,9 @@ export function FileManager({filesOnly=false,loading=false,files,title,actions,l
   const invalidDates=Boolean(draft?.after&&draft?.before&&draft.after>draft.before);
   const sortDirection=draft?.sort==='modified'?(draft.direction==='desc'?'Newest first':'Oldest first'):draft?.sort==='size'?(draft.direction==='desc'?'Largest first':'Smallest first'):draft?.direction==='asc'?'A–Z':'Z–A';
   const onRemoteQuery=remote?.onQueryChange;
-  useEffect(()=>{if(!onRemoteQuery)return;const timer=window.setTimeout(()=>onRemoteQuery(JSON.parse(serverQuery) as ManagerQuery),200);return()=>clearTimeout(timer);},[serverQuery,onRemoteQuery]);
+  useEffect(()=>{if(!onRemoteQuery)return;const timer=window.setTimeout(()=>onRemoteQuery(JSON.parse(serverQuery) as ManagerQuery),query!== (initialQuery?.query??'')?100:0);return()=>clearTimeout(timer);},[serverQuery,onRemoteQuery,query,initialQuery?.query]);
   const pages=Math.max(1,Math.ceil(filtered.length/pageSize)),current=Math.min(page,pages),visible=filtered.slice((current-1)*pageSize,current*pageSize);
-  const displayed=remote?files:visible;const resultCount=remote?.total??filtered.length;const displayedPage=remote?.page??current;
+  const displayed=remote?(remote.pending||serverQuery!==JSON.stringify(initialQuery??{})?filtered:files):visible;const resultCount=remote?.total??filtered.length;const displayedPage=remote?.page??current;
   const groups=new Map<string,ManagedFile[]>();for(const file of displayed){const key=group==='type'?typeLabels[file.kind]:group==='subject'?file.subject:'';groups.set(key,[...(groups.get(key)||[]),file]);}
   const selectionScope=`${serverQuery}:${displayedPage}`;
   const selected=selection.scope===selectionScope?selection.keys.filter(key=>displayed.some(file=>file.key===key)):[];
