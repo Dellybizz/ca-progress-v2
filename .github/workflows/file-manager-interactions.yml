@@ -37,6 +37,7 @@ jobs:
           node scripts/resources/file-manager-interactions-browser-check.mjs
           node scripts/resources/file-manager-dialogs-browser-check.mjs
           node scripts/resources/file-manager-visual-browser-check.mjs
+          node scripts/resources/design-reset-phase2-browser-check.mjs
           node scripts/resources/phase2-preview-build.mjs
           node scripts/resources/phase2-browser-check.mjs
           node scripts/resources/file-manager-transfers-browser-check.mjs
