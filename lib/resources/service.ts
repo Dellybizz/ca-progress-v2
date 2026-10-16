@@ -121,6 +121,10 @@ export async function getResourceLibraryModel({ includeOfficial = true, metadata
   if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: context.displayName, officialResources: [] };
   const identity = { id: context.userId };
 
+  if(metadataOnly){
+    const subjects=await getPhase6AcademicOptions(identity.id);
+    return {mode:"ready",viewerName:context.displayName,subjects:subjects.filter(subject=>context.subjectIds.includes(subject.id)),myNotes:[],myUploads:[],sharedNotes:[],sharedUploads:[],officialResources:includeOfficial?officialCards(await getIcaiPublicCatalog({level:context.selection.level,attempt:context.selection.attemptKey})):[]};
+  }
   const client = await createD1ServerClient();
   const [names, tagsByNote, rows, subjects, officialResources, importanceRows] = await Promise.all([
     nameMaps(client),
