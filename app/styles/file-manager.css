@@ -331,3 +331,13 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
  .resource-workspace .file-manager{gap:6px 4px}
  .resource-workspace .file-manager>.fm-location-content{max-height:min(24dvh,160px)}
 }
+@media(min-width:801px){
+ .resource-workspace .file-manager:not(:has(.fm-new-menu)) .fm-heading>.fm-toolbar{grid-column:1/3}
+ .resource-workspace .file-manager:not(:has(.fm-new-menu)) .fm-heading>.fm-actions{grid-column:4;grid-row:1;justify-self:end}
+ .resource-workspace .file-manager:not(:has(.fm-new-menu)) .fm-heading>.fm-current-location{grid-column:1/4}
+}
+@media(max-width:800px){
+ .resource-workspace .file-manager:not(:has(.fm-new-menu)){grid-template-columns:44px 40px minmax(0,1fr) auto}
+ .resource-workspace .file-manager:not(:has(.fm-new-menu)) .fm-search-toggle{grid-column:1}
+ .resource-workspace .file-manager:not(:has(.fm-new-menu))>.fm-controls>.fm-filter-menu{grid-column:2}
+}
