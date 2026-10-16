@@ -20,7 +20,7 @@ try{
    assert.equal(await card.locator('.fm-file-subject').isVisible(),false,'metadata stays out of grid');
    const title=card.locator('.fm-file-copy strong');assert.equal(await title.evaluate(node=>getComputedStyle(node).whiteSpace),'nowrap','long filenames remain one line');assert.ok((await title.boundingBox()).width>24,'filename keeps readable space');
   }
-  await page.getByRole('button',{name:'Select Image screenshot',exact:true}).click();assert.equal(await page.locator('.fm-primary-action').count(),3);
+  await page.getByRole('button',{name:'Select Image screenshot',exact:true}).click();assert.equal(await page.locator('.fm-primary-action').count(),4);
   const more=page.getByRole('button',{name:'More actions',exact:true});await more.click();await page.getByRole('menuitem',{name:'Export file list',exact:true}).waitFor();await page.keyboard.press('Escape');await page.getByRole('menu',{name:'File actions'}).waitFor({state:'hidden'});await page.waitForFunction(()=>document.activeElement?.matches('.fm-more-actions'));assert.equal(await more.evaluate(node=>node===document.activeElement),true);
   await page.getByRole('button',{name:'Clear selection',exact:true}).click();
   await page.locator('.fm-filter-menu>summary').click();await page.getByRole('dialog',{name:'Filter resources',exact:true}).waitFor();await page.locator('.fm-advanced-filters>summary').click();await page.getByRole('combobox',{name:'Group files by',exact:true}).waitFor();await page.getByRole('button',{name:'Apply',exact:true}).click();
