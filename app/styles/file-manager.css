@@ -343,3 +343,5 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 }
 /* Tablet navigation is a left rail, so its width must be excluded from the page. */
 @media(min-width:720px) and (max-width:899px){.app-shell:has(.resource-workspace) .app-main{width:calc(100% - var(--mobile-rail-width,76px))}}
+.resource-workspace .file-manager{height:100%}
+.resource-workspace .file-manager>.fm-empty{height:100%;align-self:stretch;place-content:center}
