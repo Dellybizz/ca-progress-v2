@@ -123,3 +123,12 @@ This reset supersedes the old file-only Resources interpretation and the idea th
 ## 10. Verification boundary
 
 The standalone preview is a design model, not a production implementation or a replacement for the app's tests. Browser verification checks mock state changes, save/find/reopen, selection geometry and overflow. It cannot certify actual authorization, cloud saving, uploads, PDF rendering, rich-text formatting, mobile keyboard behavior or storage integrity. Those remain release gates in the implementation phases above.
+
+## 11. Phase 1 verification record
+
+The design-only verification passed at 320, 390, 1024 and 1440px. Checks covered file-canvas starting position, stable selection geometry, grid/list, exclusive Details/Transfers panels, example PDF page navigation, mock note creation/save/find/reopen, a single-row mobile editor toolbar, formatting-menu Escape dismissal and document-wide overflow. Desktop and mobile screenshots were inspected; the review corrected overly narrow desktop cards and the mobile formatting toolbar before completion.
+
+Design source: `ec70c37dcc56cdc5bde50b52e0b6b3e1c2e90129` on `design/resources-notes-reset-phase1`.
+Verification: https://github.com/Dellybizz/ca-progress-v2/actions/runs/38892220936 — successful.
+
+This certifies the design preview's mechanics and geometry only. It does not deploy the proposal or certify production note saving, document rendering, formatting or permissions. Phase 2 begins implementation after the design direction is reviewed.
