@@ -54,6 +54,6 @@ export async function assembleTransfer(owner:string,id:string,db:HotD1Database=g
 export async function cancelTransfer(owner:string,id:string,db:HotD1Database=getHotD1Database(),bucket:ResourceR2Bucket=getResourceR2Bucket()){
  const row=await ownedTransfer(owner,id,db);if(await db.prepare('SELECT id FROM uploaded_resources WHERE owner_user_id=?1 AND storage_path=?2').bind(owner,row.object_key).first())throw new TransferError('This file is already saved. Use Trash to remove it.');
  const lock=await db.prepare("UPDATE resource_transfers SET state='cancelled' WHERE intent_id=?1 AND state IN ('initializing','active','uploaded','cancelled') AND (lease_until IS NULL OR julianday(lease_until)<julianday('now')) AND NOT EXISTS(SELECT 1 FROM resource_completion_claims c WHERE c.intent_id=resource_transfers.intent_id AND julianday(c.expires_at)>=julianday('now'))").bind(id).run();if(!changed(lock))throw new TransferError('Transfer is in progress. Pause and retry cancellation.');
- if(row.multipart_id)await bucket.resumeMultipartUpload(row.object_key,row.multipart_id).abort().catch(()=>undefined);
+ if(row.multipart_id){try{await bucket.resumeMultipartUpload(row.object_key,row.multipart_id).abort();}catch(error){const missing=error as {code?:string;status?:number};if(missing.code!=='NoSuchUpload'&&missing.status!==404)throw error;}}
  await bucket.delete(row.object_key);await db.prepare("UPDATE r2_upload_intents SET status='abandoned' WHERE id=?1 AND status='issued'").bind(id).run();return {cancelled:true};
 }
