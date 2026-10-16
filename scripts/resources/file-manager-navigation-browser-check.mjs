@@ -20,9 +20,9 @@ try{
   if(await page.getByRole('button',{name:'Clear selection',exact:true}).isVisible())await page.getByRole('button',{name:'Clear selection',exact:true}).click();await page.locator('.fm-filter-menu>summary').click();await page.getByRole('button',{name:'Folders',exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
   await page.locator('.fm-real-folders').waitFor();
   assert.equal(new URL(page.url()).searchParams.get('fmView'),'folder');
-  await page.getByRole('button',{name:'Parent',exact:false}).click();
+  await page.getByRole('button',{name:'Parent',exact:true}).click();
   await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Parent',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Child',exact:false}).click();
+  await page.getByRole('button',{name:'Child',exact:true}).click();
   await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Child',exact:true}).waitFor();
   const path=page.getByRole('navigation',{name:'Folder path'});
   assert.equal(await path.getByRole('button').count(),3);
