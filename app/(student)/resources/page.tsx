@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { StorageCleanupWarning } from '@/components/billing/storage-cleanup-warning';
 import { LoginRequired } from '@/components/auth/login-required';
 import { ResourceLibrary } from '@/components/resources/resource-library';
+import {ResourceCollectionPicker} from '@/components/resources/resource-collection-picker';
 import { ResourceHubTabs } from '@/components/resources/resource-hub-tabs';
 import { IcaiResourceBrowser } from '@/components/icai/resource-browser';
 import { OfflineSnapshot } from '@/components/offline/offline-snapshot';
@@ -45,5 +46,5 @@ export default async function ResourcesPage({searchParams}:{searchParams:Promise
       <ResourceLibrary key={tab} model={model} initialTab={tab} hideTabs initialAcademicContext={{subjectId:param(params.subjectId),chapterId:param(params.chapterId)}} initialCommunityDraft={communityDraft}/>
     </> : <div className="resource-hub-guest"><LoginRequired next={resourceDestination(params,tab)} title="Sign in to open your library"/><p>Official study material is available without signing in. <Link href={resourceDestination(params,'icai')}>Browse ICAI resources →</Link></p></div>;
   }
-  return <div className="resource-hub resource-workspace"><aside className="resource-workspace-sidebar"><div className="fm-sidebar-title"><span>Workspace</span></div><ResourceHubTabs tab={tab} params={params}/><div id="fm-view-navigation"/><Link href="/updates" className="fm-updates-link">ICAI updates ↗</Link></aside><div className="resource-workspace-content">{content}</div></div>;
+  return <div className="resource-hub resource-workspace"><aside className="resource-workspace-sidebar"><div className="fm-sidebar-title"><span>Workspace</span></div><ResourceCollectionPicker tab={tab} params={params}/><div id="fm-view-navigation"/><ResourceHubTabs tab={tab} params={params}/><Link href="/updates" className="fm-updates-link">ICAI updates ↗</Link></aside><div className="resource-workspace-content">{content}</div><div id="fm-utility-dock" className="fm-utility-dock"/></div>;
 }
