@@ -260,3 +260,6 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 }
 
 @media(max-width:800px){.resource-workspace .fm-collections a svg{width:16px;height:16px;flex-shrink:0}}
+
+.file-manager .ui-dialog .fm-filter-content>.fm-checkbox{display:flex;align-items:center;gap:8px;min-height:40px}
+.file-manager .ui-dialog .fm-filter-content input[type=checkbox]{width:16px;height:16px;min-height:16px;padding:0;margin:0;flex-shrink:0;accent-color:var(--color-brand)}
