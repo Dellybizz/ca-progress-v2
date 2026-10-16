@@ -25,7 +25,7 @@ try{
   let menuBounds=await folderMenu.boundingBox();assert.ok(menuBounds.x>=0&&menuBounds.x+menuBounds.width<=width&&menuBounds.y+menuBounds.height<=900,'folder menu stays in viewport');
   assert.equal(await folderMenu.getByRole('separator').count(),3,'folder actions are grouped');
   await page.screenshot({path:`/tmp/resources-phase1-preview/workspace-folder-menu-${width}.png`,animations:'disabled'});
-  await page.keyboard.press('Escape');assert.equal(await sourceMenu.evaluate(node=>node===document.activeElement),true,'folder menu returns focus');
+  await page.keyboard.press('Escape');await folderMenu.waitFor({state:'hidden'});assert.equal(await sourceMenu.evaluate(node=>node===document.activeElement),true,'folder menu returns focus');
   await page.locator('.fm-folder-open[data-folder-target="source"]').focus();await page.keyboard.press('Shift+F10');await folderMenu.waitFor();
   await folderMenu.getByRole('menuitem',{name:'Rename',exact:true}).click();const renameFolder=page.getByRole('dialog',{name:'Rename folder',exact:true});
   await renameFolder.getByRole('textbox',{name:'Name',exact:true}).fill('Renamed source');await renameFolder.getByRole('button',{name:'Save',exact:true}).click();await renameFolder.waitFor({state:'hidden'});
