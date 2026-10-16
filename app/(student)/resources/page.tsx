@@ -32,7 +32,7 @@ export default async function ResourcesPage({searchParams}:{searchParams:Promise
   });
   const content=model.mode==='ready'?<>
     <OfflineSnapshot kind="resources" data={model}/><StorageCleanupWarning/>
-    <ResourceCollections model={model} catalog={catalog} initialTab={tab} subjectId={param(params.subjectId)} chapterId={param(params.chapterId)}/>
+    <ResourceCollections model={model} catalog={catalog} initialTab={tab} initialAcademicContext={{subjectId:param(params.subjectId),chapterId:param(params.chapterId)}} initialOfficialContext={{subject:requestedSubject,type:param(params.type)}}/>
   </>:tab==='icai'?<IcaiResourceBrowser catalog={catalog} embedded scopeLocked={Boolean(selection)}/>:<div className="resource-hub-guest"><LoginRequired next={resourceDestination(params,tab)} title="Sign in to open your library"/><p>Official study material is available without signing in. <Link href={resourceDestination(params,'icai')}>Browse ICAI resources →</Link></p></div>;
   return <div className="resource-hub resource-workspace"><ResourceViewport/><aside className="resource-workspace-sidebar"><div className="fm-sidebar-title"><span>Workspace</span></div><ResourceHubTabs tab={tab} params={params}/><div id="fm-view-navigation"/><Link href="/updates" className="fm-updates-link">ICAI updates ↗</Link></aside><div className="resource-workspace-content">{content}</div><div id="fm-utility-dock" className="fm-utility-dock"/></div>;
 }
