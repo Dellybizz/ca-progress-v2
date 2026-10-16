@@ -287,3 +287,6 @@ body:has(.app-shell--floating .resource-workspace){--topbar-height:84px}
 .resource-workspace-content{background:var(--color-surface)}
 .app-shell .content-wrap:has(>.resource-workspace) .file-manager>.fm-footer{padding-inline:12px}
 @media(max-width:800px){.app-shell .content-wrap:has(>.resource-workspace) .file-manager>.fm-footer{padding-inline:8px}}
+
+/* Resources has an internal scrolling canvas; override the legacy document-scroll contract. */
+.app-shell .content-wrap:has(>.resource-workspace){height:var(--fm-page-height,calc(100dvh - var(--topbar-height,84px) - var(--fm-bottom-inset)))!important;padding:0!important}
