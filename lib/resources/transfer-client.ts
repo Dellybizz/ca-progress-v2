@@ -38,7 +38,7 @@ export async function runQueuedUpload(row:QueuedUpload,file:File,input:{api:Tran
    }
   }
   check();row.confirmedBytes=file.size;progress(100);row.phase='saving';await save(row);const receipt=await post({action:'complete',uploadId:row.uploadId});if(typeof receipt.id!=='string')throw Error('File receipt is missing. Retry verification.');row.resourceId=receipt.id;row.state='complete';row.progress=100;await save(row);input.onProgress?.(100);return row;
- }catch(error){row.state=(error as {code?:string}).code==='DUPLICATE_FILE'?'duplicate':signal.aborted?'paused':'failed';row.error=error instanceof Error?error.message:'Upload failed. Retry this file.';await save(row);throw error;}
+ }catch(error){row.state=(error as {code?:string}).code==='DUPLICATE_FILE'?'duplicate':signal.aborted?'paused':'failed';row.error=signal.aborted?undefined:error instanceof Error?error.message:'Upload failed. Retry this file.';await save(row);throw error;}
 }
 export async function imageThumbnail(file:File){
  if(file.size>10*1024*1024)return null;
