@@ -77,7 +77,7 @@
 .fm-location-content .fm-folder-tools{margin:0;gap:6px}.fm-location-content .fm-folder-tools>button{min-height:36px;padding:6px 10px;font-size:12px}.fm-location-content .fm-folder-tools>button:first-child{display:none}
 
 .fm-location-content .fm-real-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:8px;margin:0}
-.fm-location-content .fm-real-folders:empty{display:none}.fm-location-content:not(:has(.fm-real-folders>button)):not(:has(.fm-breadcrumbs button:nth-child(2))){display:none}
+.fm-location-content .fm-real-folders:empty{display:none}
 .fm-real-folders button{min-height:44px;padding:8px 10px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fm-groups{gap:16px}.fm-files--grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:12px}.fm-files--grid .fm-file{max-width:none;border-radius:10px}.fm-files--grid .fm-thumbnail{aspect-ratio:4/3}
 .fm-file-copy{padding:10px 38px 10px 10px}.fm-file-copy strong{font-size:13px}.fm-file-copy span{margin-top:3px;font-size:11px}
