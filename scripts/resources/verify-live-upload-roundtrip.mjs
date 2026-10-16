@@ -51,6 +51,15 @@ try{
   stage='Phase 4 Trash undo';const trash=await workspace({action:'trash',keys:[key]});assert.equal(trash.results[0].ok,true);assert.equal((await workspace({action:'undo',items:[{key,...trash.results[0].undo}]})).results[0].ok,true);
   assert.equal(query(`SELECT trashed_at FROM resource_workspace_entries WHERE owner_user_id=${owner} AND entity_kind='upload' AND entity_id=${quote(completed.id)}`)[0].trashed_at,null);
   console.log('PASS live Phase 4 owned hierarchy, acknowledged move undo, stale revision refusal and Trash undo through deployed D1');
+  if(process.env.VERIFY_RESOURCE_SHARING==='true'){
+   stage='confirm Community share is explicit';assert.equal((await workspace({action:'share',keys:[key]})).results[0].ok,false);
+   stage='submit owned upload for Community review';assert.equal((await workspace({action:'share',keys:[key],confirm:true})).results[0].ok,true);
+   const shared=query(`SELECT u.visibility,u.moderation_status,u.size_bytes,i.content_sha256,w.folder_id FROM uploaded_resources u JOIN resource_inspections i ON i.resource_id=u.id JOIN resource_workspace_entries w ON w.entity_kind='upload' AND w.entity_id=u.id WHERE u.id=${quote(completed.id)} AND u.owner_user_id=${owner}`)[0];assert.equal(shared.visibility,'shared');assert.equal(shared.moderation_status,'pending');assert.equal(shared.size_bytes,bytes.length);assert.equal(shared.content_sha256,sha256);assert.equal(shared.folder_id,folderId);
+   assert.equal((await workspace({action:'share',keys:[key],confirm:true})).results[0].ok,true);
+   await request(`/api/v1/resources/${completed.id}/access`,undefined,401,{headers:{Origin:base}});
+   console.log('PASS live Community submission requires confirmation, awaits moderation, preserves exact source/folder and rejects anonymous access');
+  }
+
  }
 
 }catch(error){console.error(`FAIL live upload stage: ${stage}; ${error instanceof Error?error.message:'verification failed'}`);throw Error(`Live upload roundtrip failed during ${stage}`);}finally{
