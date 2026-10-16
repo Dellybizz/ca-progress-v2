@@ -22,10 +22,10 @@ import {loadWorkspacePage,canRestoreWorkspaceSnapshot,peekWorkspacePage,previewW
 const subscribeOnline=(callback:()=>void)=>{window.addEventListener('online',callback);window.addEventListener('offline',callback);return()=>{window.removeEventListener('online',callback);window.removeEventListener('offline',callback);};};
 const onlineSnapshot=()=>navigator.onLine;
 const serverOnlineSnapshot=()=>true;
-let currentNavigationSearch='';
-const subscribeNavigation=(callback:()=>void)=>{const update=()=>{currentNavigationSearch=window.location.search;callback();};update();window.addEventListener('popstate',update);window.addEventListener('ca-files-navigation',update);return()=>{window.removeEventListener('popstate',update);window.removeEventListener('ca-files-navigation',update);};};
-const navigationSnapshot=()=>currentNavigationSearch;
-const serverNavigationSnapshot=()=>'';
+let currentNavigationSearch='',navigationVersion=0;
+const subscribeNavigation=(callback:()=>void)=>{const update=(event?:Event)=>{if(event)navigationVersion++;currentNavigationSearch=window.location.search;callback();};update();window.addEventListener('popstate',update);window.addEventListener('ca-files-navigation',update);return()=>{window.removeEventListener('popstate',update);window.removeEventListener('ca-files-navigation',update);};};
+const navigationSnapshot=()=>`${navigationVersion}:${currentNavigationSearch}`;
+const serverNavigationSnapshot=()=> '0:';
 type SavedView={name:string;query:ManagerQuery;view:string;folder:string};
 type Dialog={action:'create-folder'|'rename-folder'|'move-folder'|'move'|'save-view'|'rename'|'tag'|'replace-version'|'create-page'|'erase'|'delete-folder'|'share';keys?:string[];id?:string};
 type OperationItem={key:string;label?:string;ok:boolean;error?:string;undo?:{action:'move'|'restore';folderId:string|null;revision:number}};
@@ -211,6 +211,6 @@ function WorkspaceBrowserContent({filesOnly=false,model,collection,academicConte
 
 /** Remount collection state on navigation or owner/context changes; old pages never carry over. */
 export function WorkspaceBrowser(props:Omit<Parameters<typeof WorkspaceBrowserContent>[0],'routeSearch'>){
- const student=useStudentContext();const routeSearch=useSyncExternalStore(subscribeNavigation,navigationSnapshot,serverNavigationSnapshot);
- return <WorkspaceBrowserContent {...props} key={`${student.userId}:${student.contextKey}:${props.collection}:${routeSearch}`} routeSearch={routeSearch}/>;
+ const student=useStudentContext();const navigation=useSyncExternalStore(subscribeNavigation,navigationSnapshot,serverNavigationSnapshot);const routeSearch=navigation.slice(navigation.indexOf(':')+1);
+ return <WorkspaceBrowserContent {...props} key={`${student.userId}:${student.contextKey}:${props.collection}:${navigation}`} routeSearch={routeSearch}/>;
 }
