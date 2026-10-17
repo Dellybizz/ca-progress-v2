@@ -10,11 +10,14 @@ type Options={ownerId:string|null|undefined;contextKey:string;draftId:string;not
 export function useNotePersistence(options:Options){
  const latest=useRef(options);useLayoutEffect(()=>{latest.current=options;});
  const identity=useRef({owner:options.ownerId,context:options.contextKey}),id=useRef(options.noteId??null),revision=useRef(options.revision),version=useRef(0),cloudVersion=useRef(0),localVersion=useRef(0),writing=useRef(Promise.resolve()),saving=useRef<Promise<boolean>|null>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),mounted=useRef(true),conflicted=useRef(false);
+ const draftTimer=useRef<ReturnType<typeof setTimeout>|null>(null),draftDeadline=useRef<ReturnType<typeof setTimeout>|null>(null);
  const baseline=useRef(options.baseline??null),queuedReceipt=useRef<string|null>(null);
  const [status,setStatus]=useState<'ready'|'editing'|'saved'|'device'|'saving'|'error'>('ready'),[error,setError]=useState(''),[recovery,setRecovery]=useState<NoteDraft|null>(null),[savedId,setSavedId]=useState(options.noteId??null);
  const key=`typed-note-draft:${options.contextKey}:${options.draftId}`;
  const sameIdentity=()=>latest.current.ownerId===identity.current.owner&&latest.current.contextKey===identity.current.context;
  const persist=()=>{
+  if(draftTimer.current){clearTimeout(draftTimer.current);draftTimer.current=null;}
+  if(draftDeadline.current){clearTimeout(draftDeadline.current);draftDeadline.current=null;}
   if(!sameIdentity()||!latest.current.ownerId)return Promise.reject(Error('Your account or study profile changed. Reopen the note before saving.'));
   const captured=version.current,owner=latest.current.ownerId;
   const draft:NoteDraft={format:2,ownerId:owner,contextKey:latest.current.contextKey,updatedAt:new Date().toISOString(),savedId:id.current,serverRevision:revision.current,snapshot:latest.current.snapshot(),version:captured,cloudVersion:cloudVersion.current,baseline:baseline.current,queuedReceipt:queuedReceipt.current};
@@ -56,16 +59,22 @@ export function useNotePersistence(options:Options){
  };
  const changed=()=>{
   version.current++;latest.current.onDirtyChange?.(true);setStatus('editing');
-  void persist().catch(caught=>{if(mounted.current){setError(caught instanceof Error?caught.message:'Device draft storage is unavailable. Keep this note open.');setStatus('error');}});
+  if(draftTimer.current)clearTimeout(draftTimer.current);
+  const writeDraft=()=>void persist().catch(caught=>{if(mounted.current){setError(caught instanceof Error?caught.message:'Device draft storage is unavailable. Keep this note open.');setStatus('error');}});
+  draftTimer.current=setTimeout(writeDraft,150);
+  if(!draftDeadline.current)draftDeadline.current=setTimeout(writeDraft,1000);
   if(timer.current)clearTimeout(timer.current);timer.current=setTimeout(()=>void save(),1800);
  };
  useEffect(()=>{
   mounted.current=true;let active=true;
   if(options.ownerId)getOfflineMeta<NoteDraft>(options.ownerId,key).then(draft=>{if(active&&draft?.format===2&&draft.ownerId===options.ownerId&&draft.contextKey===options.contextKey&&(draft.version>draft.cloudVersion||draft.queuedReceipt||!options.noteId))setRecovery(draft);}).catch(()=>{if(active)setError('Device draft recovery is unavailable. Keep this note open until saved.');});
   const guard=(event:BeforeUnloadEvent)=>{if(version.current>localVersion.current){event.preventDefault();event.returnValue='';}};
+  const flushDraft=()=>{if(version.current>localVersion.current)void persist().catch(()=>undefined);};
+  const hidden=()=>{if(document.visibilityState==='hidden')flushDraft();};
   const online=()=>{if(version.current!==cloudVersion.current)void save();};
+  window.addEventListener('pagehide',flushDraft);document.addEventListener('visibilitychange',hidden);
   window.addEventListener('beforeunload',guard);window.addEventListener('online',online);
-  return()=>{active=false;mounted.current=false;if(timer.current)clearTimeout(timer.current);window.removeEventListener('beforeunload',guard);window.removeEventListener('online',online);};
+  return()=>{flushDraft();if(draftTimer.current)clearTimeout(draftTimer.current);if(draftDeadline.current)clearTimeout(draftDeadline.current);window.removeEventListener('pagehide',flushDraft);document.removeEventListener('visibilitychange',hidden);active=false;mounted.current=false;if(timer.current)clearTimeout(timer.current);window.removeEventListener('beforeunload',guard);window.removeEventListener('online',online);};
  // Draft identity is fixed for the lifetime of an editor instance.
  // eslint-disable-next-line react-hooks/exhaustive-deps
  },[key,options.ownerId,options.contextKey]);
