@@ -1,3 +1,4 @@
+import {validateObjectModel,renderObject} from './chart-model';
 import type {NoteNode} from './structured-document';
 export type FormatCategory='Statements'|'Books & accounts'|'Workings'|'Charts & trees';
 export type CAFormat={id:string;name:string;category:FormatCategory;variants:string[];rows:string[];columns?:string[]};
@@ -67,7 +68,8 @@ export function buildCAFormat(format:CAFormat,options:FormatOptions):NoteNode[]{
 
 const esc=(s:unknown)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export function validateDiagram(kind:string,data:string){
- if(!['bar','line','pie','hierarchy','tree','flow'].includes(kind)||typeof data!=='string'||data.length>6000)throw Error('Invalid chart data.');
+ if(!['bar','line','pie','hierarchy','tree','flow'].includes(kind)||typeof data!=='string'||data.length>40000)throw Error('Invalid chart data.');
+ if(data.trim().startsWith('{')){validateObjectModel(kind,JSON.parse(data));return;}
  const rows=data.split('\n').filter(line=>line.trim());if(!rows.length||rows.length>40)throw Error('Use 1–40 chart items.');
  const labels=new Set<string>();for(const row of rows){const [label,value]=row.split('|').map(v=>v.trim());if(!label||label.length>80||labels.has(label))throw Error('Each chart item needs a unique label of up to 80 characters.');labels.add(label);if(['bar','line','pie'].includes(kind)&&(!value||!Number.isFinite(Number(value))||Math.abs(Number(value))>1e12||(kind==='pie'&&Number(value)<0)))throw Error('Enter a valid number after each label.');}
  if(['tree','hierarchy'].includes(kind)){const parents=new Map(rows.map(row=>{const [label,parent='']=row.split('|').map(v=>v.trim());return [label,parent];}));for(const [label,parent]of parents){if(parent&&!labels.has(parent))throw Error('Every parent must match an item label.');const seen=new Set<string>();let at=label;while(at){if(seen.has(at))throw Error('A hierarchy cannot contain a cycle.');seen.add(at);at=parents.get(at)??'';}}}
@@ -75,7 +77,7 @@ export function validateDiagram(kind:string,data:string){
 }
 /** Only validated data is interpolated, and every text/attribute value is escaped. */
 export function renderDiagram(kind:string,data:string,title:string,variant:string){
- validateDiagram(kind,data);const rows=data.split('\n').filter(s=>s.trim()).map(s=>s.split('|').map(v=>v.trim())),colors=['#6366f1','#0d9488','#f59e0b','#e879a4','#60a5fa','#a78bfa'];let shapes='',height=300,width=620;
+ validateDiagram(kind,data);if(data.trim().startsWith('{'))return renderObject(kind,JSON.parse(data),title,variant);const rows=data.split('\n').filter(s=>s.trim()).map(s=>s.split('|').map(v=>v.trim())),colors=['#6366f1','#0d9488','#f59e0b','#e879a4','#60a5fa','#a78bfa'];let shapes='',height=300,width=620;
  if(kind==='bar'&&variant==='Horizontal'){
   height=Math.max(260,rows.length*35+60);const values=rows.map(r=>Number(r[1])),min=Math.min(0,...values),max=Math.max(1,...values),range=max-min||1,zero=160+(0-min)/range*380;
   shapes=`<path d="M${zero} 20V${height-20}" stroke="#94a3b8"/>`;
