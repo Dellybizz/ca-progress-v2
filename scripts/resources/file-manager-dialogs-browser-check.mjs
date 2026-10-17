@@ -2,7 +2,7 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import fs from 'node:fs';
-const server=http.createServer((request,response)=>{const file=request.url?.startsWith('/app.js')?'app.js':'index.html';response.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':'text/html');response.end(fs.readFileSync('/tmp/resources-phase1-preview/'+file));});let browser,currentPage;
+const server=http.createServer((request,response)=>{const file=request.url?.startsWith('/app.js')?'app.js':request.url?.startsWith('/app.css')?'app.css':'index.html';response.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html');response.end(fs.readFileSync('/tmp/resources-phase1-preview/'+file));});let browser,currentPage;
 try{
  await new Promise(resolve=>server.listen(8769,'127.0.0.1',resolve));browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  for(const width of [1440,390]){
