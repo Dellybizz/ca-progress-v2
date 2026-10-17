@@ -1,3 +1,4 @@
+import {validateStructuredNote,renderStructuredNote} from "@/lib/notes/structured-document";
 import { OFFLINE_ENABLED } from "@/lib/offline/config";
 import { flushPendingMutations, getOfflineIdentity, getOfflineMutationResult, getOfflineSnapshot, getPendingMutations, queueOfflineMutation } from "@/lib/offline/database";
 import { conflictBaseline, entityKey, projectOfflineEdit, snapshotKind, normalizeOfflineUrl } from "@/lib/offline/projection";
@@ -23,7 +24,7 @@ export async function offlineMutationFetch(ownerId: string, url: string, body: R
   const identity = await getOfflineIdentity();
   if (!ownerId || identity?.userId !== ownerId) throw new Error("Your account changed. Reopen this screen before saving.");
   const idempotencyKey = crypto.randomUUID();
-  const durableBody = { ...body, ...(url === "/api/notes" ? { bodyHtml: safeLocalHtml(String(body.bodyHtml ?? "")) } : {}), clientId: typeof body.clientId === 'string' ? body.clientId : idempotencyKey, offlineOccurredAt: new Date().toISOString() };
+  const durableBody = { ...body, ...(url === "/api/notes" ? { bodyHtml: body.document?renderStructuredNote(validateStructuredNote(body.document)):safeLocalHtml(String(body.bodyHtml ?? "")) } : {}), clientId: typeof body.clientId === 'string' ? body.clientId : idempotencyKey, offlineOccurredAt: new Date().toISOString() };
   const model = await projectedSnapshot(ownerId, identity.contextKey, kind);
   const expected = expectedOverride === undefined ? conflictBaseline(url, durableBody, model) : expectedOverride;
   const pending = await getPendingMutations(ownerId);
