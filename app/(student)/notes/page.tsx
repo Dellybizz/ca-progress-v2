@@ -1,3 +1,4 @@
+import "@/app/styles/notes-workspace.css";
 import {NoteEditor} from '@/components/resources/note-editor';
 import {redirect} from 'next/navigation';
 import {LoginRequired} from '@/components/auth/login-required';
