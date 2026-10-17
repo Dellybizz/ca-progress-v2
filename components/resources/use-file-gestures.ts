@@ -10,21 +10,47 @@ export function useFileGestures(options:Options){
  const [rectangle,setRectangle]=useState<Rectangle|null>(null),[dragPreview,setDragPreview]=useState<(Point&{count:number})|null>(null);
  useEffect(()=>{
   const canvas=options.canvas.current;if(!canvas)return;
-  let gesture:{id:number;start:Point;point:Point;kind:'marquee'|'touch';active:boolean;keys:string[];base:string[]}|null=null;
+  let gesture:{id:number;start:Point;point:Point;kind:'marquee'|'touch';active:boolean;keys:string[];base:string[];scroll:Point}|null=null;
   let timer=0,frame=0,suppressUntil=0;
   const clear=()=>{clearTimeout(timer);cancelAnimationFrame(frame);gesture=null;setRectangle(null);setDragPreview(null);delete document.body.dataset.resourceTouchdrag;};
   const point=(event:PointerEvent)=>({x:event.clientX,y:event.clientY});
-  const scroll=()=>{if(!gesture?.active||gesture.kind!=='touch')return;const groups=canvas.querySelector('.fm-groups');if(groups){const box=groups.getBoundingClientRect(),{x,y}=gesture.point;if(x>=box.left&&x<=box.right&&y>=box.top&&y<=box.bottom){const before=groups.scrollTop;groups.scrollTop+=y<box.top+36?-8:y>box.bottom-36?8:0;if(groups.scrollTop!==before)latest.current.onTouchDrag?.(gesture.keys,'move',x,y);}}frame=requestAnimationFrame(scroll);};
+  const updateMarquee=()=>{
+   if(!gesture||gesture.kind!=='marquee')return;
+   const groups=canvas.querySelector('.fm-groups');if(!groups)return;
+   const bounds=groups.getBoundingClientRect(),x=Math.max(bounds.left,Math.min(gesture.point.x,bounds.right)),y=Math.max(bounds.top,Math.min(gesture.point.y,bounds.bottom));
+   // Keep the anchor attached to the original content while the viewport scrolls.
+   const anchor={x:gesture.start.x+gesture.scroll.x-groups.scrollLeft,y:gesture.start.y+gesture.scroll.y-groups.scrollTop};
+   const rect={x:Math.min(anchor.x,x),y:Math.min(anchor.y,y),width:Math.abs(x-anchor.x),height:Math.abs(y-anchor.y)};
+   const left=Math.max(bounds.left,rect.x),top=Math.max(bounds.top,rect.y);
+   setRectangle({x:left,y:top,width:Math.max(0,Math.min(bounds.right,rect.x+rect.width)-left),height:Math.max(0,Math.min(bounds.bottom,rect.y+rect.height)-top)});
+   const keys=Array.from(canvas.querySelectorAll<HTMLElement>('[data-file-key]')).filter(node=>{const box=node.getBoundingClientRect();return box.left<rect.x+rect.width&&box.right>rect.x&&box.top<rect.y+rect.height&&box.bottom>rect.y;}).map(node=>node.dataset.fileKey!);
+   latest.current.onSelection([...new Set([...gesture.base,...keys])]);
+  };
+  let previousFrame=0;
+  const scroll=(time:number)=>{
+   if(!gesture?.active)return;
+   const groups=canvas.querySelector('.fm-groups');
+   if(groups){
+    const box=groups.getBoundingClientRect(),{x,y}=gesture.point,edge=44;
+    const direction=y<box.top+edge?-Math.min(1,(box.top+edge-y)/edge):y>box.bottom-edge?Math.min(1,(y-box.bottom+edge)/edge):0;
+    const elapsed=previousFrame?Math.min(32,time-previousFrame):16;
+    if(x>=box.left-32&&x<=box.right+32&&direction){
+     const before=groups.scrollTop;groups.scrollTop+=direction*elapsed*(gesture.kind==='marquee'?0.9:0.5);
+     if(groups.scrollTop!==before){if(gesture.kind==='marquee')updateMarquee();else latest.current.onTouchDrag?.(gesture.keys,'move',x,y);}
+    }
+   }
+   previousFrame=time;frame=requestAnimationFrame(scroll);
+  };
   const start=(event:PointerEvent)=>{
    if(gesture){latest.current.onTouchDrag?.(gesture.keys,'cancel',event.clientX,event.clientY);clear();return;}
    if(latest.current.blocked||event.button!==0||!(event.target instanceof Element))return;
    const row=event.target.closest<HTMLElement>('[data-file-key]');
    if(event.pointerType==='touch'&&row&&latest.current.onTouchDrag&&!event.target.closest('.fm-file-info,input,a')){
-    const key=row.dataset.fileKey!;gesture={id:event.pointerId,start:point(event),point:point(event),kind:'touch',active:false,keys:latest.current.selected.includes(key)?latest.current.selected:[key],base:[]};
+    const key=row.dataset.fileKey!;gesture={id:event.pointerId,start:point(event),point:point(event),kind:'touch',active:false,keys:latest.current.selected.includes(key)?latest.current.selected:[key],base:[],scroll:{x:0,y:0}};
     timer=window.setTimeout(()=>{if(!gesture||latest.current.blocked)return;gesture.active=true;latest.current.onSelection(gesture.keys);document.body.dataset.resourceTouchdrag='true';setDragPreview({...gesture.point,count:gesture.keys.length});latest.current.onTouchDrag?.(gesture.keys,'start',gesture.point.x,gesture.point.y);frame=requestAnimationFrame(scroll);},350);return;
    }
    if(event.pointerType!=='mouse'||row||!event.target.closest('.fm-groups')||event.target.closest('button,input,a,select'))return;
-   event.preventDefault();gesture={id:event.pointerId,start:point(event),point:point(event),kind:'marquee',active:false,keys:[],base:event.ctrlKey||event.metaKey||event.shiftKey?[...latest.current.selected]:[]};canvas.setPointerCapture(event.pointerId);
+   event.preventDefault();gesture={id:event.pointerId,start:point(event),point:point(event),kind:'marquee',active:false,keys:[],base:event.ctrlKey||event.metaKey||event.shiftKey?[...latest.current.selected]:[],scroll:{x:canvas.querySelector('.fm-groups')!.scrollLeft,y:canvas.querySelector('.fm-groups')!.scrollTop}};canvas.setPointerCapture(event.pointerId);
   };
   const move=(event:PointerEvent)=>{
    if(!gesture||event.pointerId!==gesture.id)return;
@@ -34,10 +60,7 @@ export function useFileGestures(options:Options){
     if(!gesture.active){clear();return;}
     event.preventDefault();setDragPreview({...gesture.point,count:gesture.keys.length});latest.current.onTouchDrag?.(gesture.keys,'move',event.clientX,event.clientY);return;
    }
-   gesture.active=true;const bounds=canvas.querySelector('.fm-groups')!.getBoundingClientRect();const x=Math.max(bounds.left,Math.min(event.clientX,bounds.right)),y=Math.max(bounds.top,Math.min(event.clientY,bounds.bottom));
-   const rect={x:Math.min(gesture.start.x,x),y:Math.min(gesture.start.y,y),width:Math.abs(x-gesture.start.x),height:Math.abs(y-gesture.start.y)};setRectangle(rect);
-   const keys=Array.from(canvas.querySelectorAll<HTMLElement>('[data-file-key]')).filter(node=>{const box=node.getBoundingClientRect();return box.bottom>bounds.top&&box.top<bounds.bottom&&box.left<rect.x+rect.width&&box.right>rect.x&&box.top<rect.y+rect.height&&box.bottom>rect.y;}).map(node=>node.dataset.fileKey!);
-   latest.current.onSelection([...new Set([...gesture.base,...keys])]);
+   if(!gesture.active){gesture.active=true;previousFrame=0;frame=requestAnimationFrame(scroll);}updateMarquee();
   };
   const finish=(event:PointerEvent)=>{if(!gesture||event.pointerId!==gesture.id)return;if(gesture.active){suppressUntil=performance.now()+400;if(gesture.kind==='touch')latest.current.onTouchDrag?.(gesture.keys,event.type==='pointercancel'?'cancel':'drop',event.clientX,event.clientY);}if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);clear();};
   const touchmove=(event:TouchEvent)=>{if(gesture?.kind==='touch'&&gesture.active&&event.touches.length===1)event.preventDefault();};
