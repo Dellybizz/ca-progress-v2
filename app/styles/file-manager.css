@@ -468,3 +468,5 @@ body[data-resource-touchdrag=true]{user-select:none;-webkit-user-select:none}
 @media(max-width:719px){.fm-resource-toast,.fm-interaction-status{bottom:calc(var(--bottom-nav-height,64px) + env(safe-area-inset-bottom) + 12px)}}
 
 .fm-folder-tile.is-selected{background:var(--color-brand-soft);border-color:var(--color-brand)}.fm-folder-open{touch-action:manipulation}
+
+.fm-sidebar-tree ul{list-style:none;margin:0;padding:0}.fm-sidebar-tree li{margin:0;padding:0}.fm-sidebar-tree button{width:100%;gap:5px}.fm-sidebar-tree button>svg{flex-shrink:0}.fm-sidebar-tree .fm-tree-chevron{opacity:.65}.fm-sidebar-tree button>span{flex:1;min-width:0}
