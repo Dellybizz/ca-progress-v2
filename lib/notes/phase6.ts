@@ -144,6 +144,7 @@ async function validateOwnedResources(userId: string, resourceIds: string[], exi
 export async function savePhase6Note(input: {
   id: string | null;
   createId?: string | null;
+  documentJson?:string;
   userId: string;
   ownerLabel: string;
   title: string;
@@ -187,7 +188,7 @@ export async function savePhase6Note(input: {
   const sourceAnswer = source?.answer ?? existing?.source_answer ?? null;
   const sourceCreatedAt = source?.createdAt ?? existing?.source_created_at ?? null;
   const sourcePath = source?.discussionPath ?? existing?.source_discussion_path ?? null;
-  const documentJson = JSON.stringify({ version: 1, format: "html", html: input.bodyHtml });
+  const documentJson = input.documentJson??JSON.stringify({ version: 1, format: "html", html: input.bodyHtml });
 
   await db.prepare(`INSERT INTO note_revision_metadata(
       note_id,user_id,level_id,subject_id,chapter_id,topic_id,document_json,source_type,
