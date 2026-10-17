@@ -1,3 +1,4 @@
+import {parseInk,renderInk} from './ink-model';
 import {financialConfig,totalFormula,canonicalAmount,rawAmount,numberCell,totalsStale,type FinancialConfig} from './financial-formats';
 import {renderDiagram,validateDiagram} from './ca-formats';
 /** Versioned, bounded document protocol. No DOM or editor dependency on the server. */
@@ -16,8 +17,8 @@ const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 export function safeNoteLink(v:unknown){return typeof v==='string'&&(/^(https?:\/\/|mailto:)/i.test(v)||/^#block-[\w-]+$/.test(v))&&!/[\u0000-\u0020<>"']/.test(v)&&!/[?&](?:[^=]*(?:token|signature|credential)|expires)=/i.test(v);}
 const color=(v:unknown)=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v);
 const inline=new Set(['text','hardBreak','image','math','reference','attachment']);
-const blocks=new Set(['paragraph','heading','bulletList','orderedList','taskList','blockquote','codeBlock','horizontalRule','table','callout','toggle','pageBreak','diagram']);
-const allowedAttrs:Record<string,string[]>={diagram:['blockId','kind','title','variant','data','width','height','align'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir','caOwner','caCaption'],heading:['blockId','level','textAlign','lineHeight','indent','dir','caOwner','caCaption'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId','caFormat','caStale'],tableRow:['caRowId'],tableCell:['colspan','rowspan','colwidth','textAlign','align','caColId','caKind','caRaw','caFormula'],tableHeader:['colspan','rowspan','colwidth','textAlign','align','caColId','caKind','caRaw','caFormula'],image:['src','alt','title','width','caption','crop','height','align'],math:['expression'],reference:['label','href'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
+const blocks=new Set(['paragraph','heading','bulletList','orderedList','taskList','blockquote','codeBlock','horizontalRule','table','callout','toggle','pageBreak','diagram','ink']);
+const allowedAttrs:Record<string,string[]>={ink:['blockId','data','label','width'],diagram:['blockId','kind','title','variant','data','width','height','align'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir','caOwner','caCaption'],heading:['blockId','level','textAlign','lineHeight','indent','dir','caOwner','caCaption'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId','caFormat','caStale'],tableRow:['caRowId'],tableCell:['colspan','rowspan','colwidth','textAlign','align','caColId','caKind','caRaw','caFormula'],tableHeader:['colspan','rowspan','colwidth','textAlign','align','caColId','caKind','caRaw','caFormula'],image:['src','alt','title','width','caption','crop','height','align'],math:['expression'],reference:['label','href'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
 const markAttrs:Record<string,string[]>={bold:[],italic:[],underline:[],strike:[],code:[],subscript:[],superscript:[],link:['href','target','rel','class'],highlight:['color'],textStyle:['fontFamily','fontSize','color']};
 function fail():never{throw Error('Unsupported or invalid structured note. Your original content has been retained.');}
 export function validateStructuredNote(value:unknown,attachmentIds?:string[]):StructuredNote{
@@ -57,8 +58,9 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
    else if(key==='colwidth'){if(!Array.isArray(v)||v.length>12||v.some(w=>!Number.isInteger(w)||w<25||w>1600))fail();}
    else if(['checked','open'].includes(key)){if(typeof v!=='boolean')fail();}
    else if(key==='crop'){if(!['contain','cover'].includes(String(v)))fail();}
-   else if(typeof v!=='string'||v.length>(key==='data'?40000:2000))fail();
+   else if(typeof v!=='string'||v.length>(key==='data'?(n.type==='ink'?220000:40000):2000))fail();
   }
+  if(n.type==='ink'){parseInk(a.data);if(typeof a.label!=='string'||a.label.length>160)fail();}
   if(n.type==='diagram'){if(typeof a.kind!=='string'||typeof a.data!=='string'||typeof a.title!=='string'||typeof a.variant!=='string')fail();validateDiagram(a.kind,a.data);}
   if(n.type==='image'&&(!a.src||typeof a.src!=='string'))fail();if(n.type==='attachment'&&!a.resourceId)fail();if(n.type==='math'&&(typeof a.expression!=='string'||a.expression.length>2000))fail();if(n.type==='reference'&&(!safeNoteLink(a.href)||typeof a.label!=='string'))fail();
   if(n.type==='text'){if(typeof n.text!=='string'||n.content)fail();textBytes+=new TextEncoder().encode(n.text).length;}else if(n.text!==undefined)fail();
@@ -89,6 +91,7 @@ export function renderStructuredNote(d:StructuredNote){
   const tags:Record<string,string>={paragraph:'p',heading:`h${a.level??2}`,bulletList:'ul',orderedList:'ol',listItem:'li',taskList:'ul',taskItem:'li',blockquote:'blockquote',table:'table',tableRow:'tr',tableCell:'td',tableHeader:'th',callout:'aside'};
   if(n.type==='doc')return children;
   if(n.type==='table'&&a.caFormat){const cfg=financialConfig(a.caFormat);return `<table${attrs} class="note-financial-table" data-ca-borders="${cfg.borders}" data-ca-density="${cfg.density}">${n.content?.[0]?.content?.every(c=>c.type==='tableHeader')?`<thead>${render(n.content[0],cfg)}</thead><tbody>${n.content.slice(1).map(r=>render(r,cfg)).join('')}</tbody>`:children}</table>${totalsStale(n)?'<p class="note-total-warning">Totals need recalculation.</p>':''}`;}
+  if(n.type==='ink')return `<figure class="note-ink-output"${attrs} style="width:${Number(a.width)||100}%;max-width:100%;break-inside:avoid"><figcaption>${esc(a.label)}</figcaption>${renderInk(parseInk(a.data),String(a.label))}</figure>`;
   if(n.type==='diagram')return `<figure class="note-diagram"${attrs} style="width:${Number(a.width)||100}%;max-width:100%;margin-left:${a.align==='right'||a.align==='center'?'auto':'0'};margin-right:${a.align==='left'||!a.align||a.align==='center'?'auto':'0'}"><figcaption>${esc(a.title)}</figcaption><div class="note-diagram-graphic"${a.height?` style="height:${Number(a.height)}px"`:''}>${renderDiagram(String(a.kind),String(a.data),String(a.title),String(a.variant))}</div><details><summary>Chart data</summary><pre>${esc(a.data)}</pre></details></figure>`;
   if(n.type==='hardBreak')return '<br>';
   if(n.type==='horizontalRule')return `<hr${attrs}>`;
