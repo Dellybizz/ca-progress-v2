@@ -1,5 +1,6 @@
 "use client";
 
+import {SidebarFolderTree} from '@/components/resources/sidebar-folder-tree';
 import {FileManager} from "@/components/resources/file-manager";
 import {officialFiles} from "@/lib/resources/file-manager";
 import { useState } from "react";
@@ -142,7 +143,8 @@ export function IcaiResourceBrowser({
         </button>
       </form>
   );
-  if (embedded) return <FileManager files={officialFiles(catalog.resources.filter(item=>(!officialFilter.subject||item.subjects.some(subject=>subject.id===officialFilter.subject))&&(!officialFilter.type||item.type===officialFilter.type)))} title="ICAI files" extraFilters={<details className="fm-official-filters"><summary>Academic & official filters</summary>{filterForm}{catalog.events.length ? <ul>{catalog.events.map(event=><li key={event.id}><a href={event.sourceUrl} target="_blank" rel="noreferrer">{dateLabel(event.eventDate)} · {event.title}</a></li>)}</ul> : null}</details>}/>;
+  const officialFolders=catalog.subjects.filter(subject=>catalog.resources.some(item=>item.subjects.some(value=>value.id===subject.id))).flatMap(subject=>[{id:subject.id,name:subject.title,parent_id:null},...Object.entries(TYPE_LABELS).filter(([type])=>catalog.resources.some(item=>item.type===type&&item.subjects.some(value=>value.id===subject.id))).map(([type,name])=>({id:subject.id+'::'+type,name,parent_id:subject.id}))]);
+  if (embedded) return <><SidebarFolderTree folders={officialFolders} current={officialFilter.subject?(officialFilter.type?officialFilter.subject+'::'+officialFilter.type:officialFilter.subject):''} onOpen={id=>{const [subject,type='']=id.split('::');setOfficialFilter({subject,type});}}/><FileManager files={officialFiles(catalog.resources.filter(item=>(!officialFilter.subject||item.subjects.some(subject=>subject.id===officialFilter.subject))&&(!officialFilter.type||item.type===officialFilter.type)))} title="ICAI files" extraFilters={<details className="fm-official-filters"><summary>Academic & official filters</summary>{filterForm}{catalog.events.length ? <ul>{catalog.events.map(event=><li key={event.id}><a href={event.sourceUrl} target="_blank" rel="noreferrer">{dateLabel(event.eventDate)} · {event.title}</a></li>)}</ul> : null}</details>}/></>;
   return (
     <div className="icai-page">
       {!embedded ? <><AcademicBreadcrumbs
