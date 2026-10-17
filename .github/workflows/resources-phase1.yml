@@ -72,7 +72,7 @@ jobs:
             /tmp/resources-phase1-preview/workspace-*.png
             /tmp/resources-phase2-preview/transfers-*.png
             /tmp/note-studio-preview/notes-*.png
-            /tmp/note-studio-preview/notes-print.pdf
+            /tmp/note-studio-preview/notes-print*.pdf
           if-no-files-found: ignore
   deploy:
     needs: verify
