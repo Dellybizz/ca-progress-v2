@@ -6,6 +6,7 @@ on:
     paths:
       - app/**
       - components/resources/**
+      - components/notes/**
       - lib/resources/**
       - lib/auth/proxy.ts
       - lib/billing/service.ts
@@ -16,6 +17,7 @@ on:
       - lib/offline/**
       - d1/**
       - scripts/resources/**
+      - scripts/notes/**
       - tests/**
       - .github/workflows/resources-phase1.yml
   pull_request:
@@ -60,6 +62,8 @@ jobs:
           node scripts/resources/phase2-preview-build.mjs
           node scripts/resources/phase2-browser-check.mjs
           node scripts/resources/file-manager-transfers-browser-check.mjs
+          node scripts/notes/preview-build.mjs
+          node scripts/notes/browser-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -67,6 +71,8 @@ jobs:
           path: |
             /tmp/resources-phase1-preview/workspace-*.png
             /tmp/resources-phase2-preview/transfers-*.png
+            /tmp/note-studio-preview/notes-*.png
+            /tmp/note-studio-preview/notes-print.pdf
           if-no-files-found: ignore
   deploy:
     needs: verify
