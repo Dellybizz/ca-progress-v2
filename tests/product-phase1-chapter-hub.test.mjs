@@ -27,7 +27,7 @@ test("Product Phase 1 destinations consume and validate Chapter Hub academic con
   const notesRoute = read("app/(student)/notes/page.tsx");
   const resourcesRoute = read("app/(student)/resources/page.tsx");
   const library = read("components/resources/resource-library.tsx");
-  const noteEditor = read("components/resources/note-editor.tsx");
+  const noteEditor = (read("components/resources/note-editor.tsx") + read("components/notes/note-studio.tsx"));
 
   assert.match(studyRoute, /initialSubjectId=\{cleanId\(params\.subjectId\)\}/);
   assert.match(studyRoute, /initialChapterId=\{cleanId\(params\.chapterId\)\}/);
