@@ -2,7 +2,7 @@ import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import fs from 'node:fs';
-const server=http.createServer((req,res)=>{const name=req.url.startsWith('/app.js')?'app.js':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'application/javascript':'text/html');res.end(fs.readFileSync('/tmp/resources-phase1-preview/'+name));});
+const server=http.createServer((req,res)=>{const name=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/app.css')?'app.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'application/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync('/tmp/resources-phase1-preview/'+name));});
 let browser,page;
 async function checkToolbar(){const controls=[];for(const selector of ['.fm-new-menu>summary','.fm-search','.fm-filter-menu>summary','.fm-layout-switch'])controls.push(await page.locator(selector).boundingBox());assert.ok(Math.max(...controls.map(box=>box.y))-Math.min(...controls.map(box=>box.y))<=4,'desktop tools share one row');for(let i=0;i<controls.length-1;i++)assert.ok(controls[i].x+controls[i].width<=controls[i+1].x+1,'desktop tools do not overlap');}
 try{
