@@ -16,7 +16,7 @@ export function safeNoteLink(v:unknown){return typeof v==='string'&&(/^(https?:\
 const color=(v:unknown)=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v);
 const inline=new Set(['text','hardBreak','image','math','reference','attachment']);
 const blocks=new Set(['paragraph','heading','bulletList','orderedList','taskList','blockquote','codeBlock','horizontalRule','table','callout','toggle','pageBreak','diagram']);
-const allowedAttrs:Record<string,string[]>={diagram:['blockId','kind','title','variant','data'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir'],heading:['blockId','level','textAlign','lineHeight','indent','dir'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId'],tableRow:[],tableCell:['colspan','rowspan','colwidth','textAlign','align'],tableHeader:['colspan','rowspan','colwidth','textAlign','align'],image:['src','alt','title','width','caption','crop'],math:['expression'],reference:['label','href'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
+const allowedAttrs:Record<string,string[]>={diagram:['blockId','kind','title','variant','data','width','height','align'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir'],heading:['blockId','level','textAlign','lineHeight','indent','dir'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId'],tableRow:[],tableCell:['colspan','rowspan','colwidth','textAlign','align'],tableHeader:['colspan','rowspan','colwidth','textAlign','align'],image:['src','alt','title','width','caption','crop','height','align'],math:['expression'],reference:['label','href'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
 const markAttrs:Record<string,string[]>={bold:[],italic:[],underline:[],strike:[],code:[],subscript:[],superscript:[],link:['href','target','rel','class'],highlight:['color'],textStyle:['fontFamily','fontSize','color']};
 function fail():never{throw Error('Unsupported or invalid structured note. Your original content has been retained.');}
 export function validateStructuredNote(value:unknown,attachmentIds?:string[]):StructuredNote{
@@ -41,6 +41,7 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
    else if(key==='color'){if(!color(v))fail();}
    else if(key==='fontFamily'){if(!NOTE_FONTS.includes(v as typeof NOTE_FONTS[number]))fail();}
    else if(key==='fontSize'){if(!['12px','14px','16px','18px','20px','24px','28px','32px'].includes(String(v)))fail();}
+   else if(key==='height'){if(!Number.isInteger(v)||Number(v)<80||Number(v)>1600)fail();}
    else if(key==='textAlign'||key==='align'){if(!['left','center','right','justify'].includes(String(v)))fail();}
    else if(key==='lineHeight'){if(!['1','1.5','2'].includes(String(v)))fail();}
    else if(key==='indent'){if(!Number.isInteger(v)||Number(v)<0||Number(v)>8)fail();}
@@ -48,7 +49,7 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
    else if(key==='colwidth'){if(!Array.isArray(v)||v.length>12||v.some(w=>!Number.isInteger(w)||w<25||w>1600))fail();}
    else if(['checked','open'].includes(key)){if(typeof v!=='boolean')fail();}
    else if(key==='crop'){if(!['contain','cover'].includes(String(v)))fail();}
-   else if(typeof v!=='string'||v.length>(key==='data'?6000:2000))fail();
+   else if(typeof v!=='string'||v.length>(key==='data'?40000:2000))fail();
   }
   if(n.type==='diagram'){if(typeof a.kind!=='string'||typeof a.data!=='string'||typeof a.title!=='string'||typeof a.variant!=='string')fail();validateDiagram(a.kind,a.data);}
   if(n.type==='image'&&(!a.src||typeof a.src!=='string'))fail();if(n.type==='attachment'&&!a.resourceId)fail();if(n.type==='math'&&(typeof a.expression!=='string'||a.expression.length>2000))fail();if(n.type==='reference'&&(!safeNoteLink(a.href)||typeof a.label!=='string'))fail();
@@ -72,12 +73,12 @@ export function renderStructuredNote(d:StructuredNote){
  validateStructuredNote(d);
  function render(n:NoteNode):string{
   const a=n.attrs??{},children=(n.content??[]).map(render).join('');
-  let style='';if(a.textAlign||a.align)style+=`text-align:${a.textAlign??a.align};`;if(a.lineHeight)style+=`line-height:${a.lineHeight};`;if(a.indent)style+=`margin-left:${Number(a.indent)*24}px;`;
+  let style='';if(n.type!=='diagram'&&(a.textAlign||a.align))style+=`text-align:${a.textAlign??a.align};`;if(a.lineHeight)style+=`line-height:${a.lineHeight};`;if(a.indent)style+=`margin-left:${Number(a.indent)*24}px;`;
   const attrs=`${a.dir?` dir="${esc(a.dir)}"`:''}${a.blockId?` id="${esc(a.blockId)}"`:''}${style?` style="${style}"`:''}`;
   if(n.type==='text'){let s=esc(n.text);for(const m of n.marks??[]){const ma=m.attrs??{};const tag=({bold:'strong',italic:'em',underline:'u',strike:'s',subscript:'sub',superscript:'sup',code:'code'}as Record<string,string>)[m.type];if(tag)s=`<${tag}>${s}</${tag}>`;else if(m.type==='link')s=`<a href="${esc(ma.href)}" rel="noopener noreferrer">${s}</a>`;else if(m.type==='highlight')s=`<mark${ma.color?` style="background-color:${ma.color}"`:''}>${s}</mark>`;else if(m.type==='textStyle')s=`<span style="${ma.color?`color:${ma.color};`:''}${ma.fontFamily?`font-family:${esc(ma.fontFamily)};`:''}${ma.fontSize?`font-size:${ma.fontSize};`:''}">${s}</span>`;}return s;}
   const tags:Record<string,string>={paragraph:'p',heading:`h${a.level??2}`,bulletList:'ul',orderedList:'ol',listItem:'li',taskList:'ul',taskItem:'li',blockquote:'blockquote',table:'table',tableRow:'tr',tableCell:'td',tableHeader:'th',callout:'aside'};
   if(n.type==='doc')return children;
-  if(n.type==='diagram')return `<figure class="note-diagram"${attrs}><figcaption>${esc(a.title)}</figcaption><div class="note-diagram-graphic">${renderDiagram(String(a.kind),String(a.data),String(a.title),String(a.variant))}</div><details><summary>Chart data</summary><pre>${esc(a.data)}</pre></details></figure>`;
+  if(n.type==='diagram')return `<figure class="note-diagram"${attrs} style="width:${Number(a.width)||100}%;max-width:100%;margin-left:${a.align==='right'||a.align==='center'?'auto':'0'};margin-right:${a.align==='left'||!a.align||a.align==='center'?'auto':'0'}"><figcaption>${esc(a.title)}</figcaption><div class="note-diagram-graphic"${a.height?` style="height:${Number(a.height)}px"`:''}>${renderDiagram(String(a.kind),String(a.data),String(a.title),String(a.variant))}</div><details><summary>Chart data</summary><pre>${esc(a.data)}</pre></details></figure>`;
   if(n.type==='hardBreak')return '<br>';
   if(n.type==='horizontalRule')return `<hr${attrs}>`;
   if(n.type==='pageBreak')return `<hr${attrs} class="note-page-break">`;
@@ -85,7 +86,7 @@ export function renderStructuredNote(d:StructuredNote){
   if(n.type==='math')return `<span class="note-math" data-expression="${esc(a.expression)}" role="math">${esc(a.expression)}</span>`;
   if(n.type==='attachment')return `<a class="note-attachment" href="/resources/${esc(a.resourceId)}">${esc(a.label??'Attached file')}</a>`;
   if(n.type==='reference')return `<a class="note-reference" href="${esc(a.href)}" rel="noopener noreferrer">[${esc(a.label)}]</a>`;
-  if(n.type==='image')return `<img src="${esc(a.src)}" alt="${esc(a.alt)}" title="${esc(a.caption??a.title)}" style="width:${Number(a.width)||100}%;object-fit:${a.crop==='cover'?'cover':'contain'}" loading="lazy">${a.caption?`<em>${esc(a.caption)}</em>`:''}`;
+  if(n.type==='image')return `<span class="note-image" style="display:block;width:${Number(a.width)||100}%;max-width:100%;margin-left:${a.align==='right'||a.align==='center'?'auto':'0'};margin-right:${a.align==='right'?'0':'auto'}"><img src="${esc(a.src)}" alt="${esc(a.alt)}" title="${esc(a.caption??a.title)}" style="width:100%;${a.height?`height:${Number(a.height)}px;`:''}object-fit:${a.crop==='cover'?'cover':'contain'}" loading="lazy">${a.caption?`<span class="note-image-caption">${esc(a.caption)}</span>`:''}</span>`;
   if(n.type==='toggle')return `<details${attrs}${a.open?' open':''}><summary>${esc(a.summary??'Details')}</summary>${children}</details>`;
   const tag=tags[n.type];return `<${tag}${attrs}${n.type==='taskList'?' data-type="taskList"':''}${n.type==='taskItem'?` data-checked="${a.checked===true}"`:''}${['tableCell','tableHeader'].includes(n.type)?` colspan="${Number(a.colspan)||1}" rowspan="${Number(a.rowspan)||1}"`:''}${n.type==='orderedList'?` start="${Number(a.start)||1}"`:''}>${n.type==='taskItem'?(a.checked?'☑ ':'☐ '):''}${children}</${tag}>`;
  }
