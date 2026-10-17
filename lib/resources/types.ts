@@ -7,6 +7,7 @@ export type ResourceReportReason = "spam" | "misleading" | "copyright" | "unsafe
 
 export type NoteCard = {
   revision?:number;
+  documentJson?:string|null;
   id: string;
   title: string;
   excerpt: string;
