@@ -76,7 +76,7 @@ export type WorkspaceLocation={collection:'my'|'shared'|'official';view:'all'|'f
 export function normalizeWorkspaceLocation(value:Partial<WorkspaceLocation>):WorkspaceLocation{
   const collection=value.collection==='shared'||value.collection==='official'?value.collection:'my';
   const view=collection==='my'&&['folder','starred','recent','trash'].includes(value.view??'')?value.view!:'all';
-  const folder=view==='folder'&&typeof value.folder==='string'?value.folder.slice(0,200):'';
+  const folder=(view==='folder'||view==='trash')&&typeof value.folder==='string'?value.folder.slice(0,200):'';
   return{collection,view,folder,layout:FILE_LAYOUTS.includes(value.layout!)?value.layout!:'grid'};
 }
 export function workspaceLocationKey(ownerId:string,contextKey:string,location:WorkspaceLocation):string{
