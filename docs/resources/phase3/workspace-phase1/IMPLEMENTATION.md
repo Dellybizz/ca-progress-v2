@@ -21,3 +21,5 @@ Existing stable block identities and versioned structured documents remain the f
 1,420 tests pass locally. TypeScript and ESLint pass. Browser checks exercise six widths (320/390/768/820/1024/1440), cancelled orientation edits, saved landscape layout, working widths, mobile formatting access, existing tables/charts/images/equations, recovery after reload and legacy RTL/merged-table import. Generated portrait and landscape PDFs were inspected; page sizes match A4 orientations. Existing file-manager cached navigation checks pass.
 
 CI repeats browser and production checks. The isolated authenticated live fixture verifies exact structured JSON and changing landscape to portrait against deployed D1 before release completion. Physical Android keyboard/stylus certification is outside Phase 1.
+
+Released and verified: see [RELEASE.md](RELEASE.md). Mobile formatting preserves keyboard focus within its panel until Done/close restores document focus.
