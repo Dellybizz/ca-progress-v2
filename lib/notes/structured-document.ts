@@ -1,3 +1,4 @@
+import {financialConfig,totalFormula,canonicalAmount,rawAmount,numberCell,totalsStale,type FinancialConfig} from './financial-formats';
 import {renderDiagram,validateDiagram} from './ca-formats';
 /** Versioned, bounded document protocol. No DOM or editor dependency on the server. */
 export type NoteNode={type:string;attrs?:Record<string,unknown>;text?:string;marks?:NoteNode[];content?:NoteNode[]};
@@ -16,7 +17,7 @@ export function safeNoteLink(v:unknown){return typeof v==='string'&&(/^(https?:\
 const color=(v:unknown)=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v);
 const inline=new Set(['text','hardBreak','image','math','reference','attachment']);
 const blocks=new Set(['paragraph','heading','bulletList','orderedList','taskList','blockquote','codeBlock','horizontalRule','table','callout','toggle','pageBreak','diagram']);
-const allowedAttrs:Record<string,string[]>={diagram:['blockId','kind','title','variant','data','width','height','align'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir'],heading:['blockId','level','textAlign','lineHeight','indent','dir'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId'],tableRow:[],tableCell:['colspan','rowspan','colwidth','textAlign','align'],tableHeader:['colspan','rowspan','colwidth','textAlign','align'],image:['src','alt','title','width','caption','crop','height','align'],math:['expression'],reference:['label','href'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
+const allowedAttrs:Record<string,string[]>={diagram:['blockId','kind','title','variant','data','width','height','align'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir','caOwner','caCaption'],heading:['blockId','level','textAlign','lineHeight','indent','dir','caOwner','caCaption'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId','caFormat','caStale'],tableRow:['caRowId'],tableCell:['colspan','rowspan','colwidth','textAlign','align','caColId','caKind','caRaw','caFormula'],tableHeader:['colspan','rowspan','colwidth','textAlign','align','caColId','caKind','caRaw','caFormula'],image:['src','alt','title','width','caption','crop','height','align'],math:['expression'],reference:['label','href'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
 const markAttrs:Record<string,string[]>={bold:[],italic:[],underline:[],strike:[],code:[],subscript:[],superscript:[],link:['href','target','rel','class'],highlight:['color'],textStyle:['fontFamily','fontSize','color']};
 function fail():never{throw Error('Unsupported or invalid structured note. Your original content has been retained.');}
 export function validateStructuredNote(value:unknown,attachmentIds?:string[]):StructuredNote{
@@ -34,6 +35,13 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
   for(const [key,v]of Object.entries(a)){
    if(v===null)continue;
    if(key==='blockId'){if(typeof v!=='string'||!/^block-[\w-]{1,100}$/.test(v)||ids.has(v))fail();ids.add(v);}
+   else if(key==='caFormat'){financialConfig(v);}
+   else if(key==='caFormula'){totalFormula(v);}
+   else if(key==='caRaw'){if(typeof v!=='string'||canonicalAmount(v)!==v)fail();}
+   else if(key==='caStale'){if(typeof v!=='boolean')fail();}
+   else if(key==='caOwner'||key==='caRowId'||key==='caColId'){if(typeof v!=='string'||!/^[-\w]{1,100}$/.test(v))fail();}
+   else if(key==='caCaption'){if(!['title','subtitle'].includes(String(v)))fail();}
+   else if(key==='caKind'){if(!['text','amount','number','percent'].includes(String(v)))fail();}
    else if(key==='href'){if(!safeNoteLink(v))fail();}
    else if(key==='src'){if(typeof v!=='string'||!/^\/api\/resources\/[0-9a-f-]{36}\/access$/i.test(v)||!d.attachmentIds.includes(v.split('/')[3]))fail();}
    else if(key==='resourceId'){if(typeof v!=='string'||!d.attachmentIds.includes(v))fail();}
@@ -57,6 +65,7 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
   if(n.marks){if(mark||!inline.has(n.type)||!Array.isArray(n.marks)||n.marks.length>12)fail();n.marks.forEach(m=>walk(m,depth+1,true));}
   if(n.content!==undefined&&!Array.isArray(n.content))fail();
   const children=n.content??[];
+  if(n.type==='table'&&a.caFormat&&(children.length>201||children.some(r=>(r.content??[]).reduce((n,c)=>n+(Number(c.attrs?.colspan)||1),0)>12)))throw Error('Use up to 200 line items and 12 columns per CA working. Split larger workings into separate tables.');
   if(mark&&(children.length||n.text))fail();
   for(const child of children){
    const ok=n.type==='doc'||['blockquote','callout','toggle','listItem','taskItem','tableCell','tableHeader'].includes(n.type)?blocks.has(child.type):['paragraph','heading'].includes(n.type)?inline.has(child.type):n.type==='codeBlock'?child.type==='text':['bulletList','orderedList'].includes(n.type)?child.type==='listItem':n.type==='taskList'?child.type==='taskItem':n.type==='table'?child.type==='tableRow':n.type==='tableRow'?['tableCell','tableHeader'].includes(child.type):false;
@@ -71,13 +80,15 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
 }
 export function renderStructuredNote(d:StructuredNote){
  validateStructuredNote(d);
- function render(n:NoteNode):string{
-  const a=n.attrs??{},children=(n.content??[]).map(render).join('');
+ function render(n:NoteNode,inherited?:FinancialConfig):string{
+  const a=n.attrs??{},cfg=n.type==='table'&&a.caFormat?financialConfig(a.caFormat):inherited;let content=n.content??[];if(n.type==='tableCell'&&cfg&&['amount','number','percent'].includes(String(a.caKind))){const raw=rawAmount(n,cfg.number);if(raw!==null&&raw!=='')content=numberCell(n,raw,cfg).content??content;}const children=content.map(c=>render(c,cfg)).join('');
   let style='';if(n.type!=='diagram'&&(a.textAlign||a.align))style+=`text-align:${a.textAlign??a.align};`;if(a.lineHeight)style+=`line-height:${a.lineHeight};`;if(a.indent)style+=`margin-left:${Number(a.indent)*24}px;`;
-  const attrs=`${a.dir?` dir="${esc(a.dir)}"`:''}${a.blockId?` id="${esc(a.blockId)}"`:''}${style?` style="${style}"`:''}`;
+  if(['amount','number','percent'].includes(String(a.caKind))&&n.type==='tableCell')style+='text-align:right;font-variant-numeric:tabular-nums;';
+  const attrs=`${a.caKind?` data-ca-kind="${esc(a.caKind)}"`:''}${a.dir?` dir="${esc(a.dir)}"`:''}${a.blockId?` id="${esc(a.blockId)}"`:''}${style?` style="${style}"`:''}`;
   if(n.type==='text'){let s=esc(n.text);for(const m of n.marks??[]){const ma=m.attrs??{};const tag=({bold:'strong',italic:'em',underline:'u',strike:'s',subscript:'sub',superscript:'sup',code:'code'}as Record<string,string>)[m.type];if(tag)s=`<${tag}>${s}</${tag}>`;else if(m.type==='link')s=`<a href="${esc(ma.href)}" rel="noopener noreferrer">${s}</a>`;else if(m.type==='highlight')s=`<mark${ma.color?` style="background-color:${ma.color}"`:''}>${s}</mark>`;else if(m.type==='textStyle')s=`<span style="${ma.color?`color:${ma.color};`:''}${ma.fontFamily?`font-family:${esc(ma.fontFamily)};`:''}${ma.fontSize?`font-size:${ma.fontSize};`:''}">${s}</span>`;}return s;}
   const tags:Record<string,string>={paragraph:'p',heading:`h${a.level??2}`,bulletList:'ul',orderedList:'ol',listItem:'li',taskList:'ul',taskItem:'li',blockquote:'blockquote',table:'table',tableRow:'tr',tableCell:'td',tableHeader:'th',callout:'aside'};
   if(n.type==='doc')return children;
+  if(n.type==='table'&&a.caFormat){const cfg=financialConfig(a.caFormat);return `<table${attrs} class="note-financial-table" data-ca-borders="${cfg.borders}" data-ca-density="${cfg.density}">${n.content?.[0]?.content?.every(c=>c.type==='tableHeader')?`<thead>${render(n.content[0],cfg)}</thead><tbody>${n.content.slice(1).map(r=>render(r,cfg)).join('')}</tbody>`:children}</table>${totalsStale(n)?'<p class="note-total-warning">Totals need recalculation.</p>':''}`;}
   if(n.type==='diagram')return `<figure class="note-diagram"${attrs} style="width:${Number(a.width)||100}%;max-width:100%;margin-left:${a.align==='right'||a.align==='center'?'auto':'0'};margin-right:${a.align==='left'||!a.align||a.align==='center'?'auto':'0'}"><figcaption>${esc(a.title)}</figcaption><div class="note-diagram-graphic"${a.height?` style="height:${Number(a.height)}px"`:''}>${renderDiagram(String(a.kind),String(a.data),String(a.title),String(a.variant))}</div><details><summary>Chart data</summary><pre>${esc(a.data)}</pre></details></figure>`;
   if(n.type==='hardBreak')return '<br>';
   if(n.type==='horizontalRule')return `<hr${attrs}>`;
