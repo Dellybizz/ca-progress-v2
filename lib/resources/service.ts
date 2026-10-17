@@ -60,6 +60,7 @@ function noteDto(row: NoteRow, names: Awaited<ReturnType<typeof nameMaps>>, tags
     title: row.title,
     excerpt: excerpt(row.body_text),
     bodyHtml: row.body_html,
+    documentJson: extra?.documentJson??null,
     subjectId: row.subject_id,
     chapterId: row.chapter_id,
     topicId: extra?.topicId ?? null,
@@ -168,7 +169,7 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
     tagsForOwnNotes(client, identity.id),
     canManage ? getPhase6AcademicOptions(identity.id) : Promise.resolve([]),
     getPhase6NoteExtras([row.id], identity.id),
-    canManage ? getHotResourceLibraryRows(identity.id) : Promise.resolve({ ownUploads: [] as unknown[], ownNotes: [], sharedNotes: [], sharedUploads: [] }),
+    canManage ? getHotResourceLibraryRows(identity.id,undefined,true) : Promise.resolve({ ownUploads: [] as unknown[], ownNotes: [], sharedNotes: [], sharedUploads: [] }),
   ]);
   return {
     mode: "ready",
