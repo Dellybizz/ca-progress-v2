@@ -1,7 +1,7 @@
 import {NextRequest} from 'next/server.js';
 import {updateAuthSession} from '/tmp/resources-phase2-preview/boundary.mjs';
 import {chromium} from 'playwright';import assert from 'node:assert/strict';import http from 'node:http';import fs from 'node:fs';
-const server=http.createServer((req,res)=>{const file=req.url==='/app.js'?'app.js':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':'text/html');res.end(fs.readFileSync('/tmp/resources-phase2-preview/'+file));});let browser;
+const server=http.createServer((req,res)=>{const file=req.url==='/app.js'?'app.js':req.url==='/app.css'?'app.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync('/tmp/resources-phase2-preview/'+file));});let browser;
 try{
  await new Promise(resolve=>server.listen(8767,'127.0.0.1',resolve));browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  for(const width of [1440,390]){
