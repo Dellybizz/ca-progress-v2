@@ -20,7 +20,8 @@ export type PlannerNotificationType =
   | "test_tomorrow"
   | "goal_near_completion"
   | "doubt_answered"
-  | "buddy_activity";
+  | "buddy_activity"
+  | "billing_renewal_due" | "billing_payment_failed" | "billing_grace_ending" | "billing_grace_expired" | "billing_payment_recovered";
 export type NotificationFrequency = "realtime" | "daily_digest" | "off";
 
 export type PlannerTask = {

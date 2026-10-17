@@ -1,10 +1,12 @@
 import "server-only";
 
 import { cache } from "react";
+import {issuePasswordRecovery,limitRecoveryStart,PasswordRecoveryError} from "./password-recovery";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getServerRuntimeValue } from "@/lib/cloudflare/runtime-env";
 import type { AppRole } from "@/lib/authorization/roles";
+import { ensureCloudflareUserBootstrap } from "./cloudflare-profile";
 import type { SupportedOAuthProvider } from "./provider";
 
 const SESSION_COOKIE = "ca_session";
@@ -30,12 +32,15 @@ type D1Database = {
 };
 
 type OAuthTransaction = {
+  purpose?: "login" | "recovery";
   provider: SupportedOAuthProvider;
   state: string;
   verifier: string;
   redirectUri: string;
   next: string;
   remember: boolean;
+  clientKind: "web" | "mobile";
+  nativeTransactionId: string | null;
   expiresAt: number;
 };
 
@@ -73,6 +78,8 @@ type SessionRow = {
   phone: string | null;
   display_name: string | null;
   avatar_url: string | null;
+  client_kind?: "web" | "mobile" | null;
+  device_label?: string | null;
 };
 
 export type CloudflareApplicationSession = {
@@ -87,12 +94,17 @@ export type CloudflareApplicationSession = {
   rememberDevice: boolean;
   expiresAt: string;
   absoluteExpiresAt: string;
+  clientKind: "web" | "mobile";
+  deviceLabel: string | null;
 };
 
 export type CloudflareOAuthCallbackResult = {
+  purpose?: "login" | "recovery";
   next: string;
   remember: boolean;
   applicationUserId: string;
+  clientKind: "web" | "mobile";
+  nativeExchange?: { transactionId: string; exchangeCode: string };
 };
 
 function getDb(): D1Database {
@@ -102,6 +114,20 @@ function getDb(): D1Database {
     throw new Error("Cloudflare D1 DB binding is required for Worker authentication.");
   }
   return db;
+}
+
+function isMobileSessionSchemaUnavailable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /no such (?:column|table)/i.test(message)
+    && /(?:client_kind|device_label|last_rotated_at|auth_session_events)/i.test(message);
+}
+
+async function writeOptionalSessionEvent(statement: D1Statement) {
+  try {
+    await statement.run();
+  } catch (error) {
+    if (!isMobileSessionSchemaUnavailable(error)) throw error;
+  }
 }
 
 
@@ -220,13 +246,18 @@ export async function startCloudflareOAuth(provider: SupportedOAuthProvider, red
   const challenge = await sha256Base64Url(verifier);
   const redirectUri = callbackUriFromRedirect(redirectTo);
   const source = new URL(redirectTo);
+  const purpose=source.searchParams.get("purpose")==="recovery"?"recovery":"login";
+  if(purpose==="recovery"){if(source.searchParams.get("client")==="mobile")throw new PasswordRecoveryError();await limitRecoveryStart();}
   const transaction: OAuthTransaction = {
+    purpose,
     provider,
     state,
     verifier,
     redirectUri,
     next: sanitizedNextFromRedirect(redirectTo),
     remember: source.searchParams.get("remember") !== "false",
+    clientKind: source.searchParams.get("client") === "mobile" ? "mobile" : "web",
+    nativeTransactionId: source.searchParams.get("native_transaction"),
     expiresAt: Date.now() + OAUTH_TRANSACTION_MAX_AGE_SECONDS * 1000,
   };
   const payload = encodeJson(transaction);
@@ -246,6 +277,7 @@ export async function startCloudflareOAuth(provider: SupportedOAuthProvider, red
   authorization.searchParams.set("response_type", "code");
   authorization.searchParams.set("scope", config.scope);
   authorization.searchParams.set("state", state);
+  if(purpose==="recovery"&&provider==="google")authorization.searchParams.set("prompt","select_account");
   authorization.searchParams.set("code_challenge", challenge);
   authorization.searchParams.set("code_challenge_method", "S256");
   return authorization.toString();
@@ -316,13 +348,13 @@ async function resolveApplicationIdentity(profile: ProviderProfile) {
   const existing = await db.prepare(
     "SELECT identity_id,application_user_id,email,phone,display_name,avatar_url FROM auth_identities WHERE provider=?1 AND provider_user_id=?2 LIMIT 1",
   ).bind(profile.provider, profile.providerUserId).first<IdentityRow>();
-  const migrated = profile.email
+  const matched = profile.email && profile.emailVerified
     ? await db.prepare(
-      "SELECT identity_id,application_user_id,email,phone,display_name,avatar_url FROM auth_identities WHERE provider='supabase_auth' AND lower(email)=lower(?1) LIMIT 2",
+      "SELECT identity_id,application_user_id,email,phone,display_name,avatar_url FROM auth_identities WHERE email_verified=1 AND lower(email)=lower(?1) GROUP BY application_user_id LIMIT 2",
     ).bind(profile.email).all<IdentityRow>()
     : { results: [] };
-  const migratedUsers = migrated.results || [];
-  const canonicalUser = migratedUsers.length === 1 ? migratedUsers[0] : null;
+  const matchedUsers = matched.results || [];
+  const canonicalUser = matchedUsers.length === 1 ? matchedUsers[0] : null;
   if (existing) {
     const applicationUserId = canonicalUser?.application_user_id || existing.application_user_id;
     await db.prepare(
@@ -331,13 +363,14 @@ async function resolveApplicationIdentity(profile: ProviderProfile) {
     return { identityId: existing.identity_id, applicationUserId, profile };
   }
 
-  const applicationUserId = crypto.randomUUID();
+  if (matchedUsers.length > 1) throw new Error("This verified email belongs to multiple legacy identities and requires account review.");
+  const applicationUserId = canonicalUser?.application_user_id || crypto.randomUUID();
   const identityId = crypto.randomUUID();
-  await db.batch([
-    db.prepare("INSERT INTO app_users(user_id,auth_provider,provider_subject,account_state,role) VALUES(?1,'cloudflare_oauth',NULL,'active','student')").bind(applicationUserId),
-    db.prepare("INSERT INTO auth_identities(identity_id,provider,provider_user_id,application_user_id,email,phone,display_name,avatar_url,email_verified) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)")
-      .bind(identityId, profile.provider, profile.providerUserId, applicationUserId, profile.email, profile.phone, profile.displayName, profile.avatarUrl, profile.emailVerified ? 1 : 0),
-  ]);
+  const statements = [];
+  if (!canonicalUser) statements.push(db.prepare("INSERT INTO app_users(user_id,auth_provider,provider_subject,account_state,role) VALUES(?1,'cloudflare_oauth',NULL,'active','student')").bind(applicationUserId));
+  statements.push(db.prepare("INSERT INTO auth_identities(identity_id,provider,provider_user_id,application_user_id,email,phone,display_name,avatar_url,email_verified) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)")
+    .bind(identityId, profile.provider, profile.providerUserId, applicationUserId, profile.email, profile.phone, profile.displayName, profile.avatarUrl, profile.emailVerified ? 1 : 0));
+  await db.batch(statements);
   return { identityId, applicationUserId, profile };
 }
 
@@ -345,14 +378,121 @@ function isoAfter(seconds: number) {
   return new Date(Date.now() + seconds * 1000).toISOString();
 }
 
-async function issueSession(input: {
+type NativeAuthRow = {
+  transaction_id: string;
+  provider: SupportedOAuthProvider;
+  pkce_challenge: string;
+  application_user_id: string | null;
+  auth_identity_id: string | null;
+  exchange_code_hash: string | null;
+  device_label: string;
+  app_build: number;
+  next_path: string;
+  expires_at: string;
+  completed_at: string | null;
+  consumed_at: string | null;
+};
+
+function cleanDeviceLabel(value: string) {
+  const normalized = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  return normalized || "CA Progress mobile device";
+}
+
+function constantTimeEqual(left: string, right: string) {
+  const a = new TextEncoder().encode(left);
+  const b = new TextEncoder().encode(right);
+  let difference = a.length ^ b.length;
+  const size = Math.max(a.length, b.length);
+  for (let index = 0; index < size; index += 1) difference |= (a[index] ?? 0) ^ (b[index] ?? 0);
+  return difference === 0;
+}
+
+export async function createNativeAuthTransaction(input: {
+  provider: SupportedOAuthProvider;
+  pkceChallenge: string;
+  deviceLabel: string;
+  appBuild: number;
+  next: string;
+}) {
+  if (!/^[A-Za-z0-9_-]{43,128}$/.test(input.pkceChallenge)) throw new Error("Native PKCE challenge is invalid.");
+  if (!Number.isSafeInteger(input.appBuild) || input.appBuild < 1) throw new Error("Native application build is invalid.");
+  const transactionId = crypto.randomUUID();
+  const expiresAt = isoAfter(10 * 60);
+  await getDb().prepare(
+    "INSERT INTO native_auth_transactions(transaction_id,provider,pkce_challenge,device_label,app_build,next_path,expires_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+  ).bind(transactionId, input.provider, input.pkceChallenge, cleanDeviceLabel(input.deviceLabel), input.appBuild, input.next, expiresAt).run();
+  return { transactionId, expiresAt };
+}
+
+async function completeNativeOAuthTransaction(transactionId: string, provider: SupportedOAuthProvider, applicationUserId: string, identityId: string) {
+  const exchangeCode = randomToken(32);
+  const exchangeCodeHash = await sha256Base64Url(exchangeCode);
+  const row = await getDb().prepare(
+    `UPDATE native_auth_transactions
+        SET application_user_id=?1,auth_identity_id=?2,exchange_code_hash=?3,completed_at=CURRENT_TIMESTAMP
+      WHERE transaction_id=?4 AND provider=?5 AND completed_at IS NULL AND consumed_at IS NULL AND expires_at>CURRENT_TIMESTAMP
+      RETURNING transaction_id`,
+  ).bind(applicationUserId, identityId, exchangeCodeHash, transactionId, provider).first<{ transaction_id: string }>();
+  if (!row) throw new Error("Native authentication transaction is expired or already completed.");
+  return { transactionId, exchangeCode };
+}
+
+export async function exchangeNativeAuthTransaction(input: { transactionId: string; exchangeCode: string; verifier: string }) {
+  if (!/^[0-9a-f-]{36}$/i.test(input.transactionId)) throw new Error("Native transaction id is invalid.");
+  if (!/^[A-Za-z0-9_-]{32,256}$/.test(input.exchangeCode) || !/^[A-Za-z0-9_-]{43,128}$/.test(input.verifier)) throw new Error("Native exchange proof is invalid.");
+  const db = getDb();
+  const candidate = await db.prepare(
+    "SELECT transaction_id,provider,pkce_challenge,application_user_id,auth_identity_id,exchange_code_hash,device_label,app_build,next_path,expires_at,completed_at,consumed_at FROM native_auth_transactions WHERE transaction_id=?1 LIMIT 1",
+  ).bind(input.transactionId).first<NativeAuthRow>();
+  if (!candidate?.application_user_id || !candidate.auth_identity_id || !candidate.exchange_code_hash || !candidate.completed_at || candidate.consumed_at || Date.parse(candidate.expires_at) <= Date.now()) throw new Error("Native exchange is expired, incomplete, or already used.");
+  const [providedCodeHash, providedChallenge] = await Promise.all([sha256Base64Url(input.exchangeCode), sha256Base64Url(input.verifier)]);
+  if (!constantTimeEqual(providedCodeHash, candidate.exchange_code_hash) || !constantTimeEqual(providedChallenge, candidate.pkce_challenge)) throw new Error("Native exchange proof did not match.");
+  const consumed = await db.prepare(
+    "UPDATE native_auth_transactions SET consumed_at=CURRENT_TIMESTAMP WHERE transaction_id=?1 AND consumed_at IS NULL AND expires_at>CURRENT_TIMESTAMP RETURNING transaction_id",
+  ).bind(input.transactionId).first<{ transaction_id: string }>();
+  if (!consumed) throw new Error("Native exchange was already consumed.");
+  const session = await issueSession({ applicationUserId: candidate.application_user_id, identityId: candidate.auth_identity_id, remember: true, clientKind: "mobile", deviceLabel: candidate.device_label, setCookie: false });
+  return {
+    accessToken: session.rawToken,
+    tokenType: "Bearer" as const,
+    expiresAt: session.expiresAt,
+    absoluteExpiresAt: session.absoluteExpiresAt,
+    sessionId: session.sessionId,
+    applicationUserId: candidate.application_user_id,
+    next: candidate.next_path,
+  };
+}
+
+export async function revokeCurrentNativeSession() {
+  const requestHeaders = await headers();
+  const rawToken = requestHeaders.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{32,256})$/)?.[1] || "";
+  if (!rawToken) throw new Error("Native bearer session is required.");
+  const tokenHash = await sha256Base64Url(rawToken);
+  const db = getDb();
+  const row = await db.prepare("SELECT session_id,application_user_id,client_kind FROM sessions WHERE token_hash=?1 AND revoked_at IS NULL LIMIT 1").bind(tokenHash).first<{ session_id: string; application_user_id: string; client_kind: string }>();
+  if (!row || row.client_kind !== "mobile") throw new Error("Native session is expired or revoked.");
+  await db.prepare("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE session_id=?1 AND revoked_at IS NULL").bind(row.session_id).run();
+  await writeOptionalSessionEvent(db.prepare("INSERT INTO auth_session_events(id,session_id,application_user_id,event_type,detail_json) VALUES(?1,?2,?3,'revoked','{\"clientKind\":\"mobile\"}')").bind(crypto.randomUUID(), row.session_id, row.application_user_id));
+}
+
+export async function issueSession(input: {
   applicationUserId: string;
   identityId: string | null;
   remember: boolean;
   rotatedFromSessionId?: string | null;
   absoluteExpiresAt?: string;
+  clientKind?: "web" | "mobile";
+  deviceLabel?: string | null;
+  setCookie?: boolean;
 }) {
   const db = getDb();
+  let deviceLabel = input.deviceLabel || null;
+  if (!deviceLabel && input.clientKind !== "mobile") {
+    const agent = (await headers()).get("user-agent") || "";
+    const browser = /Edg\//.test(agent) ? "Edge" : /Firefox\//.test(agent) ? "Firefox" : /(?:Chrome|CriOS)\//.test(agent) ? "Chrome" : /Safari\//.test(agent) ? "Safari" : "Web browser";
+    const system = /Windows/.test(agent) ? "Windows" : /Android/.test(agent) ? "Android" : /iPhone|iPad/.test(agent) ? "iOS" : /Macintosh/.test(agent) ? "macOS" : /Linux/.test(agent) ? "Linux" : "Unknown device";
+    deviceLabel = `${browser} on ${system}`;
+  }
   const rawToken = randomToken(32);
   const tokenHash = await sha256Base64Url(rawToken);
   const sessionId = crypto.randomUUID();
@@ -361,35 +501,59 @@ async function issueSession(input: {
   const requestedExpiry = Date.now() + sessionSeconds * 1000;
   const absoluteExpiresAt = input.absoluteExpiresAt || isoAfter(absoluteSeconds);
   const expiresAt = new Date(Math.min(requestedExpiry, new Date(absoluteExpiresAt).getTime())).toISOString();
-  await db.prepare(
-    "INSERT INTO sessions(session_id,application_user_id,auth_identity_id,token_hash,remember_device,expires_at,absolute_expires_at,rotated_from_session_id) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-  ).bind(sessionId, input.applicationUserId, input.identityId, tokenHash, input.remember ? 1 : 0, expiresAt, absoluteExpiresAt, input.rotatedFromSessionId || null).run();
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, rawToken, {
-    httpOnly: true,
-    secure: secureCookie(),
-    sameSite: "lax",
-    path: "/",
-    maxAge: Math.max(1, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)),
-  });
-  return sessionId;
+  try {
+    await db.batch([
+      db.prepare("INSERT INTO sessions(session_id,application_user_id,auth_identity_id,token_hash,remember_device,expires_at,absolute_expires_at,rotated_from_session_id,client_kind,device_label,last_rotated_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,CURRENT_TIMESTAMP)")
+        .bind(sessionId, input.applicationUserId, input.identityId, tokenHash, input.remember ? 1 : 0, expiresAt, absoluteExpiresAt, input.rotatedFromSessionId || null, input.clientKind || "web", deviceLabel),
+      db.prepare("INSERT INTO auth_session_events(id,session_id,application_user_id,event_type,detail_json) VALUES(?1,?2,?3,?4,?5)")
+        .bind(crypto.randomUUID(), sessionId, input.applicationUserId, input.rotatedFromSessionId ? "rotated" : "issued", JSON.stringify({ clientKind: input.clientKind || "web", rotatedFrom: input.rotatedFromSessionId || null })),
+    ]);
+  } catch (error) {
+    if (!isMobileSessionSchemaUnavailable(error)) throw error;
+    await db.prepare("INSERT INTO sessions(session_id,application_user_id,auth_identity_id,token_hash,remember_device,expires_at,absolute_expires_at,rotated_from_session_id) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)")
+      .bind(sessionId, input.applicationUserId, input.identityId, tokenHash, input.remember ? 1 : 0, expiresAt, absoluteExpiresAt, input.rotatedFromSessionId || null).run();
+  }
+  if (input.setCookie !== false) {
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE, rawToken, {
+      httpOnly: true,
+      secure: secureCookie(),
+      sameSite: "lax",
+      path: "/",
+      maxAge: Math.max(1, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)),
+    });
+  }
+  return { sessionId, rawToken, expiresAt, absoluteExpiresAt };
 }
 
 export async function exchangeCloudflareOAuthCode(code: string, state: string): Promise<CloudflareOAuthCallbackResult> {
   if (!code.trim()) throw new Error("OAuth code is required.");
   const transaction = await readOAuthTransaction(state);
+  if(transaction.purpose==="recovery"){
+    try{const {accessToken,config}=await exchangeCode(transaction,code);const profile=await loadProviderProfile(transaction.provider,accessToken,config.userInfoEndpoint);
+      const applicationUserId=await issuePasswordRecovery(profile.provider,profile.providerUserId);
+      return {purpose:"recovery",next:"/account/reset",remember:false,applicationUserId,clientKind:"web"};
+    }catch(error){if(error instanceof PasswordRecoveryError)throw error;throw new PasswordRecoveryError();}
+  }
   const { accessToken, config } = await exchangeCode(transaction, code);
   const profile = await loadProviderProfile(transaction.provider, accessToken, config.userInfoEndpoint);
   const identity = await resolveApplicationIdentity(profile);
-  await issueSession({ applicationUserId: identity.applicationUserId, identityId: identity.identityId, remember: transaction.remember });
-  return { next: transaction.next, remember: transaction.remember, applicationUserId: identity.applicationUserId };
+  if (transaction.clientKind === "mobile") {
+    if (!transaction.nativeTransactionId) throw new Error("Native authentication transaction is missing.");
+    await ensureCloudflareUserBootstrap({ applicationUserId: identity.applicationUserId, displayName: profile.displayName, avatarUrl: profile.avatarUrl });
+    const nativeExchange = await completeNativeOAuthTransaction(transaction.nativeTransactionId, transaction.provider, identity.applicationUserId, identity.identityId);
+    return { next: transaction.next, remember: transaction.remember, applicationUserId: identity.applicationUserId, clientKind: transaction.clientKind, nativeExchange };
+  }
+  await issueSession({ applicationUserId: identity.applicationUserId, identityId: identity.identityId, remember: transaction.remember, clientKind: "web" });
+  return { next: transaction.next, remember: transaction.remember, applicationUserId: identity.applicationUserId, clientKind: "web" };
 }
 
 async function currentSessionRow(rawToken: string) {
   const tokenHash = await sha256Base64Url(rawToken);
-  return getDb().prepare(
-    `SELECT s.session_id,s.application_user_id,s.auth_identity_id,s.remember_device,s.expires_at,s.absolute_expires_at,s.last_seen_at,
-            u.role,u.account_state,i.email,i.phone,i.display_name,i.avatar_url,
+  const db = getDb();
+  const selectMobileSession = () => db.prepare(
+    `SELECT s.session_id,s.application_user_id,s.auth_identity_id,s.remember_device,s.expires_at,s.absolute_expires_at,s.last_seen_at,s.client_kind,s.device_label,
+            u.role,u.account_state,i.email,i.phone,COALESCE(i.display_name,pc.username) AS display_name,i.avatar_url,
             COALESCE((
               SELECT group_concat(pe.feature_key)
                 FROM user_subscriptions us
@@ -403,11 +567,39 @@ async function currentSessionRow(rawToken: string) {
        FROM sessions s
        JOIN app_users u ON u.user_id=s.application_user_id
        LEFT JOIN auth_identities i ON i.identity_id=s.auth_identity_id
+       LEFT JOIN password_credentials pc ON pc.user_id=s.application_user_id
       WHERE s.token_hash=?1 AND s.revoked_at IS NULL
         AND s.expires_at > CURRENT_TIMESTAMP
         AND s.absolute_expires_at > CURRENT_TIMESTAMP
       LIMIT 1`,
   ).bind(tokenHash).first<SessionRow>();
+  try {
+    return await selectMobileSession();
+  } catch (error) {
+    if (!isMobileSessionSchemaUnavailable(error)) throw error;
+    return db.prepare(
+      `SELECT s.session_id,s.application_user_id,s.auth_identity_id,s.remember_device,s.expires_at,s.absolute_expires_at,s.last_seen_at,
+              u.role,u.account_state,i.email,i.phone,COALESCE(i.display_name,pc.username) AS display_name,i.avatar_url,
+              COALESCE((
+                SELECT group_concat(pe.feature_key)
+                  FROM user_subscriptions us
+                  JOIN plan_entitlements pe ON pe.plan_id=us.plan_id
+                 WHERE us.user_id=s.application_user_id
+                   AND us.status='active'
+                   AND us.starts_at <= CURRENT_TIMESTAMP
+                   AND (us.ends_at IS NULL OR us.ends_at > CURRENT_TIMESTAMP)
+                   AND pe.enabled=1
+              ), '') AS entitlements
+         FROM sessions s
+         JOIN app_users u ON u.user_id=s.application_user_id
+         LEFT JOIN auth_identities i ON i.identity_id=s.auth_identity_id
+         LEFT JOIN password_credentials pc ON pc.user_id=s.application_user_id
+        WHERE s.token_hash=?1 AND s.revoked_at IS NULL
+          AND s.expires_at > CURRENT_TIMESTAMP
+          AND s.absolute_expires_at > CURRENT_TIMESTAMP
+        LIMIT 1`,
+    ).bind(tokenHash).first<SessionRow>();
+  }
 }
 
 function guestTestEnabled() {
@@ -440,18 +632,22 @@ export async function isCurrentGuestTestUser(applicationUserId: string) {
 }
 
 async function readCloudflareApplicationSession(): Promise<CloudflareApplicationSession | null> {
+  const requestHeaders = await headers();
+  const authorization = requestHeaders.get("authorization") || "";
+  const bearerMatch = authorization.match(/^Bearer ([A-Za-z0-9_-]{32,256})$/);
   const cookieStore = await cookies();
-  const rawToken = cookieStore.get(SESSION_COOKIE)?.value || "";
+  const rawToken = bearerMatch?.[1] || cookieStore.get(SESSION_COOKIE)?.value || "";
   if (!rawToken && guestTestEnabled()) {
     const applicationUserId = cookieStore.get(GUEST_TEST_COOKIE)?.value || "";
     if (/^[0-9a-f-]{36}$/i.test(applicationUserId)) {
       if (!(await ensureGuestTestUser(applicationUserId))) return null;
-      return { sessionId: applicationUserId, applicationUserId, role: "student", entitlements: [], email: null, phone: null, displayName: "Guest Tester", avatarUrl: null, rememberDevice: true, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), absoluteExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() };
+      return { sessionId: applicationUserId, applicationUserId, role: "student", entitlements: [], email: null, phone: null, displayName: "Guest Tester", avatarUrl: null, rememberDevice: true, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), absoluteExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), clientKind: "web", deviceLabel: "Guest test browser" };
     }
   }
   if (!rawToken) return null;
   const row = await currentSessionRow(rawToken);
   if (!row || row.account_state !== "active") return null;
+  if (bearerMatch && row.client_kind !== "mobile") return null;
   const role = VALID_ROLES.has(row.role as AppRole) ? row.role as AppRole : "student";
   const lastSeenAt = row.last_seen_at ? Date.parse(row.last_seen_at) : 0;
   if (!lastSeenAt || Date.now() - lastSeenAt > 5 * 60 * 1000) {
@@ -469,6 +665,8 @@ async function readCloudflareApplicationSession(): Promise<CloudflareApplication
     rememberDevice: row.remember_device === 1,
     expiresAt: row.expires_at,
     absoluteExpiresAt: row.absolute_expires_at,
+    clientKind: row.client_kind === "mobile" ? "mobile" : "web",
+    deviceLabel: row.device_label || null,
   };
 }
 
@@ -494,8 +692,10 @@ export const getCloudflareRequestAuth = cache(async (): Promise<CloudflareReques
 });
 
 export async function rotateCloudflareSession() {
+  const requestHeaders = await headers();
+  const bearer = requestHeaders.get("authorization")?.match(/^Bearer ([A-Za-z0-9_-]{32,256})$/)?.[1] || "";
   const cookieStore = await cookies();
-  const rawToken = cookieStore.get(SESSION_COOKIE)?.value || "";
+  const rawToken = bearer || cookieStore.get(SESSION_COOKIE)?.value || "";
   if (!rawToken) throw new Error("No active session to rotate.");
   const row = await currentSessionRow(rawToken);
   if (!row || row.account_state !== "active") throw new Error("Session is expired or revoked.");
@@ -511,7 +711,46 @@ export async function rotateCloudflareSession() {
     remember: row.remember_device === 1,
     rotatedFromSessionId: row.session_id,
     absoluteExpiresAt: row.absolute_expires_at,
+    clientKind: row.client_kind === "mobile" ? "mobile" : "web",
+    deviceLabel: row.device_label || null,
+    setCookie: !bearer,
   });
+}
+
+export type SessionDevice = { sessionId: string; current: boolean; clientKind: "web" | "mobile"; deviceLabel: string | null; lastSeenAt: string | null; expiresAt: string; createdAt: string };
+
+export async function listCloudflareSessions(): Promise<SessionDevice[]> {
+  const current = await getCloudflareApplicationSession();
+  if (!current) return [];
+  const db = getDb();
+  let rows: D1Result<{ session_id:string; client_kind?:string|null; device_label?:string|null; last_seen_at:string|null; expires_at:string; created_at:string }>;
+  try {
+    rows = await db.prepare("SELECT session_id,client_kind,device_label,last_seen_at,expires_at,created_at FROM sessions WHERE application_user_id=?1 AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP AND absolute_expires_at>CURRENT_TIMESTAMP ORDER BY last_seen_at DESC LIMIT 25")
+      .bind(current.applicationUserId).all();
+  } catch (error) {
+    if (!isMobileSessionSchemaUnavailable(error)) throw error;
+    rows = await db.prepare("SELECT session_id,last_seen_at,expires_at,created_at FROM sessions WHERE application_user_id=?1 AND revoked_at IS NULL AND expires_at>CURRENT_TIMESTAMP AND absolute_expires_at>CURRENT_TIMESTAMP ORDER BY last_seen_at DESC LIMIT 25")
+      .bind(current.applicationUserId).all();
+  }
+  return (rows.results || []).map(row => ({ sessionId: row.session_id, current: row.session_id === current.sessionId, clientKind: row.client_kind === "mobile" ? "mobile" : "web", deviceLabel: row.device_label || null, lastSeenAt: row.last_seen_at, expiresAt: row.expires_at, createdAt: row.created_at }));
+}
+
+export async function revokeOtherCloudflareSessions() {
+  const current = await getCloudflareApplicationSession();
+  if (!current) throw new Error("Authentication required.");
+  const db = getDb();
+  await db.prepare("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE application_user_id=?1 AND session_id<>?2 AND revoked_at IS NULL").bind(current.applicationUserId, current.sessionId).run();
+  await writeOptionalSessionEvent(db.prepare("INSERT INTO auth_session_events(id,session_id,application_user_id,event_type,detail_json) VALUES(?1,?2,?3,'revoked_others','{}')").bind(crypto.randomUUID(), current.sessionId, current.applicationUserId));
+}
+
+export async function signOutAllCloudflareSessions() {
+  const current = await getCloudflareApplicationSession();
+  if (!current) throw new Error("Authentication required.");
+  const db = getDb();
+  await db.prepare("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE application_user_id=?1 AND revoked_at IS NULL").bind(current.applicationUserId).run();
+  await writeOptionalSessionEvent(db.prepare("INSERT INTO auth_session_events(id,session_id,application_user_id,event_type,detail_json) VALUES(?1,?2,?3,'revoked_all','{}')").bind(crypto.randomUUID(), current.sessionId, current.applicationUserId));
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, "", { httpOnly: true, secure: secureCookie(), sameSite: "lax", path: "/", maxAge: 0 });
 }
 
 export async function signOutCloudflareSession() {
@@ -519,7 +758,12 @@ export async function signOutCloudflareSession() {
   const rawToken = cookieStore.get(SESSION_COOKIE)?.value || "";
   if (rawToken) {
     const tokenHash = await sha256Base64Url(rawToken);
-    await getDb().prepare("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE token_hash=?1 AND revoked_at IS NULL").bind(tokenHash).run();
+    const db = getDb();
+    const row = await db.prepare("SELECT session_id,application_user_id FROM sessions WHERE token_hash=?1 AND revoked_at IS NULL LIMIT 1").bind(tokenHash).first<{session_id:string;application_user_id:string}>();
+    if (row) {
+      await db.prepare("UPDATE sessions SET revoked_at=CURRENT_TIMESTAMP WHERE session_id=?1 AND revoked_at IS NULL").bind(row.session_id).run();
+      await writeOptionalSessionEvent(db.prepare("INSERT INTO auth_session_events(id,session_id,application_user_id,event_type,detail_json) VALUES(?1,?2,?3,'revoked','{}')").bind(crypto.randomUUID(), row.session_id, row.application_user_id));
+    }
   }
   cookieStore.set(SESSION_COOKIE, "", {
     httpOnly: true,

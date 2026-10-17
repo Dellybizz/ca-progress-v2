@@ -1,22 +1,14 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import { LoginRequired } from "@/components/auth/login-required";
-import { ResourceLibrary } from "@/components/resources/resource-library";
-import { PageHeader } from "@/components/ui/page-header";
-import { getCommunityNoteDraftForViewer } from "@/lib/notes/phase6";
-import { getResourceLibraryModel } from "@/lib/resources/service";
-import { OfflineSnapshot } from "@/components/offline/offline-snapshot";
-
-export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Notes | CA Progress" };
-
-export default async function NotesPage({ searchParams }: { searchParams: Promise<{ subjectId?: string; chapterId?: string; communityMessageId?: string }> }) {
-  const { subjectId, chapterId, communityMessageId } = await searchParams;
-  const [model, communityDraft] = await Promise.all([
-    getResourceLibraryModel(),
-    getCommunityNoteDraftForViewer(communityMessageId),
-  ]);
-  if (model.mode === "guest") return <div className="phase7-page"><PageHeader preview eyebrow="Notes preview" title="Revision Notes" description="Your private CA revision workspace appears after you sign in."/><div className="phase7-guest-official"><p>Official ICAI resources remain available separately.</p><Link className="ui-text-link" href="/resources/icai">Browse verified ICAI resources →</Link></div><LoginRequired next={communityMessageId ? `/notes?communityMessageId=${encodeURIComponent(communityMessageId)}` : "/notes"} title="Sign in to open your private notes workspace"/></div>;
-  if (model.mode !== "ready") return null;
-  return <div className="phase7-page"><OfflineSnapshot kind="notes" data={model}/><PageHeader preview={false} eyebrow="CA revision workspace" title={`Revision Notes, ${model.viewerName}.`} description="Link notes to subjects, chapters and optional Unit/AS; use focused formatting and tables; keep files private; or retain a useful Community answer with its source."/><ResourceLibrary model={model} initialTab="my" initialAcademicContext={{ subjectId, chapterId }} initialCommunityDraft={communityDraft}/></div>;
+import "@/app/styles/notes-workspace.css";
+import {NoteEditor} from '@/components/resources/note-editor';
+import {redirect} from 'next/navigation';
+import {LoginRequired} from '@/components/auth/login-required';
+import {getResourceLibraryModel} from '@/lib/resources/service';
+import {getCommunityNoteDraftForViewer} from '@/lib/notes/phase6';
+export const dynamic='force-dynamic';
+export default async function NotesPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}){
+ const params=await searchParams;const text=(key:string)=>typeof params[key]==='string'?params[key] as string:undefined;
+ if(!text('communityMessageId')){const query=new URLSearchParams();for(const key of ['subjectId','chapterId'])if(text(key))query.set(key,text(key)!);redirect(`/notes/new${query.size?'?'+query:''}`);}
+ const [model,draft]=await Promise.all([getResourceLibraryModel({includeOfficial:false,metadataOnly:true}),getCommunityNoteDraftForViewer(text('communityMessageId'))]);
+ if(model.mode==='setup')redirect('/onboarding?next=/notes');
+ return model.mode==='ready'?<div className="note-authoring-entry"><NoteEditor subjects={model.subjects} communityDraft={draft} initialSubjectId={text('subjectId')} initialChapterId={text('chapterId')}/></div>:<LoginRequired next="/notes" title="Sign in to open your notes"/>;
 }

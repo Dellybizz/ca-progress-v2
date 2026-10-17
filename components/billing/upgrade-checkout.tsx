@@ -1,0 +1,84 @@
+"use client";
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {useRouter} from 'next/navigation';
+import type {UpgradeQuote} from '@/lib/billing/subscription-rules.mjs';
+import type {UpgradeView} from '@/lib/billing/upgrade-engine.mjs';
+import type {PaymentMethod} from '@/lib/billing/payment-quote.mjs';
+type Review={planId:string;method:PaymentMethod;quoteId:string;expiresAt:string;kind?:string;quote:UpgradeQuote;checkoutReady:boolean};
+const money=(n:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',minimumFractionDigits:0,maximumFractionDigits:2}).format(n/100);
+const date=(s:string)=>new Intl.DateTimeFormat('en-IN',{day:'numeric',month:'short',year:'numeric',timeZone:'Asia/Kolkata'}).format(new Date(s));
+export function UpgradeCheckout({planLabel="Ranker",introPurchase=false,planId,onClose,loadCheckout,onBusyChange}:{planLabel?:string;introPurchase?:boolean;planId:string|null;onClose:()=>void;loadCheckout:()=>Promise<boolean>;onBusyChange:(busy:boolean)=>void}){
+ const router=useRouter(),dialog=useRef<HTMLDialogElement>(null),guard=useRef(false);
+ const [reviewData,setReview]=useState<Review|null>(null),[saved,setSaved]=useState<UpgradeView|null>(null),[method,setMethod]=useState<PaymentMethod>('upi'),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
+ const review=reviewData?.planId===planId&&reviewData?.method===method?reviewData:null;
+ const savedId=saved?.quoteId,savedReady=saved?.renewalReady;
+ const accessRefreshed=useRef<string|null>(null);
+ const setWorking=(value:boolean)=>{guard.current=value;setBusy(value);onBusyChange(value);};
+ useEffect(()=>{let active=true;void fetch('/api/v1/payments/upgrade',{cache:'no-store'}).then(r=>r.json()).then(result=>{if(active)setSaved(result.upgrade??null);}).catch(()=>undefined);return()=>{active=false;};},[]);
+ useEffect(()=>{
+  if(!planId)return;
+  void loadCheckout();
+  const controller=new AbortController();
+  void fetch('/api/v1/payments/upgrade-quote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({planId,paymentMethod:method,purchaseKind:introPurchase?"intro":"upgrade"}),signal:controller.signal}).then(async response=>{const result=await response.json();if(!response.ok)throw new Error(result.error||'Your upgrade review is unavailable.');if(!controller.signal.aborted)setReview({...result,planId,method});}).catch(reason=>{if(!controller.signal.aborted)setError(reason.message);});
+  return()=>controller.abort();
+ },[planId,method,introPurchase,loadCheckout]);
+ useLayoutEffect(()=>{if(planId&&!dialog.current?.open)dialog.current?.showModal();},[planId]);
+ useEffect(()=>{
+  if(!savedId||savedReady)return;
+  let active=true,count=0;const id=savedId;
+  const timer=setInterval(()=>{if(!active||guard.current||document.hidden||count++>=12)return;void fetch('/api/v1/payments/upgrade',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({quoteId:id,action:'recover'})}).then(r=>r.json()).then(result=>{if(active&&result.upgrade){setSaved(result.upgrade);if(result.upgrade.accessGranted&&accessRefreshed.current!==id){accessRefreshed.current=id;router.refresh();}}}).catch(()=>undefined);},10000);
+  return()=>{active=false;clearInterval(timer);};
+ },[savedId,savedReady,router]);
+ async function action(quoteId:string,actionName:string,proof:Record<string,string>={}){
+  const response=await fetch('/api/v1/payments/upgrade',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({quoteId,action:actionName,...proof})});
+  const result=await response.json();if(result.upgrade||result.abandoned)setSaved(result.upgrade??null);
+  if(!response.ok||result.error)throw new Error(result.error||'Your upgrade is being confirmed.');return result;
+ }
+ async function renew(id:string){
+  const result=await action(id,'renewal');const checkout=result.checkout;
+  if(!checkout?.subscriptionId)throw new Error('Your renewal approval is saved and being prepared.');
+  if(!await loadCheckout()||!window.Razorpay)throw new Error('Secure payment could not load. Use Continue setup to try again.');
+  const Razorpay=window.Razorpay;
+  await new Promise<void>((resolve,reject)=>{
+   const instance=new Razorpay({key:checkout.keyId,subscription_id:checkout.subscriptionId,name:'CA Progress',description:`Approve future ${result.planLabel??planLabel} renewals`,config:{display:{blocks:{selected:{name:'Automatic monthly renewal',instruments:[{method:checkout.paymentMethod}]}},sequence:['block.selected'],preferences:{show_default_blocks:false}}},theme:{color:'#4f46e5'},modal:{ondismiss:()=>reject(new Error('Your paid access is ready. You can approve future renewals later.'))},handler:async(proof:Record<string,string>)=>{
+    try{const verified=await fetch('/api/v1/payments/verify-subscription',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(proof)});if(!verified.ok)throw new Error('Your bank approval is being checked.');await action(id,'confirm_renewal');resolve();}catch(reason){reject(reason);}
+   }});instance.on?.('payment.failed',()=>reject(new Error('Your paid access is ready. Please try renewal approval again.')));instance.open();
+  });
+  router.refresh();
+ }
+ async function pay(id:string){
+  if(guard.current)return;dialog.current?.close();onClose();setWorking(true);setError(null);
+  try{
+   const result=await action(id,'pay'),upgrade=result.upgrade as UpgradeView;
+   if(!upgrade.accessGranted){
+    if(!upgrade.orderId)throw new Error('Your upgrade payment is being prepared.');
+    if(!await loadCheckout()||!window.Razorpay)throw new Error('Secure payment could not load. Your upgrade is saved; try Continue payment.');
+    const Razorpay=window.Razorpay;
+  await new Promise<void>((resolve,reject)=>{
+     let verifying=false;
+     const instance=new Razorpay({key:upgrade.keyId,order_id:upgrade.orderId,amount:upgrade.quote.amountDueSubunits,currency:upgrade.quote.currency,name:'CA Progress',description:upgrade.kind==='intro'?`First month of ${upgrade.planLabel??planLabel}`:'Pro upgrade',theme:{color:'#4f46e5'},modal:{ondismiss:()=>{if(!verifying)reject(Object.assign(new Error('Payment closed. You can choose a plan again.'),{abandonCheckout:true}));}},handler:async(proof:Record<string,string>)=>{verifying=true;try{await action(id,'verify',proof);resolve();}catch(reason){reject(reason);}}});instance.on?.('payment.failed',()=>{if(verifying)return;reject(Object.assign(new Error('Payment failed. Please try again.'),{abandonCheckout:true}));instance.close?.();});instance.open();
+    });
+   }
+   setReview(null);onClose();router.refresh();await renew(id);
+  }catch(reason){
+   if(reason instanceof Error&&'abandonCheckout' in reason){setSaved(null);setError(null);try{await action(id,'abandon');}catch{setError('Payment status is being checked. Please try again shortly.');}setReview(null);onClose();router.refresh();return;}
+   setError(reason instanceof Error?reason.message:'Your upgrade is being checked.');const latest=await fetch('/api/v1/payments/upgrade',{cache:'no-store'}).then(r=>r.json()).catch(()=>null);if(latest?.upgrade)setSaved(latest.upgrade);router.refresh();}
+  finally{setWorking(false);}
+ }
+ async function continueRenewal(id:string){if(guard.current)return;setWorking(true);setError(null);try{await renew(id);}catch(reason){setError(reason instanceof Error?reason.message:'Your renewal is being confirmed.');}finally{setWorking(false);}}
+ const close=()=>{if(busy)return;setReview(null);setError(null);onClose();};
+ return <>{saved&&!saved.renewalReady?<section className="upgrade-saved" aria-label="Your subscription payment"><div><strong>{saved.state==='review'?'Your payment needs review':saved.accessGranted?`Your ${saved.planLabel??planLabel} access is ready`:saved.kind==='intro'?'Your subscription payment is saved':'Your upgrade is saved'}</strong><p>{saved.state==='review'?'See Billing for your payment and refund status.':saved.accessGranted?`Access until ${date(saved.quote.nextRenewalAt)}. ${saved.sourceCancelled?'Approve future monthly renewals to keep your plan going.':'We’re confirming that your previous renewal has stopped.'}`:(saved.kind==='intro'?'Continue payment to start your first month.':'Continue payment. Your current paid access stays available while payment is checked.')}</p></div><button className="ui-button ui-button--primary" disabled={busy||saved.state==='review'||Boolean(saved.accessGranted&&!saved.sourceCancelled)} onClick={()=>saved.accessGranted?void continueRenewal(saved.quoteId):void pay(saved.quoteId)}>{busy?'Please wait…':saved.accessGranted?'Continue setup':'Continue payment'}</button></section>:null}{error&&!planId?<p className="phase11-notice phase11-notice--info" role="status">{error}</p>:null}{planId?<dialog ref={dialog} className="billing-review upgrade-review subscription-review" aria-labelledby="upgrade-review-title" onCancel={event=>{if(busy)event.preventDefault();else close();}}>
+ <header className="subscription-review-header"><div><span className="subscription-review-eyebrow">{introPurchase?'YOUR SUBSCRIPTION':'YOUR UPGRADE'}</span><h2 id="upgrade-review-title">{planLabel}</h2></div><button type="button" className="subscription-review-close" aria-label="Close subscription review" disabled={busy} onClick={close}>×</button></header>
+ {review?<>
+  <section className="subscription-review-price" aria-label="Payment today"><span className="subscription-review-offer">{review.quote.mode==='intro_full_month'?'First-month offer':'Pay for the remaining period'}</span><span className="subscription-review-price-label">You pay today</span><strong>{money(review.quote.amountDueSubunits)}</strong><p>{introPurchase?'For your first month':review.quote.mode==='intro_full_month'?(review.quote.unusedCreditSubunits>0?'For a full month, after your Basic credit':'For a full month'):`For Pro until ${date(review.quote.nextRenewalAt)}`}</p></section>
+  {!introPurchase&&review.quote.unusedCreditSubunits>0?<dl className="upgrade-price-breakdown subscription-review-credit"><div><dt>{review.quote.mode==='intro_full_month'?'First month of Pro':'Pro for the remaining period'}</dt><dd>{money(review.quote.planChargeSubunits)}</dd></div><div><dt>Unused Basic credit</dt><dd>−{money(review.quote.unusedCreditSubunits)}</dd></div></dl>:null}
+  <section className="subscription-review-renewal" aria-label="Future payments"><div><span>Then monthly</span><strong>{money(review.quote.recurringPriceSubunits)}<small> / month</small></strong></div><p>{introPurchase?'Starting one month after your plan activates':`Next payment on ${date(review.quote.nextRenewalAt)}`}</p><span className="subscription-review-cancel">Cancel renewal anytime</span></section>
+  <fieldset className="subscription-review-methods" disabled={busy}><legend>Pay future renewals with</legend><div>{([{value:'upi',label:'UPI AutoPay'},{value:'card',label:'Card'},{value:'emandate',label:'Bank debit'}] as const).map(option=><label key={option.value} className={method===option.value?'is-selected':''}><span>{option.label}</span><input type="radio" name="subscription-renewal-method" value={option.value} checked={method===option.value} onChange={()=>{setError(null);setReview(null);setMethod(option.value);}}/></label>)}</div></fieldset>
+  <p className="subscription-review-help">{introPurchase?'Pay today to activate your plan, then approve automatic renewals.':'Your upgrade starts after verified payment. Then approve renewals; your old subscription stops renewing.'}</p>
+  <details className="subscription-review-verification"><summary>About bank verification</summary><p>Your bank may temporarily debit a verification amount and refund it. This is separate from your plan payment.</p></details>
+ </>:<p className="subscription-review-loading" role="status">{error||'Preparing your price…'}</p>}
+ {error&&review?<p role="alert" className="phase11-notice phase11-notice--error">{error}</p>:null}
+ <div className="upgrade-review-actions"><button type="button" className="ui-button ui-button--primary" disabled={!review||busy} onClick={()=>review&&void pay(review.quoteId)}>{busy?'Please wait…':'Continue to payment'}</button></div>
+ <p className="subscription-review-secure">Secure checkout by Razorpay</p>
+ </dialog>:null}</>;
+}

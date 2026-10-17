@@ -1,1 +1,2 @@
-export default function Loading() { return <div className="phase7-loading" aria-label="Loading notes library"><div className="phase7-loading__hero"/><div className="phase7-loading__controls"/><div className="phase7-loading__card"/><div className="phase7-loading__card"/></div>; }
+import '@/app/styles/notes-workspace.css';
+export default function Loading(){return <div className="note-authoring-entry"><div className="note-loading-frame" role="status" aria-label="Opening note"><div><span className="ui-skeleton"/></div><div/><section/></div></div>;}

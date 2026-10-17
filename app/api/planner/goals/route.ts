@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const privateHeaders = { "Cache-Control": "private, no-store" };
 const KINDS: GoalKind[] = ["daily_study", "weekly_study", "completion", "revision", "test", "custom"];
 type Body =
-  | { action: "create"; title: string; description?: string; dueDate: string; goalKind?: GoalKind; targetValue?: number; startsOn?: string | null }
+  | { action: "create"; clientId?: string; title: string; description?: string; dueDate: string; goalKind?: GoalKind; targetValue?: number; startsOn?: string | null }
   | { action: "toggle"; id: string; done: boolean }
   | { action: "delete"; id: string };
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
         goalKind,
         targetValue: Math.round(Number(body.targetValue ?? 1)),
         startsOn: body.startsOn || null,
-      }), { status: 201, headers: privateHeaders });
+      }, undefined, body.clientId || null), { status: 201, headers: privateHeaders });
     }
     if (body.action === "toggle") return NextResponse.json(await togglePhase8Goal(user.id, body.id, body.done), { headers: privateHeaders });
     if (body.action === "delete") return NextResponse.json(await deletePhase8Goal(user.id, body.id), { headers: privateHeaders });

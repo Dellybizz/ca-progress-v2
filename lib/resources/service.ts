@@ -1,4 +1,7 @@
+import {versionStorage} from './lifecycle';
+import {isWorkspaceTrashed} from './workspace';
 import "server-only";
+import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 
 import { optionalUser } from "@/lib/auth/server";
 import { getStudentContext } from "@/lib/academic/student-context";
@@ -30,7 +33,8 @@ function officialCards(catalog: Awaited<ReturnType<typeof getIcaiPublicCatalog>>
     title: resource.title,
     summary: resource.summary,
     resourceType: resource.type,
-    officialUrl: resource.officialUrl,
+    // Use the verified redirect so stale or broken official destinations fail closed.
+    officialUrl: `/resources/${encodeURIComponent(resource.id)}/open`,
     sourceName: resource.sourceName,
     lastVerifiedAt: resource.lastVerifiedAt,
     publishedOn: resource.publishedOn,
@@ -56,6 +60,7 @@ function noteDto(row: NoteRow, names: Awaited<ReturnType<typeof nameMaps>>, tags
     title: row.title,
     excerpt: excerpt(row.body_text),
     bodyHtml: row.body_html,
+    documentJson: extra?.documentJson??null,
     subjectId: row.subject_id,
     chapterId: row.chapter_id,
     topicId: extra?.topicId ?? null,
@@ -111,20 +116,26 @@ async function tagsForOwnNotes(client: Awaited<ReturnType<typeof createD1ServerC
   return tagsByNote;
 }
 
-export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
+export async function getResourceLibraryModel({ includeOfficial = true, metadataOnly = false }: { includeOfficial?: boolean; metadataOnly?:boolean } = {}): Promise<ResourceLibraryModel> {
   const context = await getStudentContext();
-  if (context.mode === "guest") return { mode: "guest", officialResources: officialCards(await getIcaiPublicCatalog({})) };
+  if (context.mode === "guest") return { mode: "guest", officialResources: includeOfficial ? officialCards(await getIcaiPublicCatalog({})) : [] };
   if (context.mode !== "ready" || !context.selection || !context.userId) return { mode: "setup", viewerName: context.displayName, officialResources: [] };
-  const officialResources = officialCards(await getIcaiPublicCatalog({ level: context.selection.level, attempt: context.selection.attemptKey }));
   const identity = { id: context.userId };
 
+  if(metadataOnly){
+    const subjects=await getPhase6AcademicOptions(identity.id);
+    return {mode:"ready",viewerName:context.displayName,subjects:subjects.filter(subject=>context.subjectIds.includes(subject.id)),myNotes:[],myUploads:[],sharedNotes:[],sharedUploads:[],officialResources:includeOfficial?officialCards(await getIcaiPublicCatalog({level:context.selection.level,attempt:context.selection.attemptKey})):[]};
+  }
   const client = await createD1ServerClient();
-  const [names, tagsByNote, rows, subjects] = await Promise.all([
+  const [names, tagsByNote, rows, subjects, officialResources, importanceRows] = await Promise.all([
     nameMaps(client),
     tagsForOwnNotes(client, identity.id),
-    getHotResourceLibraryRows(identity.id),
+    getHotResourceLibraryRows(identity.id,undefined,metadataOnly),
     getPhase6AcademicOptions(identity.id),
+    includeOfficial ? getIcaiPublicCatalog({ level: context.selection.level, attempt: context.selection.attemptKey }).then(officialCards) : Promise.resolve([]),
+    getD1RuntimeDatabase().prepare("SELECT resource_id FROM resource_importance WHERE owner_user_id=?1").bind(identity.id).all<{resource_id:string}>(),
   ]);
+  const importantIds = new Set((importanceRows.results ?? []).map(row=>row.resource_id));
   const allNoteIds = [...rows.ownNotes, ...rows.sharedNotes].map((row) => row.id);
   const extras = await getPhase6NoteExtras(allNoteIds, identity.id);
   const subjectIds = new Set(context.subjectIds);
@@ -134,7 +145,7 @@ export async function getResourceLibraryModel(): Promise<ResourceLibraryModel> {
     viewerName: context.displayName,
     subjects: subjects.filter((subject)=>subjectIds.has(subject.id)),
     myNotes: scoped(rows.ownNotes).map((row) => noteDto(row as NoteRow, names, tagsByNote.get(row.id) ?? [], identity.id, extras.get(row.id))),
-    myUploads: scoped(rows.ownUploads).map((row) => uploadDto(row as UploadRow, names, identity.id)),
+    myUploads: scoped(rows.ownUploads).map((row) => ({...uploadDto(row as UploadRow, names, identity.id),important:importantIds.has(row.id)})),
     sharedNotes: scoped(rows.sharedNotes).map((row) => noteDto(row as NoteRow, names, [], identity.id, extras.get(row.id))),
     sharedUploads: scoped(rows.sharedUploads).map((row) => uploadDto(row as UploadRow, names, identity.id)),
     officialResources,
@@ -147,8 +158,9 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
   const client = await createD1ServerClient();
   const noteResponse = await client.from("notes").select("*").eq("id", noteId).maybeSingle();
   if (noteResponse.error) throw new Error(`Note could not be loaded: ${noteResponse.error.message}`);
-  if (!noteResponse.data) return { mode: "missing" };
+  if (!noteResponse.data || await isWorkspaceTrashed("note",noteId)) return { mode: "missing" };
   const row = noteResponse.data as NoteRow;
+  const revisionRow=await getD1RuntimeDatabase().prepare("SELECT COALESCE(max(id),0) revision FROM resource_file_activity WHERE entity_kind='note' AND entity_id=?1 AND owner_user_id=?2").bind(noteId,row.user_id).first<{revision:number}>();
   const canManage = row.user_id === identity.id;
   if (!canManage && !(row.visibility === "shared" && row.moderation_status === "approved")) return { mode: "missing" };
 
@@ -157,11 +169,11 @@ export async function getNoteDetailModel(noteId: string): Promise<NoteDetailMode
     tagsForOwnNotes(client, identity.id),
     canManage ? getPhase6AcademicOptions(identity.id) : Promise.resolve([]),
     getPhase6NoteExtras([row.id], identity.id),
-    canManage ? getHotResourceLibraryRows(identity.id) : Promise.resolve({ ownUploads: [] as unknown[], ownNotes: [], sharedNotes: [], sharedUploads: [] }),
+    canManage ? getHotResourceLibraryRows(identity.id,undefined,true) : Promise.resolve({ ownUploads: [] as unknown[], ownNotes: [], sharedNotes: [], sharedUploads: [] }),
   ]);
   return {
     mode: "ready",
-    note: noteDto(row, names, canManage ? tagsByNote.get(row.id) ?? [] : [], identity.id, extras.get(row.id)),
+    note: {...noteDto(row, names, canManage ? tagsByNote.get(row.id) ?? [] : [], identity.id, extras.get(row.id)),revision:revisionRow?.revision??0},
     subjects,
     availableUploads: canManage ? ownedRows.ownUploads.map((upload) => uploadDto(upload as UploadRow, names, identity.id)) : [],
     canManage,
@@ -177,7 +189,10 @@ export async function getResourceDetailModel(resourceId: string): Promise<Resour
   if (!row) return { mode: "missing" };
   const names = await nameMaps(client);
   const canManage = row.owner_user_id === identity.id;
-  return { mode: "ready", resource: uploadDto(row, names, identity.id), canManage, canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved" };
+  if(!canManage&&!(row.visibility==='shared'&&row.moderation_status==='approved'))return {mode:'missing'};
+  if(canManage){const version=await versionStorage(resourceId,identity.id);if(version)Object.assign(row,version);}
+  const importance=canManage?await getD1RuntimeDatabase().prepare("SELECT resource_id FROM resource_importance WHERE resource_id=?1 AND owner_user_id=?2").bind(resourceId,identity.id).first():null;
+  return { mode: "ready", resource: {...uploadDto(row, names, identity.id),important:Boolean(importance)}, canManage, canReport: !canManage && row.visibility === "shared" && row.moderation_status === "approved" };
 }
 
 export async function getResourceModerationPageModel(): Promise<ModerationPageModel> {

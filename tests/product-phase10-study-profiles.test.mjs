@@ -128,9 +128,9 @@ test("Product Phase 10 owner UI exposes granular visibility and exact-ID buddy g
   const viewerPage = read("app/(student)/study-profile/[userId]/page.tsx");
   assert.match(component, /Profile visibility/);
   assert.match(component, /Progress visibility/);
-  assert.match(component, /Streak & consistency visibility/);
-  assert.match(component, /Show my CA level/);
-  assert.match(component, /Show my target attempt/);
+  assert.match(component, /Streak visibility/);
+  assert.match(component, /Show CA level/);
+  assert.match(component, /Show target attempt/);
   assert.match(component, /Buddy user ID/);
   assert.match(component, /Exact user ID/);
   assert.doesNotMatch(component, /search users|discover people|suggested buddies/i);

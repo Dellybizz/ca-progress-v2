@@ -1,4 +1,7 @@
 import "server-only";
+import {insertResourceWithinQuota} from "@/lib/resources/metadata-quota";
+import {storageAllowance} from "./storage-allowance.mjs";
+import {getD1RuntimeDatabase} from "@/lib/data/d1/client";
 
 import { optionalUser } from "@/lib/auth/server";
 import { isCurrentGuestTestUser } from "@/lib/auth/cloudflare";
@@ -7,7 +10,7 @@ import { getSharedPublicJson, getCachedUserFeature } from "@/lib/cache/public";
 import { RESOURCE_R2_STORAGE_BUCKET } from "@/lib/resources/r2";
 import { getEligibleLeaderboardRewardPlan } from "@/lib/gamification/phase13-reward-eligibility";
 import { hasSubscriptionAccess } from "./lifecycle.mjs";
-import { storageQuotaBytes, tierRank } from "./plan-policy.mjs";
+import { tierRank, configuredPlanLabel } from "./plan-policy.mjs";
 import { invokeBillingService } from "./service-binding";
 
 export type BillingCycle = "free" | "monthly" | "annual";
@@ -15,13 +18,12 @@ export type PlanTier = "free" | "basic" | "pro";
 export type SubscriptionPlan = { id: string; tier_key: PlanTier; billing_cycle: BillingCycle; name: string; tagline: string; rank: number; price_subunits: number | null; currency: string; duration_value: number; duration_unit: string; active: boolean; checkout_enabled: boolean; sort_order: number };
 export type PlanEntitlement = { plan_id: string; feature_key: string; enabled: boolean; limit_value: number | null; limit_unit: string; reset_period: string; upgrade_message: string };
 export type Entitlement = { planId: string; tier: PlanTier; planName: string; featureKey: string; allowed: boolean; limitValue: number | null; limitUnit: string; resetPeriod: string; upgradeMessage: string; policyVersionId?: string; timeLimitMinutes?: number | null; storageLimitBytes?: number | null; fileSizeLimitBytes?: number | null; retentionDays?: number | null };
-export type BillingModel = { mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: SubscriptionRow | null; payments?: PaymentRow[]; events?: SubscriptionEventRow[]; plans?: SubscriptionPlan[] };
+export type BillingModel = { viewerId?: string; mode: "guest" | "ready"; currentPlan?: SubscriptionPlan; currentSubscription?: SubscriptionRow | null; payments?: PaymentRow[]; events?: SubscriptionEventRow[]; plans?: SubscriptionPlan[] };
 
 type CurrentPlanRow = { plan_id: string; status: string; starts_at: string; ends_at: string | null };
 type StorageRow = { size_bytes: number };
 type IdRow = { id: string };
 type ProfileLabelRow = { display_name: string | null };
-type CreatedResourceRow = { id: string; moderation_status: string };
 type SubscriptionRow = { id: string; plan_id: string; status: string; starts_at: string; ends_at: string | null; source: string; created_at?: string };
 type PaymentRow = { id: string; plan_id: string; provider_order_id: string; provider_payment_id: string | null; amount_subunits: number; currency: string; status: string; created_at: string; paid_at: string | null };
 type SubscriptionEventRow = { id: string; plan_id: string; event_type: string; source: string; starts_at: string | null; ends_at: string | null; created_at: string };
@@ -87,7 +89,7 @@ async function rewardEntitlementOverride(userId: string, featureKey: string, cur
   return {
     planId: plan.id,
     tier: plan.tier_key,
-    planName: plan.name,
+    planName: configuredPlanLabel(plan.tier_key,plan.name),
     featureKey,
     allowed: Boolean(entitlement?.enabled),
     limitValue: entitlement?.limit_value ?? null,
@@ -97,9 +99,9 @@ async function rewardEntitlementOverride(userId: string, featureKey: string, cur
   } satisfies Entitlement;
 }
 
-export async function getEntitlementForUser(userId: string, featureKey: string): Promise<Entitlement> {
+export async function getEntitlementForUser(userId: string, featureKey: string, {fresh=false}:{fresh?:boolean}={}): Promise<Entitlement> {
   if (await isCurrentGuestTestUser(userId)) return { planId: "guest-test", tier: "pro", planName: "Guest test access", featureKey, allowed: true, limitValue: null, limitUnit: "unlimited", resetPeriod: "never", upgradeMessage: "" };
-  return getCachedUserFeature({
+  const lookup={
     userId,
     featureKey,
     load: async () => {
@@ -118,22 +120,25 @@ export async function getEntitlementForUser(userId: string, featureKey: string):
       } catch {
         if (providerEntitlement) return providerEntitlement;
       }
-      return providerEntitlement ?? { planId: "", tier: "free", planName: "Free", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
+      return providerEntitlement ?? { planId: "", tier: "free", planName: "Explorer", featureKey, allowed: false, limitValue: 0, limitUnit: "count", resetPeriod: "never", upgradeMessage: "Billing is temporarily unavailable. Please try again shortly." };
     },
-  });
+  };
+  return fresh?lookup.load():getCachedUserFeature(lookup);
 }
 
 export async function getResourceStorageAccess(userId: string) {
-  const entitlement = await getEntitlementForUser(userId, "resources.storage");
+  const entitlement = await getEntitlementForUser(userId, "resources.storage", {fresh:true});
   const result = await db().from("uploaded_resources").select("size_bytes").eq("owner_user_id", userId);
   if (result.error) throw new Error(result.error.message);
-  const usedBytes = asRows<StorageRow>(result.data).reduce((sum, item) => sum + Number(item.size_bytes ?? 0), 0);
-  const allowed = Boolean(entitlement.planId) && entitlement.allowed;
-  const limitBytes = entitlement.storageLimitBytes ?? storageQuotaBytes(entitlement.tier);
+  const attachments = await db().from("test_attempt_attachments").select("size_bytes").eq("user_id", userId);
+  if (attachments.error) throw new Error(attachments.error.message);
+  const usedBytes = [...asRows<StorageRow>(result.data),...asRows<StorageRow>(attachments.data)].reduce((sum, item) => sum + Number(item.size_bytes ?? 0), 0);
+  const resolved=await storageAllowance(getD1RuntimeDatabase(),userId,entitlement);
+  const limitBytes = resolved.limitBytes;
   const limitValue = limitBytes / (1024 * 1024);
   return {
     ...entitlement,
-    allowed,
+    allowed: Boolean(resolved.planId) && resolved.allowed,
     limitValue,
     limitUnit: "megabytes",
     usedBytes,
@@ -146,25 +151,26 @@ export async function createResourceMetadataWithinQuota(input: { userId: string;
   const client = db();
   const access = await getResourceStorageAccess(input.userId);
   if (!access.allowed) throw new Error(access.upgradeMessage || "Resource storage is not available on this plan.");
-  if (access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
+  if (access.limitBytes!==null && access.usedBytes + input.sizeBytes > access.limitBytes) throw new Error("This upload would exceed your resource storage allowance.");
   const duplicateResult = await client.from("uploaded_resources").select("id").eq("storage_path", input.storagePath).maybeSingle();
   if (duplicateResult.error) throw new Error(duplicateResult.error.message);
   if (asRow<IdRow>(duplicateResult.data)) throw new Error("This resource upload has already been recorded.");
   const profileResult = await client.from("profiles").select("display_name").eq("user_id", input.userId).maybeSingle();
   if (profileResult.error) throw new Error(profileResult.error.message);
   const profile = asRow<ProfileLabelRow>(profileResult.data);
-  const moderationStatus = input.visibility === "shared" ? "pending" : "private";
-  const createdResult = await client.from("uploaded_resources").insert({ owner_user_id: input.userId, owner_label: profile?.display_name?.trim() || "CA Progress student", title: input.title, description: input.description, subject_id: input.subjectId, chapter_id: input.chapterId, original_filename: input.originalFilename, safe_filename: input.safeFilename, storage_bucket: RESOURCE_R2_STORAGE_BUCKET, storage_path: input.storagePath, mime_type: input.mimeType, extension: input.extension, size_bytes: input.sizeBytes, visibility: input.visibility, moderation_status: moderationStatus, published_at: null }).select("id,moderation_status").single();
-  if (createdResult.error) throw new Error(createdResult.error.message);
-  const created = asRow<CreatedResourceRow>(createdResult.data);
-  if (!created) throw new Error("Resource metadata could not be created within the plan allowance.");
+  // D1 serializes this single INSERT/SELECT, so concurrent copies and
+  // completions cannot both spend the same remaining storage allowance.
+  const created=await insertResourceWithinQuota(getD1RuntimeDatabase(),input,access.limitBytes,profile?.display_name?.trim()||"CA Progress student",RESOURCE_R2_STORAGE_BUCKET);
+  if(!created)throw new Error('Storage allowance changed or this file is already saved.');
   const usedBytes = access.usedBytes + input.sizeBytes;
   return { id: created.id, moderationStatus: created.moderation_status, usedBytes, limitBytes: access.limitBytes };
 }
 
-export async function getPricingModel() {
-  const [plans, entitlements, identity] = await Promise.all([listPlans(), listPlanEntitlements(), optionalUser()]);
-  return { plans, entitlements, authenticated: Boolean(identity), currentPlanId: identity ? await currentPlanId(identity.id) : null };
+export async function getPricingModel({includeEntitlements=true}:{includeEntitlements?:boolean}={}) {
+  const identityPromise=optionalUser();
+  const currentPlanPromise=identityPromise.then(identity=>identity?currentPlanId(identity.id):null);
+  const [plans, entitlements, identity, planId] = await Promise.all([listPlans(), includeEntitlements?listPlanEntitlements():Promise.resolve([]), identityPromise,currentPlanPromise]);
+  return { plans, entitlements, authenticated: Boolean(identity), viewerId: identity?.id ?? null, currentPlanId: planId };
 }
 
 export async function getBillingModel(): Promise<BillingModel> {
@@ -181,5 +187,5 @@ export async function getBillingModel(): Promise<BillingModel> {
   const subscriptions = asRows<SubscriptionRow>(subscriptionsResult.data);
   const now = new Date();
   const currentSubscription = subscriptions.find((item) => hasSubscriptionAccess(item, now)) ?? null;
-  return { mode: "ready", currentPlan, currentSubscription, payments: asRows<PaymentRow>(paymentsResult.data), events: asRows<SubscriptionEventRow>(eventsResult.data), plans };
+  return { mode: "ready", viewerId: identity.id, currentPlan, currentSubscription, payments: asRows<PaymentRow>(paymentsResult.data), events: asRows<SubscriptionEventRow>(eventsResult.data), plans };
 }

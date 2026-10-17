@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { NotificationPreferences, PlannerNotification } from "@/lib/planner/types";
+import { BrowserPushControls } from "./browser-push-controls";
 
 export function NotificationCenter({ notifications, preferences, compact = false }: { notifications: PlannerNotification[]; preferences: NotificationPreferences; compact?: boolean }) {
   const router = useRouter();
@@ -16,7 +17,7 @@ export function NotificationCenter({ notifications, preferences, compact = false
   async function request(body: Record<string, unknown>) {
     setBusy(true); setError(null);
     try {
-      const response = await fetch("/api/planner/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await fetch("/api/v1/planner/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Notification settings could not be saved.");
       router.refresh();
@@ -47,6 +48,7 @@ export function NotificationCenter({ notifications, preferences, compact = false
           <button className="ui-button ui-button--secondary" type="button" disabled={busy} onClick={() => void savePreferences()}>{busy ? "Saving…" : "Save preferences"}</button>
         </div>
       </details> : null}
+      {!compact ? <details className="planner-notification-settings"><summary>App push notifications</summary><BrowserPushControls/></details> : null}
     </CardBody>
   </Card>;
 }

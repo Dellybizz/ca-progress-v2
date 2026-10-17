@@ -1,4 +1,10 @@
+import {d1TransportSql} from './payments/d1-sql-transport.mjs';
+import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {verifyP5MigrationLayout,p5SchemaNames} from './payments/p5-migration-layout.mjs';
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const database = "ca-progress-v2-phase4-shadow";
 // Historical certification window retained verbatim: BETWEEN '0012' AND '0048'.
@@ -51,6 +57,46 @@ const migrations = [
   ["0056", "d1/migrations/0056_razorpay_reviewer_access.sql"],
   ["0057", "d1/migrations/0057_razorpay_reviewer_password_rotation.sql"],
   ["0058", "d1/migrations/0058_remove_temporary_reviewer_access.sql"],
+  ["0059", "d1/migrations/0059_mobile_phase3_session_devices.sql"],
+  ["0060", "d1/migrations/0060_mobile_phase7_feature_tour.sql"],
+  ["0061", "d1/migrations/0061_mobile_phase9_web_push.sql"],
+  ["0062", "d1/migrations/0062_mobile_phase11_account_deletion.sql"],
+  ["0063", "d1/migrations/0063_mobile_phase12_release_operations.sql"],
+  ["0064", "d1/migrations/0064_mobile_phase15_native_auth.sql"],
+  ["0065", "d1/migrations/0065_mobile_phase17_sync.sql"],
+  ["0066", "d1/migrations/0066_mobile_phase19_community.sql"],
+  ["0067", "d1/migrations/0067_mobile_phase20_native_push.sql"],
+  ["0068", "d1/migrations/0068_username_password_accounts.sql"],
+  ["0069", "d1/migrations/0069_auth_phase1_account_usernames.sql"],
+  ["0070", "d1/migrations/0070_payment_system_p2_checkout.sql"],
+  ["0071", "d1/migrations/0071_payment_system_p3_renewals.sql"],
+  ["0072", "d1/migrations/0072_payment_system_p4_convergence.sql"],
+  ["0073", "d1/migrations/0073_payment_system_p5_recovery.sql"],
+  ["0074", "d1/migrations/0074_plan_service_allocation.sql"],
+  ["0075", "d1/migrations/0075_subscription_lifecycle_rules.sql"],
+  ["0076", "d1/migrations/0076_immediate_upgrade_checkout.sql"],
+  ["0077", "d1/migrations/0077_direct_pro_intro.sql"],
+  ["0078", "d1/migrations/0078_basic_first_month.sql"],
+  ["0079", "d1/migrations/0079_single_mandate_offers.sql"],
+  ["0080", "d1/migrations/0080_basic_live_single_mandate.sql"],
+  ["0081", "d1/migrations/0081_pro_live_single_mandate_fallback.sql"],
+  ["0082", "d1/migrations/0082_single_checkout_switches.sql"],
+  ["0083", "d1/migrations/0083_admin_plan_display_names.sql"],
+  ["0084", "d1/migrations/0084_checkout_retry_groups.sql"],
+  ["0085", "d1/migrations/0085_student_introductory_history.sql"],
+  ["0086", "d1/migrations/0086_annual_autopay_drafts.sql"],
+  ["0087", "d1/migrations/0087_commercial_policy_transitions.sql"],
+  ["0088", "d1/migrations/0088_owner_renewal_recovery.sql"],
+  ["0089", "d1/migrations/0089_owner_plan_switches.sql"],
+  ["0090", "d1/migrations/0090_owner_storage_cleanup.sql"],
+  ["0091", "d1/migrations/0091_recurring_gift_memberships.sql"],
+  ["0092", "d1/migrations/0092_ranker_first_month_offer.sql"],
+  ["0093", "d1/migrations/0093_provider_password_recovery.sql"],
+  ["0094", "d1/migrations/0094_onboarding_setup_v2.sql"],
+  ["0095", "d1/migrations/0095_resource_workspace.sql"],
+  ["0096", "d1/migrations/0096_resource_workspace_lifecycle.sql"],
+  ["0097", "d1/migrations/0097_resource_transfers_previews.sql"],
+  ["0098", "d1/migrations/0098_resource_transfer_part_receipts.sql"],
 ];
 
 if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.CLOUDFLARE_ACCOUNT_ID) throw new Error("CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are required for retained D1 migration verification.");
@@ -67,9 +113,43 @@ function query(sql) {
 }
 const ledgerResult = query("SELECT version FROM _ca_schema_migrations WHERE version BETWEEN '0012' AND '0058' ORDER BY version;");
 const applied = new Set((ledgerResult?.[0]?.results ?? []).map((row) => String(row.version)));
+const mobileAuthLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0059','0060');");
+for (const row of mobileAuthLedger?.[0]?.results ?? []) applied.add(String(row.version));
+const mobilePushLedger = query("SELECT version FROM _ca_schema_migrations WHERE version='0061';");
+for (const row of mobilePushLedger?.[0]?.results ?? []) applied.add(String(row.version));
+const mobileDeletionLedger = query("SELECT version FROM _ca_schema_migrations WHERE version='0062';");
+for (const row of mobileDeletionLedger?.[0]?.results ?? []) applied.add(String(row.version));
+const mobileReleaseLedger = query("SELECT version FROM _ca_schema_migrations WHERE version IN ('0063','0064','0065','0066','0067','0068','0069','0070','0071','0072','0073','0074','0075','0076','0077','0078','0079','0080','0081','0082','0083','0084','0085','0086','0087','0088','0089','0090','0091','0092','0093','0094','0095','0096','0097','0098');");
+for (const row of mobileReleaseLedger?.[0]?.results ?? []) applied.add(String(row.version));
 for (const [version,file] of migrations) {
   if (applied.has(version)) { console.log(`[retained-d1] ${version} already applied; skipping replay.`); continue; }
-  console.log(`[retained-d1] applying ${version} from ${file}`); wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${file}`]);
+  console.log(`[retained-d1] applying ${version} from ${file}`);
+  if (version === "0073") {
+    const columns=query("PRAGMA table_info(razorpay_subscriptions);")?.[0]?.results??[];
+    if(columns.some(column=>column.name==='failure_paid_through_at')){
+      // The initial P5 import completed but omitted its ledger INSERT. Recover
+      // only an exact complete schema; never replay ALTER or guess partial state.
+      const sql=readFileSync(file,"utf8"),objects=query(`SELECT name,type,sql FROM sqlite_master WHERE name IN (${p5SchemaNames.map(name=>`'${name}'`).join(',')});`)?.[0]?.results??[];
+      verifyP5MigrationLayout(sql,objects,columns);
+      const ledger=sql.match(/INSERT OR IGNORE INTO _ca_schema_migrations[\s\S]*?;/)?.[0];
+      if(!ledger)throw new Error("Phase 5 migration has no completion ledger entry.");
+      wrangler(["d1","execute",database,"--remote",`--config=${config}`,"--command",ledger]);
+      continue;
+    }
+  }
+  if (version === "0066") {
+    const columns = query("PRAGMA table_info(community_messages);")?.[0]?.results ?? [];
+    if (columns.some((column) => column.name === "client_message_id")) {
+      // Older manual runs could apply the ALTER without recording 0066.
+      const alter = "ALTER TABLE community_messages ADD COLUMN client_message_id TEXT;";
+      const sql = readFileSync(file, "utf8");
+      if (!sql.startsWith(alter)) throw new Error("Unexpected 0066 migration layout; refusing partial replay.");
+      wrangler(["d1","execute",database,"--remote",`--config=${config}`,"--command",sql.slice(alter.length)]);
+      continue;
+    }
+  }
+  const transportDir=mkdtempSync(join(tmpdir(),'ca-d1-transport-')),transportFile=join(transportDir,'migration.sql');
+  try{writeFileSync(transportFile,d1TransportSql(readFileSync(file,'utf8')));wrangler(["d1","execute",database,"--remote",`--config=${config}`,`--file=${transportFile}`]);}finally{rmSync(transportDir,{recursive:true,force:true});}
 }
 const versions=migrations.map(([version])=>`'${version}'`).join(",");
 const verification=query(`SELECT version FROM _ca_schema_migrations WHERE version IN (${versions}) ORDER BY version; PRAGMA foreign_key_check;`);
@@ -77,4 +157,9 @@ const verified=new Set((verification?.[0]?.results??[]).map((row)=>String(row.ve
 const missing=migrations.map(([version])=>version).filter((version)=>!verified.has(version));
 if(missing.length)throw new Error(`Retained D1 migrations missing after apply: ${missing.join(", ")}`);
 const fkViolations=verification?.[1]?.results??[];if(fkViolations.length)throw new Error(`D1 foreign-key verification failed with ${fkViolations.length} violation(s).`);
-console.log(`[retained-d1] PASS: ${migrations.length} required migrations present; foreign keys clean.`);
+const requiredTables=["mobile_sync_entities","mobile_sync_changes","mobile_sync_mutation_receipts","community_sequence_events","native_push_devices"];
+const tableRows=query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('mobile_sync_entities','mobile_sync_changes','mobile_sync_mutation_receipts','community_sequence_events','native_push_devices');")?.[0]?.results??[];
+const present=new Set(tableRows.map((row)=>String(row.name)));
+const absent=requiredTables.filter((name)=>!present.has(name));
+if(absent.length)throw new Error(`Retained D1 mobile tables missing after apply: ${absent.join(", ")}`);
+console.log(`[retained-d1] PASS: ${migrations.length} required migrations present; mobile tables present; foreign keys clean.`);

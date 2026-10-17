@@ -208,8 +208,8 @@ test("Premium backup route is private, fail-closed, and requester-owned only", (
   const route = read(BACKUP_ROUTE);
   assert.match(route, /export async function GET\(\)/);
   assert.match(route, /const user = await optionalUser\(\)/);
-  assert.match(route, /billing\.mode !== "ready"/);
-  assert.match(route, /canUseExport\(tier, "full_backup"\)/);
+  assert.match(route, /!access\.allowed/);
+  assert.match(route, /getPlanFeatureAccessForUser\(user\.id, "full_backup"\)/);
   assert.match(route, /createOwnedFullBackupStream\(user\.id\)/);
   assert.match(route, /status: 401/);
   assert.match(route, /status: 403/);
@@ -223,9 +223,9 @@ test("Premium backup route is private, fail-closed, and requester-owned only", (
 
 test("Settings enables Full Backup only through the Premium entitlement", () => {
   const settings = read(SETTINGS_PAGE);
-  assert.match(settings, /const canExportBackup = billingReady && canUseExport\(tier, "full_backup"\)/);
+  assert.match(settings, /canExportBackup\]=access\.map\(rule=>rule\.allowed\)/);
   assert.match(settings, /canExportBackup \? <a href="\/api\/exports\/backup" download>Full Backup<\/a>/);
-  assert.match(settings, /Full Backup · Premium/);
+  assert.match(settings, /Full Backup · Pro/);
 });
 
 test("Phase 14.3 closure record preserves its original Phase 15 boundary", () => {

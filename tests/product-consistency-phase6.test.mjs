@@ -17,7 +17,13 @@ const { stageOfflineWrites } = load("lib/offline/atomic.ts");
 function adapter(sqlite) {
   function prepare(sql, values = []) {
     const statement = () => sqlite.prepare(sql);
-    return { bind: (...next) => prepare(sql, next), first: async () => statement().get(...values) ?? null, all: async () => ({ results: statement().all(...values) }), run: async () => statement().run(...values), sql, values };
+    const boundValues = () => {
+      const indexes = [...sql.matchAll(/\?(\d+)/g)].map(match => Number(match[1]));
+      if (!indexes.length) return values;
+      const max = Math.max(...indexes);
+      return [Object.fromEntries(Array.from({ length: max }, (_, index) => [`?${index + 1}`, values[index]]))];
+    };
+    return { bind: (...next) => prepare(sql, next), first: async () => statement().get(...boundValues()) ?? null, all: async () => ({ results: statement().all(...boundValues()) }), run: async () => statement().run(...boundValues()), sql, values };
   }
   return { prepare, batch: async statements => { sqlite.exec("BEGIN"); try { const results = []; for (const s of statements) results.push(await s.run()); sqlite.exec("COMMIT"); return results; } catch (e) { sqlite.exec("ROLLBACK"); throw e; } } };
 }
@@ -67,7 +73,9 @@ test("offline timers retain actual time and pauses instead of the reconnect dura
 });
 
 test("supported routes snapshot real models and the offline shell has no server identity", () => {
-  for (const page of ["dashboard", "syllabus", "progress", "study", "planner", "notes", "resources"]) assert.match(read(`app/(student)/${page}/page.tsx`), /OfflineSnapshot/);
+  for (const page of ["dashboard", "syllabus", "progress", "study", "planner", "resources"]) assert.match(read(`app/(student)/${page}/page.tsx`), /OfflineSnapshot/);
+  assert.match(read("app/(student)/resources/page.tsx"), /OfflineSnapshot kind="resources"/);
+  assert.match(read("app/(student)/notes/page.tsx"), /getResourceLibraryModel/);
   assert.match(read("app/offline/page.tsx"), /force-static/);
   assert.doesNotMatch(read("app/offline/page.tsx"), /getStudentContext|cookies\(|optionalUser/);
   const sw = read("public/sw.js");
@@ -99,7 +107,8 @@ test("offline endpoint deduplicates replay, detects stale records, and chains de
     "@/lib/offline/transaction-context": { offlineTransaction: transaction },
     "@/lib/offline/atomic": { stageOfflineWrites },
     "@/lib/offline/projection": projection,
-    ...Object.fromEntries(["progress", "planner/tasks", "notes", "study/timer"].map(route => [`@/app/api/${route}/route`, { POST: handler }])),
+    "@/lib/mobile/sync": { SYNC_DOMAINS: {}, syncJournalStatements: () => [] },
+    ...Object.fromEntries(["resources/workspace", "progress", "planner/tasks", "planner/goals", "planner/revision-settings", "notes", "study/timer", "study/reflection"].map(route => [`@/app/api/${route}/route`, { POST: handler }])),
   });
   const id = crypto.randomUUID(), first = crypto.randomUUID();
   const send = (key, input) => POST(new Request("https://ca.test/api/offline/mutations", { method: "POST", headers: { "Idempotency-Key": key, "Content-Type": "application/json" }, body: JSON.stringify(input) }));

@@ -1,0 +1,11 @@
+type Row=Record<string,unknown>;
+type Statement={bind(...values:unknown[]):Statement;first<T=Row>():Promise<T|null>;all<T=Row>():Promise<{results?:T[]}>;run():Promise<unknown>};
+export type StorageDatabase={prepare(query:string):Statement;batch(statements:Statement[]):Promise<unknown>};
+export type StorageDependencies={access(user:string):Promise<{planId:string;limitBytes:number;policyVersionId?:string|null}>;bucket?:{delete(key:string):Promise<unknown>;head?(key:string):Promise<unknown>};bucketName:string};
+export type CleanupStatus={id:string;deadline:string;state:string;usedBytes:number;limitBytes:number;importantLimitBytes:number;excessBytes:number;filesToDelete:number;deletedCount:number;lastError:string|null};
+export function cleanupSelection(files:Row[],limitBytes:number,effectiveAt:string):{selected:Row[];remainingBytes:number;importantLimitBytes:number;usedBytes:number};
+export function storageFiles(db:StorageDatabase,user:string):Promise<Row[]>;
+export function touchStorageFile(db:StorageDatabase,kind:'resource'|'test_attachment',id:string,user:string,time?:string):Promise<boolean>;
+export function setStorageImportance(db:StorageDatabase,kind:'resource'|'test_attachment',id:string,user:string,important:boolean):Promise<boolean>;
+export function cleanupStatus(db:StorageDatabase,user:string):Promise<CleanupStatus|null>;
+export function maintainStorageCleanup(db:StorageDatabase,deps:StorageDependencies,time?:string,user?:string):Promise<void>;

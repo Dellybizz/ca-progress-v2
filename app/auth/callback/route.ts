@@ -4,6 +4,8 @@ import { exchangeOAuthCodeForSession } from "@/lib/auth/provider";
 import { applyRememberDevicePreference } from "@/lib/auth/session-cookies";
 import { ensureUserBootstrap, resolvePostAuthDestination } from "@/lib/auth/server";
 
+import {PasswordRecoveryError} from "@/lib/auth/password-recovery";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
@@ -15,12 +17,22 @@ export async function GET(request: NextRequest) {
 
   try {
     const cloudflareResult = await exchangeOAuthCodeForSession(code, state);
+    if(cloudflareResult?.purpose === "recovery")return NextResponse.redirect(new URL("/account/reset",request.nextUrl.origin));
     const next = cloudflareResult?.next ?? requestedNext;
     if (!cloudflareResult) await applyRememberDevicePreference(requestedRemember);
-    await ensureUserBootstrap();
-    const destination = await resolvePostAuthDestination(next);
+    if (cloudflareResult?.clientKind !== "mobile") await ensureUserBootstrap();
+    const destination = cloudflareResult?.clientKind === "mobile" ? next : await resolvePostAuthDestination(next);
+    if (cloudflareResult?.clientKind === "mobile") {
+      const deepLink = new URL("ca-progress://auth/complete");
+      deepLink.searchParams.set("next", destination);
+      if (!cloudflareResult.nativeExchange) throw new Error("Native OAuth exchange was not created.");
+      deepLink.searchParams.set("transaction", cloudflareResult.nativeExchange.transactionId);
+      deepLink.searchParams.set("code", cloudflareResult.nativeExchange.exchangeCode);
+      return NextResponse.redirect(deepLink);
+    }
     return NextResponse.redirect(new URL(destination, request.nextUrl.origin));
-  } catch {
+  } catch (error) {
+    if(error instanceof PasswordRecoveryError)return NextResponse.redirect(new URL("/account/recover?error=verification_failed",request.nextUrl.origin));
     return NextResponse.redirect(new URL(`/login?error=auth_callback_failed&next=${encodeURIComponent(requestedNext)}`, request.nextUrl.origin));
   }
 }

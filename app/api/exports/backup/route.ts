@@ -1,6 +1,5 @@
 import { optionalUser } from "@/lib/auth/server";
-import { getBillingModel } from "@/lib/billing/service";
-import { canUseExport } from "@/lib/exports/policy.mjs";
+import { getPlanFeatureAccessForUser } from "@/lib/billing/feature-access";
 import { createOwnedFullBackupStream } from "@/lib/exports/service";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +21,9 @@ export async function GET() {
     });
   }
 
-  const billing = await getBillingModel();
-  const tier = billing.mode === "ready" ? (billing.currentPlan?.tier_key ?? "free") : "free";
-  if (billing.mode !== "ready" || !canUseExport(tier, "full_backup")) {
-    return Response.json({ error: "Full Backup requires Premium." }, {
+  const access = await getPlanFeatureAccessForUser(user.id, "full_backup");
+  if (!access.allowed) {
+    return Response.json({ error: access.upgradeMessage }, {
       status: 403,
       headers: PRIVATE_HEADERS,
     });

@@ -1,5 +1,8 @@
 "use client";
 
+import {SidebarFolderTree} from '@/components/resources/sidebar-folder-tree';
+import {FileManager} from "@/components/resources/file-manager";
+import {officialFiles} from "@/lib/resources/file-manager";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -49,18 +52,102 @@ function resourceState(
 }
 
 export function IcaiResourceBrowser({
-  catalog,
+  catalog, embedded = false, scopeLocked = false,
 }: {
-  catalog: IcaiPublicCatalog;
+  catalog: IcaiPublicCatalog; embedded?: boolean; scopeLocked?: boolean;
 }) {
+  const [officialFilter,setOfficialFilter]=useState({subject:catalog.filters.subject,type:catalog.filters.type});
   const [view, setView] = useState<"folders" | "list">("folders");
+  const [query,setQuery] = useState("");
+  const [limit,setLimit] = useState(24);
+  const results = catalog.resources.filter(resource=>!query.trim() || `${resource.title} ${resource.summary || ""} ${resource.subjects.map(subject=>subject.title).join(" ")}`.toLowerCase().includes(query.trim().toLowerCase()));
   const [level, setLevel] = useState(catalog.filters.level);
   const matchingAttempts = level
     ? catalog.attempts.filter((attempt) => attempt.levelCode === level)
     : [];
+  const filterForm = (
+      <form className="icai-filters" onSubmit={embedded?event=>{event.preventDefault();const values=new FormData(event.currentTarget);setOfficialFilter({subject:String(values.get('subject')??''),type:String(values.get('type')??'') as typeof catalog.filters.type});}:undefined} method="get" action={embedded ? "/resources" : undefined}>
+        {embedded ? <input type="hidden" name="tab" value="icai"/> : null}
+        <label>
+          <span>Level</span>
+          <select
+            name="level"
+            value={level}
+            disabled={scopeLocked}
+            onChange={(event) => setLevel(event.target.value)}
+          >
+            <option value="">All levels</option>
+            {catalog.levels.map((level) => (
+              <option key={level.code} value={level.code}>
+                {level.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Attempt</span>
+          <select
+            name="attempt"
+            key={level}
+            defaultValue={level ? catalog.filters.attempt : ""}
+            disabled={scopeLocked || !level}
+          >
+            <option value="">
+              {level ? "All available attempts" : "Select level first"}
+            </option>
+            {matchingAttempts
+              .filter(
+                (attempt, index, rows) =>
+                  rows.findIndex((row) => row.key === attempt.key) === index,
+              )
+              .map((attempt) => (
+                <option key={attempt.key} value={attempt.key}>
+                  {attempt.label}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          <span>Subject</span>
+          <select name="subject" key={level} defaultValue={catalog.subjects.some(subject=>subject.id===catalog.filters.subject && subject.levelCode===level) ? catalog.filters.subject : ""}>
+            <option value="">All subjects</option>
+            {catalog.subjects
+              .filter(
+                (subject) =>
+                  !level ||
+                  subject.levelCode === level,
+              )
+              .map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.title}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          <span>Resource type</span>
+          <select name="type" defaultValue={catalog.filters.type}>
+            <option value="">All resources</option>
+            {Object.entries(TYPE_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          className="ui-button ui-button--primary ui-button--md"
+          type="submit"
+        >
+          <span>Apply filters</span>
+        </button>
+      </form>
+  );
+  const officialFolders=catalog.subjects.filter(subject=>catalog.resources.some(item=>item.subjects.some(value=>value.id===subject.id))).flatMap(subject=>[{id:subject.id,name:subject.title,parent_id:null},...Object.entries(TYPE_LABELS).filter(([type])=>catalog.resources.some(item=>item.type===type&&item.subjects.some(value=>value.id===subject.id))).map(([type,name])=>({id:subject.id+'::'+type,name,parent_id:subject.id}))]);
+  if (embedded) return <><SidebarFolderTree folders={officialFolders} current={officialFilter.subject?(officialFilter.type?officialFilter.subject+'::'+officialFilter.type:officialFilter.subject):''} onOpen={id=>{const [subject,type='']=id.split('::');setOfficialFilter({subject,type});}}/><FileManager files={officialFiles(catalog.resources.filter(item=>(!officialFilter.subject||item.subjects.some(subject=>subject.id===officialFilter.subject))&&(!officialFilter.type||item.type===officialFilter.type)))} title="ICAI files" extraFilters={<details className="fm-official-filters"><summary>Academic & official filters</summary>{filterForm}{catalog.events.length ? <ul>{catalog.events.map(event=><li key={event.id}><a href={event.sourceUrl} target="_blank" rel="noreferrer">{dateLabel(event.eventDate)} · {event.title}</a></li>)}</ul> : null}</details>}/></>;
   return (
     <div className="icai-page">
-      <AcademicBreadcrumbs
+      {!embedded ? <><AcademicBreadcrumbs
         items={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Resources", href: "/resources" },
@@ -88,7 +175,7 @@ export function IcaiResourceBrowser({
             </small>
           </span>
         </div>
-      </section>
+      </section></> : null}
 
       <AcademicContextBar
         level={
@@ -98,82 +185,12 @@ export function IcaiResourceBrowser({
         attempt={catalog.filters.attempt || null}
       />
 
-      <form className="icai-filters" method="get">
-        <label>
-          <span>Level</span>
-          <select
-            name="level"
-            value={level}
-            onChange={(event) => setLevel(event.target.value)}
-          >
-            <option value="">All levels</option>
-            {catalog.levels.map((level) => (
-              <option key={level.code} value={level.code}>
-                {level.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Attempt</span>
-          <select
-            name="attempt"
-            defaultValue={level ? catalog.filters.attempt : ""}
-            disabled={!level}
-          >
-            <option value="">
-              {level ? "All available attempts" : "Select level first"}
-            </option>
-            {matchingAttempts
-              .filter(
-                (attempt, index, rows) =>
-                  rows.findIndex((row) => row.key === attempt.key) === index,
-              )
-              .map((attempt) => (
-                <option key={attempt.key} value={attempt.key}>
-                  {attempt.label}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label>
-          <span>Subject</span>
-          <select name="subject" defaultValue={catalog.filters.subject}>
-            <option value="">All subjects</option>
-            {catalog.subjects
-              .filter(
-                (subject) =>
-                  !catalog.filters.level ||
-                  subject.levelCode === catalog.filters.level,
-              )
-              .map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.title}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label>
-          <span>Resource type</span>
-          <select name="type" defaultValue={catalog.filters.type}>
-            <option value="">All resources</option>
-            {Object.entries(TYPE_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          className="ui-button ui-button--primary ui-button--md"
-          type="submit"
-        >
-          <span>Apply filters</span>
-        </button>
-      </form>
+      {filterForm}
+
+      <label className="resource-hub-official-search"><Icon name="search" size={18}/><input value={query} onChange={event=>{setQuery(event.target.value);setLimit(24);}} aria-label="Search ICAI resources" placeholder="Search official titles, subjects or descriptions"/></label>
 
       {catalog.events.length ? (
-        <section className="icai-section">
+        <details className="resource-hub-events"><summary>Exam dates · {catalog.events.length} events</summary><section className="icai-section">
           <div className="icai-section-heading">
             <div>
               <span className="eyebrow">Verified dates</span>
@@ -199,7 +216,7 @@ export function IcaiResourceBrowser({
               </article>
             ))}
           </div>
-        </section>
+        </section></details>
       ) : null}
 
       <section className="icai-section">
@@ -227,14 +244,14 @@ export function IcaiResourceBrowser({
             >
               List
             </button>
-            <Badge tone="neutral">{catalog.resources.length} results</Badge>
+            <Badge tone="neutral">{results.length} results</Badge>
           </div>
         </div>
-        {catalog.resources.length ? (
+        {results.length ? (
           <div
             className={`icai-resource-grid ${view === "list" ? "is-list" : ""}`}
           >
-            {catalog.resources.map((resource) => (
+            {results.slice(0,limit).map((resource) => (
               <article className="icai-resource-card" key={resource.id}>
                 <div className="icai-resource-card__top">
                   <AcademicEntityMark
@@ -300,6 +317,7 @@ export function IcaiResourceBrowser({
           />
         )}
       </section>
+      {results.length > limit ? <button type="button" className="ui-button ui-button--secondary resource-hub-load-more" onClick={()=>setLimit(value=>value+24)}>Show more ({results.length-limit} remaining)</button> : null}
     </div>
   );
 }

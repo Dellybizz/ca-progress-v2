@@ -83,7 +83,7 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
   useEffect(() => {
     if (!timer || timer.status !== "running" || timer.abandoned) return;
     const id = window.setInterval(() => {
-      if (navigator.onLine) void fetch("/api/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "touch" }), keepalive: true }).catch(() => undefined);
+      if (navigator.onLine) void fetch("/api/v1/study/timer", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "touch" }), keepalive: true }).catch(() => undefined);
     }, 5 * 60 * 1000);
     return () => window.clearInterval(id);
   }, [timer]);
@@ -106,7 +106,7 @@ export function StudyTimer({ model: serverModel, initialSubjectId, initialChapte
     setBusy(true);
     setError(null);
     try {
-      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/study/timer", body, {status:String(body.action||"queued")});
+      const {response,queued} = await offlineMutationFetch(context.userId!, "/api/v1/study/timer", body, {status:String(body.action||"queued")});
       const payload = await response.json() as StudyTimerMutationResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "Timer could not be updated.");
       if(!queued)router.refresh(); else setError("Timer change saved on this device and queued for sync.");

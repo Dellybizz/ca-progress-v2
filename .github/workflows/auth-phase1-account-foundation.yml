@@ -1,0 +1,57 @@
+name: Authentication Phase 1 Account Foundation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [auth-phase1-account-foundation]
+    paths:
+      - .github/workflows/auth-phase1-account-foundation.yml
+      - d1/migrations/0069_auth_phase1_account_usernames.sql
+      - scripts/auth/verify-phase1.mjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-phase1-account-foundation
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - name: Check migration locally
+        run: node --test tests/auth-phase1-account-foundation.test.mjs
+      - name: Require Cloudflare access
+        run: test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - name: Record recovery bookmark and ownership counts
+        run: |
+          mkdir -p deployment-evidence
+          npx wrangler d1 time-travel info ca-progress-v2-phase4-shadow --config=wrangler.jsonc --json > deployment-evidence/auth-phase1-bookmark.json
+          grep -q 'bookmark' deployment-evidence/auth-phase1-bookmark.json
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --command "SELECT (SELECT COUNT(*) FROM app_users) app_users,(SELECT COUNT(*) FROM profiles) profiles,(SELECT COUNT(*) FROM chapter_progress) chapter_progress,(SELECT COUNT(*) FROM progress_events) progress_events,(SELECT COUNT(*) FROM daily_plans) daily_plans,(SELECT COUNT(*) FROM study_sessions) study_sessions,(SELECT COUNT(*) FROM notes) notes,(SELECT COUNT(*) FROM uploaded_resources) uploaded_resources" > deployment-evidence/auth-phase1-before.json
+      - name: Apply additive username migration
+        run: npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --file=d1/migrations/0069_auth_phase1_account_usernames.sql
+      - name: Verify every account and owned-record count
+        run: |
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --command "SELECT (SELECT COUNT(*) FROM app_users) app_users,(SELECT COUNT(*) FROM profiles) profiles,(SELECT COUNT(*) FROM chapter_progress) chapter_progress,(SELECT COUNT(*) FROM progress_events) progress_events,(SELECT COUNT(*) FROM daily_plans) daily_plans,(SELECT COUNT(*) FROM study_sessions) study_sessions,(SELECT COUNT(*) FROM notes) notes,(SELECT COUNT(*) FROM uploaded_resources) uploaded_resources,(SELECT COUNT(*) FROM account_usernames) account_usernames,(SELECT COUNT(*) FROM app_users u LEFT JOIN account_usernames n ON n.user_id=u.user_id WHERE n.user_id IS NULL) missing_usernames,(SELECT COUNT(*) FROM password_credentials p JOIN account_usernames n ON n.user_id=p.user_id WHERE p.username<>n.username COLLATE NOCASE) password_mismatches,(SELECT COUNT(*) FROM _ca_schema_migrations WHERE version='0069') migration_applied" > deployment-evidence/auth-phase1-after.json
+          npx wrangler d1 execute ca-progress-v2-phase4-shadow --remote --config=wrangler.jsonc --json --command "PRAGMA foreign_key_check" > deployment-evidence/auth-phase1-foreign-keys.json
+          node scripts/auth/verify-phase1.mjs deployment-evidence/auth-phase1-bookmark.json deployment-evidence/auth-phase1-before.json deployment-evidence/auth-phase1-after.json deployment-evidence/auth-phase1-foreign-keys.json
+      - name: Retain recovery and verification evidence
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: auth-phase1-recovery-${{ github.run_id }}
+          path: deployment-evidence/
+          if-no-files-found: warn
+          retention-days: 30

@@ -3,8 +3,15 @@ import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { setHotProgressStage, undoHotProgressEvent } from "@/lib/data/d1/hot-screens";
 import { PROGRESS_STAGES, type ProgressMutationResult, type ProgressStage } from "@/lib/progress/types";
+import { APP_RELEASE_CONTRACT } from "@/config/app-release";
 
 export const dynamic = "force-dynamic";
+
+const VERSION_HEADERS = {
+  "Cache-Control": "private, no-store",
+  "X-CA-API-Version": String(APP_RELEASE_CONTRACT.api.current),
+  "X-CA-Context-Version": String(APP_RELEASE_CONTRACT.academicContext.current),
+};
 
 type Body =
   | { action: "set_stage"; chapterId: string; stage: ProgressStage; enabled: boolean }
@@ -41,7 +48,7 @@ export async function POST(request: Request) {
           error: `Record ${body.stage === "test_1" ? "Test 1" : "Test 2"} marks in Tests. Progress updates automatically; no second checkbox is required.`,
         }, { status: 409 });
       }
-      return NextResponse.json(await setHotProgressStage(user.id, body.chapterId, body.stage, body.enabled) as ProgressMutationResult);
+      return NextResponse.json(await setHotProgressStage(user.id, body.chapterId, body.stage, body.enabled) as ProgressMutationResult, { headers: VERSION_HEADERS });
     }
     if (body.action === "set_stages") {
       if (!Array.isArray(body.changes) || body.changes.length < 1 || body.changes.length > 500) return NextResponse.json({ error: "Choose between 1 and 500 progress changes." }, { status: 400 });
@@ -64,11 +71,11 @@ export async function POST(request: Request) {
       }
       revalidatePath("/progress");
       for(const chapterId of latest.keys())revalidatePath(`/chapters/${chapterId}`);
-      return NextResponse.json({states:[...latest.values()]});
+      return NextResponse.json({states:[...latest.values()]}, { headers: VERSION_HEADERS });
     }
     if (body.action === "undo") {
       if (!body.eventId) return NextResponse.json({ error: "Choose a progress change to undo." }, { status: 400 });
-      return NextResponse.json(await undoHotProgressEvent(user.id, body.eventId) as ProgressMutationResult);
+      return NextResponse.json(await undoHotProgressEvent(user.id, body.eventId) as ProgressMutationResult, { headers: VERSION_HEADERS });
     }
     return NextResponse.json({ error: "Unknown progress action." }, { status: 400 });
   } catch (error) {

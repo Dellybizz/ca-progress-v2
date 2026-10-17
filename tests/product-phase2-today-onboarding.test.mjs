@@ -26,16 +26,16 @@ test("Product Phase 2 keeps onboarding short and stores preparation state withou
   assert.match(migration, /CREATE TABLE IF NOT EXISTS onboarding_experience/);
 });
 
-test("Product Phase 2 new-user and existing-user routing make Today the default without re-onboarding completed users", () => {
+test("Today remains the login default; direct academic setup hands off to the dashboard without re-onboarding completed users", () => {
   const home = read("app/page.tsx");
   const navigation = read("lib/auth/navigation.ts");
-  const login = read("app/(public)/login/page.tsx");
-  const onboarding = read("app/(public)/onboarding/page.tsx");
+  const login = read("app/login/page.tsx");
+  const onboarding = read("app/onboarding/page.tsx");
 
   assert.match(home, /redirect\("\/planner\/today"\)/);
   assert.match(navigation, /fallback = "\/planner\/today"/);
   assert.match(login, /"\/planner\/today"/);
-  assert.match(onboarding, /"\/planner\/today"/);
+  assert.match(onboarding, /setupWorkspaceDestination/);
   assert.match(onboarding, /if \(profile\.onboarding_completed_at\) redirect\(next\)/);
   assert.match(onboarding, /OnboardingWizard/);
 });

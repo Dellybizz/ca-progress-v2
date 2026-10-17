@@ -36,10 +36,16 @@ function makePdf(text) {
   const start=Buffer.byteLength(pdf);pdf+=`xref\n0 6\n0000000000 65535 f \n${offsets.slice(1).map(offset=>`${String(offset).padStart(10,'0')} 00000 n \n`).join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`;
   return new Uint8Array(Buffer.from(pdf));
 }
+function sqliteArgs(sql,args) {
+  const indexes=[...sql.matchAll(/\?(\d+)/g)].map(match=>Number(match[1]));
+  if(!indexes.length)return args;
+  const max=Math.max(...indexes);
+  return [Object.fromEntries(Array.from({length:max},(_,index)=>[`?${index+1}`,args[index]]))];
+}
 function database() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec('CREATE TABLE icai_exam_document_cache(url TEXT PRIMARY KEY,etag TEXT,last_modified TEXT,content_hash TEXT,parser_version TEXT,payload TEXT,checked_at TEXT)');
-  return {sqlite,prepare(sql){const statement=sqlite.prepare(sql);return {bind(...args){return {async first(){return statement.get(...args)??null;},async run(){statement.run(...args);return {success:true};}};}};}};
+  return {sqlite,prepare(sql){const statement=sqlite.prepare(sql);return {bind(...args){return {async first(){return statement.get(...sqliteArgs(sql,args))??null;},async run(){statement.run(...sqliteArgs(sql,args));return {success:true};}};}};}};
 }
 const source={id:'icai-live-exam-schedules',name:'Official schedules',officialUrl:'https://www.icai.org/students.shtml?mod=4',sourceType:'exam_schedule_index',timeoutMs:1000,requestIntervalSeconds:0};
 const now = new Date('2026-09-11T00:00:00Z');
@@ -138,7 +144,7 @@ test('D1 auto-publishes new mapped dates; changed dates queue one review and pre
   sqlite.exec("INSERT INTO course_levels(id,code,name) VALUES('inter','intermediate','Intermediate'); INSERT INTO course_groups(id,level_id,code,name) VALUES('g1','inter','group_1','Group 1');");
   sqlite.prepare('INSERT INTO subjects(id,level_id,group_id,code,paper_label,slug,title,subject_kind,source_url) VALUES(?,?,?,?,?,?,?,?,?)').run('subject','inter','g1','p1','Paper 1','p1','Advanced Accounting','paper',evidence);
   sqlite.prepare('INSERT INTO icai_sync_runs(id,trigger_type,parser_version,status,started_at,source_total) VALUES(?,?,?,?,?,?)').run('run','manual','phase8.1','running',new Date().toISOString(),1);
-  const wrap=(sql,args=[])=>({bind(...values){return wrap(sql,values);},async first(){return sqlite.prepare(sql).get(...args)??null;},async all(){return {results:sqlite.prepare(sql).all(...args)};},async run(){sqlite.prepare(sql).run(...args);return {success:true};}});
+  const wrap=(sql,args=[])=>({bind(...values){return wrap(sql,values);},async first(){return sqlite.prepare(sql).get(...sqliteArgs(sql,args))??null;},async all(){return {results:sqlite.prepare(sql).all(...sqliteArgs(sql,args))};},async run(){sqlite.prepare(sql).run(...sqliteArgs(sql,args));return {success:true};}});
   const db={prepare:sql=>wrap(sql),batch:async statements=>Promise.all(statements.map(statement=>statement.run()))};
   const {IcaiD1Client}=load('workers/icai-sync/d1-client.ts');const client=new IcaiD1Client(db);
   const attempt={id:'attempt-intermediate-2027-01',level_id:'inter',attempt_key:'2027-01',label:'January 2027',status:'scheduled',source_url:evidence,content_hash:'attempt',confidence:0.98};
@@ -162,7 +168,7 @@ test('D1 auto-publishes new mapped dates; changed dates queue one review and pre
 test('the actual continuation job persists extracted events despite an empty partial-events checkpoint',async()=>{
   const sqlite=new DatabaseSync(':memory:');
   for(const file of readdirSync('d1/migrations').filter(name=>name.endsWith('.sql')).sort()) sqlite.exec(readFileSync(`d1/migrations/${file}`,'utf8'));
-  const wrap=(sql,args=[])=>({bind(...values){return wrap(sql,values);},async first(){return sqlite.prepare(sql).get(...args)??null;},async all(){return {results:sqlite.prepare(sql).all(...args)};},async run(){sqlite.prepare(sql).run(...args);return {success:true};}});
+  const wrap=(sql,args=[])=>({bind(...values){return wrap(sql,values);},async first(){return sqlite.prepare(sql).get(...sqliteArgs(sql,args))??null;},async all(){return {results:sqlite.prepare(sql).all(...sqliteArgs(sql,args))};},async run(){sqlite.prepare(sql).run(...sqliteArgs(sql,args));return {success:true};}});
   const db={prepare:sql=>wrap(sql),batch:async statements=>Promise.all(statements.map(statement=>statement.run()))};
   for(const level of ['foundation','intermediate','final']){
     sqlite.prepare('INSERT INTO course_levels(id,code,name) VALUES(?,?,?)').run(level,level,level);

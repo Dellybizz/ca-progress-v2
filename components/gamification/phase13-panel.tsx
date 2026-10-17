@@ -107,7 +107,7 @@ export function Phase13Panel({ initial, initialReferralCode = "" }: { initial: P
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/gamification/phase13", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" });
+      const response = await fetch("/api/v1/gamification/phase13", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store" });
       const payload = await response.json() as ModelResponse;
       if (!response.ok || !payload.ok || !payload.model) throw new Error(payload.error || "Action failed.");
       setModel(payload.model);
@@ -133,7 +133,7 @@ export function Phase13Panel({ initial, initialReferralCode = "" }: { initial: P
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/leaderboard?category=${encodeURIComponent(nextCategory)}`, { cache: "no-store" });
+      const response = await fetch(`/api/v1/leaderboard?category=${encodeURIComponent(nextCategory)}`, { cache: "no-store" });
       const payload = await response.json() as LeaderboardResponse;
       if (!response.ok || !payload.ok || !payload.leaderboard) throw new Error(payload.error || "Leaderboard could not be loaded.");
       setEntries(payload.leaderboard.entries);

@@ -9,6 +9,8 @@ interface CloudflareEnv {
   ICAI_SYNC_ENABLED?: string;
   ICAI_SYNC_USER_AGENT?: string;
   ICAI_SYNC_SERVICE?: { fetch(request: Request): Promise<Response> };
+  RESEND_API_KEY?: string;
+  STORAGE_CLEANUP_EMAIL_FROM?: string;
   BILLING_SERVICE?: { fetch(request: Request): Promise<Response> };
   USER_RESOURCES_R2?: R2Bucket;
   DB?: { prepare(query: string): unknown };

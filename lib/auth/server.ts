@@ -1,3 +1,4 @@
+import {accountEntryDestination} from "./account-entry";
 import "server-only";
 
 import { redirect } from "next/navigation";
@@ -16,6 +17,7 @@ import {
   ensureCloudflareUserBootstrap,
 } from "./cloudflare-profile";
 import { getCloudflareRequestAuth } from "./cloudflare";
+import { getAccountSetupState } from "./account-setup";
 import { loginPathFor, sanitizeReturnPath } from "./navigation";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -201,9 +203,7 @@ export async function resolvePostAuthDestination(next: string) {
   const safeNext = sanitizeReturnPath(next);
   if (!user) return loginPathFor(safeNext);
   const profile = await getProfileForUser(user.id);
-  if (!profile?.onboarding_completed_at)
-    return `/onboarding?next=${encodeURIComponent(safeNext)}`;
-  return safeNext;
+  return accountEntryDestination(safeNext,Boolean((await getAccountSetupState())?.eligible),Boolean(profile?.onboarding_completed_at));
 }
 
 export async function loadViewer(): Promise<Viewer> {

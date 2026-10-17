@@ -1,21 +1,38 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import { LoginRequired } from "@/components/auth/login-required";
-import { ResourceLibrary } from "@/components/resources/resource-library";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Icon } from "@/components/ui/icon";
-import { PageHeader } from "@/components/ui/page-header";
-import { getResourceLibraryModel } from "@/lib/resources/service";
-import { OfflineSnapshot } from "@/components/offline/offline-snapshot";
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { StorageCleanupWarning } from '@/components/billing/storage-cleanup-warning';
+import { LoginRequired } from '@/components/auth/login-required';
+import { ResourceCollections } from '@/components/resources/resource-collections';
+import {ResourceViewport} from '@/components/resources/resource-viewport';
+import { ResourceHubTabs } from '@/components/resources/resource-hub-tabs';
+import { IcaiResourceBrowser } from '@/components/icai/resource-browser';
+import { OfflineSnapshot } from '@/components/offline/offline-snapshot';
+import { getResourceLibraryModel } from '@/lib/resources/service';
+import { getStudentContext } from '@/lib/academic/student-context';
+import { getIcaiPublicCatalog } from '@/lib/icai/query';
+import { resourceDestination, resourceTab } from '@/lib/resources/navigation';
 
-export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Resources | CA Progress" };
+export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {title:'Resources | CA Progress'};
+const param = (value:string|string[]|undefined) => typeof value === 'string' ? value : undefined;
 
-export default async function ResourcesPage({ searchParams }: { searchParams: Promise<{ subjectId?: string; chapterId?: string }> }) {
-  const { subjectId, chapterId } = await searchParams;
-  const model = await getResourceLibraryModel();
-  if (model.mode === "ready") return <div className="phase7-page"><OfflineSnapshot kind="resources" data={model}/><PageHeader preview={false} eyebrow="Phase 7 · Resource library" title="My, Community and ICAI resources in one library." description="Private files use signed access; Community items are moderated; official ICAI metadata stays visibly separate from user uploads."/><ResourceLibrary model={model} initialTab="my" initialAcademicContext={{ subjectId, chapterId }}/></div>;
-  return <div className="phase7-page"><PageHeader preview={false} eyebrow="Resource library" title="Verified ICAI resources remain available without a private workspace." description="Sign in to create notes, upload private files and access approved Community resources."/><LoginRequired next="/resources" title="Sign in for My Notes & Files"/><Card className="phase7-icai-card"><CardHeader title="ICAI official resources" description="Verified official-source metadata from the Phase 8 engine." action={<Badge tone="success">Official · Verified</Badge>}/><CardBody>{model.officialResources.length ? <div className="phase7-document-list">{model.officialResources.slice(0, 20).map((resource) => <a href={resource.officialUrl} target="_blank" rel="noreferrer" className="phase7-document-card phase7-document-card--icai" key={resource.id}><div className="phase7-document-icon"><Icon name="shield"/></div><div className="phase7-document-copy"><div className="phase7-document-title"><strong>{resource.title}</strong><Badge tone="success">ICAI Official</Badge></div><p>{resource.summary || resource.resourceType.replaceAll("_", " ")}</p><div className="phase7-document-meta"><span>{resource.sourceName}</span><span>Verified {new Date(resource.lastVerifiedAt).toLocaleDateString()}</span></div></div><Icon name="arrow" size={17}/></a>)}</div> : <EmptyState icon="shield" title="No verified ICAI resources yet" description="The official-source feed is currently empty."/>}<Link href="/resources/icai" className="ui-text-link">Open ICAI resource browser →</Link></CardBody></Card></div>;
+export default async function ResourcesPage({searchParams}:{searchParams:Promise<Record<string,string|string[]|undefined>>}) {
+  const params = await searchParams;
+  if(param(params.communityMessageId)){const next=new URLSearchParams();for(const [key,value] of Object.entries(params))if(typeof value==='string')next.set(key,value);redirect(`/notes?${next}`);}
+  const tab = param(params.communityMessageId) ? 'my' : resourceTab(param(params.tab));
+  const [context,model]=await Promise.all([getStudentContext(),getResourceLibraryModel({includeOfficial:false,metadataOnly:true})]);
+  if(model.mode==='setup'&&tab!=='icai')redirect('/onboarding?next=/resources');
+  const selection=context.mode==='ready'?context.selection:null;
+  const requestedSubject=param(params.subject)??param(params.subjectId);
+  const catalog=await getIcaiPublicCatalog({
+    level:selection?.level??param(params.level),attempt:selection?.attemptKey??param(params.attempt),
+    subject:model.mode==='ready'?undefined:selection&&requestedSubject&&!context.subjectIds.includes(requestedSubject)?'__not_applicable__':requestedSubject,
+    type:model.mode==='ready'?undefined:param(params.type),
+  });
+  const content=model.mode==='ready'?<>
+    <OfflineSnapshot kind="resources" data={model}/><StorageCleanupWarning/>
+    <ResourceCollections model={model} catalog={catalog} initialTab={tab} initialAcademicContext={{subjectId:param(params.subjectId),chapterId:param(params.chapterId)}} initialOfficialContext={{subject:requestedSubject,type:param(params.type)}}/>
+  </>:tab==='icai'?<IcaiResourceBrowser catalog={catalog} embedded scopeLocked={Boolean(selection)}/>:<div className="resource-hub-guest"><LoginRequired next={resourceDestination(params,tab)} title="Sign in to open your library"/><p>Official study material is available without signing in. <Link href={resourceDestination(params,'icai')}>Browse ICAI resources →</Link></p></div>;
+  return <div className="resource-hub resource-workspace"><ResourceViewport/><aside className="resource-workspace-sidebar"><div className="fm-sidebar-title"><span>Workspace</span></div><ResourceHubTabs tab={tab} params={params}/><div id="fm-view-navigation"/><Link href="/updates" className="fm-updates-link">ICAI updates ↗</Link></aside><div className="resource-workspace-content">{content}</div><div id="fm-utility-dock" className="fm-utility-dock"/></div>;
 }

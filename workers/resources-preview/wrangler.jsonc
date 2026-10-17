@@ -1,0 +1,9 @@
+{
+ "$schema":"../../node_modules/wrangler/config-schema.json",
+ "name":"ca-progress-v2-resources-preview","main":"./index.ts","minify":true,
+ "compatibility_date":"2026-08-29","compatibility_flags":["nodejs_compat"],
+ "workers_dev":false,"preview_urls":false,
+ "d1_databases":[{"binding":"DB","database_name":"ca-progress-v2-phase4-shadow","database_id":"6f002cbe-fe40-4d1b-9cf4-df6faaf52350"}],
+ "r2_buckets":[{"binding":"USER_RESOURCES_R2","bucket_name":"ca-progress-v2-staging-user-resources"}],
+ "limits":{"cpu_ms":30000},"observability":{"enabled":true}
+}

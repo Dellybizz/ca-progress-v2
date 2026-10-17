@@ -37,7 +37,7 @@ export function RevisionSettingsClient({ settings }: { settings: RevisionSetting
     setError(null);
     const intervalDays = intervalText.split(",").map((value) => Number(value.trim())).filter((value) => Number.isFinite(value));
     try {
-      const response = await fetch("/api/planner/revision-settings", {
+      const response = await fetch("/api/v1/planner/revision-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ intervalDays, preferredWeekdays: weekdays, revisionMinutes, newChapterMinutes, testMinutes }),

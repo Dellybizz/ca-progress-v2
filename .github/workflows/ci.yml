@@ -3,7 +3,7 @@ name: V2 CI
 on:
   pull_request:
   push:
-    branches: [main, phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d]
+    branches: [main, phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d, mobile-phase7-student-parity]
 
 permissions:
   contents: read
@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Enforce permanent Supabase retirement
         run: npm run verify:retirement
       - run: npm run typecheck

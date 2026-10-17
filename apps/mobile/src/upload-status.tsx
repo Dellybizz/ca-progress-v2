@@ -1,0 +1,7 @@
+import {useEffect,useState} from 'react';
+import {nativeUploadRows,retryNativeUpload,pauseNativeUpload,cancelNativeUpload} from './files';
+export function NativeUploadStatus({accountId,transport}:{accountId:string;transport:(path:string,init?:RequestInit)=>Promise<unknown>}){
+ const [rows,setRows]=useState<Awaited<ReturnType<typeof nativeUploadRows>>>([]);const [error,setError]=useState('');
+ useEffect(()=>{let live=true;const refresh=()=>void nativeUploadRows(accountId).then(next=>{if(live)setRows(next);}).catch(()=>undefined);refresh();const timer=setInterval(refresh,1500);return()=>{live=false;clearInterval(timer);};},[accountId]);
+ if(!rows.length)return null;return <div className="native-upload-queue" aria-label="Pending uploads">{rows.map(row=><div className="row" key={row.id}><div><strong>{row.filename}</strong><small>{row.state==='running'?'Uploading':row.state==='queued'?'Queued':row.duplicate?'Already in your library':row.state==='paused'?'Paused':'Needs retry'}</small>{row.error&&<p>{row.error}</p>}</div>{row.state==='running'?<button onClick={()=>pauseNativeUpload(row.id)}>Pause</button>:<><button onClick={()=>void retryNativeUpload(accountId,row.id,row.duplicate).catch(cause=>setError(cause.message))}>{row.duplicate?'Upload another copy':'Resume'}</button><button onClick={()=>void cancelNativeUpload(accountId,row.id,transport).catch(cause=>setError(cause.message))}>Remove</button></>}</div>)}{error&&<p role="alert">{error}</p>}</div>;
+}

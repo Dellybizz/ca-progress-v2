@@ -4,9 +4,31 @@ export type IconName =
   | "home" | "calendar" | "chart" | "timer" | "tests" | "notes" | "book"
   | "community" | "settings" | "shield" | "search" | "bell" | "more" | "close"
   | "chevron" | "arrow" | "check" | "sparkles" | "clock" | "target" | "layers"
+  | "undo" | "redo" | "highlight" | "list" | "ordered-list" | "checklist" | "link" | "table" | "format" | "portrait" | "landscape" | "type" | "align-left" | "align-center" | "align-right" | "justify" | "outline" | "expand" | "image" | "equation"
   | "plus" | "sun" | "moon" | "command" | "lock" | "alert" | "cloud-off";
 
 const paths: Record<IconName, ReactNode> = {
+  undo: <><path d="m8 3-5 5 5 5M3 8h10a7 7 0 0 1 0 14"/></>,
+  redo: <><path d="m16 3 5 5-5 5M21 8H11a7 7 0 0 0 0 14"/></>,
+  highlight: <><path d="m9 11 7-8 5 5-8 7-4-4ZM9 11l-4 5 3 3 5-4M3 21h8"/></>,
+  list: <><path d="M9 5h12M9 12h12M9 19h12"/><circle cx="3" cy="5" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="3" cy="19" r="1"/></>,
+  'ordered-list': <><path d="M10 5h11M10 12h11M10 19h11M3 3h1v5M2 8h4M2 14c0-3 5-3 4 0l-4 5h4"/></>,
+  checklist: <><rect x="2" y="3" width="7" height="7" rx="1"/><path d="m3 6 2 2 3-4M13 6h8M13 18h8"/><rect x="2" y="15" width="7" height="7" rx="1"/></>,
+  link: <><path d="m10 13 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(1 0) scale(.9)"/></>,
+  table: <><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></>,
+  format: <><path d="M4 5h16M4 12h10M4 19h7M19 10v11M15 14l4-4 4 4"/></>,
+  portrait: <><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 7h6M9 11h6M9 15h4"/></>,
+  landscape: <><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h7M6 13h12"/></>,
+  type: <><path d="M4 5h16M12 5v15M8 20h8"/></>,
+  'align-left': <path d="M3 4h18M3 9h12M3 14h18M3 19h12"/>,
+  'align-center': <path d="M3 4h18M6 9h12M3 14h18M6 19h12"/>,
+  'align-right': <path d="M3 4h18M9 9h12M3 14h18M9 19h12"/>,
+  justify: <path d="M3 4h18M3 9h18M3 14h18M3 19h18"/>,
+  outline: <><path d="M9 4h12M9 12h12M9 20h12M3 4h1M3 12h1M3 20h1"/></>,
+  expand: <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M3 16v5h5"/>,
+  image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m3 17 5-5 4 4 4-6 5 7"/></>,
+  equation: <><path d="M20 4H8l7 8-7 8h12M3 8h3M3 16h3"/></>,
+
   home: <><path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.8V21h13V9.8"/><path d="M9.5 21v-6h5v6"/></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></>,
   chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,

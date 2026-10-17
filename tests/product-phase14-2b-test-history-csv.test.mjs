@@ -255,7 +255,7 @@ test("Test History CSV route derives ownership only from session and returns a p
   assert.match(route, /export async function GET\(\)/);
   assert.match(route, /const user = await optionalUser\(\)/);
   assert.match(route, /status: 401/);
-  assert.match(route, /canUseExport\(tier, "test_history_csv"\)/);
+  assert.match(route, /getPlanFeatureAccessForUser\(user\.id, "test_history_csv"\)/);
   assert.match(route, /createOwnedTestHistoryCsvStream\(user\.id\)/);
   assert.match(route, /private, no-store/);
   assert.match(route, /text\/csv; charset=utf-8/);

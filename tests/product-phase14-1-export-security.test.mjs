@@ -29,13 +29,13 @@ function fakeProgressDb(profileRows, progressRows) {
 }
 
 test("Phase 14.1 maps internal billing tiers to product plans without weakening the matrix", () => {
-  assert.equal(exportProductPlanLabel("free"), "Free");
-  assert.equal(exportProductPlanLabel("basic"), "Pro");
-  assert.equal(exportProductPlanLabel("pro"), "Premium");
-  assert.deepEqual(exportRequirement("progress_pdf"), { tier: "free", productPlan: "Free" });
-  assert.deepEqual(exportRequirement("study_csv"), { tier: "basic", productPlan: "Pro" });
-  assert.deepEqual(exportRequirement("test_history_csv"), { tier: "basic", productPlan: "Pro" });
-  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Premium" });
+  assert.equal(exportProductPlanLabel("free"), "Explorer");
+  assert.equal(exportProductPlanLabel("basic"), "Striver");
+  assert.equal(exportProductPlanLabel("pro"), "Ranker");
+  assert.deepEqual(exportRequirement("progress_pdf"), { tier: "free", productPlan: "Explorer" });
+  assert.deepEqual(exportRequirement("study_csv"), { tier: "basic", productPlan: "Striver" });
+  assert.deepEqual(exportRequirement("test_history_csv"), { tier: "basic", productPlan: "Striver" });
+  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Ranker" });
   assert.equal(canUseExport("free", "progress_pdf"), true);
   assert.equal(canUseExport("free", "study_csv"), false);
   assert.equal(canUseExport("basic", "study_csv"), true);

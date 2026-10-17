@@ -1,0 +1,23 @@
+// Characterization report: records current behaviour, not assertions that defects should persist.
+import {build} from 'esbuild';
+import {readFile,writeFile,mkdir,mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+const root=process.cwd(),directory=await mkdtemp(path.join(tmpdir(),'ca-resource-baseline-'));
+async function load(file){const result=await build({entryPoints:[path.join(root,file)],bundle:true,write:false,platform:'node',format:'esm',plugins:[{name:'isolate-server-adapters',setup(b){b.onResolve({filter:/^(server-only|@\/lib\/offline\/transaction-context|\.\/runtime)$/},args=>({path:args.path,namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export const getHotD1Database=()=>{throw Error("Real database is prohibited in baseline fixtures")};export const offlineTransaction=()=>null;'}));}}]});const output=path.join(directory,path.basename(file)+'.mjs');await writeFile(output,result.outputFiles[0].text);return import('file://'+output);}
+try{
+ const projection=await load('lib/offline/projection.ts'),validation=await load('lib/resources/validation.ts'),hot=await load('lib/data/d1/hot-screens.ts');
+ const queries=[];const database={prepare(sql){return {bind(...args){queries.push({sql,args});return {sql,args};}};},async batch(statements){return statements.map(statement=>({results:Array.from({length:Math.min(1001,Number(statement.sql.match(/LIMIT (\d+)/)?.[1]??1001))},(_,i)=>({id:`fixture-${i}`}))}));}};
+ const rows=await hot.getHotResourceLibraryRows('phase0-fixture-owner',database);
+ const marker='END_OF_NOTE';const input='<p>'+'x'.repeat(200001)+marker+'</p>';
+ let signatureRejected=false;try{await validation.validateUploadFile(new File(['not really PDF'],'fixture.pdf',{type:'application/pdf'}));}catch(error){signatureRejected=/signature/.test(error.message);}
+ const tracked=['components/resources/note-editor.tsx','lib/offline/projection.ts','lib/resources/validation.ts','lib/data/d1/hot-screens.ts','app/api/resources/upload-complete/route.ts','lib/jobs/execute.ts','apps/mobile/src/main.tsx','apps/mobile/src/files.ts','wrangler.jsonc','next.config.ts'];
+ const source={};for(const file of tracked)source[file]=createHash('sha256').update(await readFile(file)).digest('hex');
+ let sanitized='',sizeError=null;try{sanitized=validation.sanitizeRichTextHtml(input);}catch(error){sizeError=error.message;}
+ const completion=await readFile('app/api/resources/upload-complete/route.ts','utf8');
+ const report={schemaVersion:1,recordedAt:new Date().toISOString(),commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),sourceSha256:source,execution:'Actual source modules bundled in isolation; fake D1 captures SQL and simulates limits. No production query or mutation.',observations:{offlineRoutes:{legacy:projection.snapshotKind('/api/notes')??null,versioned:projection.snapshotKind('/api/v1/notes')??null,sourceMismatch:projection.snapshotKind('/api/notes')!==projection.snapshotKind('/api/v1/notes'),productionFeatureFlag:'unknown; no deployed build-time flag inspected'},library:{fixtureRowsPerCollection:1001,returned:Object.fromEntries(Object.entries(rows).map(([key,value])=>[key,Array.isArray(value)?value.length:null])),sqlLimits:queries.map(q=>Number(q.sql.match(/LIMIT (\d+)/)?.[1]??0)),continuation:'No cursor in current getHotResourceLibraryRows return contract'},sanitizer:{inputChars:input.length,outputChars:sanitized.length,trailingMarkerSurvives:sanitized.includes(marker),rejection:sizeError,plainTextOutputChars:validation.richTextToPlainText('x'.repeat(120001)).length},uploadValidation:{legacyHelperRejectsBadSignature:signatureRejected,directCompletionCallsHelper:/validateUploadFile\s*\(/.test(completion),interpretation:'Source call-path check only; not a live malware or parser test'},nativeBundle:{javascriptBytes:(await readFile('native-shell/assets/app.js')).length,cssBytes:(await readFile('native-shell/assets/app.css')).length},highestMigration:(await import('node:fs/promises')).readdir('d1/migrations').then(names=>names.filter(n=>/^\d+.*\.sql$/.test(n)).sort().at(-1))}};
+ report.observations.highestMigration=await report.observations.highestMigration;
+ const output=path.join(root,'docs/resources/phase0/current-system-baseline.json');await mkdir(path.dirname(output),{recursive:true});await writeFile(output,JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report.observations,null,2));
+}finally{await rm(directory,{recursive:true,force:true});}

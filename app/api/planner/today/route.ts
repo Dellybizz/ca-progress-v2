@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { performTodayPlanInteraction } from "@/lib/smart-planner/today-interactions";
+import { getTodayPlanPageModel } from "@/lib/smart-planner/service";
 import type { TodayPlanInteractionAction } from "@/lib/smart-planner/types";
+import { getStudentContext } from "@/lib/academic/student-context";
+import { MOBILE_API_HEADERS, publicStudentContext } from "@/lib/mobile/contract";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +20,11 @@ function validAction(value: unknown): value is TodayPlanInteractionAction {
   return false;
 }
 
+export async function GET() {
+  const [context, plan] = await Promise.all([getStudentContext(), getTodayPlanPageModel()]);
+  return NextResponse.json({ data: plan, academicContext: publicStudentContext(context) }, { headers: MOBILE_API_HEADERS });
+}
+
 export async function POST(request: Request) {
   const identity = await optionalUser();
   if (!identity) return NextResponse.json({ error: "Sign in to update Today Plan." }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
@@ -24,7 +32,7 @@ export async function POST(request: Request) {
   if (!validAction(body)) return NextResponse.json({ error: "Invalid Today Plan action." }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
   try {
     const result = await performTodayPlanInteraction(body);
-    return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json(result, { headers: MOBILE_API_HEADERS });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Today Plan could not be updated.";
     const status = /sign in/i.test(message) ? 401 : /not found/i.test(message) ? 404 : /valid|choose|within one year|different plans|active plan/i.test(message) ? 400 : 409;

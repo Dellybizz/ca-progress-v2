@@ -29,15 +29,15 @@ test("Phase 15C comparison locks canonical Free, Pro and Premium product values"
     monthlyPriceInr: column.monthlyPriceInr,
     storageQuotaMegabytes: column.storageQuotaMegabytes,
   })), [
-    { tier: "free", label: "Free", monthlyPriceInr: 0, storageQuotaMegabytes: 250 },
-    { tier: "basic", label: "Pro", monthlyPriceInr: 50, storageQuotaMegabytes: 2560 },
-    { tier: "pro", label: "Premium", monthlyPriceInr: 150, storageQuotaMegabytes: 15360 },
+    { tier: "free", label: "Explorer", monthlyPriceInr: 0, storageQuotaMegabytes: 250 },
+    { tier: "basic", label: "Striver", monthlyPriceInr: 50, storageQuotaMegabytes: 2560 },
+    { tier: "pro", label: "Ranker", monthlyPriceInr: 150, storageQuotaMegabytes: 15360 },
   ]);
   assert.equal(monthlyPriceInr("free"), 0);
   assert.equal(monthlyPriceInr("basic"), 50);
   assert.equal(monthlyPriceInr("pro"), 150);
-  assert.equal(productPlanLabel("basic"), "Pro");
-  assert.equal(productPlanLabel("pro"), "Premium");
+  assert.equal(productPlanLabel("basic"), "Striver");
+  assert.equal(productPlanLabel("pro"), "Ranker");
 
   const storage = PLAN_COMPARISON_ROWS.find((row) => row.key === "storage");
   assert.ok(storage);
@@ -46,16 +46,17 @@ test("Phase 15C comparison locks canonical Free, Pro and Premium product values"
   assert.equal(planComparisonValue(storage, "pro"), "15 GB");
 });
 
-test("pricing UX is comparison-first and never exposes internal Basic/Pro naming as product identity", () => {
+test("pricing UX is comparison-first and uses admin configured product names", () => {
   const page = read("app/(student)/pricing/page.tsx");
   const client = read("components/billing/pricing-client.tsx");
-  assert.match(page, /Free, Pro or Premium/);
-  assert.match(page, /server, not trusted from the browser/);
+  assert.match(page, /name:offer\?\.planName\|\|plan\.name/);
+  assert.doesNotMatch(page, /PageHeader|More focus|Compare your tools/);
+  assert.match(client, /annual offer/);
   assert.match(client, /PLAN_COMPARISON_COLUMNS/);
   assert.match(client, /PLAN_COMPARISON_ROWS/);
-  assert.match(client, /productPlanLabel\(plan\.tier_key\)/);
+  assert.match(client, /configuredPlanLabel\(plan\.tier_key,plan\.name\)/);
   assert.match(client, /plan\.price_subunits/);
-  assert.match(client, /published server policy has a valid price/);
+  assert.match(client, /if\(!checkoutMatchesPolicy\(plan,cycle,offer,selectedMethod\)\)throw/);
   assert.doesNotMatch(client, />Basic</);
 });
 
@@ -69,7 +70,7 @@ test("every implemented paid API surface is represented by the audit and has a s
     assert.notEqual(PLAN_FEATURE_REQUIRED_TIER[surface.featureKey], "free", surface.featureKey);
     const source = read(surface.route);
     assert.match(source, new RegExp(`[\"']${surface.featureKey}[\"']`), surface.key);
-    if (surface.route.includes("/exports/")) assert.match(source, /canUseExport/);
+    if (surface.route.includes("/exports/")) assert.match(source, /getPlanFeatureAccessForUser/);
     else assert.match(source, /getPlanFeatureAccessForUser/);
   }
 });
@@ -82,7 +83,7 @@ test("planner paid mutations are server gated while Free notification read state
   assert.match(goals, /getPlanFeatureAccessForUser\(user\.id, "detailed_goals_reports"\)/);
   assert.match(notifications, /if \(body\.action === "read"\)/);
   assert.match(notifications, /if \(body\.action === "read_all"\)/);
-  assert.match(notifications, /if \(body\.action === "preferences"\)[\s\S]*getPlanFeatureAccessForUser\(user\.id, "customisation_reminders"\)/);
+  assert.match(notifications, /if \(body\.action === "preferences"\)[\s\S]*getPlanFeatureAccessForUser\(\s*user\.id,\s*"customisation_reminders",?\s*\)/);
   assert.match(calendar, /PLAN_UPGRADE_REQUIRED/);
   assert.match(goals, /PLAN_UPGRADE_REQUIRED/);
   assert.match(notifications, /PLAN_UPGRADE_REQUIRED/);
@@ -109,14 +110,14 @@ test("controlled beta matrix preserves a genuinely usable Free product and monot
   ];
   for (const feature of freeCore) assert.equal(canUsePlanFeature("free", feature), true, `Free ${feature}`);
 
-  const proUpgrades = ["advanced_analytics", "advanced_planner_calendar", "customisation_reminders", "expanded_study_buddy", "detailed_goals_reports", "study_csv", "test_history_csv"];
+  const proUpgrades = [ "advanced_planner_calendar", "customisation_reminders", "expanded_study_buddy", "detailed_goals_reports", "study_csv", "test_history_csv"];
   for (const feature of proUpgrades) {
     assert.equal(canUsePlanFeature("free", feature), false, feature);
     assert.equal(canUsePlanFeature("basic", feature), true, feature);
     assert.equal(canUsePlanFeature("pro", feature), true, feature);
   }
 
-  const premiumUpgrades = ["advanced_preparation", "advanced_forecasts_insights", "full_backup", "full_historical_insights", "advanced_recovery_planning"];
+  const premiumUpgrades = ["advanced_analytics","advanced_preparation", "advanced_forecasts_insights", "full_backup", "full_historical_insights", "advanced_recovery_planning"];
   for (const feature of premiumUpgrades) {
     assert.equal(canUsePlanFeature("free", feature), false, feature);
     assert.equal(canUsePlanFeature("basic", feature), false, feature);

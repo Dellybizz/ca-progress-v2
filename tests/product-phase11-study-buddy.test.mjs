@@ -120,7 +120,7 @@ test("Product Phase 11 API requires auth and same-origin checks for every mutati
 test("Product Phase 11 UI stays an accountability workspace rather than a generic social or media system", () => {
   const component = read("components/study-buddy/study-buddy-workspace.tsx");
   const navigation = read("components/shell/navigation.tsx");
-  assert.match(component, /Connect by user ID/);
+  assert.match(component, /Add study buddy/);
   assert.match(component, /What I share with this buddy/);
   assert.match(component, /Shared weekly goals/);
   assert.match(component, /Study Together/);

@@ -31,7 +31,8 @@ test("dashboard and planner use persisted data without doing AI work in page req
 
 test("uploads enqueue attachment processing after durable metadata commit", () => {
   const upload = read("app/api/resources/upload-complete/route.ts");
-  assert.match(upload, /type: "attachment-process"/);
+  assert.match(upload, /resource_processing_outbox/);
+  assert.match(read("lib/resources/processing-outbox.ts"), /type:\s*['"]attachment-process['"]/);
   assert.match(upload, /processing: "queued"/);
 });
 

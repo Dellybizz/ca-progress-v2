@@ -25,8 +25,8 @@ export async function getPlanFeatureAccessForUser(userId: string, featureKey: st
     allowed,
     upgradeMessage: allowed
       ? ""
-      : requirement
+      : entitlement.upgradeMessage || (requirement
         ? `Upgrade to ${requirement.productPlan} to use this feature.`
-        : "This feature is not available on your current plan.",
+        : "This feature is not available on your current plan."),
   };
 }

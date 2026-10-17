@@ -27,31 +27,36 @@ test("billing exposes current plan, validity, renewal, history, empty and recove
   for (const phrase of [
     "Current plan",
     "Active until",
-    "Renewal state",
+    "Payments and renewal",
     "Payment history",
-    "Subscription audit",
+    "Plan changes",
     "No paid transactions yet",
-    "Retry payment",
+    "CheckoutRecovery",
   ]) {
     assert.ok(billing.includes(phrase), `${phrase} should be represented`);
   }
-  assert.match(billing, /state\s*===\s*"success"/);
-  assert.match(billing, /state\s*===\s*"pending"/);
-  assert.match(billing, /state\s*===\s*"failed"/);
-  assert.match(billing, /Retry payment/);
+  assert.doesNotMatch(billing, /PaymentState|query\.payment/);
+  assert.match(billing, /viewerId=\{model\.viewerId\}/);
+  const recovery=read("components/billing/checkout-recovery.tsx");
+  assert.match(recovery, /monitorCheckout/);
+  assert.match(recovery, /next\?\.accessGranted/);
 });
 
-test("pricing remains configuration-safe and sends only the plan identifier", () => {
+test("pricing remains configuration-safe and sends policy and method identifiers without a client charge amount", () => {
   const pricing = read("components/billing/pricing-client.tsx");
-  assert.match(pricing, /body:JSON\.stringify\(\{planId:plan\.id,requestId:crypto\.randomUUID\(\),promoCode:/);
+  assert.match(pricing, /checkoutIntent\(localStorage,viewerId,\{planId:plan\.id,[^\n]*paymentMethod:selectedMethod,policyVersionId:offer\?\.policyVersionId/);
+  assert.match(pricing, /body:JSON\.stringify\(input\)/);
   assert.doesNotMatch(pricing, /body:JSON\.stringify\(\{[^}]*\b(?:amount|price_subunits)\b[^}]*\}\)/);
-  assert.match(pricing, /Checkout not configured/);
-  assert.match(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
-  assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer\)/);
-  assert.match(pricing, /published server policy has a valid price/);
-  assert.match(pricing, /payment=\$\{verified\.providerStatus/);
-  assert.match(pricing, /\/billing\?payment=pending/);
-  assert.match(pricing, /\/billing\?payment=failed/);
+  assert.match(pricing, /Currently unavailable/);
+  assert.match(pricing, /publishedComparisonValue/);
+  assert.doesNotMatch(pricing, /storageQuotaMegabytes\(plan\.tier_key\)/);
+  assert.match(pricing, /checkoutMatchesPolicy\(plan,cycle,offer,method\)/);
+  assert.match(pricing, /if\(!checkoutMatchesPolicy\(plan,cycle,offer,selectedMethod\)\)throw/);
+  assert.match(pricing, /result\.accessGranted===true/);
+  assert.match(pricing, /setConfirmedPlanId\(created\.planId\)/);
+  assert.match(pricing, /setCompletionPhase\('pending'\)/);
+  assert.match(pricing, /createCheckoutCompletion/);
+  assert.match(pricing, /payment\.failed/);
   assert.doesNotMatch(pricing, /retry:\{/);
   assert.doesNotMatch(pricing, /max_count/);
 });

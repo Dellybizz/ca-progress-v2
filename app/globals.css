@@ -5,6 +5,7 @@
 @import "./styles/student-dashboard.css";
 @import "./styles/surfaces.css";
 @import "./styles/auth.css";
+@import "./styles/profile-refine.css";
 @import "./styles/auth-login-fix.css";
 @import "./styles/academic.css";
 @import "./styles/icai.css";
@@ -15,8 +16,10 @@
 @import "./styles/phase10.css";
 @import "./styles/product-phase7-community.css";
 @import "./styles/product-phase11-study-buddy.css";
+@import "./styles/study-buddy-refine.css";
 @import "./styles/phase11.css";
 @import "./styles/product-phase15-pricing.css";
+@import "./styles/product-gifts.css";
 @import "./styles/product-phase5-tests.css";
 @import "./styles/phase11-lock.css";
 @import "./styles/dashboard-a1.css";
@@ -38,6 +41,10 @@
 @import "./styles/navigation-progress.css";
 @import "./styles/product-consistency-phase11.css";
 @import "./styles/refinement-phase1-admin.css";
+@import "./styles/floating-navigation.css";
+@import "./styles/student-profile.css";
+@import "./styles/resource-hub.css";
+@import "./styles/file-manager.css";
 
 .offline-workspace { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .offline-controls { padding: 16px 0; border-block: 1px solid var(--border, #e5e7eb); margin-bottom: 16px; }
@@ -45,3 +52,8 @@
 
 /* Chapter Hub has two attachable resource sources: keep both tabs evenly aligned. */
 .chapter-hub-resource-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Native release gates sit above the hosted shell and never expose stale controls. */
+.native-update-gate{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:24px;background:var(--background,#fff)}
+.native-update-gate>.ui-card{width:min(100%,440px);padding:24px}
+.native-update-notice{position:fixed;z-index:9999;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(76px,calc(env(safe-area-inset-bottom) + 64px));display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--card);box-shadow:var(--shadow-lg)}
+.native-update-notice span{flex:1}.native-update-notice button{border:0;background:none;font-size:20px;color:inherit}

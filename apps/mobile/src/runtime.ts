@@ -1,0 +1,87 @@
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
+
+export const CANONICAL_ORIGINS = new Set(["https://caprogress.zanisheluxe.in", "https://ca-progress-v2.habeebaasif622.workers.dev"]);
+export const SAFE_DEEP_LINK = /^\/(?:auth\/callback|dashboard(?:\/.*)?|calendar|analytics(?:\/forecast)?|planner(?:\/.*)?|goals|progress|syllabus|subjects(?:\/.*)?|chapters(?:\/.*)?|study|tests|notes(?:\/.*)?|activity|study-buddy|community(?:\/.*)?|resources(?:\/.*)?|notifications(?:\/.*)?|settings(?:\/.*)?|pricing|billing|feature-tour|account-deletion)(?:[/?#]|$)/;
+const NATIVE_AUTH_CALLBACK = "ca-progress://auth/complete";
+
+export type NativeRoute = "dashboard" | "today" | "progress" | "syllabus" | "planner" | "goals" | "revisionSettings" | "focus" | "notes" | "activity" | "buddy" | "community" | "resources" | "notifications" | "profile" | "settings" | "appearance" | "focusSettings" | "security" | "exports" | "offlineStorage" | "privacy" | "calendar" | "analytics" | "forecast" | "tests" | "pricing" | "billing" | "tour" | "deletion" | "unsupported";
+
+export function routeFromDeepLink(value: string): NativeRoute | null {
+  try {
+    const url = new URL(value);
+    if (!CANONICAL_ORIGINS.has(url.origin) || !SAFE_DEEP_LINK.test(`${url.pathname}${url.search}${url.hash}`)) return null;
+    if (url.pathname.startsWith("/subjects/") && url.pathname.endsWith("/progress")) return "progress";
+    if (url.pathname.startsWith("/chapters/")) return "progress";
+    if (url.pathname.startsWith("/subjects/") || url.pathname.startsWith("/syllabus")) return "syllabus";
+    if (url.pathname.startsWith("/notes")) return "notes";
+    if (url.pathname.startsWith("/activity")) return "activity";
+    if (url.pathname.startsWith("/study-buddy")) return "buddy";
+    if (url.pathname.startsWith("/goals")) return "goals";
+    if (url.pathname.startsWith("/progress")) return "progress";
+    if (url.pathname.startsWith("/analytics/forecast")) return "forecast";
+    if (url.pathname.startsWith("/analytics")) return "analytics";
+    if (url.pathname.startsWith("/calendar")) return "calendar";
+    if (url.pathname.startsWith("/planner/today")) return "today";
+    if (url.pathname.startsWith("/planner/revision-settings")) return "revisionSettings";
+    if (url.pathname.startsWith("/planner")) return "planner";
+    if (url.pathname.startsWith("/study")) return "focus";
+    if (url.pathname.startsWith("/tests")) return "tests";
+    if (url.pathname.startsWith("/community")) return "community";
+    if (url.pathname.startsWith("/resources")) return "resources";
+    if (url.pathname.startsWith("/notifications")) return "notifications";
+    if (url.pathname.startsWith("/pricing")) return "pricing";
+    if (url.pathname.startsWith("/billing")) return "billing";
+    if (url.pathname.startsWith("/feature-tour")) return "tour";
+    if (url.pathname.startsWith("/account-deletion")) return "deletion";
+    if (url.pathname.startsWith("/settings/profile")) return "profile";
+    if (url.pathname.startsWith("/settings/appearance")) return "appearance";
+    if (url.pathname.startsWith("/settings/focus")) return "focusSettings";
+    if (url.pathname.startsWith("/settings/security")) return "security";
+    if (url.pathname.startsWith("/settings/exports")) return "exports";
+    if (url.pathname.startsWith("/settings/offline")) return "offlineStorage";
+    if (url.pathname.startsWith("/settings/privacy")) return "privacy";
+    if (url.pathname.startsWith("/settings")) return "settings";
+    return "dashboard";
+  } catch { return null; }
+}
+
+export function installNativeRuntime(onRoute: (route: NativeRoute, url: string) => void, onResume: () => void, onAuthCallback: (url: string) => void, onBack?: () => boolean) {
+  if (!Capacitor.isNativePlatform()) return () => undefined;
+  document.documentElement.dataset.nativePlatform = Capacitor.getPlatform();
+
+  // Android may recreate the activity when the browser returns from OAuth. In
+  // that cold-launch path appUrlOpen can fire before the web bundle has added
+  // its listener, so recover the launch URL as well as listening for live URLs.
+  // Keep one callback URL one-use locally because the server exchange is also
+  // one-use and a URL can occasionally be observed through both Capacitor APIs.
+  const handledAuthCallbacks = new Set<string>();
+  const handleIncomingUrl = (url: string) => {
+    if (url.startsWith(NATIVE_AUTH_CALLBACK)) {
+      if (handledAuthCallbacks.has(url)) return;
+      handledAuthCallbacks.add(url);
+      onAuthCallback(url);
+      return;
+    }
+    const route = routeFromDeepLink(url);
+    if (route) onRoute(route, url);
+  };
+
+  const handles = [
+    App.addListener("appUrlOpen", ({ url }) => handleIncomingUrl(url)),
+    App.addListener("resume", onResume),
+    App.addListener("backButton", ({ canGoBack }) => { if (onBack?.()) return; if (canGoBack) history.back(); else void App.minimizeApp(); }),
+  ];
+
+  // getLaunchUrl is required for OAuth callbacks that launched/re-launched the
+  // native activity before appUrlOpen registration completed.
+  void App.getLaunchUrl().then((launch) => { if (launch?.url) handleIncomingUrl(launch.url); });
+
+  return () => { for (const handle of handles) void handle.then((listener) => listener.remove()); };
+}
+
+export function openExternalSafely(value: string) {
+  const url = new URL(value);
+  if (url.protocol !== "https:") throw new Error("Only secure external links are allowed.");
+  window.open(url.href, "_system", "noopener,noreferrer");
+}

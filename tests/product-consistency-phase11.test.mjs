@@ -35,13 +35,15 @@ test("Phase 11 data views retain every labeled field in purpose-built mobile row
   assert.match(css, /\.data-table td::before\s*\{\s*content:\s*attr\(data-label\)/);
   assert.match(users, /className="data-table"/);
   assert.match(users, /data-label="CA profile"/);
-  assert.match(billing, /data-label="Provider reference"/);
+  assert.match(billing, /data-label="Details"/);
+  assert.match(billing, /<p>Payment reference<\/p>/);
 });
 
 test("Phase 11 overlays trap and restore focus and honor reduced motion", () => {
   const overlay = read("components/ui/overlay.tsx");
   const components = read("app/styles/components.css");
-  assert.match(overlay, /previous\?\.focus\(\)/);
+  assert.match(overlay, /previous\?\.isConnected/);
+  assert.match(overlay, /previous\.focus\(\{preventScroll:true\}\)/);
   assert.match(overlay, /event\.key !== "Tab"/);
   assert.match(overlay, /aria-labelledby=/);
   assert.match(components, /prefers-reduced-motion:\s*reduce/);

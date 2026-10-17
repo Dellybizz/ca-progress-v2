@@ -155,3 +155,13 @@ export async function getStudyBuddyComparison(ownerUserId: string, now = new Dat
 
   return items;
 }
+
+
+export type StudyBuddyOwnerSummary = {todayStudyMinutes:number;weekStudyMinutes:number;currentStreakDays:number};
+export async function getStudyBuddyOwnerSummary(ownerUserId:string, now = new Date()):Promise<StudyBuddyOwnerSummary> {
+  const rows = await getD1RuntimeDatabase().prepare(`SELECT s.ended_at,s.duration_seconds,p.timezone
+    FROM study_sessions s JOIN profiles p ON p.user_id=s.user_id
+    WHERE s.user_id=?1 AND s.ended_at>=datetime('now','-120 days') ORDER BY s.ended_at DESC LIMIT 2000`)
+    .bind(ownerUserId).all<SessionRow & {timezone:string|null}>();
+  return sessionSummary(rows.results ?? [], rows.results?.[0]?.timezone || 'Asia/Kolkata', now);
+}

@@ -1,0 +1,941 @@
+{
+  "schemaVersion": 1,
+  "scope": "Phase 0 requirements traceability; a mapping is not implementation evidence",
+  "source": "docs/resources/RESOURCE_NOTES_AUDIT_AND_PLAN_2026-10-14.md",
+  "deliveryPlan": "docs/resources/PHASED_IMPLEMENTATION_8_PHASES.md",
+  "phaseCount": 8,
+  "entryCount": 65,
+  "entries": [
+    {
+      "id": "R01",
+      "currentFindingOrMissingCapability": "Search sees capped arrays",
+      "requiredOutcome": "Server cursor pagination, accurate counts, stable ordering, deep links",
+      "priority": "A",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN03",
+        "RN04"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R02",
+      "currentFindingOrMissingCapability": "Full note bodies accompany listings",
+      "requiredOutcome": "Metadata/excerpts first; open document body on demand; bounded offline prefetch",
+      "priority": "B",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN03",
+        "RN04"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R03",
+      "currentFindingOrMissingCapability": "Note extras limited to 400 IDs",
+      "requiredOutcome": "Join/batch by requested page; no silent attachment/topic omissions",
+      "priority": "A",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN03",
+        "RN04"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R04",
+      "currentFindingOrMissingCapability": "“Folders” are subject filters",
+      "requiredOutcome": "Real nested folders/notebooks, stable IDs, root, move, cycle guards",
+      "priority": "B",
+      "deliveryPhases": [
+        0,
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN02",
+        "RN03"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R05",
+      "currentFindingOrMissingCapability": "Selection mostly supports CSV",
+      "requiredOutcome": "Range/keyboard selection, bulk move/tag/Trash with partial-failure recovery",
+      "priority": "B",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN03",
+        "RN07"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R06",
+      "currentFindingOrMissingCapability": "No lifecycle recovery in reviewed delete path",
+      "requiredOutcome": "30-day Trash, restore, explicit permanent erase, safe folder guards",
+      "priority": "A",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN07"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R07",
+      "currentFindingOrMissingCapability": "Search is loaded metadata/excerpt matching",
+      "requiredOutcome": "Full-text note/PDF search, ranked snippets, facets, saved searches",
+      "priority": "B",
+      "deliveryPhases": [
+        1,
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN04",
+        "RN06"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R08",
+      "currentFindingOrMissingCapability": "Grouping runs after client page slicing",
+      "requiredOutcome": "Correct server grouping/folder counts and group-aware continuation",
+      "priority": "B",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN04"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R09",
+      "currentFindingOrMissingCapability": "Layout preference only is clearly persisted",
+      "requiredOutcome": "Saved sort/filter/view preferences, recent files, starred/pinned shortcuts",
+      "priority": "B",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN03",
+        "RN04"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R10",
+      "currentFindingOrMissingCapability": "PDF/Word covers are icons",
+      "requiredOutcome": "Authorized generated first-page thumbnails; explicit unavailable state",
+      "priority": "B",
+      "deliveryPhases": [
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN06"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R11",
+      "currentFindingOrMissingCapability": "Image covers request original image",
+      "requiredOutcome": "Small derived images, dimension checks, lazy loading, cache invalidation",
+      "priority": "B",
+      "deliveryPhases": [
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN06"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R12",
+      "currentFindingOrMissingCapability": "Office preview absent",
+      "requiredOutcome": "Sandboxed conversion/read-only preview; original preserved",
+      "priority": "B",
+      "deliveryPhases": [
+        2,
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN06",
+        "RN18"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R13",
+      "currentFindingOrMissingCapability": "Accepted upload formats narrowly fixed",
+      "requiredOutcome": "Safe unsupported storage after actual validation; preview support listed separately",
+      "priority": "B",
+      "deliveryPhases": [
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN05",
+        "RN06"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R14",
+      "currentFindingOrMissingCapability": "Queue/staged intents live in component memory",
+      "requiredOutcome": "Durable queue, reattachment rules on web, restart-safe native jobs",
+      "priority": "A",
+      "deliveryPhases": [
+        2,
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN05",
+        "RN08"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R15",
+      "currentFindingOrMissingCapability": "Direct PUT restarts whole transfer",
+      "requiredOutcome": "Resumable protocol where warranted, chunk integrity and expiry recovery",
+      "priority": "B",
+      "deliveryPhases": [
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN05"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R16",
+      "currentFindingOrMissingCapability": "Batch stops at first error",
+      "requiredOutcome": "Per-item pause/retry/remove, explicit independent success/failure",
+      "priority": "B",
+      "deliveryPhases": [
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN05"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R17",
+      "currentFindingOrMissingCapability": "Global 10 MiB cap and separate plan limits",
+      "requiredOutcome": "One policy source, correct quota UI/reservations, measured larger-file budgets",
+      "priority": "B",
+      "deliveryPhases": [
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN05"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R18",
+      "currentFindingOrMissingCapability": "Metadata checks trust stored content-type",
+      "requiredOutcome": "Byte inspection, corruption checks, quarantine and processing statuses",
+      "priority": "A",
+      "deliveryPhases": [
+        1,
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN01",
+        "RN05",
+        "RN06"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R19",
+      "currentFindingOrMissingCapability": "Processing enqueue failure is swallowed",
+      "requiredOutcome": "Durable transactional outbox or repairable delivery; retries/dead-letter diagnostics",
+      "priority": "A",
+      "deliveryPhases": [
+        1,
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN01",
+        "RN06"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R20",
+      "currentFindingOrMissingCapability": "Completion client accepts successful response without checking ID",
+      "requiredOutcome": "Validate completion schema/receipt before reporting cloud backup",
+      "priority": "A",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN01"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R21",
+      "currentFindingOrMissingCapability": "R2 and D1 delete are separate operations",
+      "requiredOutcome": "Recoverable lifecycle/outbox reconciliation, no orphaned logical state",
+      "priority": "A",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN07"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R22",
+      "currentFindingOrMissingCapability": "No complete file activity/version UI found",
+      "requiredOutcome": "Activity, replace-as-new-version for eligible private files, revision restore",
+      "priority": "B",
+      "deliveryPhases": [
+        1,
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN07",
+        "RN10"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R23",
+      "currentFindingOrMissingCapability": "Basic owner/shared gate",
+      "requiredOutcome": "Separate view/edit/save/copy/tag/reshare/download/print/export grants",
+      "priority": "A",
+      "deliveryPhases": [
+        0,
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN02",
+        "RN19"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R24",
+      "currentFindingOrMissingCapability": "Signed original URLs used for current previews",
+      "requiredOutcome": "Protected gateway and derivative policy before restricted-content preview",
+      "priority": "A",
+      "deliveryPhases": [
+        2,
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN06",
+        "RN19"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R25",
+      "currentFindingOrMissingCapability": "Official provenance present, richer workflow missing",
+      "requiredOutcome": "Save to chapter, source/version date, stale/broken status, authorized update comparison",
+      "priority": "B",
+      "deliveryPhases": [
+        1,
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN03",
+        "RN17"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "R26",
+      "currentFindingOrMissingCapability": "Upload dialog differs from shared accessible overlay",
+      "requiredOutcome": "Focus trap/return, Escape, labels, live progress, keyboard drop alternative",
+      "priority": "B",
+      "deliveryPhases": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN01"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N01",
+      "currentFindingOrMissingCapability": "Deprecated browser commands",
+      "requiredOutcome": "Structured editor engine with schema and transaction history",
+      "priority": "A",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN09"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N02",
+      "currentFindingOrMissingCapability": "HTML wrapped as JSON",
+      "requiredOutcome": "Versioned structured document, stable block IDs, non-destructive legacy adapter",
+      "priority": "A",
+      "deliveryPhases": [
+        0,
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN02",
+        "RN09"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N03",
+      "currentFindingOrMissingCapability": "Manual save only",
+      "requiredOutcome": "Account-scoped local draft capture, durable writes, restart restore",
+      "priority": "A",
+      "deliveryPhases": [
+        1,
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN01",
+        "RN10"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N04",
+      "currentFindingOrMissingCapability": "Versioned/legacy offline URL mismatch",
+      "requiredOutcome": "Canonical route normalization and tested queue/replay compatibility",
+      "priority": "A",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN01"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N05",
+      "currentFindingOrMissingCapability": "No reliable per-note in-flight guard/revision contract in UI",
+      "requiredOutcome": "Idempotency, revision preconditions, retain edits made during save",
+      "priority": "A",
+      "deliveryPhases": [
+        1,
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN01",
+        "RN10"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N06",
+      "currentFindingOrMissingCapability": "No editor history browser",
+      "requiredOutcome": "Incremental history, checkpoints, compare/restore, unresolved branch retention",
+      "priority": "A",
+      "deliveryPhases": [
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN10"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N07",
+      "currentFindingOrMissingCapability": "Local/server sanitizer schemas differ",
+      "requiredOutcome": "One versioned schema/validation contract across clients and server",
+      "priority": "A",
+      "deliveryPhases": [
+        0,
+        1,
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN01",
+        "RN02",
+        "RN09"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N08",
+      "currentFindingOrMissingCapability": "HTML silently sliced at 200,000 chars; plain text at 120,000",
+      "requiredOutcome": "Explicit safe size limits and validation; no invisible content truncation",
+      "priority": "A",
+      "deliveryPhases": [
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN01"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N09",
+      "currentFindingOrMissingCapability": "Note body, metadata and links saved in multiple steps",
+      "requiredOutcome": "Atomic mutation or recoverable transaction protocol with receipt",
+      "priority": "A",
+      "deliveryPhases": [
+        0,
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN01",
+        "RN02"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N10",
+      "currentFindingOrMissingCapability": "Checklist is a literal square character",
+      "requiredOutcome": "Interactive task nodes with keyboard support and persistence",
+      "priority": "B",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN12"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N11",
+      "currentFindingOrMissingCapability": "Link/table creation uses prompts; selection not bookmarked",
+      "requiredOutcome": "Accessible dialogs, preserved selection, meaningful validation",
+      "priority": "B",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN09",
+        "RN12"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N12",
+      "currentFindingOrMissingCapability": "Table fallback selects last table; mutations target last row/column",
+      "requiredOutcome": "Selection-aware table commands, safe boundaries, undoable transactions",
+      "priority": "A",
+      "deliveryPhases": [
+        1,
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN01",
+        "RN12"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N13",
+      "currentFindingOrMissingCapability": "Limited typography controls",
+      "requiredOutcome": "Styles, fonts, size, color, highlight, alignment, spacing, indents",
+      "priority": "B",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN11"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N14",
+      "currentFindingOrMissingCapability": "No dedicated undo/redo toolbar/state",
+      "requiredOutcome": "Cross-command undo/redo, shortcuts, IME-safe history and active marks",
+      "priority": "B",
+      "deliveryPhases": [
+        3,
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN09",
+        "RN10",
+        "RN11"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N15",
+      "currentFindingOrMissingCapability": "No editor navigation tools",
+      "requiredOutcome": "Outline/TOC, find/replace, word/character counts, document zoom/focus",
+      "priority": "B",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN11"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N16",
+      "currentFindingOrMissingCapability": "No professional page model",
+      "requiredOutcome": "Page sizes/margins/breaks, header/footer/page numbering, print preview",
+      "priority": "B",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN13"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N17",
+      "currentFindingOrMissingCapability": "Attachments only referenced, not true inline editing",
+      "requiredOutcome": "Inline images/captions/resize/crop, safe embeds, attachment cards",
+      "priority": "B",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN12"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N18",
+      "currentFindingOrMissingCapability": "No equations/citations/code/callouts",
+      "requiredOutcome": "Editable math, highlighted code, quotes, callouts, nested blocks, references",
+      "priority": "B",
+      "deliveryPhases": [
+        3
+      ],
+      "originalRoadmapPhases": [
+        "RN12"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N19",
+      "currentFindingOrMissingCapability": "No notebook/page architecture",
+      "requiredOutcome": "Notebook sections/pages, templates, page thumbnails, reorder/duplicate",
+      "priority": "B",
+      "deliveryPhases": [
+        1,
+        5
+      ],
+      "originalRoadmapPhases": [
+        "RN03",
+        "RN14"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N20",
+      "currentFindingOrMissingCapability": "No ink engine",
+      "requiredOutcome": "Pen/highlighter/eraser, stroke objects, stylus pressure where supported",
+      "priority": "B",
+      "deliveryPhases": [
+        5
+      ],
+      "originalRoadmapPhases": [
+        "RN14"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N21",
+      "currentFindingOrMissingCapability": "No canvas object manipulation",
+      "requiredOutcome": "Lasso, move/resize/rotate, shapes/ruler, layers, paper backgrounds",
+      "priority": "B",
+      "deliveryPhases": [
+        5
+      ],
+      "originalRoadmapPhases": [
+        "RN14",
+        "RN15"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N22",
+      "currentFindingOrMissingCapability": "No PDF annotation sidecar",
+      "requiredOutcome": "Page-anchored ink/text/highlights/comments/bookmarks, split-view notes",
+      "priority": "B",
+      "deliveryPhases": [
+        5
+      ],
+      "originalRoadmapPhases": [
+        "RN16"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N23",
+      "currentFindingOrMissingCapability": "No handwriting/OCR pipeline",
+      "requiredOutcome": "Searchable recognized text; editable conversion without losing original",
+      "priority": "C",
+      "deliveryPhases": [
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN20"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N24",
+      "currentFindingOrMissingCapability": "No audio creation/replay",
+      "requiredOutcome": "Local recording, chunk recovery, timestamped typed/ink replay, transcript",
+      "priority": "C",
+      "deliveryPhases": [
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN21"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N25",
+      "currentFindingOrMissingCapability": "Export is owner JSON in reviewed note route",
+      "requiredOutcome": "Permission-aware PDF/Markdown/HTML/JSON, DOCX conversion and round-trip report",
+      "priority": "B",
+      "deliveryPhases": [
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN18"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N26",
+      "currentFindingOrMissingCapability": "No document imports",
+      "requiredOutcome": "Markdown/HTML/plain text/DOCX/PDF intake with fidelity and safety report",
+      "priority": "B",
+      "deliveryPhases": [
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN18"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N27",
+      "currentFindingOrMissingCapability": "No contextual knowledge links",
+      "requiredOutcome": "Stable note/block links, backlinks, transclusion permission checks",
+      "priority": "B",
+      "deliveryPhases": [
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN17"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N28",
+      "currentFindingOrMissingCapability": "No rich CA study workflow",
+      "requiredOutcome": "Academic templates, linked material, revision cards, optional spaced review",
+      "priority": "B",
+      "deliveryPhases": [
+        6
+      ],
+      "originalRoadmapPhases": [
+        "RN17"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N29",
+      "currentFindingOrMissingCapability": "No comments/suggestions/coediting in editor",
+      "requiredOutcome": "Anchored threads, tracked suggestions, controlled collaborative working copies",
+      "priority": "C",
+      "deliveryPhases": [
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN22"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N30",
+      "currentFindingOrMissingCapability": "Native editor is plain text",
+      "requiredOutcome": "Shared document contract and matched web/native editing; native offline assets",
+      "priority": "A",
+      "deliveryPhases": [
+        3,
+        4,
+        5
+      ],
+      "originalRoadmapPhases": [
+        "RN08",
+        "RN09",
+        "RN10",
+        "RN11",
+        "RN12",
+        "RN13",
+        "RN14",
+        "RN15"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N31",
+      "currentFindingOrMissingCapability": "No measured long-document/stroke budget",
+      "requiredOutcome": "Virtualized pages, worker processing, bounded memory, device benchmarks",
+      "priority": "A",
+      "deliveryPhases": [
+        0,
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN00",
+        "RN23"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N32",
+      "currentFindingOrMissingCapability": "Limited mobile editing controls",
+      "requiredOutcome": "Keyboard-safe toolbar, touch handles, accessible navigation, IME/RTL tests",
+      "priority": "B",
+      "deliveryPhases": [
+        3,
+        4,
+        5,
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN09",
+        "RN10",
+        "RN11",
+        "RN12",
+        "RN13",
+        "RN14",
+        "RN15",
+        "RN23"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "N33",
+      "currentFindingOrMissingCapability": "No optional assistive AI in reviewed editor",
+      "requiredOutcome": "Opt-in source-grounded summaries/flashcards with quotas and undo",
+      "priority": "C",
+      "deliveryPhases": [
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN22"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "S01",
+      "currentFindingOrMissingCapability": "Policy/docs and current code do not fully agree",
+      "requiredOutcome": "Decision-to-code test matrix; user policy overrides older implementation docs",
+      "priority": "A",
+      "deliveryPhases": [
+        0,
+        1
+      ],
+      "originalRoadmapPhases": [
+        "RN00",
+        "RN01",
+        "RN02"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "S02",
+      "currentFindingOrMissingCapability": "No end-to-end protection certification in this audit",
+      "requiredOutcome": "Every access/export/cache/index/thumbnail path follows inherited policy",
+      "priority": "A",
+      "deliveryPhases": [
+        6,
+        7
+      ],
+      "originalRoadmapPhases": [
+        "RN19",
+        "RN23"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "S03",
+      "currentFindingOrMissingCapability": "Native transfer rows do not prove byte resume",
+      "requiredOutcome": "Process-kill/reboot/network tests and actual server offset/integrity evidence",
+      "priority": "A",
+      "deliveryPhases": [
+        2,
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN05",
+        "RN08"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "S04",
+      "currentFindingOrMissingCapability": "Browser persistence differs from native guarantees",
+      "requiredOutcome": "Honest offline availability, storage-pressure handling and account isolation",
+      "priority": "A",
+      "deliveryPhases": [
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN08",
+        "RN10"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "S05",
+      "currentFindingOrMissingCapability": "Native download assembles full bytes plus base64",
+      "requiredOutcome": "Streaming vault bridge/reader design; memory profiling before larger limits",
+      "priority": "B",
+      "deliveryPhases": [
+        4
+      ],
+      "originalRoadmapPhases": [
+        "RN08"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    },
+    {
+      "id": "S06",
+      "currentFindingOrMissingCapability": "Production limits and entitlement bindings unmeasured",
+      "requiredOutcome": "Inspect deployed configuration; preserve existing billing plan decisions",
+      "priority": "A",
+      "deliveryPhases": [
+        0,
+        2
+      ],
+      "originalRoadmapPhases": [
+        "RN00",
+        "RN05"
+      ],
+      "implementationStatus": "not-delivered-by-phase0"
+    }
+  ]
+}
