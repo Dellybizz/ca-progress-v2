@@ -1,6 +1,6 @@
 import type {NoteNode} from './structured-document';
 export type NumberStyle={grouping:'indian'|'western'|'none';decimals:number;negative:'minus'|'brackets';zero:'number'|'dash'};
-export type FinancialConfig={version:1;formatId:string;title:string;variant:string;currency:string;periods:string[];number:NumberStyle;borders:'grid'|'horizontal'|'minimal';density:'compact'|'comfortable'};
+export type FinancialConfig={version:1;formatId:string;title:string;variant:string;currency:string;periods:string[];number:NumberStyle;borders:'grid'|'horizontal'|'minimal';density:'compact'|'comfortable';autoTotals?:boolean};
 export type FinancialColumn={id:string;label:string;kind:'text'|'amount'|'number'|'percent'};
 export type TotalFormula={version:1;terms:{row:string;column:string;sign:1|-1}[];basis:string[]};
 export const DEFAULT_NUMBERS:NumberStyle={grouping:'indian',decimals:2,negative:'brackets',zero:'dash'};
@@ -11,7 +11,8 @@ const exact=(v:object,names:string[])=>Object.keys(v).every(k=>names.includes(k)
 const bad=():never=>{throw Error('Invalid CA format configuration. Your existing working has been retained.');};
 export function financialConfig(value:unknown):FinancialConfig{
  if(typeof value!=='string'||value.length>6000)bad();let c:FinancialConfig;try{c=JSON.parse(value as string);}catch{return bad();}
- if(!obj(c)||!exact(c,['version','formatId','title','variant','currency','periods','number','borders','density'])||c.version!==1||!id(c.formatId)||!str(c.title)||!str(c.variant,80)||!['₹','Rs.','$','£',''].includes(c.currency)||!Array.isArray(c.periods)||c.periods.length>4||c.periods.some(p=>!str(p,80))||!['grid','horizontal','minimal'].includes(c.borders)||!['compact','comfortable'].includes(c.density))bad();
+ if(!obj(c)||!exact(c,['version','formatId','title','variant','currency','periods','number','borders','density','autoTotals'])||c.version!==1||!id(c.formatId)||!str(c.title)||!str(c.variant,80)||!['₹','Rs.','$','£',''].includes(c.currency)||!Array.isArray(c.periods)||c.periods.length>4||c.periods.some(p=>!str(p,80))||!['grid','horizontal','minimal'].includes(c.borders)||!['compact','comfortable'].includes(c.density))bad();
+ if(c.autoTotals!==undefined&&typeof c.autoTotals!=='boolean')bad();
  const n=c.number;if(!obj(n)||!exact(n,['grouping','decimals','negative','zero'])||!['indian','western','none'].includes(n.grouping)||!Number.isInteger(n.decimals)||n.decimals<0||n.decimals>6||!['minus','brackets'].includes(n.negative)||!['number','dash'].includes(n.zero))bad();return c;
 }
 export function totalFormula(value:unknown):TotalFormula{

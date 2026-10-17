@@ -44,7 +44,8 @@ try{
  },table);
  assert.ok(Number.isFinite(report.p95Ms));
  if(!process.env.NOTES_BASELINE){assert.ok(report.snapshots<=3,'Burst edits must coalesce snapshots');assert.ok(report.continuousSnapshots>=1,'Continuous typing must checkpoint within one second');assert.equal(report.hiddenDraftMatches,true,'Hiding the page must flush the latest edit');}
+ if(!process.env.NOTES_BASELINE)await page.getByRole('button',{name:'Table structure controls',exact:true}).click();
  await page.getByRole('button',{name:'Split cell',exact:true}).waitFor();
  assert.equal(await page.getByRole('button',{name:'Split cell',exact:true}).isDisabled(),!process.env.NOTES_BASELINE);
- assert.equal(await page.getByRole('button',{name:'Row below',exact:true}).isEnabled(),true);console.log(JSON.stringify(report,null,2));
+ assert.equal(await page.getByRole('button',{name:process.env.NOTES_BASELINE?'Row below':'Insert line item below',exact:true}).isEnabled(),true);console.log(JSON.stringify(report,null,2));
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

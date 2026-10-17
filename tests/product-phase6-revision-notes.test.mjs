@@ -8,7 +8,7 @@ const migration = read("d1/migrations/0017_product_phase6_revision_notes.sql");
 const service = read("lib/notes/phase6.ts");
 const route = read("app/api/notes/route.ts");
 const exportRoute = read("app/api/notes/[id]/export/route.ts");
-const editor = read("components/resources/note-editor.tsx")+read("components/notes/note-studio.tsx")+read("components/notes/note-toolbar.tsx");
+const editor = read("components/resources/note-editor.tsx")+read("components/notes/note-studio.tsx")+read("components/notes/note-toolbar.tsx")+read("components/notes/financial-inline-tools.tsx");
 const library = read("components/resources/resource-library.tsx");
 const community = read("components/community/community-chat.tsx");
 const resourceService = read("lib/resources/service.ts");
@@ -42,7 +42,7 @@ test("Product Phase 6 rich-note sanitizer round-trips revision formatting and sa
 });
 
 test("Typed notes use selection-aware structured table commands", () => {
-  for(const command of ['insertTable','addRowBefore','addRowAfter','addColumnBefore','addColumnAfter','deleteRow','deleteColumn','mergeCells','splitCell','toggleHeaderRow'])assert.ok(editor.includes(command));
+  for(const command of ['insertTable','addRowBefore','insertFinancialRow','addColumnBefore','reconfigureTable','deleteRow','deleteColumn','mergeCells','splitCell','toggleHeaderRow'])assert.ok(editor.includes(command));
   assert.doesNotMatch(editor,/document\\.execCommand|window\\.prompt/);
 });
 
