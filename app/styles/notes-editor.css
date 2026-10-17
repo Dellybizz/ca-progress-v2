@@ -103,3 +103,4 @@
 @media(max-width:719px){.ui-dialog--modal:has(.note-object-inspector){width:calc(100vw - 16px)}}
 .note-object-inspector+.note-dialog-actions .note-primary{display:inline-flex;align-items:center;justify-content:center;gap:6px}.note-object-inspector button:focus-visible,.note-object-inspector input:focus-visible,.note-object-inspector select:focus-visible{outline:2px solid var(--color-brand);outline-offset:2px}
 .note-image.note-object{display:block}.note-object-canvas [data-node-id][data-selected="true"]>g{fill:#eef2ff;stroke-width:3}.note-object-preview>.note-error{padding:10px}
+.note-diagram.note-object{overflow:visible}.note-diagram-graphic{background:#fff;border-radius:4px}
