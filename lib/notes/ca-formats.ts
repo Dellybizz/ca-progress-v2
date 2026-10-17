@@ -46,7 +46,8 @@ export function formatRows(format:CAFormat,variant:string):string[]{
  return [...format.rows];
 }
 export function buildCAFormat(format:CAFormat,options:FormatOptions):NoteNode[]{
- const {title,variant,currency}=options,rows=options.rows.slice(0,40),periods=options.periods.filter(Boolean).slice(0,4);
+ const {title,variant,currency}=options,rows=options.rows,periods=options.periods.filter(Boolean);
+ if(rows.length>40||periods.length>4||(options.columns?.length??0)>12)throw Error('Use up to 40 line items, 4 periods and 12 columns. Your configuration has not been shortened.');
  if(format.category==='Charts & trees'){const data=rows.join('\n');validateDiagram(format.id,data);return [{type:'diagram',attrs:{kind:format.id,title,variant,data}},{type:'paragraph'}];}
  let columns=options.columns?.length?options.columns:format.columns??['Particulars',...periods.map(p=>p+(currency?' ('+currency+')':''))];
  const tAccount=['T-account','Horizontal'].includes(variant)||['branch','partnership','revaluation'].includes(format.id);
@@ -58,7 +59,7 @@ export function buildCAFormat(format:CAFormat,options:FormatOptions):NoteNode[]{
   if(format.id==='cost'&&variant==='Per-unit cost')columns=['Particulars','Total cost','Units','Cost per unit'];
   if(format.id==='department')columns=['Particulars',...(periods.length?periods:['Account 1','Account 2'])];
  }
- columns=columns.slice(0,12);
+ if(columns.length>12)throw Error('Use up to 12 columns. Your configuration has not been shortened.');
  const values=rows.map(row=>{const cells=Array<string>(columns.length).fill('');if(tAccount){const [left,right='']=row.split('|').map(s=>s.trim());if(format.id==='ledger'&&columns.length===8){cells[1]=left;cells[5]=right;}else{cells[0]=left;if(columns.length>2)cells[2]=right;}}else cells[columns[0]==='Date'?1:0]=row;return cells;});
  const cells=(row:string[],header=false):NoteNode=>({type:'tableRow',content:columns.map((_,i)=>({type:header?'tableHeader':'tableCell',attrs:{colspan:1,rowspan:1,colwidth:null},content:[paragraph(row[i]??'')]}))});
  return [{type:'heading',attrs:{level:2},content:[text(title||format.name)]},paragraph([variant,...periods,currency].filter(Boolean).join(' · ')),{type:'table',content:[cells(columns,true),...values.map(row=>cells(row))]},{type:'paragraph'}];
