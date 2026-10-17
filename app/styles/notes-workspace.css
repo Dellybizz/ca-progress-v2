@@ -1,0 +1,25 @@
+/* Authoring-only shell geometry, loaded with the route to avoid a layout jump. */
+body:has(.note-authoring-entry){--topbar-height:56px}
+.app-shell:has(.note-authoring-entry) .route-trail{display:none}
+.app-shell:has(.note-authoring-entry) .content-wrap{width:100%;max-width:none;padding:8px 12px;margin:0}
+@media(min-width:900px){
+ .app-shell:has(.note-authoring-entry) .topbar{min-height:56px;height:56px;padding:4px 16px;gap:10px}
+ .app-shell:has(.note-authoring-entry) .floating-primary{padding:2px 6px;border-radius:16px}
+ .app-shell:has(.note-authoring-entry) .floating-primary>a,.app-shell:has(.note-authoring-entry) .floating-primary>.ui-popover-root>div>button{min-height:42px;gap:1px;font-size:10px}
+ .app-shell:has(.note-authoring-entry) .floating-primary svg{width:17px;height:17px}
+ .app-shell:has(.note-authoring-entry) .floating-brand{font-size:17px}
+ .app-shell:has(.note-authoring-entry) .command-trigger{width:36px;height:36px}
+}
+@media(max-width:719px){.app-shell:has(.note-authoring-entry) .content-wrap{padding:0 0 4px}}
+.note-authoring-entry{padding:0}
+@media(min-width:900px){
+ .app-shell:has(.note-authoring-entry) .floating-primary{min-height:48px}
+ .app-shell:has(.note-authoring-entry) .floating-more{width:36px;height:36px}
+ .app-shell:has(.note-authoring-entry) .command-trigger{min-width:36px}
+}
+.app-shell .note-authoring-entry{padding:0;margin:0;width:100%;max-width:none}
+.note-loading-frame{height:calc(100dvh - var(--topbar-height,64px) - 20px);min-height:180px;display:grid;grid-template-rows:44px 40px 1fr;border:1px solid var(--color-border);border-radius:9px;background:var(--color-surface);overflow:hidden}
+.note-loading-frame>div{border-bottom:1px solid var(--color-border);padding:12px}
+.note-loading-frame .ui-skeleton{height:15px;width:160px}
+.note-loading-frame>section{background:var(--color-bg-subtle)}
+@media(max-width:719px){.note-loading-frame{height:calc(100dvh - var(--topbar-height,64px) - var(--bottom-nav-height,64px) - 8px);border-radius:0;border-inline:0}}
