@@ -8,7 +8,7 @@ try{
  await new Promise(resolve=>server.listen(8767,'127.0.0.1',resolve));
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  for(const width of [1440,390]){
-  const page=await browser.newPage({viewport:{width,height:900}});const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const page=await browser.newPage({viewport:{width,height:900},hasTouch:width===390});const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const folders=[{id:'parent',name:'Parent',parent_id:null},{id:'child',name:'Child',parent_id:'parent'}];
   await page.route('**/api/v1/resources/workspace**',async route=>{
    const url=new URL(route.request().url());const folder=url.searchParams.get('folder')??'';
@@ -20,9 +20,9 @@ try{
   if(await page.getByRole('button',{name:'Clear selection',exact:true}).isVisible())await page.getByRole('button',{name:'Clear selection',exact:true}).click();await page.locator('.fm-filter-menu>summary').click();await page.getByRole('button',{name:'Folders',exact:true}).click();await page.getByRole('button',{name:'Apply',exact:true}).click();
   await page.locator('.fm-real-folders').waitFor();
   assert.equal(new URL(page.url()).searchParams.get('fmView'),'folder');
-  await page.getByRole('button',{name:'Parent',exact:true}).click();
+  const parent=page.getByRole('button',{name:'Parent',exact:true});if(width===390){await parent.tap();assert.equal(new URL(page.url()).searchParams.get('fmFolder'),null,'one tap only selects');assert.equal(await parent.getAttribute('aria-pressed'),'true');await parent.tap();}else{await parent.click();assert.equal(new URL(page.url()).searchParams.get('fmFolder'),null,'one click only selects');await parent.dblclick();}
   await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Parent',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Child',exact:true}).click();
+  await page.getByRole('button',{name:'Child',exact:true}).dblclick();
   await page.getByRole('navigation',{name:'Folder path'}).getByRole('button',{name:'Child',exact:true}).waitFor();
   const path=page.getByRole('navigation',{name:'Folder path'});
   assert.equal(await path.locator('button:not([aria-label="Current folder actions"])').count(),3);
