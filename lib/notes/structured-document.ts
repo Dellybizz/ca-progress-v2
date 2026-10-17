@@ -1,9 +1,15 @@
 import {renderDiagram,validateDiagram} from './ca-formats';
 /** Versioned, bounded document protocol. No DOM or editor dependency on the server. */
 export type NoteNode={type:string;attrs?:Record<string,unknown>;text?:string;marks?:NoteNode[];content?:NoteNode[]};
-export type NoteLayout={mode:'continuous'|'page';paper:'a4'|'letter'|'custom';width:number;margin:number;header:string;footer:string;pageNumbers:boolean;language?:'en'|'hi'|'ur'|'ar'};
+export type NoteLayout={mode:'continuous'|'page';paper:'a4'|'letter'|'custom';width:number;margin:number;header:string;footer:string;pageNumbers:boolean;orientation?:'portrait'|'landscape';workingWidth?:'readable'|'wide'|'full';height?:number;language?:'en'|'hi'|'ur'|'ar'};
 export type StructuredNote={schemaVersion:1;engine:'tiptap';engineSchemaVersion:1;kind:'document';entryId:string;revisionId:string;content:NoteNode;attachmentIds:string[];sourceAttribution:unknown;layout:NoteLayout;legacyHtml?:string};
-export const DEFAULT_LAYOUT:NoteLayout={mode:'continuous',paper:'a4',width:210,margin:20,header:'',footer:'',pageNumbers:true};
+export const DEFAULT_LAYOUT:NoteLayout={mode:'continuous',paper:'a4',orientation:'portrait',workingWidth:'wide',width:210,margin:20,header:'',footer:'',pageNumbers:true};
+export function notePageSize(layout:NoteLayout){
+ const width=layout.paper==='a4'?210:layout.paper==='letter'?215.9:layout.width;
+ const height=layout.paper==='a4'?297:layout.paper==='letter'?279.4:layout.height??297;
+ return layout.orientation==='landscape'?{width:Math.max(width,height),height:Math.min(width,height)}:{width:Math.min(width,height),height:Math.max(width,height)};
+}
+export function notePrintSize(layout:NoteLayout){const page=notePageSize(layout);return `${page.width}mm ${page.height}mm`;}
 export const NOTE_FONTS=['Inter','Arial','Georgia','Times New Roman','Courier New'] as const;
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export function safeNoteLink(v:unknown){return typeof v==='string'&&(/^(https?:\/\/|mailto:)/i.test(v)||/^#block-[\w-]+$/.test(v))&&!/[\u0000-\u0020<>"']/.test(v)&&!/[?&](?:[^=]*(?:token|signature|credential)|expires)=/i.test(v);}
@@ -58,7 +64,7 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
   if(['doc','table','tableRow','listItem','taskItem','tableCell','tableHeader','bulletList','orderedList','taskList','callout','toggle','blockquote'].includes(n.type)&&!children.length)fail();
  }
  if(d.content?.type!=='doc')fail();walk(d.content,0);if(textBytes>120000)throw Error('Note text is too large. Split it into smaller notes.');
- const l=d.layout;if(!l||(l.language!==undefined&&!['en','hi','ur','ar'].includes(l.language))||!['continuous','page'].includes(l.mode)||!['a4','letter','custom'].includes(l.paper)||!Number.isFinite(l.width)||l.width<100||l.width>300||!Number.isFinite(l.margin)||l.margin<5||l.margin>40||typeof l.header!=='string'||l.header.length>160||typeof l.footer!=='string'||l.footer.length>160||typeof l.pageNumbers!=='boolean')fail();
+ const l=d.layout;if(!l||(l.orientation!==undefined&&!['portrait','landscape'].includes(l.orientation))||(l.workingWidth!==undefined&&!['readable','wide','full'].includes(l.workingWidth))||(l.height!==undefined&&(!Number.isFinite(l.height)||l.height<100||l.height>420))||(l.language!==undefined&&!['en','hi','ur','ar'].includes(l.language))||!['continuous','page'].includes(l.mode)||!['a4','letter','custom'].includes(l.paper)||!Number.isFinite(l.width)||l.width<100||l.width>300||!Number.isFinite(l.margin)||l.margin<5||l.margin>40||typeof l.header!=='string'||l.header.length>160||typeof l.footer!=='string'||l.footer.length>160||typeof l.pageNumbers!=='boolean')fail();
  if(d.legacyHtml!==undefined&&(typeof d.legacyHtml!=='string'||new TextEncoder().encode(d.legacyHtml).length>200000))fail();
  return d;
 }
