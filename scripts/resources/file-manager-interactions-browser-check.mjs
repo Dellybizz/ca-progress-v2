@@ -79,4 +79,24 @@ try{
   if(width===390){const card=await page.locator('[data-file-key="note:n2"] .fm-file-open').boundingBox(),target=await page.locator('.fm-real-folders [data-folder-target="target"]').boundingBox();const cdp=await page.context().newCDPSession(page);await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:card.x+card.width/2,y:card.y+card.height/2}]});await page.locator('.fm-drag-preview').waitFor();await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:target.x+target.width/2,y:target.y+target.height/2}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await page.waitForFunction(()=>document.querySelectorAll('[data-file-key]').length===1);assert.deepEqual(mutations.filter(body=>body.action==='move').at(-1).keys,['note:n2']);await cdp.detach();}
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);assert.deepEqual(errors,[]);console.log(`PASS selection/context menus/keyboard/touch/internal file+folder drag/external upload staging at ${width}px`);await page.close();
  }
+ // Hold the marquee at either edge without further pointer moves.
+ const scrollPage=await browser.newPage({viewport:{width:1440,height:900}});
+ const scrollingFiles=Array.from({length:80},(_,i)=>({key:'note:scroll'+i,id:'scroll'+i,name:'Scroll file '+String(i).padStart(2,'0'),filename:'Scroll file '+i,kind:'note',extension:'NOTE',size:null,modified:'2026-10-15T00:00:00Z',subjectIds:[],subject:'Unfiled',chapterId:null,chapter:null,owner:'alice',status:'private',canManage:true,href:'/notes/scroll'+i,folderId:null}));
+ await scrollPage.route('**/api/v1/resources/workspace**',route=>route.fulfill({json:{files:scrollingFiles,total:80,nextCursor:null,folders:[],path:[],trashFolders:[]}}));
+ await scrollPage.goto('http://127.0.0.1:8768/?reset=1');
+ await scrollPage.getByRole('button',{name:'Select Scroll file 00',exact:true}).waitFor();
+ const groups=scrollPage.locator('.fm-groups'),bounds=await groups.boundingBox();
+ assert.ok(await groups.evaluate(node=>node.scrollHeight>node.clientHeight+300),'fixture has scrollable files');
+ const initialVisible=await groups.evaluate(node=>{const bounds=node.getBoundingClientRect();return Array.from(node.querySelectorAll('[data-file-key]')).filter(row=>row.getBoundingClientRect().top<bounds.bottom).length;});
+ await scrollPage.mouse.move(bounds.x+bounds.width-3,bounds.y+4);await scrollPage.mouse.down();await scrollPage.mouse.move(bounds.x+2,bounds.y+bounds.height-2,{steps:12});
+ await scrollPage.waitForFunction(()=>document.querySelector('.fm-groups').scrollTop>300);
+ assert.equal(await scrollPage.getByRole('button',{name:'Select Scroll file 00',exact:true}).getAttribute('aria-pressed'),'true','downward scrolling retains the original selection');
+ assert.ok(await scrollPage.locator('.fm-file.is-selected').count()>initialVisible,'newly revealed files join the selection');
+ await scrollPage.mouse.up();const stopped=await groups.evaluate(node=>node.scrollTop);await scrollPage.waitForTimeout(150);assert.equal(await groups.evaluate(node=>node.scrollTop),stopped,'scroll stops on release');
+ await scrollPage.getByRole('button',{name:'Clear selection',exact:true}).click();
+ const maximum=await groups.evaluate(node=>{node.scrollTop=node.scrollHeight;return node.scrollTop;});
+ await scrollPage.mouse.move(bounds.x+bounds.width-3,bounds.y+bounds.height-4);await scrollPage.mouse.down();await scrollPage.mouse.move(bounds.x+2,bounds.y+2,{steps:12});
+ await scrollPage.waitForFunction(max=>document.querySelector('.fm-groups').scrollTop<max-300,maximum);
+ assert.equal(await scrollPage.getByRole('button',{name:'Select Scroll file 79',exact:true}).getAttribute('aria-pressed'),'true','upward scrolling retains the original selection');
+ await scrollPage.mouse.up();await scrollPage.locator('.fm-selection-rectangle').waitFor({state:'hidden'});await scrollPage.close();console.log('PASS marquee edge scrolling in both directions, offscreen selection retention and release cleanup');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
