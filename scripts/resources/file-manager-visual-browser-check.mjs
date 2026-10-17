@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import fs from 'node:fs';
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
-const server=http.createServer((req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':'text/html');res.end(fs.readFileSync('/tmp/resources-phase1-preview/'+file));});let browser,page;
+const server=http.createServer((req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/app.css')?'app.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync('/tmp/resources-phase1-preview/'+file));});let browser,page;
 try{
  await new Promise(resolve=>server.listen(8770,'127.0.0.1',resolve));browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  for(const width of [1440,390]){
