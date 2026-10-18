@@ -211,3 +211,5 @@
 @media print{.note-document .tableWrapper:has(.note-account-boundaries),.note-account-sides>.tableWrapper{padding:0!important}}
 .note-document[contenteditable=false] .note-account-controls-host{display:none}
 .note-document[contenteditable=false] .note-account-sides>.tableWrapper{padding:0!important}
+
+.note-account-boundaries button{touch-action:manipulation}
