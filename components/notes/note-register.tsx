@@ -1,0 +1,37 @@
+'use client';
+import {useEffect,useLayoutEffect,useRef,useState,type CSSProperties,type ReactNode} from 'react';
+import type {Editor} from '@tiptap/react';
+import {closeHistory} from '@tiptap/pm/history';
+import {TextSelection} from '@tiptap/pm/state';
+import {notePageSize,type NoteLayout} from '@/lib/notes/structured-document';
+import {PAGE_GAP,paperBackground,paperLinesFor,registerGeometry,pageCountFromWidth,spreadStart} from '@/lib/notes/page-paper';
+export function NoteRegister({editor,layout,children,onPageChange}:{editor:Editor;layout:NoteLayout;children:ReactNode;onPageChange:(page:number)=>void}){
+ const root=useRef<HTMLDivElement>(null),windowRef=useRef<HTMLDivElement>(null),countRef=useRef(1),pageRef=useRef(1),onPage=useRef(onPageChange);
+ const [count,setCount]=useState(1),[page,setPage]=useState(1),[available,setAvailable]=useState({width:1000,height:700}),[zoom,setZoom]=useState<'auto'|'width'|'page'|number>('auto');
+ const enabled=layout.mode==='page',size=notePageSize(layout),g=registerGeometry(size.width,size.height,layout.margin),spread=layout.orientation!=='landscape'&&available.width>=1000?2:1;
+ const width=spread*g.width+(spread-1)*PAGE_GAP,fitWidth=Math.min(1,(available.width-24)/width),scale=typeof zoom==='number'?zoom:zoom==='auto'?(available.width<1000?1:fitWidth):zoom==='page'?Math.min(fitWidth,(available.height-32)/g.height):fitWidth;
+ const safeScale=Math.max(.15,scale),start=spreadStart(Math.min(page,count),spread),sheets=Math.max(spread,Math.ceil(count/spread)*spread);
+ useLayoutEffect(()=>{onPage.current=onPageChange;});
+ useEffect(()=>{if(!enabled||!root.current)return;const host=root.current.closest('.note-scroll-canvas') as HTMLElement;const update=()=>setAvailable(old=>{const next={width:host.clientWidth,height:Math.max(200,host.clientHeight-48)};return old.width===next.width&&old.height===next.height?old:next;});const observer=new ResizeObserver(update);observer.observe(host);update();return()=>observer.disconnect();},[enabled]);
+ useEffect(()=>{
+  if(!enabled)return;let frame=0,disposed=false;
+  const measure=()=>{frame=0;if(disposed)return;const dom=editor.view.dom,n=pageCountFromWidth(dom.scrollWidth,g.innerWidth,g.stride);countRef.current=n;setCount(old=>old===n?old:n);if(pageRef.current>n){pageRef.current=n;setPage(n);onPage.current(n);}};
+  const schedule=()=>{if(!frame)frame=requestAnimationFrame(measure);};
+  const follow=()=>{schedule();requestAnimationFrame(()=>{if(disposed)return;try{const dom=editor.view.dom,box=dom.getBoundingClientRect(),actualScale=box.width/g.innerWidth,at=editor.view.coordsAtPos(editor.state.selection.head),next=Math.max(1,Math.min(countRef.current,Math.floor((at.left-box.left)/actualScale/g.stride)+1));if(next!==pageRef.current){pageRef.current=next;setPage(next);onPage.current(next);}}catch{/* Selection can disappear during editor teardown. */}});};
+  const observer=new ResizeObserver(schedule);observer.observe(editor.view.dom);for(const child of Array.from(editor.view.dom.children))observer.observe(child);
+  const mutations=new MutationObserver(schedule);mutations.observe(editor.view.dom,{subtree:true,childList:true,attributes:true,characterData:true});editor.on('update',schedule);editor.on('selectionUpdate',follow);editor.view.dom.addEventListener('load',schedule,true);void document.fonts.ready.then(schedule);schedule();
+  return()=>{disposed=true;cancelAnimationFrame(frame);observer.disconnect();mutations.disconnect();editor.off('update',schedule);editor.off('selectionUpdate',follow);editor.view.dom.removeEventListener('load',schedule,true);};
+ },[editor,enabled,g.innerWidth,g.innerHeight,g.stride]);
+ useLayoutEffect(()=>{if(!enabled||!windowRef.current)return;windowRef.current.scrollLeft=(start-1)*g.stride*safeScale;},[start,safeScale,enabled,g.stride]);
+ const go=(next:number)=>{const n=Math.max(1,Math.min(count,next));pageRef.current=n;setPage(n);onPage.current(n);};
+ const addPage=()=>{if(!editor.isEditable)return;const tr=closeHistory(editor.state.tr).insert(editor.state.doc.content.size,[editor.schema.nodes.pageBreak.create(),editor.schema.nodes.paragraph.create()]);tr.setSelection(TextSelection.near(tr.doc.resolve(tr.doc.content.size-1)));editor.view.dispatch(tr);editor.commands.focus(undefined,{scrollIntoView:false});};
+ const style={'--register-width':g.width+'px','--register-height':g.height+'px','--register-margin':g.margin+'px','--register-inner-width':g.innerWidth+'px','--register-inner-height':g.innerHeight+'px','--register-gap':PAGE_GAP+'px','--register-stride':g.stride+'px','--register-scale':safeScale,'--register-view-width':width*safeScale+'px','--register-track-width':(sheets*g.stride-PAGE_GAP)+'px'} as CSSProperties;
+ return <div ref={root} className={enabled?'note-register':'note-continuous'} data-page-count={count} data-active-page={page} data-spread={spread} style={style}>
+ {enabled?<nav className="note-register-nav" aria-label="Register pages"><div><button type="button" aria-label="Previous page" disabled={start===1} onClick={()=>go(Math.max(1,start-spread))}>‹</button><label>Page<select aria-label="Selected page" value={Math.min(page,count)} onChange={e=>go(Number(e.target.value))}>{Array.from({length:count},(_,i)=><option key={i+1} value={i+1}>{i+1}</option>)}</select><span>of {count}</span></label><button type="button" aria-label="Next page" disabled={start+spread>count} onClick={()=>go(start+spread)}>›</button><button type="button" className="note-register-add" aria-label="Add page" disabled={!editor.isEditable} onClick={addPage}>+</button></div><label><span className="sr-only">Page zoom</span><select aria-label="Page zoom" value={zoom} onChange={e=>setZoom(['auto','width','page'].includes(e.target.value)?e.target.value as 'auto'|'width'|'page':Number(e.target.value))}><option value="auto">Automatic</option><option value="width">Fit width</option><option value="page">Fit page</option>{[.5,.75,1,1.25,1.5].map(n=><option key={n} value={n}>{n*100}%</option>)}</select><small>{Math.round(safeScale*100)}%</small></label></nav>:null}
+ <div ref={windowRef} className="note-register-window"><div className="note-register-track">
+ {enabled?<div className="note-register-sheets">{Array.from({length:sheets},(_,i)=>{const n=i+1,paper=paperLinesFor(layout,n);return <div key={n} className="note-register-sheet" data-active={n===page} data-placeholder={n>count} style={{left:i*g.stride}}><div className="note-register-ruling" style={{backgroundImage:paperBackground(paper)}}/>{paper.marginLine?<span className="note-register-margin-line"/>:null}<header aria-hidden="true">{layout.header}</header>{n>count?<button type="button" className="note-register-add-sheet" aria-label={`Start page ${n}`} disabled={!editor.isEditable} onClick={addPage}>+ Start page {n}</button>:null}<footer aria-hidden="true"><span>{layout.footer}</span>{layout.pageNumbers?<span>{n}</span>:null}</footer></div>;})}</div>:null}
+ <div className="note-register-content">{children}</div>
+ </div></div>
+ {enabled&&count>1?<nav className="note-page-thumbnails" aria-label="Page thumbnails">{Array.from({length:count},(_,i)=><button type="button" key={i+1} aria-label={`Go to page ${i+1}`} aria-current={page===i+1?'page':undefined} onClick={()=>go(i+1)}><span style={{backgroundImage:paperBackground(paperLinesFor(layout,i+1))}}/>{i+1}</button>)}</nav>:null}
+ </div>;
+}

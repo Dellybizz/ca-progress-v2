@@ -1,3 +1,4 @@
+import {validPaperLines,type PaperLines} from './page-paper';
 import {normalizeWorkingNotes} from './working-notes';
 import {rowCalculation,columnRoles} from './accounting-semantics';
 import {parseInk,renderInk} from './ink-model';
@@ -5,7 +6,7 @@ import {financialConfig,totalFormula,canonicalAmount,rawAmount,numberCell,totals
 import {renderDiagram,validateDiagram} from './ca-formats';
 /** Versioned, bounded document protocol. No DOM or editor dependency on the server. */
 export type NoteNode={type:string;attrs?:Record<string,unknown>;text?:string;marks?:NoteNode[];content?:NoteNode[]};
-export type NoteLayout={mode:'continuous'|'page';paper:'a4'|'letter'|'custom';width:number;margin:number;header:string;footer:string;pageNumbers:boolean;orientation?:'portrait'|'landscape';workingWidth?:'readable'|'wide'|'full';height?:number;language?:'en'|'hi'|'ur'|'ar'};
+export type NoteLayout={mode:'continuous'|'page';paper:'a4'|'letter'|'custom';width:number;margin:number;header:string;footer:string;pageNumbers:boolean;orientation?:'portrait'|'landscape';workingWidth?:'readable'|'wide'|'full';height?:number;language?:'en'|'hi'|'ur'|'ar';lines?:PaperLines;pageLines?:Record<string,PaperLines>};
 export type StructuredNote={schemaVersion:1;engine:'tiptap';engineSchemaVersion:1;kind:'document';entryId:string;revisionId:string;content:NoteNode;attachmentIds:string[];sourceAttribution:unknown;layout:NoteLayout;legacyHtml?:string};
 export const DEFAULT_LAYOUT:NoteLayout={mode:'continuous',paper:'a4',orientation:'portrait',workingWidth:'wide',width:210,margin:20,header:'',footer:'',pageNumbers:true};
 export function notePageSize(layout:NoteLayout){
@@ -93,6 +94,8 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
  }
  if(d.content?.type!=='doc')fail();walk(d.content,0);if(textBytes>120000)throw Error('Note text is too large. Split it into smaller notes.');
  const l=d.layout;if(!l||(l.orientation!==undefined&&!['portrait','landscape'].includes(l.orientation))||(l.workingWidth!==undefined&&!['readable','wide','full'].includes(l.workingWidth))||(l.height!==undefined&&(!Number.isFinite(l.height)||l.height<100||l.height>420))||(l.language!==undefined&&!['en','hi','ur','ar'].includes(l.language))||!['continuous','page'].includes(l.mode)||!['a4','letter','custom'].includes(l.paper)||!Number.isFinite(l.width)||l.width<100||l.width>300||!Number.isFinite(l.margin)||l.margin<5||l.margin>40||typeof l.header!=='string'||l.header.length>160||typeof l.footer!=='string'||l.footer.length>160||typeof l.pageNumbers!=='boolean')fail();
+ if(l.lines!==undefined&&!validPaperLines(l.lines))fail();
+ if(l.pageLines!==undefined&&(!l.pageLines||typeof l.pageLines!=='object'||Array.isArray(l.pageLines)||Object.keys(l.pageLines).length>500||Object.entries(l.pageLines).some(([key,value])=>!/^([1-9]\d{0,3})$/.test(key)||Number(key)>5000||!validPaperLines(value))))fail();
  if(d.legacyHtml!==undefined&&(typeof d.legacyHtml!=='string'||new TextEncoder().encode(d.legacyHtml).length>200000))fail();
  return d;
 }

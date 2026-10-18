@@ -101,11 +101,15 @@ jobs:
           node scripts/notes/preview-build.mjs
           node scripts/notes/certification-check.mjs
           NOTES_TEST_ENGINE=webkit node scripts/notes/certification-check.mjs
+          node scripts/notes/register-check.mjs
+          NOTES_TEST_ENGINE=webkit node scripts/notes/register-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: notes-editor-certification-${{ github.event.pull_request.head.sha || github.sha }}
-          path: /tmp/note-studio-preview/notes-certification-*.json
+          path: |
+            /tmp/note-studio-preview/notes-certification-*.json
+            /tmp/note-studio-preview/notes-register-*
           if-no-files-found: warn
   deploy:
     needs: [verify, editor-certification]

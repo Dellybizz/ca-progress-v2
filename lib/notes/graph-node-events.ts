@@ -12,7 +12,8 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
  const shell=document.createElement('div');shell.className='note-graph-ui note-graph-toolbar';shell.setAttribute('aria-label','Diagram canvas controls');
  const popup=document.createElement('div');popup.className='note-graph-ui note-graph-menu';popup.hidden=true;popup.setAttribute('role','dialog');popup.setAttribute('aria-label','Element options');popup.contentEditable='false';
  const status=document.createElement('div');status.className='note-graph-ui note-graph-status';status.setAttribute('role','status');
- graphic.after(shell,popup,status);
+ // Keep fixed menus outside the zoomed paper so viewport coordinates remain valid.
+ graphic.after(shell,status);document.body.append(popup);
  const current=()=>{const n=read(),m=objectModel(n.attrs.kind,n.attrs.data,n.attrs.variant);if(m.type!=='graph')throw Error('Choose a diagram.');return m;};
  const message=(error:unknown)=>{status.textContent=error instanceof Error?error.message:String(error);};
  const select=(type:'node'|'edge'|'category',id:string,edit=false)=>{
