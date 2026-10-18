@@ -1,3 +1,4 @@
+import {prepareAccounting,independentAccount} from './accounting-templates';
 import {DEFAULT_NUMBERS,financialSubtitle,type FinancialConfig,type FinancialColumn} from './financial-formats';
 import {validateObjectModel,renderObject} from './chart-model';
 import type {NoteNode} from './structured-document';
@@ -59,7 +60,9 @@ export function buildCAFormat(format:CAFormat,options:FormatOptions):NoteNode[]{
  const paired=['T-account','Horizontal'].includes(variant)||['branch','partnership','revaluation'].includes(format.id),labelIndex=columns.findIndex(c=>c.id==='particulars'||c.id==='left-label');
  const makeCell=(value:string,col:FinancialColumn,header=false):NoteNode=>({type:header?'tableHeader':'tableCell',attrs:{colspan:1,rowspan:1,colwidth:null,caColId:col.id,caKind:col.kind,...(!header&&col.kind!=='text'?{textAlign:'right'}:{})},content:[paragraph(value)]});
  const body=rows.map((row,i)=>{const values=columns.map(()=>''),[left,right='']=row.split('|').map(s=>s.trim());values[labelIndex>=0?labelIndex:0]=paired?left:row;const rightIndex=columns.findIndex(c=>c.id==='right-label');if(paired&&rightIndex>=0)values[rightIndex]=right;return {type:'tableRow',attrs:{caRowId:'row-'+(i+1)},content:columns.map((c,j)=>makeCell(values[j],c))};});
- return [{type:'heading',attrs:{level:2,caOwner:owner,caCaption:'title'},content:[text(cfg.title)]},{...paragraph(financialSubtitle(cfg)),attrs:{caOwner:owner,caCaption:'subtitle'}},{type:'table',attrs:{blockId:owner,caFormat:JSON.stringify(cfg),caStale:false},content:[{type:'tableRow',attrs:{caRowId:'header'},content:columns.map(c=>makeCell(c.label,c,true))},...body]},{type:'paragraph'}];
+ const stock=JSON.stringify(rows)===JSON.stringify(formatRows(format,variant));let working:NoteNode={type:'table',attrs:{blockId:owner,caFormat:JSON.stringify(cfg),caStale:false},content:[{type:'tableRow',attrs:{caRowId:'header'},content:columns.map(c=>makeCell(c.label,c,true))},...body]};
+ if(['journal','profit','balance','ledger'].includes(format.id)){if(paired)working=independentAccount(working,stock,owner);else working=prepareAccounting(working,stock);}
+ return [{type:'heading',attrs:{level:2,caOwner:owner,caCaption:'title'},content:[text(cfg.title)]},{...paragraph(financialSubtitle(cfg)),attrs:{caOwner:owner,caCaption:'subtitle'}},working,{type:'paragraph'}];
 }
 
 export function financialColumns(format:CAFormat,options:Pick<FormatOptions,'variant'|'periods'|'currency'|'columns'>):FinancialColumn[]{

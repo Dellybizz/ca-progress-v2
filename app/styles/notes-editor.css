@@ -170,3 +170,27 @@
 @media print{.note-graph-ui,.note-graph-node-overlays{display:none!important}.note-diagram-graphic.is-direct-graph{max-height:none;overflow:visible;background:none}}
 .note-object .note-diagram-graphic.is-direct-graph{display:block;overflow:auto}.note-graph-stage{flex:none}.note-object .is-direct-graph .note-graph-stage>svg{max-width:none;max-height:none}
 .note-object .note-diagram-graphic.is-direct-graph{touch-action:none;cursor:grab}.note-diagram-graphic.is-panning{cursor:grabbing}
+
+/* Independent account sides share controls while keeping separate row grids. */
+.note-account{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;margin:16px 0}
+.note-account:has(>.note-account-sides){display:block}
+.note-account-sides{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.note-account-sides>.tableWrapper{min-width:0;margin:0!important;padding:36px 0 0 32px!important;overflow:auto!important}
+.note-account-controls-host{min-height:80px;margin-bottom:8px}
+.note-account-controls-host:empty::before{content:'Select a cell to edit this account';font-size:11px;color:var(--color-text-muted)}
+.note-account .note-table-live-bar,.note-account .note-table-edge-tools{flex-wrap:wrap}
+.note-table-live-bar>label{display:flex;align-items:center;gap:4px;font-size:11px}
+.note-table-live-bar>label select{font:inherit;max-width:140px}
+.note-document :is(td,th)[data-ca-col-role=reference]{padding-inline:3px!important;white-space:nowrap;font-size:11px}
+.note-document .tableWrapper:has(.note-account-boundaries){position:relative;padding:36px 0 0 32px}
+.note-account-boundaries{position:absolute;z-index:12;display:flex;align-items:center;gap:3px;max-width:100%;white-space:nowrap;background:var(--color-surface,#fff);border:1px solid #cbd5e1;border-radius:6px;padding:2px;font:11px system-ui;box-shadow:0 2px 6px #0001}
+.note-account-boundaries span{padding:0 3px;color:var(--color-text-muted)}
+.note-account-boundaries button{background:transparent;border:0;border-radius:4px;padding:4px;color:inherit;cursor:pointer}
+.note-account-boundaries button:hover,.note-account-boundaries button:focus-visible{background:var(--color-brand-soft,#eef2ff);outline:1px solid #818cf8}
+.note-account-boundaries button:disabled{opacity:.4;cursor:default}
+.note-account-row-boundary{width:29px;max-width:29px;flex-direction:column;gap:0;padding:0}
+.note-account-row-boundary button{font-size:11px;padding:1px!important;min-height:18px;width:26px}
+.note-account-column-boundary{top:4px}
+.note-accounting-status{font-size:11px;color:var(--color-text-muted);margin:4px 0}
+@media(max-width:650px){.note-account,.note-account-sides{grid-template-columns:minmax(0,1fr)}.note-account-controls-host{min-height:112px}.note-account-boundaries{font-size:10px;gap:0}.note-account-boundaries button{padding:5px 3px}}
+@media print{.note-account,.note-account-sides{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.note-account-boundaries,.note-account-controls-host{display:none!important}.note-document .tableWrapper:has(.note-account-boundaries),.note-account-sides>.tableWrapper{padding:0!important}}

@@ -3,7 +3,7 @@ import {blankFinancial} from './financial-formats';
 export type CustomFormat={version:1;id:string;name:string;nodes:NoteNode[]};
 function document(nodes:NoteNode[]){return {schemaVersion:1,engine:'tiptap',engineSchemaVersion:1,kind:'document',entryId:'custom-format',revisionId:'custom-format',content:{type:'doc',content:nodes},attachmentIds:[],sourceAttribution:null,layout:DEFAULT_LAYOUT};}
 export function validateCustomFormat(value:unknown):CustomFormat{
- if(!value||typeof value!=='object')throw Error('Invalid saved format.');const f=value as CustomFormat;if(f.version!==1||typeof f.id!=='string'||!/^[-\w]{1,80}$/.test(f.id)||typeof f.name!=='string'||!f.name.trim()||f.name.length>80||!Array.isArray(f.nodes)||f.nodes.length>4||f.nodes.filter(n=>['table','diagram'].includes(n.type)).length!==1||f.nodes.some(n=>!['table','diagram','paragraph','heading'].includes(n.type))||JSON.stringify(f).length>100000)throw Error('Use a name up to 80 characters and one table or diagram per format.');
+ if(!value||typeof value!=='object')throw Error('Invalid saved format.');const f=value as CustomFormat;if(f.version!==1||typeof f.id!=='string'||!/^[-\w]{1,80}$/.test(f.id)||typeof f.name!=='string'||!f.name.trim()||f.name.length>80||!Array.isArray(f.nodes)||f.nodes.length>4||f.nodes.filter(n=>['table','diagram','account'].includes(n.type)).length!==1||f.nodes.some(n=>!['table','diagram','account','paragraph','heading'].includes(n.type))||JSON.stringify(f).length>100000)throw Error('Use a name up to 80 characters and one table or diagram per format.');
  validateStructuredNote(document(f.nodes));renderStructuredNote(validateStructuredNote(document(f.nodes)));return f;
 }
 export function instantiateFormat(format:CustomFormat,blank=false):NoteNode[]{

@@ -8,3 +8,14 @@ export function requiresHierarchyEditor(value:unknown):boolean{
  return document.content!==undefined&&requiresHierarchyEditor(document.content);
 }
 export function hierarchyWriteNeedsReload(previous:unknown,capabilities:unknown){return requiresHierarchyEditor(previous)&&(!Array.isArray(capabilities)||!capabilities.includes(HIERARCHY_EDITOR_CAPABILITY));}
+
+/** Older clients cannot flatten independent accounts or discard calculation membership. */
+export const ACCOUNTING_EDITOR_CAPABILITY='accounting-workings-v1';
+export function requiresAccountingEditor(value:unknown):boolean{
+ if(!value||typeof value!=='object')return false;
+ const n=value as {type?:unknown;attrs?:Record<string,unknown>;content?:unknown};
+ if(n.type==='account'||n.attrs&&(n.attrs.caTotal||n.attrs.caSection||n.attrs.caColRole))return true;
+ if(typeof n.attrs?.caFormat==='string')try{if(JSON.parse(n.attrs.caFormat).workings===1)return true;}catch{}
+ return Array.isArray(n.content)?n.content.some(requiresAccountingEditor):requiresAccountingEditor(n.content);
+}
+export function accountingWriteNeedsReload(previous:unknown,capabilities:unknown){return requiresAccountingEditor(previous)&&(!Array.isArray(capabilities)||!capabilities.includes(ACCOUNTING_EDITOR_CAPABILITY));}
