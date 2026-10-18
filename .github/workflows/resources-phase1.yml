@@ -105,6 +105,8 @@ jobs:
           NOTES_TEST_ENGINE=webkit node scripts/notes/register-check.mjs
           node scripts/notes/manipulation-check.mjs
           NOTES_TEST_ENGINE=webkit node scripts/notes/manipulation-check.mjs
+          node scripts/notes/layout-repair-check.mjs
+          NOTES_TEST_ENGINE=webkit node scripts/notes/layout-repair-check.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -113,6 +115,7 @@ jobs:
             /tmp/note-studio-preview/notes-certification-*.json
             /tmp/note-studio-preview/notes-register-*
             /tmp/note-studio-preview/notes-manipulation-*
+            /tmp/note-studio-preview/notes-layout-*
           if-no-files-found: warn
   deploy:
     needs: [verify, editor-certification]

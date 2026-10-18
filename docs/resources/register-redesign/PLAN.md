@@ -20,3 +20,5 @@ Phase 2 is implemented and live. Phone/tablet row and column pointer dragging, s
 Known baseline findings: account CSS includes both a 16px gap and authoring gutters; hierarchy duplication currently copies an element rather than all descendants; the exact amount parser already supports bracketed negatives, so Phase 4 must audit consistency across entry paths rather than add a second parser.
 
 Physical Android/iOS testing and full rich editing in the offline APK remain open under the earlier certification record. Do not imply device parity from headless browser checks.
+
+Post-phase-2 corrective work: [repairs/IMPLEMENTATION.md](repairs/IMPLEMENTATION.md). This repairs the reported page access, table resizing, clipped hierarchy and crowded-control defects and adds regression coverage before the next feature phase.

@@ -1,10 +1,10 @@
 export type Handle='n'|'ne'|'e'|'se'|'s'|'sw'|'w'|'nw';
 export const RESIZE_HANDLES:Handle[]=['nw','n','ne','e','se','s','sw','w'];
 export type Box={x:number;y:number;width:number;height:number};
-export type FreePosition={version:1;page:number;x:number;y:number};
+export type FreePosition={version:1|2;page:number;x:number;y:number};
 export function freePosition(value:unknown):FreePosition|null{
  if(value==null)return null;if(typeof value!=='string'||value.length>200)throw Error('Invalid object position.');let p:FreePosition;try{p=JSON.parse(value);}catch{throw Error('Invalid object position.');}
- if(!p||Object.keys(p).some(k=>!['version','page','x','y'].includes(k))||p.version!==1||!Number.isInteger(p.page)||p.page<1||p.page>5000||![p.x,p.y].every(n=>Number.isFinite(n)&&n>=0&&n<=4000))throw Error('Invalid object position.');return p;
+ if(!p||Object.keys(p).some(k=>!['version','page','x','y'].includes(k))||![1,2].includes(p.version)||!Number.isInteger(p.page)||p.page<1||p.page>5000||![p.x,p.y].every(n=>Number.isFinite(n)&&n>=0&&n<=4000))throw Error('Invalid object position.');return p;
 }
 export const clamp=(n:number,min:number,max:number)=>Math.max(min,Math.min(Math.max(min,max),n));
 export function resizeBox(box:Box,handle:Handle,dx:number,dy:number,limits:{minWidth:number;minHeight:number;maxWidth:number;maxHeight:number},aspect=false):Box{
