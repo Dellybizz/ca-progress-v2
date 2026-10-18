@@ -18,6 +18,6 @@ export async function printRegisterNote(html:string,title:string,layout:NoteLayo
    const header=doc.createElement('header');header.textContent=layout.header;const footer=doc.createElement('footer'),left=doc.createElement('span');left.textContent=layout.footer;footer.append(left);if(layout.pageNumbers){const n=doc.createElement('span');n.textContent=String(page);footer.append(n);}paper.append(header,footer);
    const crop=doc.createElement('div');crop.className='note-register-print-crop';const copy=flow.cloneNode(true) as HTMLElement;copy.style.setProperty('--register-offset',`${-(page-1)*g.stride}px`);crop.append(copy);sheet.append(paper,crop);doc.body.append(sheet);
   }
-  await doc.fonts.ready;await new Promise<void>(resolve=>frame.contentWindow!.requestAnimationFrame(()=>resolve()));frame.contentWindow?.focus();frame.contentWindow?.print();window.setTimeout(()=>frame.remove(),60000);
+  await doc.fonts.ready;await new Promise<void>(resolve=>frame.contentWindow!.requestAnimationFrame(()=>resolve()));doc.body.dataset.notePrintReady='true';frame.contentWindow?.focus();frame.contentWindow?.print();window.setTimeout(()=>frame.remove(),60000);
  }catch(error){frame.remove();throw error;}
 }
