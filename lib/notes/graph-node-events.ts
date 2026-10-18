@@ -76,7 +76,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
    for(const endpoint of ['from','to'] as const)choice('Connection '+endpoint,edge[endpoint],m.nodes.map(n=>[n.id,n.label]),value=>{const base=current(),previous=base.edges.find(e=>e.id===id)!;const next={...previous,[endpoint]:value};if(next.from===next.to||read().attrs.kind!=='flow'&&(base.edges.some(e=>e.id!==id&&e.to===next.to)||graphBranch({...base,edges:base.edges.filter(e=>e.id!==id)},next.to).has(next.from)))throw Error('Choose a connection without a cycle or a second parent.');commit({...base,edges:base.edges.map(e=>e.id===id?next:e)});});
    button(popup,'Delete this connection','Delete connection',()=>{commit({...current(),edges:current().edges.filter(e=>e.id!==id)});closeMenu();});
   }
-  positionMenu();if(edit)requestAnimationFrame(()=>{text.focus();text.select();});
+  positionMenu();if(edit){text.focus();text.select();}
  }
  function draw(model:GraphModel,rebuild=true){
   if(!stage)return;const {attrs}=read();const previousViewBox=stage.querySelector('svg')?.getAttribute('viewBox');stage.querySelector('svg')?.remove();stage.insertAdjacentHTML('afterbegin',renderObject(attrs.kind,model,attrs.title,attrs.variant));const svg=stage.querySelector('svg')!;
