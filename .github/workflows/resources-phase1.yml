@@ -81,8 +81,34 @@ jobs:
             /tmp/note-studio-preview/notes-*.png
             /tmp/note-studio-preview/notes-print*.pdf
           if-no-files-found: ignore
+  editor-certification:
+    if: github.event_name != 'pull_request' || (github.head_ref == 'onboarding-design-phase7' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22, cache: npm}
+      - run: npm ci --no-audit --no-fund
+      - name: Install Chromium and WebKit
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright
+          npx playwright install --with-deps chromium webkit
+      - name: Certify editing, clipboard, read-only and touch controls
+        run: |
+          node scripts/notes/preview-build.mjs
+          node scripts/notes/certification-check.mjs
+          NOTES_TEST_ENGINE=webkit node scripts/notes/certification-check.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: notes-editor-certification-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /tmp/note-studio-preview/notes-certification-*.json
+          if-no-files-found: warn
   deploy:
-    needs: verify
+    needs: [verify, editor-certification]
     runs-on: ubuntu-latest
     environment: v2-staging
     timeout-minutes: 40

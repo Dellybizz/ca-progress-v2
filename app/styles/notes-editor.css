@@ -200,3 +200,14 @@
 .note-working .note-working-body>h3:first-child{margin-top:4px}
 .note-reference[data-working-target]{color:var(--color-brand,#6366f1);cursor:pointer;scroll-margin-block:70px}
 @media print{.note-working{break-inside:auto}.note-working>header{color:#333}.note-working-backlink{color:inherit}}
+/* Reference headers wrap while compact folio values keep their width. */
+.note-document th[data-ca-col-role=reference]{white-space:normal;overflow-wrap:anywhere}
+@media(pointer:coarse){
+ .note-document .tableWrapper:has(.note-account-boundaries),.note-account-sides>.tableWrapper{padding:54px 0 0 48px!important}
+ .note-account-row-boundary{width:44px;max-width:44px}
+ .note-account-row-boundary button{width:44px;min-height:44px;font-size:15px}
+ .note-account-column-boundary button{min-width:44px;min-height:44px;padding:6px}
+}
+@media print{.note-document .tableWrapper:has(.note-account-boundaries),.note-account-sides>.tableWrapper{padding:0!important}}
+.note-document[contenteditable=false] .note-account-controls-host{display:none}
+.note-document[contenteditable=false] .note-account-sides>.tableWrapper{padding:0!important}
