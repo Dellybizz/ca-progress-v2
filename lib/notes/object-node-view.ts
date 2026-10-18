@@ -1,6 +1,7 @@
 'use client';
 import type {NodeViewRendererProps} from '@tiptap/core';
 import {closeHistory} from '@tiptap/pm/history';
+import {attachGraphEditing} from './graph-node-events';
 import {renderDiagram} from './ca-formats';
 /** DOM-only pointer previews; one history step and autosave on release. */
 export function objectNodeView({node:initial,editor,getPos}:NodeViewRendererProps){
@@ -11,13 +12,14 @@ export function objectNodeView({node:initial,editor,getPos}:NodeViewRendererProp
  const select=()=>{const pos=getPos();if(typeof pos==='number')editor.commands.setNodeSelection(pos);};
  const open=()=>{select();editor.view.dom.dispatchEvent(new CustomEvent('ca-note-edit-node',{detail:imageNode?'image':'chart'}));};
  edit.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();open();});
- dom.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();open();});
+ dom.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation();if(imageNode)open();else select();});
  dom.addEventListener('click',e=>{if(!(e.target as Element).closest('button')){e.preventDefault();select();}});
  const failure=document.createElement('button');failure.type='button';failure.className='note-image-error';failure.textContent='Image unavailable · Retry';failure.hidden=true;const img=document.createElement('img');img.loading='lazy';
  img.addEventListener('error',()=>{img.hidden=true;failure.hidden=false;dom.querySelectorAll<HTMLButtonElement>('.note-resize-handle').forEach(h=>h.disabled=true);});img.addEventListener('load',()=>{img.hidden=false;failure.hidden=true;dom.querySelectorAll<HTMLButtonElement>('.note-resize-handle').forEach(h=>h.disabled=false);});failure.onclick=()=>{img.src=node.attrs.src;};
  if(imageNode)graphic.append(img,failure);else dom.append(title);dom.append(graphic,caption,edit);
  const render=()=>{dom.style.width=(node.attrs.width??100)+'%';dom.style.marginLeft=['center','right'].includes(node.attrs.align)?'auto':'0';dom.style.marginRight=node.attrs.align==='right'?'0':'auto';graphic.style.height=node.attrs.height?node.attrs.height+'px':'';if(imageNode){if(img.getAttribute('src')!==node.attrs.src)img.src=node.attrs.src;img.alt=node.attrs.alt;img.title=node.attrs.title;img.style.objectFit=node.attrs.crop;caption.textContent=node.attrs.caption;}else{title.textContent=node.attrs.title;try{graphic.innerHTML=renderDiagram(node.attrs.kind,node.attrs.data,node.attrs.title,node.attrs.variant);}catch{graphic.textContent='Edit this chart to correct its data.';}}};
  render();
+ const stopGraph=imageNode?undefined:attachGraphEditing({editor,getPos},graphic,()=>node);
  for(const corner of ['se','sw','ne','nw']){const handle=document.createElement('button');handle.type='button';handle.className='note-resize-handle is-'+corner;handle.setAttribute('aria-label','Resize '+(imageNode?'image':'chart')+' '+corner);handle.disabled=imageNode&&!img.naturalWidth;handle.title='Drag to resize · Shift to keep proportions';
   const commit=(width:number,height:number|null)=>{const pos=getPos();if(typeof pos!=='number')return;editor.view.dispatch(closeHistory(editor.state.tr).setNodeMarkup(pos,undefined,{...node.attrs,width,height}));};
   handle.onkeydown=e=>{if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();e.stopPropagation();commit(Math.max(10,Math.min(100,(node.attrs.width??100)+(e.key==='ArrowRight'?2:e.key==='ArrowLeft'?-2:0))),imageNode&&!node.attrs.height&&['ArrowLeft','ArrowRight'].includes(e.key)?null:Math.max(80,Math.min(1600,(node.attrs.height??graphic.offsetHeight)+(e.key==='ArrowDown'?10:e.key==='ArrowUp'?-10:0))));};
@@ -27,5 +29,5 @@ export function objectNodeView({node:initial,editor,getPos}:NodeViewRendererProp
    cleanup=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',finish);window.removeEventListener('pointercancel',finish);cleanup=undefined;};window.addEventListener('pointermove',move);window.addEventListener('pointerup',finish);window.addEventListener('pointercancel',finish);
   };dom.append(handle);
  }
- return {dom,update(next:typeof node){if(next.type!==node.type)return false;node=next;render();return true;},selectNode(){selected=true;dom.classList.add('ProseMirror-selectednode');},deselectNode(){selected=false;dom.classList.remove('ProseMirror-selectednode');},stopEvent(event:Event){return !!(event.target as Element).closest('button')||selected&&event.type==='dblclick';},ignoreMutation(){return true;},destroy(){cleanup?.();}};
+ return {dom,update(next:typeof node){if(next.type!==node.type)return false;node=next;render();return true;},selectNode(){selected=true;dom.classList.add('ProseMirror-selectednode');},deselectNode(){selected=false;dom.classList.remove('ProseMirror-selectednode');},stopEvent(event:Event){return !!(event.target as Element).closest('button,[data-node-id],[data-edge-id],[data-category-id]')||selected&&event.type==='dblclick';},ignoreMutation(){return true;},destroy(){cleanup?.();stopGraph?.();}};
 }
