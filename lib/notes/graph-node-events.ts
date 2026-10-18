@@ -86,10 +86,16 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
   }
   positionMenu();if(edit){text.focus();text.select();}
  }
+ function fitStage(){
+  if(!stage)return;const svg=stage.querySelector('svg');if(!svg)return;
+  const width=Number(svg.getAttribute('width'))||620,height=Number(svg.getAttribute('height'))||300,limit=parseFloat(graphic.style.height)||Infinity;const paperScale=graphic.getBoundingClientRect().width/graphic.offsetWidth||1;viewPadding=Math.min(24/paperScale,graphic.clientWidth*.2,Number.isFinite(limit)?limit*.2:100);viewScale=Math.max(.02,Math.min(1,(graphic.clientWidth-2*viewPadding)/width,(limit-2*viewPadding)/height)*zoom);stage.style.width=(width*viewScale+2*viewPadding)+'px';stage.style.height=(height*viewScale+2*viewPadding)+'px';
+  svg.style.position='absolute';svg.style.left=viewPadding+'px';svg.style.top=viewPadding+'px';svg.style.width=(parseFloat(stage.style.width)-2*viewPadding)+'px';svg.style.height=(parseFloat(stage.style.height)-2*viewPadding)+'px';svg.style.overflow='visible';
+  const model=current();for(const group of stage.querySelectorAll<HTMLElement>('[data-for-node]')){const n=model.nodes.find(n=>n.id===group.dataset.forNode);if(!n)continue;const size=nodeSize(n);Object.assign(group.style,{left:(viewPadding+n.x*viewScale)+'px',top:(viewPadding+n.y*viewScale)+'px',width:size.width*viewScale+'px',height:size.height*viewScale+'px'});}
+ }
  function draw(model:GraphModel,rebuild=true){
   if(!stage)return;const {attrs}=read();const previousViewBox=stage.querySelector('svg')?.getAttribute('viewBox');stage.querySelector('svg')?.remove();stage.insertAdjacentHTML('afterbegin',renderObject(attrs.kind,model,attrs.title,attrs.variant));const svg=stage.querySelector('svg')!;
   if(!rebuild&&previousViewBox)svg.setAttribute('viewBox',previousViewBox);
-  if(rebuild){const width=Number(svg.getAttribute('width'))||620,height=Number(svg.getAttribute('height'))||300,limit=parseFloat(graphic.style.height)||Infinity;const paperScale=graphic.getBoundingClientRect().width/graphic.offsetWidth||1;viewPadding=Math.min(24/paperScale,graphic.clientWidth*.2,Number.isFinite(limit)?limit*.2:100);viewScale=Math.max(.02,Math.min(1,(graphic.clientWidth-2*viewPadding)/width,(limit-2*viewPadding)/height)*zoom);stage.style.width=(width*viewScale+2*viewPadding)+'px';stage.style.height=(height*viewScale+2*viewPadding)+'px';}
+  if(rebuild)fitStage();
   svg.style.position='absolute';svg.style.left=viewPadding+'px';svg.style.top=viewPadding+'px';svg.style.width=(parseFloat(stage.style.width)-2*viewPadding)+'px';svg.style.height=(parseFloat(stage.style.height)-2*viewPadding)+'px';svg.style.overflow='visible';
   tools?.remove();tools=document.createElement('div');tools.className='note-graph-node-overlays';stage.append(tools);
   for(const n of visibleGraph(model,attrs.kind).nodes){const size=nodeSize(n),group=document.createElement('div');group.className='note-graph-node-tools';group.dataset.forNode=n.id;group.dataset.active=String(n.id===selected||n.id===hovered);Object.assign(group.style,{left:(viewPadding+n.x*viewScale)+'px',top:(viewPadding+n.y*viewScale)+'px',width:size.width*viewScale+'px',height:size.height*viewScale+'px'});tools.append(group);
@@ -153,7 +159,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
  };
  let editable=editor.isEditable;const editableChanged=()=>{if(editable!==editor.isEditable){editable=editor.isEditable;refresh();}};editor.on('update',editableChanged);
  const selectionChanged=()=>{dock();shell.hidden=!editor.isEditable||editor.state.selection.from!==getPos();if(!popup.hidden&&editor.state.selection.from!==getPos())closeMenu();};editor.on('selectionUpdate',selectionChanged);
- let fitFrame=0;const fitObserver=new ResizeObserver(()=>{if(!fitFrame)fitFrame=requestAnimationFrame(()=>{fitFrame=0;if(!destroyed&&!gesture)refresh();});});fitObserver.observe(graphic);
+ let fitFrame=0;const fitObserver=new ResizeObserver(()=>{if(!fitFrame)fitFrame=requestAnimationFrame(()=>{fitFrame=0;if(!destroyed&&!gesture)fitStage();});});fitObserver.observe(graphic);
  const checkpoint=()=>{if(document.visibilityState==='hidden')flush();};document.addEventListener('visibilitychange',checkpoint,true);window.addEventListener('pagehide',flush,true);
  const outside=(event:PointerEvent)=>{if(!popup.hidden&&!popup.contains(event.target as Node)&&!graphic.contains(event.target as Node))closeMenu();};
  window.addEventListener('pointermove',panMove,{passive:false});window.addEventListener('pointerup',panEnd);window.addEventListener('pointercancel',panEnd);graphic.addEventListener('pointerover',over);graphic.addEventListener('pointerdown',down);graphic.addEventListener('click',click);graphic.addEventListener('dblclick',double);graphic.addEventListener('keydown',keyboard);popup.addEventListener('keydown',keyboard);popup.addEventListener('pointerdown',e=>e.stopPropagation());popup.addEventListener('click',e=>e.stopPropagation());document.addEventListener('pointerdown',outside);window.addEventListener('resize',positionMenu);window.addEventListener('scroll',positionMenu,true);window.visualViewport?.addEventListener('resize',positionMenu);
