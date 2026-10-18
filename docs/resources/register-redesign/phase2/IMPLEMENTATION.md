@@ -1,6 +1,6 @@
 # Phase 2: direct movement and resizing
 
-The register uses one shared selection overlay for charts, images, tables, accounts and ink. Eight edge/corner handles and visible drag controls replace the table width slider. Controls stay at a usable physical size when the page is zoomed; off-screen edges have visible resize proxies within the canvas.
+The register uses one shared selection overlay for charts, images, tables, accounts and ink. Eight edge/corner handles and visible drag controls replace the table width slider. The movement strip occupies its own toolbar row. Controls stay at a usable physical size when the page is zoomed; off-screen edges have visible resize proxies within the canvas.
 
 Objects remain in text flow by default. Top-level objects that fit a page can switch to free placement, with page-local coordinates, guide snapping and keyboard nudging. Oversized workings retain normal flow. Proportions can be locked. Column boundaries resize adjacent columns; selected rows have a height grip. Whole-account resizing preserves both tables.
 

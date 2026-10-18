@@ -11,3 +11,7 @@
 @media(pointer:coarse){.note-row-grip{height:44px;min-width:44px}.note-column-grip{min-height:44px;top:auto}}
 .note-manipulation-bar{flex-wrap:wrap;overflow:visible}.note-manipulation-bar .note-row-grip{position:static;flex:none;transform:none;left:auto!important;top:auto!important;min-width:32px;width:32px!important;height:32px}.note-manipulation-bar .note-row-grip:after{content:'↕';font-size:18px}.note-manipulation-measure{margin-left:auto}
 @media(pointer:coarse){.note-manipulation-bar .note-row-grip{min-width:44px;height:44px}}
+.note-scroll-canvas>.note-manipulation-bar{z-index:85;margin:0 0 8px;max-width:100%;box-sizing:border-box}.note-manipulation-bar[hidden],.note-direct-resize[hidden]{display:none}
+.note-studio>.note-manipulation-bar{flex:none;z-index:25;margin:0;border-radius:0;max-width:100%;box-sizing:border-box}
+.note-studio>.note-manipulation-bar{flex-wrap:nowrap;overflow-x:auto;min-height:44px}.note-studio>.note-manipulation-bar .note-manipulation-measure{margin-left:0}
+@media(max-height:500px){.note-studio:has(>.note-manipulation-bar:not([hidden])) .note-context-tools{display:none}.note-studio>.note-manipulation-bar{min-height:34px;padding-block:1px}.note-studio>.note-manipulation-bar button{min-height:32px}}
