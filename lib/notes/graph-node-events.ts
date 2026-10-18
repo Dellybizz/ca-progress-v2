@@ -41,7 +41,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
  };
  const positionMenu=()=>{
   if(popup.hidden)return;const anchor=graphic.querySelector(`[data-${menuType}-id="${CSS.escape(menuId)}"]`)?.getBoundingClientRect();if(!anchor){closeMenu();return;}
-  const viewport=window.visualViewport,left=viewport?.offsetLeft??0,top=Math.max(viewport?.offsetTop??0,graphic.closest('.note-scroll-canvas')?.getBoundingClientRect().top??0),right=left+(viewport?.width??innerWidth),bottom=top+(viewport?.height??innerHeight);
+  const viewport=window.visualViewport,left=viewport?.offsetLeft??0,top=Math.max(viewport?.offsetTop??0,graphic.closest('.note-scroll-canvas')?.getBoundingClientRect().top??0),right=left+(viewport?.width??innerWidth),bottom=(viewport?.offsetTop??0)+(viewport?.height??innerHeight);
   const width=Math.min(294,right-left-24),canRight=anchor.right+10+width<=right-12,canLeft=anchor.left-10-width>=left+12,below=bottom-anchor.bottom-22,above=anchor.top-top-22;
   const side=canRight||canLeft,putBelow=below>=above,available=side?bottom-top-24:Math.max(below,above);
   popup.style.maxHeight=Math.max(120,Math.min(500,available))+'px';popup.style.width=width+'px';const rect=popup.getBoundingClientRect();
