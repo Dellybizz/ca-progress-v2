@@ -11,7 +11,7 @@ Implemented in the existing Tiptap diagram NodeView. This phase replaces the hie
 - Menu includes text, fit to text, duplicate, child/sibling, parent, collapse/expand, position lock, delete element and a separately confirmed delete-branch action. Deleting one element retains descendants as roots. Last-element deletion is refused.
 - Connections expose local label, colour, straight/elbow, solid/dashed, endpoints and delete. Hierarchies reject cycles/second parents; flowcharts retain general graph relationships.
 - Blank-canvas dragging pans; two-finger background gestures zoom/pan. Explicit zoom and Fit remain available. Viewport navigation is local and does not alter saved geometry. Ordinary page navigation remains outside the embedded canvas.
-- Arrow keys move, Shift increases the step, F2 edits, Enter/Space opens options, Escape cancels previews/closes options; Ctrl/Cmd Z/Y supports undo/redo. Text edits commit on blur as one step. Move/resize previews dispatch no editor transaction and commit once on release; cancellation restores the original.
+- Arrow keys move, Shift increases the step, F2 edits, Enter/Space opens options, Escape cancels previews/closes options; Ctrl/Cmd Z/Y supports undo/redo. Text edits commit on blur as one step, or before the note’s hidden-page/pagehide checkpoint if the field is still focused. Move/resize previews dispatch no editor transaction and commit once on release; cancellation restores the original.
 
 ## Persistence and compatibility
 
