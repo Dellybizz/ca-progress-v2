@@ -1,3 +1,4 @@
+import {hierarchyWriteNeedsReload} from '@/lib/notes/hierarchy-compatibility';
 import {validateStructuredNote,renderStructuredNote,type StructuredNote} from "@/lib/notes/structured-document";
 import { NextResponse } from "next/server";
 import { getProfileForUser, optionalUser } from "@/lib/auth/server";
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   try {
     if(noteId){
       const oldDocument=await getHotD1Database().prepare('SELECT document_json FROM note_revision_metadata WHERE note_id=?1 AND user_id=?2').bind(noteId,identity.id).first<{document_json:string}>();
-      if(oldDocument?.document_json){let previous;try{previous=JSON.parse(oldDocument.document_json);}catch{}if(previous?.engine==='tiptap'&&(!document||previous.engineSchemaVersion!==1||previous.schemaVersion!==1))return NextResponse.json({error:'This note uses the new editor. Update or reload CA Progress before editing it.',code:'NOTE_EDITOR_REQUIRED'},{status:409});if(document&&previous?.legacyHtml)document={...document,legacyHtml:previous.legacyHtml};else if(document&&previous?.format==='html')document={...document,legacyHtml:previous.html};}
+      if(oldDocument?.document_json){let previous;try{previous=JSON.parse(oldDocument.document_json);}catch{}if(previous?.engine==='tiptap'&&(!document||previous.engineSchemaVersion!==1||previous.schemaVersion!==1))return NextResponse.json({error:'This note uses the new editor. Update or reload CA Progress before editing it.',code:'NOTE_EDITOR_REQUIRED'},{status:409});if(hierarchyWriteNeedsReload(previous,body.editorCapabilities))return NextResponse.json({error:'This hierarchy uses newer editing controls. Reload CA Progress before saving. Your saved note is unchanged.',code:'NOTE_EDITOR_REQUIRED'},{status:409});if(document&&previous?.legacyHtml)document={...document,legacyHtml:previous.legacyHtml};else if(document&&previous?.format==='html')document={...document,legacyHtml:previous.html};}
     }
     if(noteId){
       const db=getHotD1Database();
