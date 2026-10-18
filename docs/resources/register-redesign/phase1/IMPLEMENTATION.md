@@ -8,7 +8,7 @@ Scope: page layout and paper controls, following the October 18 register-editor 
 - Portrait shows two facing sheets when the available editor width is at least 1,000px. Smaller widths focus one sheet. Landscape focuses one selected sheet.
 - A single ProseMirror document flows across fixed-height CSS columns. No pagination nodes, duplicated editor instances, or DOM reparenting are written into the note. Explicit page breaks remain canonical content.
 - Page selection, previous/next spread, append page, active-page outline, paper thumbnails, fit width, fit page, and 50–150% zoom. Navigation and zoom do not mutate the note. Automatic phone/tablet zoom preserves readable text; horizontal panning stays inside the page viewport.
-- Plain, ruled, narrow ruled, squared, and dotted paper. Spacing, colour, opacity, register margin, and a separate print inclusion setting.
+- Plain, ruled, narrow ruled, squared, and dotted paper. Narrow ruling starts at 6mm; explicit custom spacing is honoured. Spacing, colour, opacity, register margin, and a separate print inclusion setting.
 - Paper applies to every page or the selected page number. Page overrides follow page numbers as text reflows. Applying all-page paper deliberately replaces overrides; merely changing orientation preserves them.
 - Headers, footers and page numbers stay in page margins. Landscape/portrait dimensions use the same geometry for screen and print.
 - Register print creates one clipped column per physical sheet with paper backgrounds and per-page overrides. Typography, math and loaded attachments are prepared before print. Financial exports retain semantic table headers.
@@ -27,4 +27,4 @@ Release verification is recorded after CI and deployment finish. Physical Androi
 
 ## Implementation boundaries
 
-Browser pagination measures actual font/image layout; changing orientation or font can change page count. The page switcher is a visual paper thumbnail, not a second rendered editor. Very large single rows or nested unbreakable content require shorter rows or continuous view. Browser-specific fragmentation and physical print settings must be validated on target hardware; no physical-device certification is claimed.
+Browser pagination measures actual font/image layout; changing orientation or font can change page count. The page switcher is a visual paper thumbnail, not a second rendered editor. Very large single rows or nested unbreakable content require shorter rows or continuous view. Native HTML row/column dragging is checked on desktop; phone layouts use the existing move buttons pending the Phase 2 touch-drag redesign. Browser-specific fragmentation and physical print settings must be validated on target hardware; no physical-device certification is claimed.

@@ -10,7 +10,7 @@ export function paperLinesFor(layout:NoteLayout,page:number):PaperLines{return l
 /** Values are validated before use in CSS or SVG. */
 export function paperBackground(p:PaperLines){
  if(!validPaperLines(p))throw Error('Invalid paper lines.');
- const size=(p.style==='narrow'?Math.min(p.spacing,6):p.spacing)*96/25.4,ink=p.color,opacity=p.opacity/100;
+ const size=p.spacing*96/25.4,ink=p.color,opacity=p.opacity/100;
  const mark=p.style==='dotted'?`<circle cx="1" cy="1" r="0.8" fill="${ink}" fill-opacity="${opacity}"/>`:p.style==='plain'?'':`<path d="M0 ${size-.5}H${size}${p.style==='squared'?`M${size-.5} 0V${size}`:''}" fill="none" stroke="${ink}" stroke-opacity="${opacity}" stroke-width="0.7"/>`;
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${mark}</svg>`;
  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;

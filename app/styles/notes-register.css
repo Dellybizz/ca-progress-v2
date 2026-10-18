@@ -39,3 +39,5 @@
 .note-register .note-document table,.note-register-print-flow table{overflow:visible!important}
 /* Paper remains light and legible when the surrounding app uses dark mode. */
 .note-register .note-register-content,.note-register-print-flow{--color-text:#172033;--color-text-muted:#64748b;--color-text-faint:#94a3b8;--color-surface:#ffffff;--color-bg-subtle:#f8fafc;--color-border:#cbd5e1;--color-border-strong:#94a3b8}
+
+.note-scroll-canvas.is-page{scroll-padding-top:70px}
