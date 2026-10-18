@@ -1,6 +1,6 @@
 # Phase 5 — editor certification and hardening
 
-Status: automated verification/release in progress. Full physical-device and bundled-APK rich-editor certification is not complete.
+Status: automated verification and hardening release completed on 18 October 2026. Full physical-device and bundled-APK rich-editor certification remains open; see RELEASE.md for verified evidence.
 
 ## Audit findings and fixes
 
@@ -17,14 +17,14 @@ Status: automated verification/release in progress. Full physical-device and bun
 - `scripts/notes/certification-check.mjs` exercises source typing and scoped totals, numeric paste/undo/manual retention, live read-only changes, clipboard refusal, independent-side deletion refusal, maximum row/column controls, node-local add/edit/width/move/undo, working-note links, save capabilities and safe export.
 - Runs in Chromium and WebKit at 1440×1000, 390×844, 320×740, 820×1180, 844×390 and 1024×768. Touch contexts check 44-pixel controls. Engine-specific JSON reports explicitly record `physicalDevice:false`.
 - A separate `editor-certification` release job runs both engines. Deployment requires that job and the complete existing verification job. The full existing hierarchy/touch, chart, financial, catalogue, paste/reuse/print, performance and resource suites remain required.
-- Local Chromium certification and 1,482 tests passed. Local production build passed using Webpack because this isolated checkout uses a dependency symlink unsupported by Turbopack. The release runner must pass the ordinary default build. Local WebKit libraries were unavailable under container package-install restrictions; WebKit must pass on the release runner, not be silently skipped.
+- Local Chromium certification and 1,482 tests passed. Local production build passed using Webpack because this isolated checkout uses a dependency symlink unsupported by Turbopack. The release runner passed the ordinary default build. Local WebKit libraries were unavailable under container package-install restrictions; WebKit passed on the release runner at all six sizes; it was not skipped.
 
 ## Remaining certification gates
 
 | Gate | Status / exact work needed |
 |---|---|
-| Web Chromium desktop and simulated touch | Automated checks; final release evidence belongs in RELEASE.md |
-| WebKit engine, including simulated phone/tablet | Release-runner check; not physical Safari certification |
+| Web Chromium desktop and simulated touch | Passed; exact release evidence is in RELEASE.md |
+| WebKit engine, including simulated phone/tablet | Passed on the release runner; not physical Safari certification |
 | Android APK package/storage installation | Emulator workflow; does not certify full editor gestures |
 | Full rich editor bundled in offline APK | Pending implementation: replace plain-text notes with the rich model/editor, persist document JSON and capabilities in SQLite/outbox, resolve protected attachment access, then exercise editing/recovery in an installed WebView |
 | Physical Android Chrome/WebView | Pending connected device: keyboard/IME, long press versus drag, pinch/resize, background recovery, offline replay, rotation and export |
