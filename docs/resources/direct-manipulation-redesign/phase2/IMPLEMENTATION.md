@@ -5,7 +5,7 @@ Implemented in the existing Tiptap diagram NodeView. This phase replaces the hie
 ## Interaction
 
 - Side plus adds a sibling under the same parent; a root sibling is another root. Bottom plus adds a child. New elements avoid existing bounds without rearranging existing elements, and focus their text immediately.
-- Mouse click opens an anchored element menu. Touch tap selects and reveals controls; a 500 ms hold opens the menu and keeps it open on release. Moving 8 px cancels the hold and drags; mouse movement threshold is 4 px. The selected element also has a visible options button.
+- Mouse click opens an anchored element menu. Touch tap selects and reveals controls; a 500 ms hold opens the menu and keeps it open on release. Moving 8 px cancels the hold and drags; mouse movement threshold is 4 px. The selected element also has a visible options button. Menus use the available side/above/below space to avoid intercepting a double-click on the node.
 - Move one element by default. The explicit branch option moves descendants together. Relationships do not change with visual position.
 - Selected elements have northwest/southeast resize handles and numeric size alternatives. Per-node size, fill/border/text colour, shape, font size and alignment persist. Connector anchors follow resized bounds for rectangles, ellipses and decisions.
 - Menu includes text, fit to text, duplicate, child/sibling, parent, collapse/expand, position lock, delete element and a separately confirmed delete-branch action. Deleting one element retains descendants as roots. Last-element deletion is refused.

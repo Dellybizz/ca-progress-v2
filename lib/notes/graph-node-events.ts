@@ -7,6 +7,7 @@ import {addGraphNode,boundedLayout,deleteGraphNode,graphBranch,moveGraphNode,rep
 /** Local graph UI. Pointer previews never dispatch a note transaction. */
 export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'editor'|'getPos'>,graphic:HTMLElement,read:()=>NodeViewRendererProps['node']){
  let gesture:(()=>void)|undefined,selected='',hovered='',menuId='',menuType:'node'|'edge'='node',branch=false,zoom=1,suppressClick=false,destroyed=false;
+ let lastActivation={id:'',time:0};
  let stage:HTMLDivElement|undefined,tools:HTMLDivElement|undefined,pending:{model:GraphModel;expected:string}|undefined;
  const shell=document.createElement('div');shell.className='note-graph-ui note-graph-toolbar';shell.setAttribute('aria-label','Diagram canvas controls');
  const popup=document.createElement('div');popup.className='note-graph-ui note-graph-menu';popup.hidden=true;popup.setAttribute('role','dialog');popup.setAttribute('aria-label','Element options');popup.contentEditable='false';
@@ -38,8 +39,12 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
  const positionMenu=()=>{
   if(popup.hidden)return;const anchor=graphic.querySelector(`[data-${menuType}-id="${CSS.escape(menuId)}"]`)?.getBoundingClientRect();if(!anchor){closeMenu();return;}
   const viewport=window.visualViewport,left=viewport?.offsetLeft??0,top=viewport?.offsetTop??0,right=left+(viewport?.width??innerWidth),bottom=top+(viewport?.height??innerHeight);
-  popup.style.maxHeight=Math.max(120,Math.min(500,bottom-top-24))+'px';popup.style.width=Math.min(294,right-left-24)+'px';const rect=popup.getBoundingClientRect();
-  popup.style.left=Math.max(left+12,Math.min(right-rect.width-12,anchor.right+10+rect.width<right?anchor.right+10:anchor.left))+'px';popup.style.top=Math.max(top+12,Math.min(bottom-rect.height-12,anchor.top))+'px';
+  const width=Math.min(294,right-left-24),canRight=anchor.right+10+width<=right-12,canLeft=anchor.left-10-width>=left+12,below=bottom-anchor.bottom-22,above=anchor.top-top-22;
+  const side=canRight||canLeft,putBelow=below>=above,available=side?bottom-top-24:Math.max(below,above);
+  popup.style.maxHeight=Math.max(120,Math.min(500,available))+'px';popup.style.width=width+'px';const rect=popup.getBoundingClientRect();
+  popup.style.left=Math.max(left+12,Math.min(right-rect.width-12,canRight?anchor.right+10:canLeft?anchor.left-10-rect.width:anchor.left))+'px';
+  const proposed=side?anchor.top:putBelow?anchor.bottom+10:anchor.top-rect.height-10;
+  popup.style.top=Math.max(top+12,Math.min(bottom-rect.height-12,proposed))+'px';
  };
  const field=(label:string,value:string|number,change:(value:string)=>void,type='text',parent:HTMLElement=popup)=>{const wrap=document.createElement('label');wrap.textContent=label;const input=document.createElement('input');input.type=type;input.value=String(value);input.setAttribute('aria-label',label);wrap.append(input);parent.append(wrap);input.onchange=()=>{try{flush();change(input.value);}catch(error){message(error);}};return input;};
  const choice=(label:string,value:string,values:[string,string][],change:(value:string)=>void,parent:HTMLElement=popup)=>{const wrap=document.createElement('label');wrap.textContent=label;const input=document.createElement('select');input.setAttribute('aria-label',label);for(const [value,text]of values){const option=document.createElement('option');option.value=value;option.textContent=text;input.append(option);}input.value=value;input.onchange=()=>{try{flush();change(input.value);}catch(error){message(error);input.value=value;}};wrap.append(input);parent.append(wrap);return input;};
@@ -63,7 +68,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
    const actions=document.createElement('div');actions.className='note-graph-menu-grid';popup.append(actions);
    button(actions,'Add child element','+ Child',()=>add(id,'child')).disabled=m.nodes.length>=40;
    button(actions,'Add sibling element','+ Sibling',()=>add(id,'sibling')).disabled=m.nodes.length>=40;
-   button(actions,'Duplicate element','Duplicate',()=>{const key=crypto.randomUUID();let next=addGraphNode(current(),id,'sibling',read().attrs.kind,key,crypto.randomUUID());next={...next,nodes:next.nodes.map(n=>n.id===key?{...node,...n,label:node.label,width:node.width,height:node.height,fill:node.fill,color:node.color,textColor:node.textColor,fontSize:node.fontSize,textAlign:node.textAlign}:n)};if(commit(next)){select('node',key);openMenu('node',key,true);}}).disabled=m.nodes.length>=40;
+   button(actions,'Duplicate element','Duplicate',()=>{const key=crypto.randomUUID();let next=addGraphNode(current(),id,'sibling',read().attrs.kind,key,crypto.randomUUID());next={...next,nodes:next.nodes.map(n=>n.id===key?{...node,...n,label:node.label,shape:node.shape,locked:false,collapsed:false,width:node.width,height:node.height,fill:node.fill,color:node.color,textColor:node.textColor,fontSize:node.fontSize,textAlign:node.textAlign}:n)};if(commit(next)){select('node',key);openMenu('node',key,true);}}).disabled=m.nodes.length>=40;
    if(m.edges.some(e=>e.from===id)&&read().attrs.kind!=='flow')button(actions,'Collapse or expand branch',node.collapsed?'Expand branch':'Collapse branch',()=>{patch(id,{collapsed:!current().nodes.find(n=>n.id===id)!.collapsed});closeMenu();}).disabled=Boolean(node.locked);
    branch=graphic.dataset.moveBranch==='true';const branchLabel=document.createElement('label');branchLabel.className='note-graph-check';const check=document.createElement('input');check.type='checkbox';check.checked=branch;check.setAttribute('aria-label','Move this whole branch');check.onchange=()=>{branch=check.checked;graphic.dataset.moveBranch=String(branch);editor.view.dom.dispatchEvent(new CustomEvent('ca-object-part',{detail:{blockId:read().attrs.blockId,type:'node',id,moveBranch:branch}}));};branchLabel.append(check,'Move whole branch');popup.append(branchLabel);
    button(actions,'Lock or unlock element',node.locked?'Unlock':'Lock position',()=>{patch(id,{locked:!current().nodes.find(n=>n.id===id)!.locked});openMenu('node',id);});
@@ -130,7 +135,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
   };
   const end=(e:PointerEvent)=>{if(e.pointerId!==pointer)return;finish(e.type==='pointercancel');};
   const cancel=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(true);}};
-  const finish=(cancelled:boolean)=>{gesture?.();if(!cancelled&&moved)commit(next,original.attrs.data);refresh();if(moved)focusNode(id);if(!cancelled&&!moved&&!held&&!resize){suppressClick=true;if(event.pointerType!=='touch')openMenu('node',id);}if(held)positionMenu();};
+  const finish=(cancelled:boolean)=>{gesture?.();if(!cancelled&&moved)commit(next,original.attrs.data);refresh();if(moved)focusNode(id);if(!cancelled&&!moved&&!held&&!resize){suppressClick=true;if(event.pointerType!=='touch'){const now=performance.now(),edit=lastActivation.id===id&&now-lastActivation.time<350;lastActivation={id,time:now};openMenu('node',id,edit);}}if(held)positionMenu();};
   gesture=()=>{clearTimeout(timer);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);window.removeEventListener('keydown',cancel,true);gesture=undefined;};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);window.addEventListener('keydown',cancel,true);
  };
  const keyboard=(event:KeyboardEvent)=>{
