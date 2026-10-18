@@ -1,4 +1,5 @@
 import katex from 'katex';
+import {positionPrintedObjects} from './object-placement';
 import {notePageSize,type NoteLayout} from './structured-document';
 import {PAGE_GAP,paperBackground,paperLinesFor,registerGeometry,pageCountFromWidth} from './page-paper';
 /** Print uses the same column geometry as authoring, with one clipped column per sheet. */
@@ -11,6 +12,7 @@ export async function printRegisterNote(html:string,title:string,layout:NoteLayo
   const style=doc.createElement('style');style.textContent=`@page{size:${size.width}mm ${size.height}mm;margin:0}html,body{margin:0!important;padding:0!important;background:white!important;color:#172033!important}body{font-family:Arial,'Noto Sans Devanagari',sans-serif;--register-width:${g.width}px;--register-height:${g.height}px;--register-margin:${g.margin}px;--register-inner-width:${g.innerWidth}px;--register-inner-height:${g.innerHeight}px;--register-gap:${PAGE_GAP}px}.note-register-print-flow{font-family:${typography.fontFamily};font-size:${typography.fontSize};line-height:${typography.lineHeight}}.note-register-print-flow table{border-collapse:collapse;width:100%;table-layout:fixed}.note-register-print-flow :is(td,th){overflow-wrap:anywhere}.note-register-print-flow .note-account{break-inside:auto}.note-register-print-flow .note-diagram details{display:none}.note-register-print-flow .note-diagram-graphic{height:auto!important;overflow:visible!important}.note-register-print-flow svg{max-height:${g.innerHeight-50}px!important;width:100%;height:auto}.note-register-print-flow .note-page-break{break-before:column}.note-register-print-flow :is(img,svg){break-inside:avoid}`;doc.head.append(style);
   const flow=doc.createElement('article');flow.className='note-register-print-flow note-rich-content';flow.innerHTML=html;doc.body.append(flow);for(const math of Array.from(flow.querySelectorAll<HTMLElement>('[data-expression]')))katex.render(math.dataset.expression??'',math,{throwOnError:false,trust:false,strict:'ignore'});
   await Promise.all(ready);await doc.fonts.ready;await Promise.all(Array.from(doc.images).map(img=>{img.loading='eager';return img.decode().catch(()=>{});}));
+  positionPrintedObjects(flow);
   const count=pageCountFromWidth(flow.scrollWidth,g.innerWidth,g.stride);flow.remove();
   for(let page=1;page<=count;page++){
    const sheet=doc.createElement('section');sheet.className='note-register-print-sheet';const paper=doc.createElement('div');paper.className='note-register-sheet';const lines=paperLinesFor(layout,page);

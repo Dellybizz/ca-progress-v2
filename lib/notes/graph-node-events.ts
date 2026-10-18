@@ -1,5 +1,7 @@
 'use client';
 import type {NodeViewRendererProps} from '@tiptap/core';
+import {pointerGesture,scrollParents} from './pointer-gesture';
+import {RESIZE_HANDLES,resizeBox,snapBox} from './manipulation';
 import {closeHistory} from '@tiptap/pm/history';
 import {objectModel,renderObject,nodeSize,wrapNodeLabel,type GraphModel,type DiagramNode} from './chart-model';
 import {addGraphNode,boundedLayout,deleteGraphNode,graphBranch,moveGraphNode,reparentGraph,resizeGraphNode,visibleGraph} from './object-actions';
@@ -7,7 +9,7 @@ import {addGraphNode,boundedLayout,deleteGraphNode,graphBranch,moveGraphNode,rep
 /** Local graph UI. Pointer previews never dispatch a note transaction. */
 export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'editor'|'getPos'>,graphic:HTMLElement,read:()=>NodeViewRendererProps['node']){
  let gesture:(()=>void)|undefined,selected='',hovered='',menuId='',menuType:'node'|'edge'='node',branch=false,zoom=1,suppressClick=false,destroyed=false;
- let lastActivation={id:'',time:0};
+ let lastActivation={id:'',time:0},snapping=false;
  let stage:HTMLDivElement|undefined,tools:HTMLDivElement|undefined,pending:{model:GraphModel;expected:string}|undefined;
  const shell=document.createElement('div');shell.className='note-graph-ui note-graph-toolbar';shell.setAttribute('aria-label','Diagram canvas controls');
  const popup=document.createElement('div');popup.className='note-graph-ui note-graph-menu';popup.hidden=true;popup.setAttribute('role','dialog');popup.setAttribute('aria-label','Element options');popup.contentEditable='false';
@@ -93,7 +95,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
   for(const n of visibleGraph(model,attrs.kind).nodes){const size=nodeSize(n),group=document.createElement('div');group.className='note-graph-node-tools';group.dataset.forNode=n.id;group.dataset.active=String(n.id===selected||n.id===hovered);Object.assign(group.style,{left:n.x*zoom+'px',top:n.y*zoom+'px',width:size.width*zoom+'px',height:size.height*zoom+'px'});tools.append(group);
    const sibling=button(group,'Add sibling to '+n.label,'+',()=>add(n.id,'sibling'));sibling.className='note-graph-add sibling';sibling.disabled=model.nodes.length>=40;
    const child=button(group,'Add child to '+n.label,'+',()=>add(n.id,'child'));child.className='note-graph-add child';child.disabled=model.nodes.length>=40;
-   if(n.id===selected){button(group,'Options for '+n.label,'⋯',()=>openMenu('node',n.id)).className='note-graph-options';if(!n.locked)for(const corner of ['nw','se']){const resize=button(group,'Resize element '+corner,'',()=>{});resize.className='note-graph-node-resize '+corner;resize.dataset.resize=corner;resize.dataset.resizeNode=n.id;}}
+   if(n.id===selected){button(group,'Options for '+n.label,'⋯',()=>openMenu('node',n.id)).className='note-graph-options';if(!n.locked)for(const corner of RESIZE_HANDLES){const resize=button(group,'Resize element '+corner,'',()=>{});resize.className='note-graph-node-resize '+corner;resize.dataset.resize=corner;resize.dataset.resizeNode=n.id;}}
    stage.querySelector(`[data-node-id="${CSS.escape(n.id)}"]`)?.setAttribute('data-selected',String(n.id===selected));
   }
  }
@@ -103,6 +105,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
   try{const model=current();stage=document.createElement('div');stage.className='note-graph-stage';graphic.replaceChildren(stage);draw(model);if(menuId&&!model.nodes.some(n=>n.id===menuId)&&menuType==='node'){pending=undefined;menuId='';popup.hidden=true;}positionMenu();}catch(error){message(error);}
  }
  button(shell,'Add root element','+ Root',()=>add(selected||current().nodes[0].id,'free'));
+ const snapControl=button(shell,'Snap diagram to guides','Snap',()=>{snapping=!snapping;snapControl.setAttribute('aria-pressed',String(snapping));});snapControl.setAttribute('aria-pressed','false');
  button(shell,'Auto arrange diagram','Arrange',()=>commit(boundedLayout(current(),read().attrs.variant==='Left to right')));
  const zoomText=document.createElement('span');zoomText.textContent='100%';
  const setZoom=(value:number)=>{zoom=Math.max(.25,Math.min(2,value));zoomText.textContent=Math.round(zoom*100)+'%';refresh();};
@@ -129,15 +132,14 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
   const target=(event.target as Element).closest<SVGElement>('[data-node-id]'),handle=(event.target as Element).closest<HTMLElement>('[data-resize-node]');
   if(pans.size||!target&&!handle){if((event.target as Element).closest('[data-edge-id],[data-category-id],button'))return;panStart(event);return;}event.preventDefault();event.stopPropagation();gesture?.();suppressClick=false;closeMenu();
   const original=read(),model=current(),id=handle?.dataset.resizeNode??target!.dataset.nodeId!,n=model.nodes.find(n=>n.id===id)!;selected=id;select('node',id);draw(model);focusNode(id);if(n.locked){openMenu('node',id);return;}
-  const matrix=stage?.querySelector('svg')?.getScreenCTM();if(!matrix)return;const scaleX=Math.abs(matrix.a)||zoom,scaleY=Math.abs(matrix.d)||zoom,startX=event.clientX,startY=event.clientY,pointer=event.pointerId,resize=handle?.dataset.resize,sz=nodeSize(n);let next=model,moved=false,held=false;
+  const matrix=stage?.querySelector('svg')?.getScreenCTM();if(!matrix)return;const scaleX=Math.abs(matrix.a)||zoom,scaleY=Math.abs(matrix.d)||zoom,startX=event.clientX,startY=event.clientY,resize=handle?.dataset.resize as import('./manipulation').Handle|undefined,sz=nodeSize(n),initial=graphic.getBoundingClientRect(),scrollX=graphic.scrollLeft,scrollY=graphic.scrollTop,paperScale=initial.width/graphic.offsetWidth||1;let next=model,held=false;
   const timer=event.pointerType==='touch'&&!resize?window.setTimeout(()=>{held=true;suppressClick=true;openMenu('node',id);},500):undefined;
-  const move=(e:PointerEvent)=>{if(e.pointerId!==pointer||held)return;const dx=e.clientX-startX,dy=e.clientY-startY;if(!moved&&Math.hypot(dx,dy)<(event.pointerType==='touch'?8:4))return;moved=true;clearTimeout(timer);suppressClick=true;
-   try{if(resize){const west=resize==='nw',width=Math.max(80,Math.min(west?Math.min(600,n.x+sz.width):600,sz.width+dx/scaleX*(west?-1:1))),height=Math.max(40,Math.min(west?Math.min(400,n.y+sz.height):400,sz.height+dy/scaleY*(west?-1:1)));next=resizeGraphNode(model,id,width,height,west?n.x+sz.width-width:n.x,west?n.y+sz.height-height:n.y);}else next=moveGraphNode(model,id,n.x+dx/scaleX,n.y+dy/scaleY,graphic.dataset.moveBranch==='true');draw(next,false);}catch(error){message(error);}
-  };
-  const end=(e:PointerEvent)=>{if(e.pointerId!==pointer)return;finish(e.type==='pointercancel');};
-  const cancel=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finish(true);}};
-  const finish=(cancelled:boolean)=>{gesture?.();if(!cancelled&&moved)commit(next,original.attrs.data);refresh();if(moved)focusNode(id);if(!cancelled&&!moved&&!held&&!resize){suppressClick=true;if(event.pointerType!=='touch'){const now=performance.now(),edit=lastActivation.id===id&&now-lastActivation.time<350;lastActivation={id,time:now};openMenu('node',id,edit);}}if(held)positionMenu();};
-  gesture=()=>{clearTimeout(timer);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);window.removeEventListener('keydown',cancel,true);gesture=undefined;};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);window.addEventListener('keydown',cancel,true);
+  const clearGuides=()=>stage?.querySelectorAll('.note-graph-guide').forEach(el=>el.remove());
+  gesture=pointerGesture(event,graphic,{threshold:event.pointerType==='touch'?8:4,scroll:[graphic,...scrollParents(graphic)],move:point=>{
+   if(held)return;clearTimeout(timer);suppressClick=true;const rect=graphic.getBoundingClientRect(),dx=(point.x-startX-(rect.left-initial.left)+(graphic.scrollLeft-scrollX)*paperScale)/scaleX,dy=(point.y-startY-(rect.top-initial.top)+(graphic.scrollTop-scrollY)*paperScale)/scaleY;
+   try{if(resize){const box=resizeBox({x:n.x,y:n.y,...sz},resize,dx,dy,{minWidth:80,minHeight:40,maxWidth:resize.includes('w')?Math.min(600,n.x+sz.width):600,maxHeight:resize.includes('n')?Math.min(400,n.y+sz.height):400},point.shift&&!point.alt);next=resizeGraphNode(model,id,box.width,box.height,Math.max(0,box.x),Math.max(0,box.y));draw(next,false);}else{let x=n.x+dx,y=n.y+dy;let guides:ReturnType<typeof snapBox>|undefined;if(snapping&&!point.alt){guides=snapBox({x,y,...sz},model.nodes.filter(v=>v.id!==id).map(v=>({x:v.x,y:v.y,...nodeSize(v)})),{width:4000,height:4000},6/scaleX);x=guides.x;y=guides.y;}next=moveGraphNode(model,id,x,y,graphic.dataset.moveBranch==='true');draw(next,false);clearGuides();if(guides&&stage)for(const [axis,at]of [['x',guides.guideX],['y',guides.guideY]] as const){if(at===undefined)continue;const line=document.createElement('div');line.className='note-graph-guide '+axis;line.style[axis==='x'?'left':'top']=at*zoom+'px';stage.append(line);}}}catch(error){message(error);}
+  },finish:(cancelled,moved)=>{clearTimeout(timer);gesture=undefined;clearGuides();if(!cancelled&&!held&&moved)commit(next,original.attrs.data);refresh();if(moved)focusNode(id);if(!cancelled&&!moved&&!held&&!resize){suppressClick=true;if(event.pointerType!=='touch'){const now=performance.now(),edit=lastActivation.id===id&&now-lastActivation.time<350;lastActivation={id,time:now};openMenu('node',id,edit);}}if(held)positionMenu();}});
+
  };
  const keyboard=(event:KeyboardEvent)=>{
   if(!editor.isEditable)return;

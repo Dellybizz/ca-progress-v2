@@ -23,3 +23,8 @@ export function accountingWriteNeedsReload(previous:unknown,capabilities:unknown
 export const WORKING_NOTES_CAPABILITY='linked-working-notes-v1';
 export function requiresWorkingNotesEditor(value:unknown):boolean{if(!value||typeof value!=='object')return false;const n=value as {type?:unknown;attrs?:{workingTarget?:unknown};content?:unknown};return n.type==='workingNote'||!!n.attrs?.workingTarget||(Array.isArray(n.content)?n.content.some(requiresWorkingNotesEditor):requiresWorkingNotesEditor(n.content));}
 export function workingNotesWriteNeedsReload(previous:unknown,capabilities:unknown){return requiresWorkingNotesEditor(previous)&&(!Array.isArray(capabilities)||!capabilities.includes(WORKING_NOTES_CAPABILITY));}
+
+/** Clients that do not understand placement must not flatten positioned objects. */
+export const OBJECT_MANIPULATION_CAPABILITY='object-placement-v1';
+export function requiresObjectManipulation(value:unknown):boolean{if(!value||typeof value!=='object')return false;const n=value as {type?:string;attrs?:Record<string,unknown>;content?:unknown};if(n.attrs&&(n.attrs.caPosition!=null||n.attrs.caAspect!=null||n.type==='account'&&n.attrs.caWidth!=null))return true;return Array.isArray(n.content)?n.content.some(requiresObjectManipulation):requiresObjectManipulation(n.content);}
+export function objectManipulationWriteNeedsReload(previous:unknown,capabilities:unknown){return requiresObjectManipulation(previous)&&(!Array.isArray(capabilities)||!capabilities.includes(OBJECT_MANIPULATION_CAPABILITY));}

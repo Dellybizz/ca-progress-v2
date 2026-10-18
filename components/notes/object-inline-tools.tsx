@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useRef,useState,type ReactNode} from 'react';
+import {useCallback,useEffect,useRef,useState,useSyncExternalStore,type ReactNode} from 'react';
 import {useEditorState,type Editor} from '@tiptap/react';
 import {NodeSelection} from '@tiptap/pm/state';
 import {closeHistory} from '@tiptap/pm/history';
@@ -13,8 +13,9 @@ function Field({label,value,onValue,number=false,maxLength=80}:{label:string;val
  return <input aria-label={label} type={number?'number':'text'} step={number?'any':undefined} maxLength={maxLength} value={draft??value} onFocus={()=>setDraft(String(value))} onChange={e=>{const value=e.target.value;setDraft(value);if(!number||value.trim()&&Number.isFinite(Number(value)))onValue(value);}} onBlur={()=>setDraft(null)} onKeyDown={e=>{if(e.key==='Enter'||e.key==='Escape'){e.preventDefault();e.currentTarget.blur();}}}/>;
 }
 export function ObjectInlineTools({editor}:{editor:Editor}){
+ const subscribe=useCallback((notify:()=>void)=>{editor.on('update',notify);return()=>{editor.off('update',notify);};},[editor]);const editable=useSyncExternalStore(subscribe,()=>editor.isEditable,()=>editor.isEditable);
  const selected=useEditorState({editor,selector:({editor:e})=>{const s=e.state.selection;return s instanceof NodeSelection&&s.node.type.name==='diagram'?{pos:s.from,attrs:s.node.attrs}:null;}});
- return selected?<ObjectControls key={selected.attrs.blockId??selected.pos} editor={editor} pos={selected.pos} attrs={selected.attrs}/>:null;
+ return editable&&selected?<ObjectControls key={selected.attrs.blockId??selected.pos} editor={editor} pos={selected.pos} attrs={selected.attrs}/>:null;
 }
 function ObjectControls({editor,pos,attrs}:{editor:Editor;pos:number;attrs:Record<string,unknown>}){
  const root=useRef<HTMLDivElement>(null);const blockId=String(attrs.blockId??''),kind=String(attrs.kind),variant=String(attrs.variant),title=String(attrs.title);
@@ -27,7 +28,7 @@ function ObjectControls({editor,pos,attrs}:{editor:Editor;pos:number;attrs:Recor
  const selectedNode=graph?.nodes.find(n=>n.id===part.node)??graph?.nodes[0],selectedEdge=graph?.edges.find(e=>e.id===part.edge);
  useEffect(()=>{const select=(event:Event)=>{const d=(event as CustomEvent).detail;if(d.blockId!==blockId)return;if(typeof d.moveBranch==='boolean')setBranch(d.moveBranch);setPart(p=>({...p,[d.type]:d.id}));setTab(isGraph&&d.type!=='category'?null:'data');if(d.edit)requestAnimationFrame(()=>{const label=d.type==='node'?'In-page node label':d.type==='edge'?'In-page connection label':null;if(label)root.current?.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)?.focus();else root.current?.querySelector<HTMLInputElement>(`[data-category-row-id="${CSS.escape(d.id)}"] input`)?.focus();});};editor.view.dom.addEventListener('ca-object-part',select);return()=>editor.view.dom.removeEventListener('ca-object-part',select);},[editor,blockId,isGraph]);
  useEffect(()=>{if(!graphic)return;graphic.setAttribute('data-move-branch',String(branch));for(const el of graphic.querySelectorAll('[data-node-id],[data-edge-id],[data-category-id]'))el.setAttribute('data-selected',String(el.getAttribute('data-node-id')===selectedNode?.id||el.getAttribute('data-edge-id')===part.edge||el.getAttribute('data-category-id')===part.category));},[graphic,branch,selectedNode?.id,part.edge,part.category,attrs.data]);
- const change=(next:ObjectModel,patch:Record<string,unknown>={})=>{try{validateObjectModel(String(patch.kind??kind),next);const current=editor.state.doc.nodeAt(pos);if(current?.type.name!=='diagram'||current.attrs.blockId!==attrs.blockId)throw Error('Select this object again before editing.');const data=JSON.stringify(next);if(data!==current.attrs.data||Object.entries(patch).some(([k,v])=>current.attrs[k]!==v))editor.view.dispatch(closeHistory(editor.state.tr).setNodeMarkup(pos,undefined,{...current.attrs,...patch,data}));setError('');return true;}catch(caught){setError(caught instanceof Error?caught.message:'This change is not valid.');return false;}};
+ const change=(next:ObjectModel,patch:Record<string,unknown>={})=>{if(!editor.isEditable)return false;try{validateObjectModel(String(patch.kind??kind),next);const current=editor.state.doc.nodeAt(pos);if(current?.type.name!=='diagram'||current.attrs.blockId!==attrs.blockId)throw Error('Select this object again before editing.');const data=JSON.stringify(next);if(data!==current.attrs.data||Object.entries(patch).some(([k,v])=>current.attrs[k]!==v))editor.view.dispatch(closeHistory(editor.state.tr).setNodeMarkup(pos,undefined,{...current.attrs,...patch,data}));setError('');return true;}catch(caught){setError(caught instanceof Error?caught.message:'This change is not valid.');return false;}};
  const editChart=(fn:(m:ChartModel)=>ChartModel)=>{if(chart){const next=fn(chart);change({...next,categoryIds:categoryIds(next)});}};
  const editGraph=(fn:(m:GraphModel)=>GraphModel)=>{if(graph)try{change(fn(graph));}catch(caught){setError(caught instanceof Error?caught.message:'Check this connection.');}};
  const nodePatch=(patch:Partial<GraphModel['nodes'][number]>)=>editGraph(m=>({...m,nodes:m.nodes.map(n=>n.id===selectedNode?.id?{...n,...patch}:n)}));

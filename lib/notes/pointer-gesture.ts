@@ -1,0 +1,15 @@
+'use client';
+export type PointerPoint={x:number;y:number;shift:boolean;alt:boolean};
+/** Shared capture, cancellation and edge scrolling. Previews never write document state. */
+export function pointerGesture(event:PointerEvent,capture:HTMLElement,options:{move:(point:PointerPoint)=>void;finish:(cancelled:boolean,moved:boolean)=>void;scroll?:HTMLElement[];threshold?:number}){
+ event.preventDefault();event.stopPropagation();const id=event.pointerId,start={x:event.clientX,y:event.clientY};let point:PointerPoint={...start,shift:event.shiftKey,alt:event.altKey},moved=false,done=false,frame=0;
+ try{capture.setPointerCapture(id);}catch{/* Synthetic test pointers do not own capture. */}
+ const render=()=>{if(!done&&moved)options.move(point);};
+ const tick=()=>{if(done)return;let scrolled=false;if(moved)for(const el of options.scroll??[]){const r=el.getBoundingClientRect(),pad=36;const vx=point.x<r.left+pad?-12:point.x>r.right-pad?12:0,vy=point.y<r.top+pad?-12:point.y>r.bottom-pad?12:0,bx=el.scrollLeft,by=el.scrollTop;if(point.x>=r.left-24&&point.x<=r.right+24&&point.y>=r.top-24&&point.y<=r.bottom+24)el.scrollBy(vx,vy);scrolled ||= bx!==el.scrollLeft||by!==el.scrollTop;}if(scrolled)render();frame=requestAnimationFrame(tick);};
+ const move=(e:PointerEvent)=>{if(e.pointerId!==id||done)return;e.preventDefault();point={x:e.clientX,y:e.clientY,shift:e.shiftKey,alt:e.altKey};moved ||= Math.hypot(point.x-start.x,point.y-start.y)>=(options.threshold??3);render();};
+ const finish=(cancelled:boolean)=>{if(done)return;done=true;cancelAnimationFrame(frame);window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up);window.removeEventListener('pointercancel',cancel);window.removeEventListener('keydown',key,true);window.removeEventListener('blur',blur);document.removeEventListener('visibilitychange',visibility);capture.removeEventListener('lostpointercapture',lost);try{if(capture.hasPointerCapture(id))capture.releasePointerCapture(id);}catch{}options.finish(cancelled,moved);};
+ const up=(e:PointerEvent)=>{if(e.pointerId===id)finish(false);},cancel=(e:PointerEvent)=>{if(e.pointerId===id)finish(true);},lost=(e:PointerEvent)=>{if(e.pointerId===id)finish(true);};
+ const key=(e:KeyboardEvent)=>{if(e.key==='Escape'||(e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();e.stopPropagation();finish(true);}};const blur=()=>finish(true),visibility=()=>{if(document.visibilityState==='hidden')finish(true);};
+ window.addEventListener('pointermove',move,{passive:false});window.addEventListener('pointerup',up);window.addEventListener('pointercancel',cancel);window.addEventListener('keydown',key,true);window.addEventListener('blur',blur);document.addEventListener('visibilitychange',visibility);capture.addEventListener('lostpointercapture',lost);frame=requestAnimationFrame(tick);return()=>finish(true);
+}
+export function scrollParents(element:HTMLElement){const result:HTMLElement[]=[];for(let p=element.parentElement;p;p=p.parentElement)if(/auto|scroll/.test(getComputedStyle(p).overflow+getComputedStyle(p).overflowX+getComputedStyle(p).overflowY))result.push(p);return result;}
