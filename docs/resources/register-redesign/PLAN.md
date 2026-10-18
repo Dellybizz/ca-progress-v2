@@ -15,7 +15,7 @@ Phase 1 implementation and release evidence: [phase1/IMPLEMENTATION.md](phase1/I
 
 Key interpretation: orientation is a document paper setting. Portrait uses a facing spread where space allows; smaller screens focus one readable page. Landscape focuses one selected sheet. New notes use register view; existing notes retain their saved view until changed. Page-specific paper follows the page number after reflow.
 
-Phase 2 should address phone row/column touch dragging explicitly. Current phone layouts retain accessible move buttons; native HTML row/column dragging is certified on desktop. Keep one canonical document and avoid saving pointer previews or zoom/navigation as content edits.
+Phase 2 is implemented and live. Phone/tablet row and column pointer dragging, shared sizing/placement, cancellation, undo and print persistence are certified. See [phase2/IMPLEMENTATION.md](phase2/IMPLEMENTATION.md) and [phase2/RELEASE.md](phase2/RELEASE.md). Phase 3 contextual menus and complete hierarchy-branch copying are next.
 
 Known baseline findings: account CSS includes both a 16px gap and authoring gutters; hierarchy duplication currently copies an element rather than all descendants; the exact amount parser already supports bracketed negatives, so Phase 4 must audit consistency across entry paths rather than add a second parser.
 
