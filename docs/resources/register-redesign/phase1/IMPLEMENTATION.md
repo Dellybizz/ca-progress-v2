@@ -23,7 +23,7 @@ New model tests cover paper roundtrip, old layouts, invalid settings/CSS injecti
 
 Local verification: 1,486 model/repository tests passed; TypeScript and ESLint passed. Chromium existing editor certification passed all six sizes; the full existing Notes editor browser suite passed desktop/mobile/tablet and legacy import. The new register suite passed 1,440px, 390px and 820px, including long-table column flow. The 20-table/60-edit local benchmark retained one snapshot and one continuous checkpoint (median 2.2ms, p95 3.6ms; headless command timing). A generated two-page landscape PDF was rendered and inspected; A4 dimensions and page count were verified.
 
-Release verification is recorded after CI and deployment finish. Physical Android/iOS validation and offline APK rich-editor integration remain separate open gates from the earlier certification work. New resize/move controls, context menus, complete branch copying, joined account sides and appearance presets belong to subsequent redesign phases.
+Release verification passed on the final commit; exact job, deployment and live persistence evidence is recorded in RELEASE.md. Physical Android/iOS validation and offline APK rich-editor integration remain separate open gates from the earlier certification work. New resize/move controls, context menus, complete branch copying, joined account sides and appearance presets belong to subsequent redesign phases.
 
 ## Implementation boundaries
 
