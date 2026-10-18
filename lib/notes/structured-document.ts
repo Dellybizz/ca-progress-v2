@@ -1,3 +1,4 @@
+import {normalizeWorkingNotes} from './working-notes';
 import {rowCalculation,columnRoles} from './accounting-semantics';
 import {parseInk,renderInk} from './ink-model';
 import {financialConfig,totalFormula,canonicalAmount,rawAmount,numberCell,totalsStale,type FinancialConfig} from './financial-formats';
@@ -18,8 +19,8 @@ const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 export function safeNoteLink(v:unknown){return typeof v==='string'&&(/^(https?:\/\/|mailto:)/i.test(v)||/^#block-[\w-]+$/.test(v))&&!/[\u0000-\u0020<>"']/.test(v)&&!/[?&](?:[^=]*(?:token|signature|credential)|expires)=/i.test(v);}
 const color=(v:unknown)=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v);
 const inline=new Set(['text','hardBreak','image','math','reference','attachment']);
-const blocks=new Set(['paragraph','heading','bulletList','orderedList','taskList','blockquote','codeBlock','horizontalRule','table','callout','toggle','pageBreak','diagram','ink','account']);
-const allowedAttrs:Record<string,string[]>={account:['blockId'],ink:['blockId','data','label','width'],diagram:['blockId','kind','title','variant','data','width','height','align'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir','caOwner','caCaption'],heading:['blockId','level','textAlign','lineHeight','indent','dir','caOwner','caCaption'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId','caFormat','caStale','caWidth'],tableRow:['caRowId','caRole','caHeight','caSection','caTotal','caSign'],tableCell:['colspan','rowspan','colwidth','textAlign','align','caColId','caColRole','caKind','caRaw','caFormula','caFill','caBorder'],tableHeader:['colspan','rowspan','colwidth','textAlign','align','caColId','caColRole','caKind','caRaw','caFormula','caFill','caBorder'],image:['src','alt','title','width','caption','crop','height','align'],math:['expression'],reference:['label','href'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
+const blocks=new Set(['paragraph','heading','bulletList','orderedList','taskList','blockquote','codeBlock','horizontalRule','table','callout','toggle','pageBreak','diagram','ink','account','workingNote']);
+const allowedAttrs:Record<string,string[]>={workingNote:['blockId','number','backlinks'],account:['blockId'],ink:['blockId','data','label','width'],diagram:['blockId','kind','title','variant','data','width','height','align'],doc:[],text:[],hardBreak:[],paragraph:['blockId','textAlign','lineHeight','indent','dir','caOwner','caCaption'],heading:['blockId','level','textAlign','lineHeight','indent','dir','caOwner','caCaption'],bulletList:['blockId'],orderedList:['blockId','start'],listItem:['blockId'],taskList:['blockId'],taskItem:['blockId','checked'],blockquote:['blockId'],codeBlock:['blockId','language'],horizontalRule:['blockId'],table:['blockId','caFormat','caStale','caWidth'],tableRow:['caRowId','caRole','caHeight','caSection','caTotal','caSign'],tableCell:['colspan','rowspan','colwidth','textAlign','align','caColId','caColRole','caKind','caRaw','caFormula','caFill','caBorder'],tableHeader:['colspan','rowspan','colwidth','textAlign','align','caColId','caColRole','caKind','caRaw','caFormula','caFill','caBorder'],image:['src','alt','title','width','caption','crop','height','align'],math:['expression'],reference:['blockId','label','href','workingTarget'],attachment:['resourceId','label'],callout:['blockId'],toggle:['blockId','summary','open'],pageBreak:['blockId']};
 const markAttrs:Record<string,string[]>={bold:[],italic:[],underline:[],strike:[],code:[],subscript:[],superscript:[],link:['href','target','rel','class'],highlight:['color'],textStyle:['fontFamily','fontSize','color']};
 function fail():never{throw Error('Unsupported or invalid structured note. Your original content has been retained.');}
 export function validateStructuredNote(value:unknown,attachmentIds?:string[]):StructuredNote{
@@ -37,6 +38,9 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
   for(const [key,v]of Object.entries(a)){
    if(v===null)continue;
    if(key==='blockId'){if(typeof v!=='string'||!/^block-[\w-]{1,100}$/.test(v)||ids.has(v))fail();ids.add(v);}
+   else if(key==='workingTarget'){if(typeof v!=='string'||!/^block-[\w-]{1,100}$/.test(v))fail();}
+   else if(key==='number'){if(!Number.isInteger(v)||Number(v)<1||Number(v)>400)fail();}
+   else if(key==='backlinks'){if(!Array.isArray(v)||v.length>80||v.some(id=>typeof id!=='string'||!/^block-[\w-]{1,100}$/.test(id)))fail();}
    else if(key==='caFormat'){financialConfig(v);}
    else if(key==='caTotal'){rowCalculation(v);}
    else if(key==='caSection'){if(typeof v!=='string'||!/^[-\w]{1,80}$/.test(v))fail();}
@@ -76,11 +80,13 @@ export function validateStructuredNote(value:unknown,attachmentIds?:string[]):St
   if(n.marks){if(mark||!inline.has(n.type)||!Array.isArray(n.marks)||n.marks.length>12)fail();n.marks.forEach(m=>walk(m,depth+1,true));}
   if(n.content!==undefined&&!Array.isArray(n.content))fail();
   const children=n.content??[];
+  if(n.type==='reference'&&a.workingTarget&&a.href!=='#'+a.workingTarget)fail();
+  if(n.type==='workingNote'&&(!a.blockId||!children.length||children.some(c=>c.type==='workingNote')))fail();
   if(n.type==='account'&&(children.length!==2||children.some(c=>c.type!=='table'||!c.attrs?.caFormat)))fail();
   if(n.type==='table'&&a.caFormat&&(children.length>201||children.some(r=>(r.content??[]).reduce((n,c)=>n+(Number(c.attrs?.colspan)||1),0)>12)))throw Error('Use up to 200 line items and 12 columns per CA working. Split larger workings into separate tables.');
   if(mark&&(children.length||n.text))fail();
   for(const child of children){
-   const ok=n.type==='doc'||['blockquote','callout','toggle','listItem','taskItem','tableCell','tableHeader'].includes(n.type)?blocks.has(child.type):['paragraph','heading'].includes(n.type)?inline.has(child.type):n.type==='codeBlock'?child.type==='text':['bulletList','orderedList'].includes(n.type)?child.type==='listItem':n.type==='taskList'?child.type==='taskItem':n.type==='account'?child.type==='table':n.type==='table'?child.type==='tableRow':n.type==='tableRow'?['tableCell','tableHeader'].includes(child.type):false;
+   const ok=n.type==='doc'||['workingNote','blockquote','callout','toggle','listItem','taskItem','tableCell','tableHeader'].includes(n.type)?blocks.has(child.type):['paragraph','heading'].includes(n.type)?inline.has(child.type):n.type==='codeBlock'?child.type==='text':['bulletList','orderedList'].includes(n.type)?child.type==='listItem':n.type==='taskList'?child.type==='taskItem':n.type==='account'?child.type==='table':n.type==='table'?child.type==='tableRow':n.type==='tableRow'?['tableCell','tableHeader'].includes(child.type):false;
    if(!ok)fail();walk(child,depth+1);
   }
   if(['doc','table','tableRow','listItem','taskItem','tableCell','tableHeader','bulletList','orderedList','taskList','callout','toggle','blockquote'].includes(n.type)&&!children.length)fail();
@@ -100,6 +106,7 @@ export function renderStructuredNote(d:StructuredNote){
   if(n.type==='text'){let s=esc(n.text);for(const m of n.marks??[]){const ma=m.attrs??{};const tag=({bold:'strong',italic:'em',underline:'u',strike:'s',subscript:'sub',superscript:'sup',code:'code'}as Record<string,string>)[m.type];if(tag)s=`<${tag}>${s}</${tag}>`;else if(m.type==='link')s=`<a href="${esc(ma.href)}" rel="noopener noreferrer">${s}</a>`;else if(m.type==='highlight')s=`<mark${ma.color?` style="background-color:${ma.color}"`:''}>${s}</mark>`;else if(m.type==='textStyle')s=`<span style="${ma.color?`color:${ma.color};`:''}${ma.fontFamily?`font-family:${esc(ma.fontFamily)};`:''}${ma.fontSize?`font-size:${ma.fontSize};`:''}">${s}</span>`;}return s;}
   const tags:Record<string,string>={paragraph:'p',heading:`h${a.level??2}`,bulletList:'ul',orderedList:'ol',listItem:'li',taskList:'ul',taskItem:'li',blockquote:'blockquote',table:'table',tableRow:'tr',tableCell:'td',tableHeader:'th',callout:'aside'};
   if(n.type==='doc')return children;
+  if(n.type==='workingNote')return `<section${attrs} class="note-working" data-working-note="1" data-working-number="${a.number}"><header>Working note ${a.number}${(a.backlinks as string[]??[]).map((id,i)=>` <a class="note-working-backlink" href="#${esc(id)}">Back to answer${i?' '+(i+1):''}</a>`).join('')}</header><div class="note-working-body">${children}</div></section>`;
   if(n.type==='account')return `<div${attrs} data-ca-account="1" class="note-account" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start">${children}</div>`;
   if(n.type==='table'&&a.caFormat){const cfg=financialConfig(a.caFormat),widths=(n.content?.[0]?.content??[]).flatMap(c=>Array.from({length:Number(c.attrs?.colspan)||1},(_,i)=>Number((c.attrs?.colwidth as number[]|undefined)?.[i])||120)),totalWidth=widths.reduce((a,b)=>a+b,0),colgroup=n.content?.[0]?.content?.some(c=>c.attrs?.colwidth)?'<colgroup>'+widths.map(w=>`<col style="width:${(w/totalWidth*100).toFixed(3)}%">`).join('')+'</colgroup>':'';return `<table${attrs} class="note-financial-table" data-ca-borders="${cfg.borders}" data-ca-density="${cfg.density}">${colgroup}${n.content?.[0]?.content?.every(c=>c.type==='tableHeader')?`<thead>${render(n.content[0],cfg)}</thead><tbody>${n.content.slice(1).map(r=>render(r,cfg)).join('')}</tbody>`:children}</table>${totalsStale(n)?'<p class="note-total-warning">Totals need recalculation.</p>':''}`;}
   if(n.type==='ink')return `<figure class="note-ink-output"${attrs} style="width:${Number(a.width)||100}%;max-width:100%;break-inside:avoid"><figcaption>${esc(a.label)}</figcaption>${renderInk(parseInk(a.data),String(a.label))}</figure>`;
@@ -110,11 +117,11 @@ export function renderStructuredNote(d:StructuredNote){
   if(n.type==='codeBlock')return `<pre${attrs}><code>${children}</code></pre>`;
   if(n.type==='math')return `<span class="note-math" data-expression="${esc(a.expression)}" role="math">${esc(a.expression)}</span>`;
   if(n.type==='attachment')return `<a class="note-attachment" href="/resources/${esc(a.resourceId)}">${esc(a.label??'Attached file')}</a>`;
-  if(n.type==='reference')return `<a class="note-reference" href="${esc(a.href)}" rel="noopener noreferrer">[${esc(a.label)}]</a>`;
+  if(n.type==='reference')return `<a${a.blockId?` id="${esc(a.blockId)}"`:''}${a.workingTarget?` data-working-target="${esc(a.workingTarget)}"`:''} class="note-reference" href="${esc(a.href)}" rel="noopener noreferrer">[${esc(a.label)}]</a>`;
   if(n.type==='image')return `<span class="note-image" style="display:block;width:${Number(a.width)||100}%;max-width:100%;margin-left:${a.align==='right'||a.align==='center'?'auto':'0'};margin-right:${a.align==='right'?'0':'auto'}"><img src="${esc(a.src)}" alt="${esc(a.alt)}" title="${esc(a.caption??a.title)}" style="width:100%;${a.height?`height:${Number(a.height)}px;`:''}object-fit:${a.crop==='cover'?'cover':'contain'}" loading="lazy">${a.caption?`<span class="note-image-caption">${esc(a.caption)}</span>`:''}</span>`;
   if(n.type==='toggle')return `<details${attrs}${a.open?' open':''}><summary>${esc(a.summary??'Details')}</summary>${children}</details>`;
   const tag=tags[n.type];return `<${tag}${attrs}${n.type==='taskList'?' data-type="taskList"':''}${n.type==='taskItem'?` data-checked="${a.checked===true}"`:''}${['tableCell','tableHeader'].includes(n.type)?` colspan="${Number(a.colspan)||1}" rowspan="${Number(a.rowspan)||1}"`:''}${n.type==='orderedList'?` start="${Number(a.start)||1}"`:''}>${n.type==='taskItem'?(a.checked?'☑ ':'☐ '):''}${children}</${tag}>`;
  }
- const html=render(d.content);if(new TextEncoder().encode(html).length>200000)throw Error('Rendered note is too large. Split it into smaller notes.');return html;
+ const html=render(normalizeWorkingNotes(d.content));if(new TextEncoder().encode(html).length>200000)throw Error('Rendered note is too large. Split it into smaller notes.');return html;
 }
 export function readStructuredNote(json:string|null|undefined){if(!json)return null;try{const d=JSON.parse(json);return d.engine==='tiptap'?validateStructuredNote(d):null;}catch{return null;}}

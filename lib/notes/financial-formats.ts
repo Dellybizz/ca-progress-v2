@@ -62,7 +62,7 @@ export function recalculateTotals(table:NoteNode):NoteNode{
 }
 export function blankFinancial(table:NoteNode):NoteNode{
  const clear=(n:NoteNode):NoteNode=>({...n,attrs:n.attrs?{...n.attrs,...('blockId'in n.attrs?{blockId:null}:{})}:undefined,content:n.content?.map(clear)});let next=clear(table);const cols=columnsOf(table),labels=new Set(cols.filter(c=>['particulars','left-label','right-label'].includes(c.id)).map(c=>c.id));if(!labels.size){const first=cols.find(c=>c.kind==='text'&&!/date|ref|voucher/i.test(c.label));if(first)labels.add(first.id);}
- next={...next,content:next.content?.map((r,i)=>i===0?r:{...r,content:r.content?.map(c=>!labels.has(String(c.attrs?.caColId))?{...c,attrs:{...c.attrs,caRaw:null},content:[paragraph('')]}:c)})};
+ next={...next,content:next.content?.map((r,i)=>i===0?r:{...r,content:r.content?.map(c=>!labels.has(String(c.attrs?.caColId))?{...c,attrs:{...c.attrs,caRaw:null},content:[{type:'paragraph',content:workingReferences(c)}]}:c)})};
  return recalculateTotals(next);
 }
 export function addTotal(table:NoteNode,terms:{row:string;sign:1|-1}[],columnIds:string[],label:string,rowId:string):NoteNode{
@@ -88,3 +88,5 @@ export function adoptFinancial(table:NoteNode):NoteNode{
 export function formulaTerms(table:NoteNode,f:TotalFormula):TotalFormula['terms']{
  if(!f.scope)return f.terms;const {section,column}=f.scope;return (table.content??[]).slice(1).filter(r=>r.attrs?.caSection===section&&(r.attrs?.caRole??'item')==='item'&&!r.attrs?.caTotal).map(r=>({row:String(r.attrs?.caRowId),column,sign:r.attrs?.caSign===-1?-1:1}));
 }
+
+function workingReferences(n:NoteNode):NoteNode[]{return n.type==='reference'&&n.attrs?.workingTarget?[n]:(n.content??[]).flatMap(workingReferences);}

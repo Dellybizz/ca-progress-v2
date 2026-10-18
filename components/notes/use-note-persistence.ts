@@ -3,7 +3,7 @@ import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {invalidateWorkspacePages} from '@/lib/resources/workspace-page-cache';
 import {getOfflineMeta,putOfflineMeta,getOfflineMutationResult} from '@/lib/offline/database';
 import {offlineMutationFetch} from '@/lib/offline/mutation';
-import {HIERARCHY_EDITOR_CAPABILITY,ACCOUNTING_EDITOR_CAPABILITY} from '@/lib/notes/hierarchy-compatibility';
+import {HIERARCHY_EDITOR_CAPABILITY,ACCOUNTING_EDITOR_CAPABILITY,WORKING_NOTES_CAPABILITY} from '@/lib/notes/hierarchy-compatibility';
 import type {StructuredNote} from '@/lib/notes/structured-document';
 export type NoteSnapshot={title:string;document:StructuredNote;subjectId:string|null;chapterId:string|null;topicId:string|null;tags:string[];visibility:'private'|'shared';resourceIds:string[];sourceMessageId:string|null};
 export type NoteDraft={format:2;ownerId:string;contextKey:string;updatedAt:string;savedId:string|null;serverRevision:number|undefined;snapshot:NoteSnapshot;version:number;cloudVersion:number;baseline?:Record<string,unknown>|null;queuedReceipt?:string|null};
@@ -36,7 +36,7 @@ export function useNotePersistence(options:Options){
     await persist();if(!sameIdentity())return false;
     if(manual&&mounted.current)setStatus('saving');
     if(queuedReceipt.current){const receipt=await getOfflineMutationResult(latest.current.ownerId!,queuedReceipt.current);if(receipt?.data._offlineBaseline){baseline.current=receipt.data._offlineBaseline as Record<string,unknown>;queuedReceipt.current=null;}}
-    const result=await offlineMutationFetch(latest.current.ownerId!,'/api/v1/notes',{...snapshot,editorCapabilities:[HIERARCHY_EDITOR_CAPABILITY,ACCOUNTING_EDITOR_CAPABILITY],bodyHtml:'',id:id.current,clientId:options.draftId,expectedRevision:revision.current,expectedOwnerId:identity.current.owner,expectedContextKey:identity.current.context},{},baseline.current);
+    const result=await offlineMutationFetch(latest.current.ownerId!,'/api/v1/notes',{...snapshot,editorCapabilities:[HIERARCHY_EDITOR_CAPABILITY,ACCOUNTING_EDITOR_CAPABILITY,WORKING_NOTES_CAPABILITY],bodyHtml:'',id:id.current,clientId:options.draftId,expectedRevision:revision.current,expectedOwnerId:identity.current.owner,expectedContextKey:identity.current.context},{},baseline.current);
     const payload=await result.response.json() as {id?:string;noteRevision?:number;error?:string;code?:string;_offlineBaseline?:Record<string,unknown>};
     if(!sameIdentity())return false;
     if(result.response.status===409&&payload.id&&!id.current){id.current=payload.id;revision.current=payload.noteRevision;await persist();throw Error('The earlier draft was saved. Press Save to include your latest changes.');}

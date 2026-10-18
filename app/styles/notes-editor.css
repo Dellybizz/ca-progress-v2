@@ -194,3 +194,9 @@
 .note-accounting-status{font-size:11px;color:var(--color-text-muted);margin:4px 0}
 @media(max-width:650px){.note-account,.note-account-sides{grid-template-columns:minmax(0,1fr)}.note-account-controls-host{min-height:112px}.note-account-boundaries{font-size:10px;gap:0}.note-account-boundaries button{padding:5px 3px}}
 @media print{.note-account,.note-account-sides{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.note-account-boundaries,.note-account-controls-host{display:none!important}.note-document .tableWrapper:has(.note-account-boundaries),.note-account-sides>.tableWrapper{padding:0!important}}
+.note-working{border:1px solid var(--color-border,#cbd5e1);border-radius:6px;padding:12px;margin:16px 0;scroll-margin-block:70px}
+.note-working>header{display:flex;align-items:center;flex-wrap:wrap;gap:10px;color:var(--color-text-muted);font-size:12px;border-bottom:1px solid var(--color-border,#cbd5e1);padding-bottom:8px;margin-bottom:8px}
+.note-working-backlink{font-size:11px;color:var(--color-brand,#6366f1);text-decoration:underline}
+.note-working .note-working-body>h3:first-child{margin-top:4px}
+.note-reference[data-working-target]{color:var(--color-brand,#6366f1);cursor:pointer;scroll-margin-block:70px}
+@media print{.note-working{break-inside:auto}.note-working>header{color:#333}.note-working-backlink{color:inherit}}

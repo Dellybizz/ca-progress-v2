@@ -19,3 +19,7 @@ export function requiresAccountingEditor(value:unknown):boolean{
  return Array.isArray(n.content)?n.content.some(requiresAccountingEditor):requiresAccountingEditor(n.content);
 }
 export function accountingWriteNeedsReload(previous:unknown,capabilities:unknown){return requiresAccountingEditor(previous)&&(!Array.isArray(capabilities)||!capabilities.includes(ACCOUNTING_EDITOR_CAPABILITY));}
+
+export const WORKING_NOTES_CAPABILITY='linked-working-notes-v1';
+export function requiresWorkingNotesEditor(value:unknown):boolean{if(!value||typeof value!=='object')return false;const n=value as {type?:unknown;attrs?:{workingTarget?:unknown};content?:unknown};return n.type==='workingNote'||!!n.attrs?.workingTarget||(Array.isArray(n.content)?n.content.some(requiresWorkingNotesEditor):requiresWorkingNotesEditor(n.content));}
+export function workingNotesWriteNeedsReload(previous:unknown,capabilities:unknown){return requiresWorkingNotesEditor(previous)&&(!Array.isArray(capabilities)||!capabilities.includes(WORKING_NOTES_CAPABILITY));}

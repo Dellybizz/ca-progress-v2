@@ -1,3 +1,4 @@
+import {pairedFormat,catalogueRows,catalogueColumns} from './catalogue-layouts';
 import {prepareAccounting,independentAccount} from './accounting-templates';
 import {DEFAULT_NUMBERS,financialSubtitle,type FinancialConfig,type FinancialColumn} from './financial-formats';
 import {validateObjectModel,renderObject} from './chart-model';
@@ -40,6 +41,7 @@ export type FormatOptions={title:string;variant:string;periods:string[];currency
 const text=(value:string):NoteNode=>({type:'text',text:value});
 const paragraph=(value:string):NoteNode=>({type:'paragraph',content:value?[text(value)]:[]});
 export function formatRows(format:CAFormat,variant:string):string[]{
+ const specialized=catalogueRows(format.id,variant);if(specialized)return specialized;
  if(format.id==='journal')return variant==='Opening entries'?['Opening assets','Opening liabilities','Opening capital']:variant==='Adjusting entries'?['Accrued expense','Prepaid expense','Depreciation','Outstanding income']:variant==='Closing entries'?['Transfer expenses','Transfer income','Transfer profit / loss']:['','','','',''];
  if(format.id==='npo')return variant==='Receipts & payments'?['Opening cash / bank','Subscriptions received','Donations received','Payments for activities','Capital receipts / payments','Closing cash / bank']:['Subscriptions earned','Revenue donations','Other revenue income','Activity expenses','Administration expenses','Surplus / deficit'];
  if(format.id==='budget')return variant==='Cash budget'?['Opening cash','Cash receipts','Cash payments','Financing / repayment','Closing cash']:variant==='Production budget'?['Budgeted sales units','Desired closing inventory','Opening inventory','Production required']:['Activity level','Variable costs','Fixed costs','Total cost'];
@@ -57,18 +59,18 @@ export function buildCAFormat(format:CAFormat,options:FormatOptions):NoteNode[]{
  if(rows.length>40||periods.length>4||(options.columns?.length??0)>12)throw Error('Use up to 40 line items, 4 periods and 12 columns. Your configuration has not been shortened.');
  if(format.category==='Charts & trees'){const data=rows.join('\n');validateDiagram(format.id,data);return [{type:'diagram',attrs:{kind:format.id,title,variant,data}},{type:'paragraph'}];}
  const columns=financialColumns(format,options),cfg:FinancialConfig={version:1,formatId:format.id,title:title||format.name,variant,currency,periods,number:{...DEFAULT_NUMBERS},borders:'grid',density:'compact'},owner='block-'+crypto.randomUUID();
- const paired=['T-account','Horizontal'].includes(variant)||['branch','partnership','revaluation'].includes(format.id),labelIndex=columns.findIndex(c=>c.id==='particulars'||c.id==='left-label');
+ const paired=pairedFormat(format.id,variant),labelIndex=columns.findIndex(c=>c.id==='particulars'||c.id==='left-label');
  const makeCell=(value:string,col:FinancialColumn,header=false):NoteNode=>({type:header?'tableHeader':'tableCell',attrs:{colspan:1,rowspan:1,colwidth:null,caColId:col.id,caKind:col.kind,...(!header&&col.kind!=='text'?{textAlign:'right'}:{})},content:[paragraph(value)]});
  const body=rows.map((row,i)=>{const values=columns.map(()=>''),[left,right='']=row.split('|').map(s=>s.trim());values[labelIndex>=0?labelIndex:0]=paired?left:row;const rightIndex=columns.findIndex(c=>c.id==='right-label');if(paired&&rightIndex>=0)values[rightIndex]=right;return {type:'tableRow',attrs:{caRowId:'row-'+(i+1)},content:columns.map((c,j)=>makeCell(values[j],c))};});
  const stock=JSON.stringify(rows)===JSON.stringify(formatRows(format,variant));let working:NoteNode={type:'table',attrs:{blockId:owner,caFormat:JSON.stringify(cfg),caStale:false},content:[{type:'tableRow',attrs:{caRowId:'header'},content:columns.map(c=>makeCell(c.label,c,true))},...body]};
- if(['journal','profit','balance','ledger'].includes(format.id)){if(paired)working=independentAccount(working,stock,owner);else working=prepareAccounting(working,stock);}
+ {if(paired)working=independentAccount(working,stock,owner);else working=prepareAccounting(working,stock);}
  return [{type:'heading',attrs:{level:2,caOwner:owner,caCaption:'title'},content:[text(cfg.title)]},{...paragraph(financialSubtitle(cfg)),attrs:{caOwner:owner,caCaption:'subtitle'}},working,{type:'paragraph'}];
 }
 
 export function financialColumns(format:CAFormat,options:Pick<FormatOptions,'variant'|'periods'|'currency'|'columns'>):FinancialColumn[]{
  const {variant,currency}=options,periods=options.periods.filter(Boolean),amount=(id:string,label:string,kind:FinancialColumn['kind']='amount')=>({id,label:label+(currency&&kind==='amount'?' ('+currency+')':''),kind}),label=(id:string,label:string)=>({id,label,kind:'text' as const});
  const periodCols=(periods.length?periods:['Current year']).map((p,i)=>amount('period-'+i,p));let cols:FinancialColumn[];
- const paired=['T-account','Horizontal'].includes(variant)||['branch','partnership','revaluation'].includes(format.id);
+ const paired=pairedFormat(format.id,variant);
  if(paired)cols=format.id==='ledger'?[label('left-date','Date'),label('left-label','Dr. particulars'),label('left-ref','Ref.'),amount('left-amount','Amount'),label('right-date','Date'),label('right-label','Cr. particulars'),label('right-ref','Ref.'),amount('right-amount','Amount')]:[label('left-label',format.id==='balance'?'Equity and liabilities':'Dr. particulars'),amount('left-amount','Amount'),label('right-label',format.id==='balance'?'Assets':'Cr. particulars'),amount('right-amount','Amount')];
  else if(['balance','profit'].includes(format.id))cols=variant==='Comparative'?[label('particulars','Particulars'),...periodCols,amount('change','Change'),amount('change-percent','Change (%)','percent')]:[label('particulars','Particulars'),label('notes','Note'),...periodCols];
  else if(format.id==='ledger')cols=[label('date','Date'),label('particulars','Particulars'),label('ref','Ref.'),amount('debit','Debit'),amount('credit','Credit'),amount('balance','Balance')];
@@ -79,6 +81,7 @@ export function financialColumns(format:CAFormat,options:Pick<FormatOptions,'var
  else if(format.id==='audit')cols=(variant==='Risk & response'?['Area','Risk','Response','Evidence / reference','Conclusion']:variant==='Assertion testing'?['Assertion','Test','Sample','Result','Conclusion']:['Procedure','Objective','Evidence / reference','Finding','Conclusion']).map((n,i)=>label(i===0?'particulars':'field-'+i,n));
  else if(format.columns)cols=format.columns.map((name,i)=>/Date|Particulars|Account|Asset|Ratio|Ref|Voucher|Comment|Favourable/i.test(name)?label(i===(format.columns![0]==='Date'?1:0)?'particulars':'field-'+i,name):amount('field-'+i,name,/Rate|Result/i.test(name)?'number':'amount'));
  else cols=[label('particulars','Particulars'),...periodCols];
+ cols=catalogueColumns(format.id,variant,currency,periods)??cols;
  if(options.columns?.length)cols=options.columns.map((name,i)=>({...cols[i]??label('custom-'+i,name),label:name}));
  if(cols.length>12)throw Error('Use up to 12 columns. Your configuration has not been shortened.');return cols;
 }
