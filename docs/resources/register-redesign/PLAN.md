@@ -22,3 +22,5 @@ Known baseline findings: account CSS includes both a 16px gap and authoring gutt
 Physical Android/iOS testing and full rich editing in the offline APK remain open under the earlier certification record. Do not imply device parity from headless browser checks.
 
 Post-phase-2 corrective work: [repairs/IMPLEMENTATION.md](repairs/IMPLEMENTATION.md). This repairs the reported page access, table resizing, clipped hierarchy and crowded-control defects and adds regression coverage before the next feature phase.
+
+The corrective release is live and passed Chromium/WebKit, full workflows and signed-in persistence checks: [repairs/RELEASE.md](repairs/RELEASE.md). Phase 3 remains next.
