@@ -32,10 +32,10 @@ function read(path) {
 }
 
 test("Phase 15A defines one canonical Free/Pro/Premium identity and rank order", () => {
-  assert.deepEqual(PRODUCT_PLAN_LABELS, { free: "Free", basic: "Pro", pro: "Premium" });
-  assert.equal(productPlanLabel("free"), "Free");
-  assert.equal(productPlanLabel("basic"), "Pro");
-  assert.equal(productPlanLabel("pro"), "Premium");
+  assert.deepEqual(PRODUCT_PLAN_LABELS, { free: "Explorer", basic: "Striver", pro: "Ranker" });
+  assert.equal(productPlanLabel("free"), "Explorer");
+  assert.equal(productPlanLabel("basic"), "Striver");
+  assert.equal(productPlanLabel("pro"), "Ranker");
   assert.equal(tierRank("free"), 0);
   assert.equal(tierRank("basic"), 1);
   assert.equal(tierRank("pro"), 2);
@@ -47,7 +47,7 @@ test("Phase 15A defines one canonical Free/Pro/Premium identity and rank order",
 test("unknown or malformed plan values fail safely to Free", () => {
   for (const value of [undefined, null, "", "premium", "enterprise", 2, {}, []]) {
     assert.equal(normalizePlanTier(value), "free");
-    assert.equal(productPlanLabel(value), "Free");
+    assert.equal(productPlanLabel(value), "Explorer");
     assert.equal(tierRank(value), 0);
   }
 });
@@ -91,12 +91,14 @@ test("Free remains a complete core study product while paid feature floors stay 
     assert.equal(canUsePlanFeature("free", feature), true, feature);
   }
 
-  for (const feature of ["advanced_analytics", "study_csv", "test_history_csv"]) {
+  for (const feature of ["study_csv", "test_history_csv"]) {
     assert.equal(canUsePlanFeature("free", feature), false, feature);
     assert.equal(canUsePlanFeature("basic", feature), true, feature);
     assert.equal(canUsePlanFeature("pro", feature), true, feature);
   }
 
+  assert.equal(canUsePlanFeature("basic", "advanced_analytics"), false);
+  assert.equal(canUsePlanFeature("pro", "advanced_analytics"), true);
   assert.equal(canUsePlanFeature("basic", "full_backup"), false);
   assert.equal(canUsePlanFeature("pro", "full_backup"), true);
   assert.equal(canUsePlanFeature("pro", "unknown_feature"), false);
@@ -106,7 +108,7 @@ test("Phase 14 export behavior is preserved through the Phase 15A policy adapter
   assert.equal(EXPORT_PRODUCT_PLANS, PRODUCT_PLAN_LABELS);
   assert.equal(normalizeExportTier("basic"), "basic");
   assert.equal(normalizeExportTier("unexpected"), "free");
-  assert.equal(exportProductPlanLabel("pro"), "Premium");
+  assert.equal(exportProductPlanLabel("pro"), "Ranker");
 
   assert.equal(canUseExport("free", "progress_pdf"), true);
   assert.equal(canUseExport("free", "study_csv"), false);
@@ -123,8 +125,8 @@ test("Phase 14 export behavior is preserved through the Phase 15A policy adapter
   assert.equal(canUseExport("pro", "test_history_csv"), true);
   assert.equal(canUseExport("pro", "full_backup"), true);
 
-  assert.deepEqual(exportRequirement("study_csv"), { tier: "basic", productPlan: "Pro" });
-  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Premium" });
+  assert.deepEqual(exportRequirement("study_csv"), { tier: "basic", productPlan: "Striver" });
+  assert.deepEqual(exportRequirement("full_backup"), { tier: "pro", productPlan: "Ranker" });
   assert.equal(planFeatureRequirement("not_real"), null);
 });
 
@@ -139,8 +141,11 @@ test("exports and resource storage consume the canonical policy instead of priva
   assert.match(billingSource, /from "\.\/plan-policy\.mjs"/);
   assert.match(billingSource, /tierRank\(rewardTier\)/);
   assert.match(billingSource, /tierRank\(currentTier\)/);
-  assert.match(billingSource, /entitlement\.storageLimitBytes \?\? storageQuotaBytes\(entitlement\.tier\)/);
-  assert.match(billingSource, /entitlement\.allowed/);
+  assert.match(billingSource, /storageAllowance/);
+  const allowanceSource=read("lib/billing/storage-allowance.mjs");
+  assert.match(allowanceSource,/configuredStorageBytes\(entitlement\)/);
+  assert.match(billingSource, /resolved\.allowed/);
+  assert.match(allowanceSource,/entitlement\.allowed/);
   assert.doesNotMatch(billingSource, /entitlement\.limitValue \* 1024 \* 1024/);
 });
 

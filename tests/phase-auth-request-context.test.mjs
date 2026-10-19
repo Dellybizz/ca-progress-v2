@@ -39,7 +39,7 @@ test("personalized academic loaders obtain identity and scope from the canonical
 });
 
 test("public entry points do not perform personalized auth work", () => {
-  for (const file of ["app/page.tsx", "app/(public)/login/page.tsx"]) {
+  for (const file of ["app/page.tsx", "app/login/page.tsx"]) {
     const source = read(file);
     assert.doesNotMatch(source, /optionalUser|getRequestAuthContext|getCloudflareApplicationSession|createD1ServerCompatClient/);
   }

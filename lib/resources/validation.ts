@@ -1,6 +1,7 @@
 import "server-only";
+import { assertNoteContentSize, LEGACY_NOTE_TAGS } from '@/lib/notes/content-limits';
 
-export const RESOURCE_MAX_BYTES = 10 * 1024 * 1024;
+// Resources have no application per-file upload cap.
 export const RESOURCE_BUCKET = "user-resources";
 export const SIGNED_URL_SECONDS = 120;
 
@@ -14,11 +15,7 @@ const MIME_BY_EXTENSION: Record<string, string[]> = {
   docx: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
 };
 
-const ALLOWED_TAGS = new Set([
-  "p", "br", "strong", "b", "em", "i", "u", "ul", "ol", "li", "blockquote", "a",
-  "h1", "h2", "h3", "h4", "code", "pre", "mark", "hr",
-  "table", "thead", "tbody", "tfoot", "tr", "th", "td",
-]);
+const ALLOWED_TAGS = new Set<string>(LEGACY_NOTE_TAGS);
 
 export type ValidatedUpload = {
   bytes: Uint8Array;
@@ -62,7 +59,6 @@ export async function validateUploadFile(file: File): Promise<ValidatedUpload> {
   if (!(file instanceof File)) throw new Error("A file is required.");
   if (!file.name || file.name.length > 180) throw new Error("File name is invalid.");
   if (file.size <= 0) throw new Error("Empty files are not allowed.");
-  if (file.size > RESOURCE_MAX_BYTES) throw new Error("File exceeds the 10 MB upload limit.");
 
   const extension = extensionOf(file.name);
   const acceptedMimes = MIME_BY_EXTENSION[extension];
@@ -87,7 +83,8 @@ function safeTableSpan(rawAttrs: string, name: "colspan" | "rowspan") {
 }
 
 export function sanitizeRichTextHtml(input: string) {
-  const bounded = input.slice(0, 200000);
+  assertNoteContentSize(input);
+  const bounded = input;
   const withoutDangerousBlocks = bounded.replace(/<(script|style|iframe|object|embed|form|input|button|svg|math)[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
   return withoutDangerousBlocks.replace(/<\/?([a-z0-9]+)([^>]*)>/gi, (full, rawTag: string, rawAttrs: string) => {
     const closing = /^<\//.test(full);
@@ -118,8 +115,7 @@ export function richTextToPlainText(html: string) {
     .replace(/&quot;/gi, "\"")
     .replace(/&#39;/gi, "'")
     .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, 120000);
+    .trim();
 }
 
 export function normalizeTags(value: unknown) {

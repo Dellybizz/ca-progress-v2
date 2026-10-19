@@ -1,0 +1,96 @@
+name: Mobile P3 daily workspace
+
+on:
+  push:
+    branches: [mobile-phase7-student-parity]
+    paths:
+      - scripts/mobile/apply-p3-daily-workspace.mjs
+      - scripts/mobile/mobile-p3-daily-workspace.test.mjs
+      - .github/workflows/mobile-p3-daily-workspace.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-p3-daily-workspace
+  cancel-in-progress: false
+
+jobs:
+  apply-and-certify:
+    if: ${{ !contains(github.event.head_commit.message || '', '[p3-certified]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: mobile-phase7-student-parity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - name: Repair P3 patcher and syntax-check
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/mobile/apply-p3-daily-workspace.mjs')
+          s=p.read_text().replace("',$\n'  readTimer()", "',\n'  readTimer()")
+          if 'function mountExamCountdown(file)' not in s:
+              marker='// Local repository: verified attempt dates, goals, and revision settings use the existing local DB + outbox transaction model.'
+              helper='''function mountExamCountdown(file){\n  const source=read(file);\n  if(source.includes("<ExamCountdown workspace={workspace}/>"))return;\n  const dashboard=source.indexOf("function Dashboard");\n  const phrase=source.indexOf("Countdown coming soon",dashboard);\n  const start=source.lastIndexOf('<section className="dashboard-a1-exam"',phrase);\n  const close="</section>";\n  const end=source.indexOf(close,phrase);\n  if(dashboard<0||phrase<0||start<dashboard||end<0)throw new Error("P3 patch failed: dashboard countdown mount");\n  write(file,source.slice(0,start)+'<ExamCountdown workspace={workspace}/>'+source.slice(end+close.length));\n}\n\n'''
+              s=s.replace(marker,helper+marker)
+          label=',"dashboard countdown mount");'
+          if label in s:
+              end=s.index(label)+len(label)
+              start=s.rfind('replaceOnce(main,',0,end)
+              if start < 0:
+                  raise SystemExit('Could not locate dashboard countdown mount block')
+              s=s[:start]+'mountExamCountdown(main);'+s[end:]
+          p.write_text(s)
+          PY
+          node --check scripts/mobile/apply-p3-daily-workspace.mjs
+      - name: Apply P3 implementation
+        run: node scripts/mobile/apply-p3-daily-workspace.mjs
+      - name: Harden generated P3 source and gate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('packages/mobile-data/src/repository.ts')
+          p.write_text(p.read_text().replace('description:String(payload.description||"")','description:payload.description?String(payload.description):null'))
+          PY
+          cp scripts/mobile/mobile-p3-daily-workspace.test.mjs tests/mobile-p3-daily-workspace.test.mjs
+          node --check tests/mobile-p3-daily-workspace.test.mjs
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: P3 contract gate
+        run: node --test tests/mobile-p3-daily-workspace.test.mjs
+      - name: TypeScript gate
+        run: |
+          if ! npm run typecheck; then
+            echo '--- generated apps/mobile/src/main.tsx around TypeScript failure ---'
+            nl -ba apps/mobile/src/main.tsx | sed -n '34,80p'
+            exit 1
+          fi
+      - name: Native bundle gate
+        run: npm run native:bundle
+      - name: Retained mobile regression gate
+        run: npm run test:mobile:phase20
+      - name: Diff safety gate
+        run: |
+          git diff --check
+          if git diff --name-only | grep -E '^\.github/workflows/.*deploy|^wrangler|^workers/' ; then
+            echo 'P3 unexpectedly touched deployment/runtime infrastructure.' >&2
+            exit 1
+          fi
+      - name: Commit certified P3
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo 'No P3 changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apps/mobile/src/main.tsx apps/mobile/src/styles.css packages/mobile-data/src/repository.ts packages/mobile-data/src/sync.ts lib/mobile/sync.ts lib/planner/phase8.ts app/api/planner/goals/route.ts app/api/offline/mutations/route.ts app/api/v1/sync/bootstrap/route.ts tests/mobile-p3-daily-workspace.test.mjs docs/mobile/P3_DAILY_WORKSPACE_CERTIFICATION.md scripts/mobile/apply-p3-daily-workspace.mjs scripts/mobile/mobile-p3-daily-workspace.test.mjs
+          git commit -m 'feat(mobile): complete P3 daily workspace [p3-certified]'
+          git push origin HEAD:mobile-phase7-student-parity

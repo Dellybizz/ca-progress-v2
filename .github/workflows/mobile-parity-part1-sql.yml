@@ -1,0 +1,81 @@
+name: Mobile parity recovery Part 1 SQL fix
+
+on:
+  push:
+    branches: [mobile-phase7-student-parity]
+    paths:
+      - .github/workflows/mobile-parity-part1-sql.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-parity-part1-sql
+  cancel-in-progress: false
+
+jobs:
+  repair-and-certify:
+    if: ${{ !contains(github.event.head_commit.message || '', '[part1-sql-fix]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: mobile-phase7-student-parity
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - name: Repair recovery SQL and lock regression
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const patcherPath='scripts/mobile/apply-parity-recovery-v2.mjs';
+          const testPath='scripts/mobile/mobile-parity-recovery.test.mjs';
+          let patcher=fs.readFileSync(patcherPath,'utf8');
+          const bad="VALUES(?,NULL,0,?,?,'pending',?,?,?,?,?,?,NULL,?)";
+          const good="VALUES(?,NULL,0,?,?,'pending',?,?,?,?,?,NULL,?)";
+          const badCount=patcher.split(bad).length-1;
+          if(badCount>1) throw new Error(`Expected at most one broken progress INSERT, found ${badCount}`);
+          if(badCount===1) patcher=patcher.replace(bad,good);
+          if(!patcher.includes(good)) throw new Error('Corrected progress INSERT was not found after repair.');
+          fs.writeFileSync(patcherPath,patcher);
+
+          let testSource=fs.readFileSync(testPath,'utf8');
+          const marker='test("untouched chapter progress INSERT keeps columns placeholders and args aligned"';
+          if(!testSource.includes(marker)) {
+            testSource += `\n\ntest("untouched chapter progress INSERT keeps columns placeholders and args aligned",()=>{\n  const expected="INSERT INTO progress_records(local_id,server_id,server_version,account_id,academic_context_key,local_state,created_at,updated_at,subject_id,chapter_id,stage,understanding,payload_json) VALUES(?,NULL,0,?,?,'pending',?,?,?,?,?,NULL,?)";\n  const broken="INSERT INTO progress_records(local_id,server_id,server_version,account_id,academic_context_key,local_state,created_at,updated_at,subject_id,chapter_id,stage,understanding,payload_json) VALUES(?,NULL,0,?,?,'pending',?,?,?,?,?,?,NULL,?)";\n  assert.ok(repo.includes(expected),"expected 9-placeholder untouched-chapter progress INSERT");\n  assert.ok(!repo.includes(broken),"broken 10-placeholder untouched-chapter progress INSERT must not return");\n  assert.ok(repo.includes("args:[localId,account.id,context,timestamp,timestamp,catalog.parent_server_id,catalog.server_id,stage,JSON.stringify(payload)]"),"INSERT args must stay aligned to the 9 placeholders");\n});\n`;
+          }
+          fs.writeFileSync(testPath,testSource);
+          NODE
+      - name: Check repaired patcher syntax
+        run: node --check scripts/mobile/apply-parity-recovery-v2.mjs
+      - name: Apply repaired recovery patch
+        run: node scripts/mobile/apply-parity-recovery-v2.mjs
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Run recovery contracts
+        run: |
+          cp scripts/mobile/mobile-parity-recovery.test.mjs tests/mobile-parity-recovery.test.mjs
+          node --test tests/mobile-parity-recovery.test.mjs
+      - name: Validate generated TypeScript
+        run: npm run typecheck
+      - name: Validate patch diff
+        run: git diff --check
+      - name: Keep Part 1 scoped to patcher and regression contract
+        run: |
+          git checkout -- packages/mobile-data/src/repository.ts apps/mobile/src/main.tsx
+          rm -f tests/mobile-parity-recovery.test.mjs
+          changed="$(git diff --name-only)"
+          printf '%s\n' "$changed"
+          test "$changed" = $'scripts/mobile/apply-parity-recovery-v2.mjs\nscripts/mobile/mobile-parity-recovery.test.mjs'
+      - name: Commit certified Part 1 fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/mobile/apply-parity-recovery-v2.mjs scripts/mobile/mobile-parity-recovery.test.mjs
+          git commit -m 'fix(mobile): repair untouched progress SQL [part1-sql-fix]'
+          git push origin HEAD:mobile-phase7-student-parity

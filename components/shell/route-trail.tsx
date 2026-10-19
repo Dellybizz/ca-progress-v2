@@ -61,7 +61,7 @@ export function RouteTrail({ homeHref }: { homeHref: string }) {
     return () => document.removeEventListener("click", rememberRootNavigation, true);
   }, [resetKey]);
 
-  if (pathname === homeHref || pathname === "/") return null;
+  if (pathname === homeHref || pathname === "/" || ["/pricing", "/billing", "/gifts", "/resources"].includes(pathname)) return null;
   const visible = items.length > 1 ? items : [{ href: homeHref, label: homeHref === "/admin" ? "Operations" : "Dashboard" }, current];
   return <nav className="route-trail" aria-label="Page path"><ol>{visible.map((item, index) => <li key={`${item.href}-${index}`}>
     {index ? <Icon name="chevron" size={12}/> : null}

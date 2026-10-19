@@ -1,11 +1,14 @@
-import { existsSync } from "node:fs";
+import { existsSync,mkdtempSync,readdirSync,readFileSync,writeFileSync,rmSync } from "node:fs";
+import {tmpdir} from "node:os";
+import {join,resolve} from "node:path";
+import {d1TransportSql} from "./payments/d1-sql-transport.mjs";
 import { spawn, spawnSync } from "node:child_process";
 
 const host = "127.0.0.1";
 const port = 8787;
 const base = process.env.SMOKE_BASE_URL || `http://${host}:${port}`;
 const isExternal = /^https?:\/\//.test(process.env.SMOKE_BASE_URL || "");
-const routes = ["/dashboard", "/community", "/activity", "/progress", "/planner", "/resources", "/settings", "/admin"];
+const routes = ["/welcome", "/login", "/account/recover", "/onboarding-preview", "/onboarding-offline-preview", "/dashboard", "/community", "/activity", "/progress", "/planner", "/resources", "/settings", "/admin"];
 const userAgents = {
   desktop: "CA-Progress-Synthetic/Desktop",
   mobile: "CA-Progress-Synthetic/Mobile",
@@ -50,7 +53,12 @@ if (!isExternal) {
     if (build.status !== 0) throw new Error(`Cloudflare smoke prebuild failed with exit code ${build.status ?? "unknown"}.`);
   }
   const wrangler = process.platform === "win32" ? "npx.cmd" : "npx";
-  const migrate = spawnSync(wrangler, ["wrangler", "d1", "migrations", "apply", "ca-progress-v2-smoke-local", "--local", "--config", "wrangler.smoke.jsonc"], { env: { ...process.env, NO_COLOR: "1", CI: "1", NO_D1_WARNING: "true" }, stdio: "inherit" });
+  const migrationDir=mkdtempSync(join(tmpdir(),'ca-smoke-migrations-')),migrationConfig=resolve('.wrangler-smoke-migrations.json');
+  const configuration=JSON.parse(readFileSync('wrangler.smoke.jsonc','utf8'));configuration.d1_databases[0].migrations_dir=migrationDir;
+  for(const file of readdirSync('d1/migrations').filter(f=>f.endsWith('.sql')))writeFileSync(join(migrationDir,file),d1TransportSql(readFileSync('d1/migrations/'+file,'utf8')));
+  writeFileSync(migrationConfig,JSON.stringify(configuration));
+  let migrate;try{migrate = spawnSync(wrangler, ["wrangler", "d1", "migrations", "apply", "ca-progress-v2-smoke-local", "--local", "--config", migrationConfig], { env: { ...process.env, NO_COLOR: "1", CI: "1", NO_D1_WARNING: "true" }, stdio: "inherit" });
+  }finally{rmSync(migrationDir,{recursive:true,force:true});rmSync(migrationConfig,{force:true});}
   if (migrate.status !== 0) throw new Error(`Cloudflare smoke D1 bootstrap failed with exit code ${migrate.status ?? "unknown"}.`);
   child = spawn(wrangler, ["wrangler", "dev", "--local", "--config", "wrangler.smoke.jsonc", "--ip", host, "--port", String(port)], { env: { ...process.env, NO_COLOR: "1" }, stdio: ["ignore", "pipe", "pipe"] });
   for (const stream of [child.stdout, child.stderr]) {
@@ -84,6 +92,22 @@ try {
     await request(route, "mobile");
   }
   await loadSample();
+  const reset = await request("/account/reset", "desktop");
+  const resetHtml=await reset.text();
+  const httpRedirect=[302,303,307,308].includes(reset.status)&&reset.headers.get("location")?.includes("/account/recover");
+  // Next may flush the root loading shell before this async page redirects.
+  // Its streamed redirect must have the explicit recovery destination and no reset fields.
+  const streamingRedirect=reset.status===200&&/<meta[^>]*id="__next-page-redirect"[^>]*content="[^"<>]*url=\/account\/recover[^"<>]*"/i.test(resetHtml);
+  if ((!httpRedirect&&!streamingRedirect)||/<input[^>]*autoComplete="new-password"/i.test(resetHtml))throw new Error(`Reset without proof did not safely return to recovery (status ${reset.status}).`);
+  const unverifiedReset=await fetch(`${base}/api/v1/password-recovery`,{method:"POST",headers:{...headers("desktop"),"Content-Type":"application/json",origin:base},body:JSON.stringify({password:"synthetic-only-password-12"})});
+  if(unverifiedReset.status!==403)throw new Error("Unverified password reset was not rejected.");
+  const setupBody=JSON.stringify({schemaVersion:2,ownerId:'another-account',action:'draft',revision:0,draft:{schemaVersion:2,step:'intro'}});
+  // Test account authorization separately from Origin validation: the local
+  // OpenNext adapter can reconstruct the request with its internal origin.
+  const unverifiedSetup=await fetch(`${base}/api/v1/onboarding`,{method:'POST',headers:{...headers('desktop'),'Content-Type':'application/json'},body:setupBody});
+  if(![401,409].includes(unverifiedSetup.status))throw new Error(`Setup must reject an unauthenticated or mismatched account owner (status ${unverifiedSetup.status}: ${(await unverifiedSetup.text()).slice(0,300)}).`);
+  const crossSiteSetup=await fetch(`${base}/api/v1/onboarding`,{method:'POST',headers:{...headers('desktop'),'Content-Type':'application/json',origin:'https://invalid.example','sec-fetch-site':'cross-site'},body:setupBody});
+  if(crossSiteSetup.status!==403)throw new Error(`Cross-site setup mutation was not rejected (status ${crossSiteSetup.status}).`);
   const oauthFailure = await fetch(`${base}/auth/google?next=%2F%2Fevil.example`, { redirect: "manual", headers: headers("desktop") });
   if (oauthFailure.status >= 500) throw new Error(`OAuth failure path returned ${oauthFailure.status}`);
   const webhook = await fetch(`${base}/api/payments/webhook`, { method: "POST", headers: headers("desktop"), body: "{}" });

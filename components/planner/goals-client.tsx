@@ -24,7 +24,7 @@ export function GoalsClient({ goals }: { goals: PlannerGoal[] }) {
   async function request(body: Record<string, unknown>) {
     setBusy(true); setError(null);
     try {
-      const response = await fetch("/api/planner/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await fetch("/api/v1/planner/goals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const payload = await response.json() as { error?: string };
       if (!response.ok) throw new Error(payload.error || "Goal could not be saved.");
       router.refresh(); return true;

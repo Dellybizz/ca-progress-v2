@@ -1,3 +1,4 @@
+import {isWorkspaceTrashed,mutateWorkspace} from '@/lib/resources/workspace';
 import { offlineTransaction } from "@/lib/offline/transaction-context";
 import "server-only";
 
@@ -85,12 +86,12 @@ export async function getHotDashboardProgress(userId: string, chapterIds: string
 export type HotNoteRow = { id: string; user_id: string; title: string; body_text: string; body_html: string; subject_id: string | null; chapter_id: string | null; visibility: string; moderation_status: string; owner_label: string; updated_at: string; published_at: string | null };
 export type HotUploadRow = { id: string; owner_user_id: string; title: string; description: string | null; original_filename: string; mime_type: string; extension: string; size_bytes: number; subject_id: string | null; chapter_id: string | null; visibility: string; moderation_status: string; owner_label: string; updated_at: string; published_at: string | null };
 
-export async function getHotResourceLibraryRows(userId: string, db = getHotD1Database()) {
+export async function getHotResourceLibraryRows(userId: string, db = getHotD1Database(), metadataOnly=false) {
   const result = await db.batch([
-    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE user_id=?1 ORDER BY updated_at DESC LIMIT 250").bind(userId),
-    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE owner_user_id=?1 ORDER BY updated_at DESC LIMIT 250").bind(userId),
-    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE visibility='shared' AND moderation_status='approved' AND user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
-    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE visibility='shared' AND moderation_status='approved' AND owner_user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
+    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE user_id=?1 AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='note' AND w.entity_id=notes.id AND w.trashed_at IS NOT NULL) ORDER BY updated_at DESC LIMIT 250".replace("body_text,body_html",metadataOnly?"substr(body_text,1,180) body_text,'' body_html":"body_text,body_html")).bind(userId),
+    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE owner_user_id=?1 AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL) ORDER BY updated_at DESC LIMIT 250").bind(userId),
+    db.prepare("SELECT id,user_id,title,body_text,body_html,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM notes WHERE NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='note' AND w.entity_id=notes.id AND w.trashed_at IS NOT NULL) AND visibility='shared' AND moderation_status='approved' AND user_id<>?1 ORDER BY published_at DESC LIMIT 150".replace("body_text,body_html",metadataOnly?"substr(body_text,1,180) body_text,'' body_html":"body_text,body_html")).bind(userId),
+    db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL) AND visibility='shared' AND moderation_status='approved' AND owner_user_id<>?1 ORDER BY published_at DESC LIMIT 150").bind(userId),
   ]);
   return {
     ownNotes: (result[0]?.results ?? []) as HotNoteRow[],
@@ -108,7 +109,7 @@ export async function getHotExamEvents(attemptKey: string, startDate: string, en
 }
 
 export async function getHotResourceDetail(resourceId: string, db = getHotD1Database()) {
-  return db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE id=?1 LIMIT 1").bind(resourceId).first<HotUploadRow>();
+  return db.prepare("SELECT id,owner_user_id,title,description,original_filename,mime_type,extension,size_bytes,subject_id,chapter_id,visibility,moderation_status,owner_label,updated_at,published_at FROM uploaded_resources WHERE id=?1 AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries w WHERE w.entity_kind='upload' AND w.entity_id=uploaded_resources.id AND w.trashed_at IS NOT NULL) LIMIT 1").bind(resourceId).first<HotUploadRow>();
 }
 
 export type HotStudySession = { id: string; subject_id: string | null; chapter_id: string | null; started_at: string; ended_at: string; duration_seconds: number; mode: string; timezone: string };
@@ -211,7 +212,7 @@ async function visibleCommunityMessage(messageId: string, userId: string, db: Ho
 
 export async function createHotCommunityMessage(input: {
   channelSlug: string; userId: string; authorLabel: string; body: string;
-  replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[];
+  replyToId?: string | null; resourceId?: string | null; mentionUserIds?: string[]; clientMessageId?: string | null;
 }, db: HotD1Database = getHotD1Database()) {
   const channel = await visibleCommunityChannel(input.channelSlug, input.userId, db);
   if (!["members", "all"].includes(channel.write_policy)) communityError("You cannot write in this channel.");
@@ -219,6 +220,8 @@ export async function createHotCommunityMessage(input: {
   if (blocked) communityError("You are temporarily blocked from this channel.");
   const body = input.body.trim().replace(/\s+/g, " ");
   if (body.length < 1 || body.length > 2000) communityError("Message must be between 1 and 2000 characters.");
+  const clientMessageId=input.clientMessageId?.trim()||null;
+  if(clientMessageId){const existing=await db.prepare(`SELECT id,sequence_id FROM community_messages WHERE user_id=?1 AND client_message_id=?2 LIMIT 1`).bind(input.userId,clientMessageId).first<{id:string;sequence_id:number}>();if(existing)return{id:existing.id,sequence:Number(existing.sequence_id)};}
   const recent = await db.prepare(`SELECT COUNT(*) AS count FROM community_messages WHERE user_id=?1 AND created_at>=datetime('now','-60 seconds')`).bind(input.userId).first<{ count: number }>();
   if (Number(recent?.count ?? 0) >= 12) communityError("Message rate limit exceeded.");
   const duplicate = await db.prepare(`SELECT 1 AS duplicate FROM community_messages WHERE channel_id=?1 AND user_id=?2 AND body=?3 AND created_at>=datetime('now','-90 seconds') LIMIT 1`).bind(channel.id, input.userId, body).first<{ duplicate: number }>();
@@ -235,8 +238,8 @@ export async function createHotCommunityMessage(input: {
   const sequence = await db.prepare(`SELECT COALESCE(MAX(sequence_id),0)+1 AS next_sequence FROM community_messages WHERE channel_id=?1`).bind(channel.id).first<{ next_sequence: number }>();
   const mentionIds = [...new Set((input.mentionUserIds ?? []).filter(Boolean))].slice(0, 10);
   const statements = [
-    db.prepare(`INSERT INTO community_messages (id,sequence_id,channel_id,user_id,author_label,body,reply_to_message_id,attached_resource_id,moderation_status)
-      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'active')`).bind(id, Number(sequence?.next_sequence ?? 1), channel.id, input.userId, input.authorLabel || "Student", body, input.replyToId ?? null, input.resourceId ?? null),
+    db.prepare(`INSERT INTO community_messages (id,sequence_id,channel_id,user_id,author_label,body,reply_to_message_id,attached_resource_id,moderation_status,client_message_id)
+      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'active',?9)`).bind(id, Number(sequence?.next_sequence ?? 1), channel.id, input.userId, input.authorLabel || "Student", body, input.replyToId ?? null, input.resourceId ?? null,clientMessageId),
   ];
   for (const mentionedUserId of mentionIds) {
     statements.push(db.prepare(`INSERT OR IGNORE INTO community_message_mentions (message_id,user_id) VALUES (?1,?2)`).bind(id, mentionedUserId));
@@ -365,6 +368,7 @@ export async function saveHotNote(input: { id: string|null; createId?:string|nul
   await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
   const id=input.id ?? input.createId ?? crypto.randomUUID();
   if(!input.id&&input.createId){const replay=await db.prepare("SELECT id,moderation_status AS status FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(input.createId,input.userId).first<{id:string;status:string}>();if(replay)return replay;}
+  if(input.id && await isWorkspaceTrashed('note',input.id,db))throw new Error('Restore this note from Trash before editing it.');
   const existing=input.id ? await db.prepare("SELECT id FROM notes WHERE id=?1 AND user_id=?2 LIMIT 1").bind(input.id,input.userId).first() : null;
   if (input.id && !existing) throw new Error("Note not found.");
   const status=input.visibility==="shared"?"pending":"private";
@@ -379,13 +383,14 @@ export async function saveHotNote(input: { id: string|null; createId?:string|nul
   }
   await db.batch(statements); return {id,status};
 }
-export async function deleteHotNote(id:string,userId:string,db:HotD1Database=getHotD1Database()){ await db.prepare("DELETE FROM notes WHERE id=?1 AND user_id=?2").bind(id,userId).run(); return {ok:true}; }
-export async function patchHotResource(input:{id:string;userId:string;title:string;description:string|null;subjectId:string|null;chapterId:string|null;visibility:"private"|"shared"},db:HotD1Database=getHotD1Database()){
+export async function deleteHotNote(id:string,userId:string,db:HotD1Database=getHotD1Database()){const result=await mutateWorkspace(userId,{action:'trash',keys:[`note:${id}`]},db);if('results' in result && !result.results?.[0]?.ok)throw Error(result.results?.[0]?.error??'Note could not be moved to Trash.');return {ok:true};}
+export async function patchHotResource(input:{id:string;userId:string;title:string;description?:string|null;subjectId:string|null;chapterId:string|null;visibility:"private"|"shared"},db:HotD1Database=getHotD1Database()){
   if(!input.title||input.title.length>160) throw new Error("A resource title is required.");
   await assertHotAcademicSelection(input.userId,input.subjectId,input.chapterId,db);
+  if(await isWorkspaceTrashed('upload',input.id,db))throw new Error('Restore this file from Trash before editing it.');
   const row=await db.prepare("SELECT id FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(input.id,input.userId).first(); if(!row) throw new Error("Resource not found.");
   const status=input.visibility==="shared"?"pending":"private";
-  await db.prepare("UPDATE uploaded_resources SET title=?1,description=?2,subject_id=?3,chapter_id=?4,visibility=?5,moderation_status=?6,published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?7 AND owner_user_id=?8").bind(input.title,input.description,input.subjectId,input.chapterId,input.visibility,status,input.id,input.userId).run();
+  await db.prepare("UPDATE uploaded_resources SET title=?1,description=CASE WHEN ?9 THEN ?2 ELSE description END,subject_id=?3,chapter_id=?4,visibility=?5,moderation_status=?6,published_at=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?7 AND owner_user_id=?8").bind(input.title,input.description??null,input.subjectId,input.chapterId,input.visibility,status,input.id,input.userId,input.description!==undefined?1:0).run();
   return {id:input.id,status};
 }
 export async function getHotOwnedResource(id:string,userId:string,db:HotD1Database=getHotD1Database()){return db.prepare("SELECT id,owner_user_id,storage_bucket,storage_path FROM uploaded_resources WHERE id=?1 AND owner_user_id=?2 LIMIT 1").bind(id,userId).first<{id:string;owner_user_id:string;storage_bucket:string;storage_path:string}>();}

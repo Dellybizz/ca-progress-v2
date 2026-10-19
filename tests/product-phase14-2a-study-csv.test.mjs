@@ -191,7 +191,7 @@ test("Study CSV entitlement and route enforce Pro/Premium access from session id
   const route = fs.readFileSync("app/api/exports/study/route.ts", "utf8");
   assert.match(route, /export async function GET\(\)/);
   assert.match(route, /const user = await optionalUser\(\)/);
-  assert.match(route, /canUseExport\(tier, "study_csv"\)/);
+  assert.match(route, /getPlanFeatureAccessForUser\(user\.id, "study_csv"\)/);
   assert.match(route, /createOwnedStudyCsvStream\(user\.id\)/);
   assert.match(route, /status: 401/);
   assert.match(route, /status: 403/);

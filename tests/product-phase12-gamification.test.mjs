@@ -124,7 +124,7 @@ test("Product Phase 12 private API and Activity UI expose motivation metrics wit
   assert.match(activity, /ActivityGamificationClient/);
   assert.match(activity, /never change syllabus progress, revision readiness or test readiness/);
   assert.doesNotMatch(activity, /getGamificationSummary|getPhase13UserModel/);
-  assert.match(client, /\/api\/gamification/);
+  assert.match(client, /\/api\/v1\/gamification/);
   assert.match(client, /Professional level/);
   assert.match(client, /Current streak/);
   assert.match(client, /Achievements/);

@@ -1,0 +1,17 @@
+'use client';
+import {Extension} from '@tiptap/core';
+import {Plugin,TextSelection} from '@tiptap/pm/state';
+import {closeHistory} from '@tiptap/pm/history';
+import {CellSelection,selectedRect} from '@tiptap/pm/tables';
+import {spreadsheetGrid,checkedGrid,gridTable,pasteTableGrid} from './spreadsheet-paste';
+import type {NoteNode} from './structured-document';
+export const SpreadsheetPaste=Extension.create({name:'spreadsheetPaste',priority:1100,addProseMirrorPlugins(){return [new Plugin({props:{handlePaste(view,event){
+ if(!view.editable)return false;
+ if(view.state.selection.$from.parent.type.name==='codeBlock')return false;
+ const text=event.clipboardData?.getData('text/plain')??'',html=event.clipboardData?.getData('text/html')??'';if(!text.includes('\t')&&!/<table[\s>]/i.test(html))return false;
+ try{if(/<table[\s>]/i.test(html)){if(html.length>400000)throw Error('The pasted table is too large.');const source=new DOMParser().parseFromString(html,'text/html').querySelector('table');if(source?.querySelector('table'))throw Error('Paste one flat spreadsheet range at a time.');if(source&&Array.from(source.rows).some(r=>Array.from(r.cells).some(c=>c.colSpan!==1||c.rowSpan!==1)))throw Error('Unmerge spreadsheet cells before copying.');}let grid:string[][];if(text.includes('\t'))grid=spreadsheetGrid(text);else{if(html.length>400000)throw Error('The pasted table is too large.');const table=new DOMParser().parseFromString(html,'text/html').querySelector('table');if(!table) return false;if(table.querySelector('table'))throw Error('Paste one flat spreadsheet range at a time.');const rows=Array.from(table.rows);if(rows.some(r=>Array.from(r.cells).some(c=>c.colSpan!==1||c.rowSpan!==1)))throw Error('Unmerge spreadsheet cells before copying.');grid=checkedGrid(rows.map(r=>Array.from(r.cells,c=>c.textContent??'')));}
+ const state=view.state,selection=state.selection,$from=selection instanceof CellSelection?state.doc.resolve(Math.min(selection.$anchorCell.pos,selection.$headCell.pos)+1):selection.$from;let tableDepth=-1;for(let d=$from.depth;d>0;d--)if($from.node(d).type.name==='table'){tableDepth=d;break;}
+ let tr=closeHistory(state.tr);if(tableDepth>0){const at=$from.before(tableDepth),table=$from.node(tableDepth),row=$from.index(tableDepth),column=$from.index(tableDepth+1),rect=selection instanceof CellSelection?selectedRect(state):null,next=pasteTableGrid(table.toJSON() as NoteNode,rect?.top??row,rect?.left??column,grid);tr=tr.replaceWith(at,at+table.nodeSize,state.schema.nodeFromJSON(next));let caret=at+4;tr.doc.nodeAt(at)?.forEach((r,offset,i)=>{if(i===(rect?.top??row))r.forEach((_c,cellOffset,j)=>{if(j===(rect?.left??column))caret=at+offset+cellOffset+4;});});tr.setSelection(TextSelection.near(tr.doc.resolve(caret)));}else tr=tr.replaceSelectionWith(state.schema.nodeFromJSON(gridTable(grid)));
+ if(new TextEncoder().encode(tr.doc.textContent).length>120000||new TextEncoder().encode(JSON.stringify(tr.doc.toJSON())).length>560000)throw Error('This paste would exceed the note size limit. Split the range into another note.');view.dispatch(tr.scrollIntoView());view.dom.dispatchEvent(new CustomEvent('ca-note-paste-error',{detail:''}));return true;
+ }catch(error){view.dom.dispatchEvent(new CustomEvent('ca-note-paste-error',{detail:error instanceof Error?error.message:'This spreadsheet could not be pasted.'}));return true;}
+ }}})];}});

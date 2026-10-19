@@ -1,0 +1,23 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {build} from 'esbuild';
+const built=await build({stdin:{contents:"export * from './lib/notes/financial-actions';export * from './lib/notes/financial-formats';export * from './lib/notes/ca-formats';export * from './lib/notes/structured-document';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'});
+const a=await import('data:text/javascript;base64,'+Buffer.from(built.outputFiles[0].text).toString('base64'));
+const make=()=>{const f=a.CA_FORMATS.find(f=>f.id==='balance');return a.buildCAFormat(f,{title:'Working',variant:'Vertical',currency:'₹',periods:['2026'],rows:['Cash','Bank','Capital']})[2];};
+const write=(t,i,raw)=>({...t,content:t.content.map((r,j)=>i===j?{...r,content:r.content.map(c=>c.attrs.caColId==='period-0'?a.numberCell(c,raw,a.financialConfig(t.attrs.caFormat)):c)}:r)});
+const doc=table=>({schemaVersion:1,engine:'tiptap',engineSchemaVersion:1,kind:'document',entryId:'inline-test',revisionId:'test',content:{type:'doc',content:[table]},attachmentIds:[],sourceAttribution:null,layout:a.DEFAULT_LAYOUT});
+test('moving rows and columns preserves source identities, exact amounts and total formulas',()=>{
+ let t=write(write(make(),1,'100.123456'),2,'50');const ids=[t.content[1].attrs.caRowId,t.content[2].attrs.caRowId];t=a.upsertFinancialTotal(t,ids.map(row=>({row,sign:1})),['period-0'],'Total','row-total',2);const formula=t.content[3].content.find(c=>c.attrs.caColId==='period-0').attrs.caFormula;
+ t=a.moveFinancialRow(t,1,2);t=a.moveFinancialColumn(t,2,0);assert.equal(t.content[2].content[0].attrs.caRaw,'100.123456');assert.equal(t.content[3].content[0].attrs.caFormula,formula);assert.equal(a.totalsStale(t),false);a.validateStructuredNote(doc(t));
+ assert.throws(()=>a.moveFinancialRow(t,0,1),/header/);assert.throws(()=>a.moveFinancialColumn(t,0,12),/existing column/);
+});
+test('inline sections, working notes and editable subtotal sources survive schema and HTML export',()=>{
+ let t=write(write(make(),1,'100'),2,'50');const ids=[t.content[1].attrs.caRowId,t.content[2].attrs.caRowId];t=a.insertFinancialRow(t,0,'section','row-section');t=a.insertFinancialRow(t,2,'working','row-working');
+ t=a.upsertFinancialTotal(t,ids.map(row=>({row,sign:1})),['period-0'],'Subtotal','row-total');const note=t.content.at(-1).content.find(c=>c.attrs.caColId==='notes');note.content=[{type:'paragraph',content:[{type:'text',text:'W.N. 2',marks:[{type:'bold'}]}]}];t=a.upsertFinancialTotal(t,[{row:ids[0],sign:1},{row:ids[1],sign:-1}],['period-0'],'Net','row-total');const last=t.content.at(-1);assert.equal(last.content.find(c=>c.attrs.caColId==='period-0').attrs.caRaw,'50');assert.equal(last.attrs.caRole,'subtotal');assert.equal(a.nodeText(last.content.find(c=>c.attrs.caColId==='notes')),'W.N. 2');assert.equal(last.content.find(c=>c.attrs.caColId==='notes').content[0].content[0].marks[0].type,'bold');assert.equal(t.content.filter(r=>r.attrs.caRowId==='row-total').length,1);
+ t.attrs.caWidth=75;t.content[1].attrs.caHeight=45;t.content[1].content[0].attrs.caFill='#fff4cc';t.content[1].content[0].attrs.caBorder='#aabbcc';const value=doc(t);a.validateStructuredNote(value);assert.deepEqual(a.readStructuredNote(JSON.stringify(value)),value);const html=a.renderStructuredNote(value);for(const pattern of [/width:75%/,/height:45px/,/background-color:#fff4cc/,/border-color:#aabbcc/,/data-ca-role="section"/,/data-ca-role="working"/,/data-ca-role="subtotal"/])assert.match(html,pattern);
+ for(const patch of [{caFill:'red;position:fixed'},{caBorder:'url(x)'},{caFill:'#fff" onclick="bad'}]){const bad=structuredClone(t);Object.assign(bad.content[1].content[0].attrs,patch);assert.throws(()=>a.validateStructuredNote(doc(bad)));}
+});
+test('source edits reject circular, missing and empty selections without mutating the original working',()=>{
+ let t=write(make(),1,'100');const id=t.content[1].attrs.caRowId;t=a.upsertFinancialTotal(t,[{row:id,sign:1}],['period-0'],'Total','row-total');const before=JSON.stringify(t);
+ for(const terms of [[],[{row:'missing',sign:1}],[{row:'row-total',sign:1}]])assert.throws(()=>a.upsertFinancialTotal(t,terms,['period-0'],'Total','row-total'));assert.equal(JSON.stringify(t),before);
+ const merged=structuredClone(t);merged.content[1].content[0].attrs.colspan=2;assert.throws(()=>a.insertFinancialRow(merged,1,'item','new'),/Unmerge/);
+ const cfg=a.financialConfig(t.attrs.caFormat);assert.equal(a.financialConfig(JSON.stringify({...cfg,autoTotals:true})).autoTotals,true);assert.throws(()=>a.financialConfig(JSON.stringify({...cfg,autoTotals:'yes'})));
+});

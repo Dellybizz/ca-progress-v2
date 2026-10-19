@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {monitorCheckout} from '../lib/billing/checkout-monitor.mjs';
+const flush=()=>new Promise(resolve=>setImmediate(resolve));
+function harness(extra={}){const queue=[],published=[],errors=[];let reads=0,recovers=0;const stop=monitorCheckout({read:async()=>{reads++;return {attemptId:'original',state:'ready',accessGranted:false};},reconcile:async view=>{recovers++;return view;},publish:view=>published.push(view),onError:error=>errors.push(error),schedule:fn=>{queue.push(fn);return fn;},cancel:fn=>{const index=queue.indexOf(fn);if(index>=0)queue.splice(index,1);},...extra});return {queue,published,errors,stop,get reads(){return reads;},get recovers(){return recovers;}};}
+test('pending checkout checks are bounded and preserve the original attempt',async()=>{const h=harness({maxChecks:3});await flush();while(h.queue.length){await h.queue.shift()();}assert.equal(h.reads,3);assert.equal(h.recovers,3);assert.ok(h.published.every(view=>view.attemptId==='original'));});
+for(const state of ['failed','cancelled','succeeded'])test(`terminal ${state} never requests reconciliation`,async()=>{const h=harness({read:async()=>({state,accessGranted:false})});await flush();assert.equal(h.recovers,0);assert.equal(h.queue.length,0);});
+test('verified access stops checks immediately',async()=>{const h=harness({reconcile:async view=>({...view,accessGranted:true})});await flush();assert.equal(h.published.at(-1).accessGranted,true);assert.equal(h.queue.length,0);});
+test('unmount during provider response prevents stale publications and schedules',async()=>{let resolve;const h=harness({reconcile:()=>new Promise(done=>{resolve=done;})});await flush();h.stop();resolve({state:'succeeded',accessGranted:true});await flush();assert.equal(h.published.length,1);assert.equal(h.queue.length,0);});
+test('hidden or busy page skips requests without consuming retry budget',async()=>{let visible=false;const h=harness({canCheck:()=>visible,maxChecks:1});await flush();assert.equal(h.reads,0);visible=true;await h.queue.shift()();assert.equal(h.reads,1);assert.equal(h.recovers,1);assert.equal(h.queue.length,0);});
+test('provider failures are retried only within the bounded budget',async()=>{const h=harness({maxChecks:2,reconcile:async()=>{throw new Error('provider unavailable');}});await flush();await h.queue.shift()();assert.equal(h.errors.length,2);assert.equal(h.queue.length,0);});
+test('manual action starting during status read prevents overlapping recovery',async()=>{let resolve,available=true;const h=harness({read:()=>new Promise(done=>{resolve=done;}),canCheck:()=>available});available=false;resolve({state:'ready',accessGranted:false});await flush();assert.equal(h.recovers,0);assert.equal(h.queue.length,1);h.stop();});
+
+test('unactivated unpaid setup stops background recovery and polling',async()=>{
+ const h=harness({read:async()=>({state:'ready',providerStatus:'created',resumable:true,accessGranted:false})});
+ await flush();assert.equal(h.published.length,1);assert.equal(h.recovers,0);assert.equal(h.queue.length,0);
+});
+test('authenticated mandate still checks pending payment verification',async()=>{
+ const h=harness({maxChecks:1,read:async()=>({state:'pending',providerStatus:'authenticated',resumable:true,accessGranted:false})});
+ await flush();assert.equal(h.recovers,1);
+});

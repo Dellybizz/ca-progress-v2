@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "path": "assets/onboarding/stationery.svg",
+      "bytes": 3011,
+      "sha256": "6bac2b9d8d6de04c8f14b5f18ae19d652f698a10213355f4ef4073db0156e76e"
+    },
+    {
+      "path": "assets/onboarding/book.svg",
+      "bytes": 1625,
+      "sha256": "05c9439dbac7d980ab303202c45e542b7d684374129d8b2843a8eceb92c5f68a"
+    }
+  ],
+  "fonts": "System font stack; no remote font requests.",
+  "catalog": "First-run verified catalog is empty; refreshed choices are cached per account."
+}

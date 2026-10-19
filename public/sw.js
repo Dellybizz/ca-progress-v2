@@ -1,6 +1,6 @@
 /* Cache only public build assets and the data-free offline shell. Private HTML,
    RSC payloads, API responses, avatars and file download URLs never enter Cache API. */
-const BASE = "ca-progress-shell-v4";
+const BASE = "ca-progress-shell-v5";
 const ROUTES = new Set(["/offline", "/dashboard", "/syllabus", "/progress", "/study", "/planner", "/notes", "/resources"]);
 const blocked = url => /[?&](?:[^=]*(?:token|signature|credential)|expires)=/i.test(url.search);
 self.addEventListener("install", event => event.waitUntil((async () => {
@@ -11,8 +11,39 @@ self.addEventListener("install", event => event.waitUntil((async () => {
   const assets = [...new Set([...html.matchAll(/(?:src|href)="(\/_next\/static\/[^"?]+)"/g)].map(match => match[1]))];
   await cache.addAll(assets);
   await cache.put("/offline", shell);
-  await self.skipWaiting();
 })()));
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") event.waitUntil(self.skipWaiting());
+});
+self.addEventListener("sync", event => {
+  if (event.tag !== "ca-progress-offline-sync") return;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: false }).then(clients => {
+    for (const client of clients) client.postMessage({ type: "SYNC_OFFLINE_EDITS" });
+  }));
+});
+self.addEventListener("push", event => {
+  event.waitUntil((async () => {
+    let payload = {};
+    try { payload = event.data?.json() ?? {}; } catch { payload = { body: event.data?.text() ?? "" }; }
+    const title = typeof payload.title === "string" ? payload.title.slice(0, 100) : "CA Progress";
+    const body = typeof payload.body === "string" ? payload.body.slice(0, 240) : "You have a new update.";
+    const rawHref = typeof payload.href === "string" ? payload.href : "/dashboard";
+    const href = rawHref.startsWith("/") && !rawHref.startsWith("//") ? rawHref : "/dashboard";
+    await self.registration.showNotification(title, { body, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", data: { href }, tag: typeof payload.tag === "string" ? payload.tag.slice(0, 100) : undefined });
+  })());
+});
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const href = typeof event.notification.data?.href === "string" ? event.notification.data.href : "/dashboard";
+    const target = new URL(href, self.location.origin).href;
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if ("focus" in client) { await client.focus(); if ("navigate" in client) await client.navigate(target); return; }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
+});
 self.addEventListener("activate", event => event.waitUntil((async () => {
   for (const name of await caches.keys()) if (name.startsWith("ca-progress-shell-") && name !== BASE) await caches.delete(name);
   await self.clients.claim();

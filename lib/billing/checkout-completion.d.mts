@@ -1,0 +1,1 @@
+export function createCheckoutCompletion<T>(options:{closed:()=>void;confirming:()=>void;abandon:()=>Promise<unknown>;verify:(proof:T)=>Promise<{accessGranted?:boolean}>;abandoned:(result:unknown)=>void;verified:(result:{accessGranted?:boolean})=>void;error:(error:unknown,phase:string)=>void}):{dismiss:()=>Promise<boolean>|null;paid:(proof:T)=>Promise<boolean>|null};

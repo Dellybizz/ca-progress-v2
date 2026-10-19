@@ -1,0 +1,104 @@
+name: Onboarding Phase 7 APK certification
+on:
+  push:
+    branches: [onboarding-design-phase7]
+    paths:
+      - tests/**
+      - android/**
+      - apps/mobile/**
+      - components/auth/onboarding/**
+      - packages/mobile-data/**
+      - packages/capacitor-*/**
+      - lib/profile/setup-*.ts
+      - native-shell/**
+      - scripts/mobile/prepare-onboarding-certification.mjs
+      - capacitor.config.ts
+      - package*.json
+      - .github/workflows/onboarding-phase7.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: onboarding-phase7-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: {node-version: 22, cache: npm}
+      - uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: 21, cache: gradle}
+      - run: npm ci --no-audit --no-fund
+      - name: Verify repository and retained onboarding behavior
+        run: npm run ci
+      - name: Build production-assets APK
+        run: |
+          npm run native:build:android:debug
+          node scripts/mobile/prepare-onboarding-certification.mjs
+          cd android
+          ./gradlew :app:assembleDebugAndroidTest
+      - name: Verify APK signature and packaged assets
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose android/app/build/outputs/apk/debug/app-debug.apk
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | tee apk-contents.txt
+          sha256sum android/app/build/outputs/apk/debug/app-debug.apk > apk-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ca-progress-onboarding-phase7-apk-${{ github.sha }}
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            apk-sha256.txt
+            apk-contents.txt
+          if-no-files-found: error
+          retention-days: 30
+  installed-package:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {api: 24, target: default}
+          - {api: 35, target: google_apis}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: ca-progress-onboarding-phase7-apk-${{ github.sha }}
+          path: certified-apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install exact downloadable APK and run Android package/storage tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          ram-size: 2048M
+          heap-size: 256M
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none
+          script: |
+            for attempt in 1 2 3 4 5; do adb root && break; test "$attempt" -lt 5 || exit 1; sleep 2; done
+            adb wait-for-device
+            adb install certified-apk/android/app/build/outputs/apk/debug/app-debug.apk
+            adb install certified-apk/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell svc wifi disable || { adb logcat -d -t 200; exit 1; }
+            adb shell svc data disable || { adb logcat -d -t 200; exit 1; }
+            adb shell am instrument -w -r in.zanisheluxe.caprogress.test/androidx.test.runner.AndroidJUnitRunner | tee instrumentation.txt
+            grep -q 'OK (2 tests)' instrumentation.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ca-progress-onboarding-installed-api-${{ matrix.api }}-${{ github.sha }}
+          path: instrumentation.txt
+          if-no-files-found: warn
+          retention-days: 30

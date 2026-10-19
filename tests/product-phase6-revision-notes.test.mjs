@@ -8,11 +8,11 @@ const migration = read("d1/migrations/0017_product_phase6_revision_notes.sql");
 const service = read("lib/notes/phase6.ts");
 const route = read("app/api/notes/route.ts");
 const exportRoute = read("app/api/notes/[id]/export/route.ts");
-const editor = read("components/resources/note-editor.tsx");
+const editor = read("components/resources/note-editor.tsx")+read("components/notes/note-studio.tsx")+read("components/notes/note-toolbar.tsx")+read("components/notes/financial-inline-tools.tsx");
 const library = read("components/resources/resource-library.tsx");
 const community = read("components/community/community-chat.tsx");
 const resourceService = read("lib/resources/service.ts");
-const validation = read("lib/resources/validation.ts");
+const validation = read("lib/resources/validation.ts")+JSON.stringify(read("lib/notes/content-limits.ts").match(/LEGACY_NOTE_TAGS = \[([^\]]*)/s)?.[1]?.split("'").filter((_,i)=>i%2===1));
 const chapterHub = read("lib/chapter-hub/service.ts");
 const deploy = read(".github/workflows/deploy-staging.yml");
 
@@ -41,17 +41,9 @@ test("Product Phase 6 rich-note sanitizer round-trips revision formatting and sa
   assert.match(service, /JSON\.stringify\(\{ version: 1, format: "html", html: input\.bodyHtml \}\)/);
 });
 
-test("Product Phase 6 provides table presets custom sizing and reliable row column header controls", () => {
-  assert.match(editor, /tableHtml\(2, 2\)/);
-  assert.match(editor, /tableHtml\(3, 3\)/);
-  assert.match(editor, /tableHtml\(4, 4\)/);
-  assert.match(editor, /insertCustomTable/);
-  assert.match(editor, /function addRow/);
-  assert.match(editor, /function removeRow/);
-  assert.match(editor, /function addColumn/);
-  assert.match(editor, /function removeColumn/);
-  assert.match(editor, /function toggleHeader/);
-  assert.match(editor, /cell merging is not enabled/);
+test("Typed notes use selection-aware structured table commands", () => {
+  for(const command of ['insertTable','addRowBefore','insertFinancialRow','addColumnBefore','reconfigureTable','deleteRow','deleteColumn','mergeCells','splitCell','toggleHeaderRow'])assert.ok(editor.includes(command));
+  assert.doesNotMatch(editor,/document\\.execCommand|window\\.prompt/);
 });
 
 test("Product Phase 6 private images PDFs and note files are owner-linked at D1 and service boundaries", () => {
@@ -59,7 +51,7 @@ test("Product Phase 6 private images PDFs and note files are owner-linked at D1 
   assert.match(migration, /FOREIGN KEY\(resource_id,user_id\) REFERENCES uploaded_resources\(id,owner_user_id\)/);
   assert.match(service, /WHERE owner_user_id=\?1 AND id IN/);
   assert.match(service, /not owned by you/);
-  assert.match(editor, /Private note files/);
+  assert.match(editor, /Attached files/);
 });
 
 test("Product Phase 6 Community answers retain immutable source attribution and start private", () => {

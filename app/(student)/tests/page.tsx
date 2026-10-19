@@ -1,3 +1,4 @@
+import {StorageCleanupWarning} from "@/components/billing/storage-cleanup-warning";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginRequired } from "@/components/auth/login-required";
@@ -42,6 +43,6 @@ export default async function TestsPage() {
       description={`${model.levelName} · ${model.groupLabel} · ${model.attemptKey}. The first valid Test 1/Test 2 completion advances chapter progress once; retakes append Attempt 2, 3 and beyond without overwriting earlier results.`}
       actions={<div className="phase6-header-links"><Link href="/progress">Progress</Link><Link href="/analytics">Analytics</Link></div>}
     />
-    <TestArchiveWorkspace initialChapters={model.chapters} milestoneRecords={milestoneRecords} initialArchive={archive}/>
+    <StorageCleanupWarning/><TestArchiveWorkspace initialChapters={model.chapters} milestoneRecords={milestoneRecords} initialArchive={archive}/>
   </div>;
 }

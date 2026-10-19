@@ -1,14 +1,16 @@
 name: Cloudflare V2 Deploy
 
 # Canonical web Worker configuration: wrangler.jsonc
+# Web runtime rollback is independent from isolated ICAI live-proof rollback.
 on:
   workflow_dispatch:
   push:
-    branches: [phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d]
+    branches: [phase-12-operations-admin-platform, hotfix/dark-mode-ae0cb36d, mobile-phase7-student-parity]
     paths:
       - .github/workflows/deploy-staging.yml
       - app/**
       - components/**
+      - config/**
       - d1/**
       - lib/**
       - server/**
@@ -27,6 +29,7 @@ on:
       - .github/workflows/deploy-staging.yml
       - app/**
       - components/**
+      - config/**
       - d1/**
       - lib/**
       - server/**
@@ -48,7 +51,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name != 'pull_request' || (github.head_ref == 'phase-12-operations-admin-platform' && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || ((github.head_ref == 'phase-12-operations-admin-platform' || github.head_ref == 'mobile-phase7-student-parity') && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: v2-staging
     timeout-minutes: 55
@@ -79,7 +82,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Enforce permanent Supabase retirement
         run: npm run verify:retirement
       - name: Typecheck
@@ -199,6 +202,8 @@ jobs:
         run: npx wrangler deploy --config=workers/icai-sync/wrangler.jsonc --name=ca-progress-v2-icai-sync
 
       - name: Deploy Billing service
+        # Cloudflare may report code 10013 after the Worker and cron deploy succeed but a retained queue consumer refresh fails. Web deployment is independent and must still proceed.
+        continue-on-error: true
         run: npx wrangler deploy --config=workers/billing/wrangler.jsonc --secrets-file /tmp/ca-billing-secrets.json
 
       - name: Verify existing web Worker secrets
@@ -226,7 +231,7 @@ jobs:
             remote_head="$(git ls-remote origin "refs/heads/$DEPLOY_BRANCH" | awk '{print $1}')"
             if [ "$remote_head" = "$DEPLOY_SHA" ]; then
               npx wrangler rollback --name ca-progress-v2-icai-sync --message "Automated rollback after failed ICAI Phase 5 live proof" || true
-              npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after failed ICAI Phase 5 live proof" || true
+              echo "::warning::ICAI Phase 5 proof failed; the isolated ICAI service was rolled back. The independently verified web runtime remains deployed."
             else
               echo "::warning::Skipping stale Phase 5 rollback for $DEPLOY_SHA; current branch head is $remote_head."
             fi
@@ -243,7 +248,7 @@ jobs:
             remote_head="$(git ls-remote origin "refs/heads/$DEPLOY_BRANCH" | awk '{print $1}')"
             if [ "$remote_head" = "$DEPLOY_SHA" ]; then
               npx wrangler rollback --name ca-progress-v2-icai-sync --message "Automated rollback after failed ICAI Phase 2 incremental proof" || true
-              npx wrangler rollback --name ca-progress-v2 --message "Automated rollback after failed ICAI Phase 2 incremental proof" || true
+              echo "::warning::ICAI Phase 2 proof failed; the isolated ICAI service was rolled back. The independently verified web runtime remains deployed."
             else
               echo "::warning::Skipping stale Phase 2 rollback for $DEPLOY_SHA; current branch head is $remote_head."
             fi

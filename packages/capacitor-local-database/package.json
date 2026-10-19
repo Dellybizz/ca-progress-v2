@@ -1,0 +1,8 @@
+{
+  "name": "@ca-progress/capacitor-local-database",
+  "version": "1.0.0",
+  "main": "index.js",
+  "files": ["index.js", "android", "ios", "Package.swift"],
+  "peerDependencies": { "@capacitor/core": ">=8.0.0" },
+  "capacitor": { "android": { "src": "android" }, "ios": { "src": "ios" } }
+}

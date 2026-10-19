@@ -139,7 +139,7 @@ async function hydratePhase7Messages(rows: MessageRow[], viewerId: string | null
     db.prepare(`SELECT id,session_id,community_message_id,subject_id,chapter_id,status FROM study_session_doubts WHERE community_message_id IN (${placeholders(messageIds.length)})`).bind(...messageIds),
   ];
   if (replyIds.length) statements.push(db.prepare(`SELECT id,author_label,body FROM community_messages WHERE id IN (${placeholders(replyIds.length)})`).bind(...replyIds));
-  if (resourceIds.length) statements.push(db.prepare(`SELECT id,title,original_filename,extension,owner_label FROM uploaded_resources WHERE id IN (${placeholders(resourceIds.length)}) AND visibility='shared' AND moderation_status='approved'`).bind(...resourceIds));
+  if (resourceIds.length) statements.push(db.prepare(`SELECT id,title,original_filename,extension,owner_label FROM uploaded_resources WHERE id IN (${placeholders(resourceIds.length)}) AND visibility='shared' AND moderation_status='approved' AND NOT EXISTS(SELECT 1 FROM resource_workspace_entries rw WHERE rw.entity_kind='upload' AND rw.entity_id=uploaded_resources.id AND rw.trashed_at IS NOT NULL)`).bind(...resourceIds));
   if (viewerId) {
     statements.push(db.prepare(`SELECT message_id FROM community_saved_messages WHERE user_id=?1 AND message_id IN (${placeholders(messageIds.length, 2)})`).bind(viewerId, ...messageIds));
     statements.push(db.prepare(`SELECT followed_user_id FROM community_follows WHERE user_id=?1 AND followed_user_id IN (${placeholders(authorIds.length, 2)})`).bind(viewerId, ...authorIds));
@@ -233,6 +233,27 @@ export async function getPhase7CommunityMessagePage(input: {
   const pageRows = raw.slice(0, PAGE_SIZE);
   const messages = await hydratePhase7Messages(pageRows, viewerId, db);
   return { messages: messages.reverse(), nextCursor: hasMore && pageRows.length ? String(pageRows[pageRows.length - 1].sequence_id) : null, filter };
+}
+
+export async function getPhase19CommunityDelta(input: { channelSlug:string; afterSequence?:number; beforeSequence?:number; limit?:number }) {
+  const identity=(await getRequestAuthContext()).identity;
+  if(!identity)throw new Error("Sign in to synchronize Community messages.");
+  const db=getHotD1Database();
+  const {channel}=await assertVisibleChannel(input.channelSlug,identity.id,db);
+  const values:unknown[]=[channel.id];
+  const where=["m.channel_id=?1"];
+  if(Number.isSafeInteger(input.afterSequence)&&Number(input.afterSequence)>=0){values.push(Number(input.afterSequence));where.push(`m.sequence_id>?${values.length}`);}
+  if(Number.isSafeInteger(input.beforeSequence)&&Number(input.beforeSequence)>0){values.push(Number(input.beforeSequence));where.push(`m.sequence_id<?${values.length}`);}
+  const limit=Math.max(1,Math.min(100,Number(input.limit)||50));
+  const order=input.beforeSequence?"DESC":"ASC";
+  const result=await db.prepare(`SELECT m.id,m.sequence_id,m.channel_id,m.user_id,m.author_label,m.body,m.created_at,m.moderation_status,m.reply_to_message_id,m.attached_resource_id FROM community_messages m WHERE ${where.join(" AND ")} ORDER BY m.sequence_id ${order} LIMIT ${limit+1}`).bind(...values).all<MessageRow>();
+  const raw=(result.results??[]) as MessageRow[];
+  const hasMore=raw.length>limit;
+  const selected=raw.slice(0,limit);
+  if(order==="DESC")selected.reverse();
+  const messages=await hydratePhase7Messages(selected,identity.id,db);
+  const latest=await db.prepare("SELECT COALESCE(MAX(sequence_id),0) AS latest FROM community_messages WHERE channel_id=?1").bind(channel.id).first<{latest:number}>();
+  return {channelId:channel.id,channelKey:input.channelSlug,afterSequence:input.afterSequence??null,beforeSequence:input.beforeSequence??null,latestSequence:Number(latest?.latest||0),messages,hasMore};
 }
 
 export async function getPhase7CommunityChannelModel(channelSlug: string) {

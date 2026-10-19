@@ -24,7 +24,7 @@ test("subject deep links fail closed outside the current subject set",()=>{
 });
 
 test("ICAI resource filters cannot broaden a signed-in student's scope",()=>{
-  const page=read("app/(student)/resources/icai/page.tsx");
+  const page=read("app/(student)/resources/page.tsx");
   assert.match(page,/selection\?\.level/);
   assert.match(page,/selection\?\.attemptKey/);
   assert.match(page,/!context\.subjectIds\.includes\(requestedSubject\)/);

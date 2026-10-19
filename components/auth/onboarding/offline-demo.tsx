@@ -1,0 +1,6 @@
+"use client";
+import {useEffect,useMemo,useState} from 'react';
+import {BookWelcome} from './welcome';
+import {PersistentSetup} from './persistent-setup';
+import {indexedSetupStore} from '@/lib/profile/setup-storage';
+export function OfflineSetupDemo(){const store=useMemo(()=>indexedSetupStore(),[]),[started,setStarted]=useState(false),[error,setError]=useState('');useEffect(()=>{let active=true;void store.read('demo:installation').then(row=>{if(active&&row&&(row.draft.step!=='intro'||row.draft.level))setStarted(true);}).catch(()=>{if(active)setError('Device storage is unavailable.');});return()=>{active=false;};},[store]);return <><p className="ca-offline-demo-label" role="status">Offline demo · saves only this demo on your device · no account requests{error?` · ${error}`:''}</p>{started?<PersistentSetup demo scope="demo:installation" ownerId={null} store={store} transport={null} onExit={()=>setStarted(false)} onServerComplete={()=>undefined} onOpenWorkspace={()=>{void store.remove('demo:installation').then(()=>window.location.reload()).catch(()=>setError('The demo draft could not be cleared. It is still retained.'));}} pendingActionLabel="Start new demo"/>:<BookWelcome onBegin={()=>setStarted(true)}/>}</>;}

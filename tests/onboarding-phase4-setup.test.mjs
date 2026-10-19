@@ -1,0 +1,47 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {mkdtemp,writeFile,rm,readFile} from 'node:fs/promises';
+import path from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+async function moduleAt(entry){const dir=await mkdtemp(path.join(process.cwd(),'.phase4-test-'));const result=await build({entryPoints:[entry],bundle:true,write:false,platform:'node',format:'esm',jsx:'automatic',external:['react','react-dom'],loader:{'.css':'empty'}});const file=path.join(dir,'module.mjs');await writeFile(file,result.outputFiles[0].text);return {module:await import('file://'+file),cleanup:()=>rm(dir,{recursive:true,force:true})};}
+const attempts=[{key:'2040-01',label:'January 2040',levels:['foundation','intermediate'],groupsByLevel:{intermediate:['group_1']}},{key:'2040-05',label:'May 2040',levels:['intermediate','final'],groupsByLevel:{intermediate:['group_1','group_2'],final:['group_1','group_2']}}];
+const ready={schemaVersion:2,step:'review',level:'intermediate',group:'both',attemptDecision:'decided',attemptKey:'2040-05',preparationState:'studying',support:['progress','planner'],goalMode:'set',dailyTargetMinutes:120};
+test('setup validates actual level/group mappings, tentative attempts, preference keys and goal boundaries',async()=>{const {module:c,cleanup}=await moduleAt('lib/profile/setup-contract.ts');try{
+ assert.equal(c.validateSetupDraft(ready,attempts,true).ok,true);
+ for(const patch of [{attemptKey:'2040-01'},{level:'foundation',group:'both'},{attemptKey:'fake'},{support:['premium']},{dailyTargetMinutes:14},{dailyTargetMinutes:721},{dailyTargetMinutes:60.5},{dailyTargetMinutes:'60'},{password:'never-store-me'}])assert.equal(c.validateSetupDraft({...ready,...patch},attempts,true).ok,false,JSON.stringify(patch));
+ assert.equal(c.validateSetupDraft({...ready,attemptDecision:'undecided',attemptKey:null,goalMode:'keep',dailyTargetMinutes:null},attempts,true).ok,true);
+ assert.equal(c.validateSetupDraft({...ready,attemptDecision:'undecided'},attempts,true).ok,false);
+ assert.equal(c.validateSetupDraft({...ready,goalMode:'keep'},attempts,true).ok,false);
+ assert.equal(c.validateSetupDraft({...c.emptySetupDraft(),step:'goal'},attempts).ok,false);
+ assert.deepEqual(c.setupSteps('foundation'),['intro','level','attempt','stage','progress','support','goal','review']);
+ assert.deepEqual(c.chooseSetupLevel(ready,'foundation'),{...ready,level:'foundation',group:'not_applicable',attemptKey:null,attemptDecision:null});
+ assert.equal(c.chooseSetupAttempt(ready,'2040-01',attempts).group,null);
+ assert.equal(c.reconcileSavedSetup({...ready},[attempts[0]]).step,'attempt');
+ const legacy=c.resumeLegacySetup({ca_level:'intermediate',group_choice:'both',attempt_key:'2040-05',onboarding_step:4,daily_target_minutes:147,preparation_state:'revising'},attempts);assert.equal(legacy.step,'stage');assert.equal(legacy.preparationState,'revising');assert.equal(legacy.goalMode,'keep');assert.equal(legacy.dailyTargetMinutes,null);
+ const absent=c.resumeLegacySetup({ca_level:'foundation',group_choice:'not_applicable',attempt_key:null,onboarding_step:4,preparation_state:'starting'},attempts);assert.equal(absent.step,'attempt');assert.equal(absent.attemptKey,null);
+ }finally{await cleanup();}});
+test('account-scoped setup SQL atomically preserves old goals and study records, rejects stale revisions and rolls back failures',async()=>{const {module:s,cleanup}=await moduleAt('lib/profile/setup-sql.ts');const db=new DatabaseSync(':memory:');try{
+ db.exec(`PRAGMA foreign_keys=ON;CREATE TABLE app_users(user_id TEXT PRIMARY KEY,account_state TEXT);CREATE TABLE profiles(user_id TEXT PRIMARY KEY,display_name TEXT,ca_level TEXT,group_choice TEXT,attempt_key TEXT,daily_target_minutes INTEGER,onboarding_step INTEGER,onboarding_completed_at TEXT,updated_at TEXT);CREATE TABLE onboarding_experience(user_id TEXT PRIMARY KEY,preparation_state TEXT CHECK(preparation_state IN ('starting','studying','revising','practice')),updated_at TEXT);CREATE TABLE study_records(user_id TEXT,body TEXT);CREATE TABLE _ca_schema_migrations(version TEXT PRIMARY KEY,description TEXT,source_freeze_commit TEXT);INSERT INTO app_users VALUES('a','active'),('b','active');INSERT INTO profiles VALUES('a','Original student',NULL,NULL,NULL,147,3,NULL,'old'),('b','Other student',NULL,NULL,NULL,240,0,NULL,'old');INSERT INTO study_records VALUES('a','Retained chapter history');`);
+ db.exec(await readFile('d1/migrations/0094_onboarding_setup_v2.sql','utf8'));
+ const draft={...ready,attemptDecision:'undecided',attemptKey:null,goalMode:'keep',dailyTargetMinutes:null};
+ const save=(user,revision,claim,d=draft)=>db.prepare(revision===0?s.writeSetupSql:s.updateSetupSql).all(user,JSON.stringify(d),claim,revision);
+ assert.equal(save('a',0,'first')[0].revision,1);assert.equal(save('b',0,'other')[0].revision,1);
+ assert.deepEqual(save('a',0,'replay'),[]);assert.deepEqual(save('a',9,'stale'),[]);assert.equal(db.prepare("SELECT revision FROM onboarding_setup WHERE user_id='b'").get().revision,1);
+ function finish(revision,claim,stage='studying'){db.exec('BEGIN');try{const rows=save('a',revision,claim);db.prepare(s.completeSetupProfileSql).run(draft.level,draft.group,draft.attemptKey,draft.goalMode,draft.dailyTargetMinutes,'a',claim);db.prepare(s.completeSetupPreparationSql).run('a',stage,claim);db.prepare(s.finishSetupSql).run('a',claim);db.exec('COMMIT');return rows;}catch(e){db.exec('ROLLBACK');throw e;}}
+ assert.throws(()=>finish(1,'rollback','not-a-stage'));assert.equal(db.prepare("SELECT revision FROM onboarding_setup WHERE user_id='a'").get().revision,1);assert.equal(db.prepare("SELECT onboarding_completed_at FROM profiles WHERE user_id='a'").get().onboarding_completed_at,null);
+ assert.deepEqual(finish(99,'wrong-revision'),[]);assert.equal(db.prepare("SELECT onboarding_completed_at FROM profiles WHERE user_id='a'").get().onboarding_completed_at,null);
+ assert.equal(finish(1,'finished')[0].revision,2);const row=db.prepare("SELECT * FROM profiles WHERE user_id='a'").get();assert.equal(row.daily_target_minutes,147);assert.equal(row.attempt_key,null);assert.equal(row.display_name,'Original student');assert.ok(row.onboarding_completed_at);assert.equal(db.prepare("SELECT preparation_state FROM onboarding_experience WHERE user_id='a'").get().preparation_state,'studying');assert.equal(db.prepare('SELECT body FROM study_records').get().body,'Retained chapter history');assert.equal(db.prepare("SELECT daily_target_minutes FROM profiles WHERE user_id='b'").get().daily_target_minutes,240);
+ assert.deepEqual(save('a',2,'after-completed',ready),[]);assert.equal(db.prepare("SELECT revision FROM onboarding_setup WHERE user_id='a'").get().revision,2);
+ // The explicit preset/custom path updates an existing goal, rather than keeping it.
+ assert.equal(save('b',1,'b-complete',ready)[0].revision,2);db.prepare(s.completeSetupProfileSql).run(ready.level,ready.group,ready.attemptKey,'set',60,'b','b-complete');assert.equal(db.prepare("SELECT daily_target_minutes FROM profiles WHERE user_id='b'").get().daily_target_minutes,60);
+ }finally{db.close();await cleanup();}});
+test('shared setup screens show live catalog labels, honest examples, real progress bounds and offline save state',async()=>{const {module:c,cleanup}=await moduleAt('components/auth/onboarding/setup.tsx');try{
+ const props={initial:{draft:{...ready,level:'foundation',group:'not_applicable',attemptKey:'2040-01',step:'attempt'},revision:1},attempts,existingGoal:147,onSave:async()=>({revision:2}),onComplete:async()=>{},onExit(){}};
+ const html=renderToStaticMarkup(React.createElement(c.SetupScreens,props));assert.match(html,/January 2040/);assert.doesNotMatch(html,/May 2040/);assert.match(html,/Not decided yet/);assert.match(html,/aria-valuemax="7"/);assert.match(html,/type="radio"/);
+ const offline=renderToStaticMarkup(React.createElement(c.SetupScreens,{...props,online:false}));assert.match(offline,/have not been synced/);assert.match(offline,/<button[^>]*disabled=""[^>]*>Continue/);
+ const preview=renderToStaticMarkup(React.createElement(c.SetupScreens,{...props,preview:true,initial:{draft:{...ready,step:'progress'},revision:0}}));assert.match(preview,/no account data is saved/);assert.match(preview,/Illustrative progress preview/);
+ }finally{await cleanup();}});
+test('tentative contexts stay empty and native UI remains portable without routing or credentials',async()=>{const context=await readFile('lib/academic/student-context.ts','utf8');const tentative=context.slice(context.indexOf('if(!profile.attempt_key'),context.indexOf('const checked = await validateAcademicContextSelection({ level: profile.ca_level'));assert.match(tentative,/hasTentativeSetup/);assert.match(tentative,/mode:'setup'/);assert.match(tentative,/subjectIds:\[\]/);assert.match(tentative,/selection:null/);const api=await readFile('app/api/onboarding/route.ts','utf8');assert.match(api,/body.ownerId!==user.id/);const bundle=await build({entryPoints:['apps/mobile/src/onboarding-setup.tsx'],bundle:true,write:false,format:'esm',platform:'browser',jsx:'automatic',loader:{'.css':'empty'}});assert.doesNotMatch(bundle.outputFiles[0].text,/next\/navigation|server-only|localStorage|sessionStorage|fetch\(/);assert.match(bundle.outputFiles[0].text,/assets\/onboarding\/book.svg/);});

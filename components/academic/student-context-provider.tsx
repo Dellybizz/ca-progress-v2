@@ -9,8 +9,10 @@ export function StudentContextProvider({ value, children }: { value: StudentCont
   return <StudentContext.Provider value={value}>{children}</StudentContext.Provider>;
 }
 
-export function useStudentContext() {
+export function useStudentContext(optional?:false):StudentContextContract;
+export function useStudentContext(optional:true):StudentContextContract|null;
+export function useStudentContext(optional=false) {
   const value = useContext(StudentContext);
-  if (!value) throw new Error("useStudentContext must be used inside the student workspace.");
+  if (!value&&!optional) throw new Error("useStudentContext must be used inside the student workspace.");
   return value;
 }

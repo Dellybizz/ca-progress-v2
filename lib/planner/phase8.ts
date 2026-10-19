@@ -129,9 +129,10 @@ function validateGoal(input: { title: string; description: string | null; dueDat
   return { ...input, targetUnit };
 }
 
-export async function createPhase8Goal(userId: string, input: Parameters<typeof validateGoal>[0], db = getD1RuntimeDatabase()) {
+export async function createPhase8Goal(userId: string, input: Parameters<typeof validateGoal>[0], db = getD1RuntimeDatabase(), createId?:string|null) {
   const value = validateGoal(input);
-  const id = crypto.randomUUID();
+  const id = createId ?? crypto.randomUUID();
+  if(createId){const replay=await db.prepare("SELECT id FROM goals WHERE id=?1 AND user_id=?2 LIMIT 1").bind(createId,userId).first<{id:string}>();if(replay)return{id,...value,status:"active",completed_at:null};}
   await db.batch([
     db.prepare("INSERT INTO goals (id,user_id,title,description,due_date,status,completed_at) VALUES (?1,?2,?3,?4,?5,'active',NULL)").bind(id, userId, value.title, value.description, value.dueDate),
     db.prepare("INSERT INTO planner_goal_phase8(goal_id,user_id,goal_kind,target_value,target_unit,starts_on) VALUES(?1,?2,?3,?4,?5,?6)").bind(id, userId, value.goalKind, value.targetValue, value.targetUnit, value.startsOn),
@@ -272,7 +273,7 @@ async function refreshNotifications(userId: string, timezone: string, goals: Pla
 export async function getPhase8NotificationCenter(userId: string, timezone: string, goals?: PlannerGoal[], db = getD1RuntimeDatabase()) {
   const goalRows = goals ?? await getPhase8GoalSummaries(userId, timezone, db);
   const preferences = await refreshNotifications(userId, timezone, goalRows, db);
-  const rows = (await db.prepare("SELECT id,notification_type,title,body,action_href,read_at,created_at FROM in_app_notifications WHERE user_id=?1 ORDER BY created_at DESC LIMIT 30").bind(userId).all<NotificationRow>()).results ?? [];
+  const rows = (await db.prepare("SELECT id,notification_type,title,body,action_href,read_at,created_at FROM in_app_notifications WHERE user_id=?1 UNION ALL SELECT id,notification_type,title,body,action_href,read_at,created_at FROM billing_notifications WHERE user_id=?1 AND suppressed_at IS NULL ORDER BY created_at DESC LIMIT 30").bind(userId).all<NotificationRow>()).results ?? [];
   const notifications: PlannerNotification[] = rows.map((row) => ({ id: row.id, notificationType: row.notification_type, title: row.title, body: row.body, actionHref: row.action_href, readAt: row.read_at, createdAt: row.created_at }));
   return { preferences, notifications };
 }
@@ -280,6 +281,8 @@ export async function getPhase8NotificationCenter(userId: string, timezone: stri
 export async function markPhase8NotificationRead(userId: string, id: string | null, db = getD1RuntimeDatabase()) {
   if (id) await db.prepare("UPDATE in_app_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE id=?1 AND user_id=?2").bind(id, userId).run();
   else await db.prepare("UPDATE in_app_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE user_id=?1 AND read_at IS NULL").bind(userId).run();
+  if (id) await db.prepare("UPDATE billing_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE id=?1 AND user_id=?2 AND suppressed_at IS NULL").bind(id, userId).run();
+  else await db.prepare("UPDATE billing_notifications SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP) WHERE user_id=?1 AND read_at IS NULL AND suppressed_at IS NULL").bind(userId).run();
   return { ok: true };
 }
 

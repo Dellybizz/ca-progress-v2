@@ -1,0 +1,226 @@
+'use client';
+import {useCallback,useEffect,useRef,useState,useSyncExternalStore,useId,useEffectEvent} from 'react';
+import {useStudentContext} from '@/components/academic/student-context-provider';
+import {projectWorkspaceOperation} from '@/lib/resources/offline-workspace';
+import {offlineMutationFetch} from '@/lib/offline/mutation';
+import {getOfflineMeta,putOfflineMeta,getPendingMutations} from '@/lib/offline/database';
+import {Modal} from '@/components/ui/overlay';
+import {FileDestinationPicker} from './file-destination-picker';
+import {VersionPicker} from './version-picker';
+import type {FileDragPhase} from './use-file-gestures';
+import {FileManager,type ManagerQuery} from './file-manager';
+import {type ManagedFile} from '@/lib/resources/file-manager';
+import type {WorkspacePage} from '@/lib/resources/workspace';
+import type {ResourceLibraryReady} from '@/lib/resources/types';
+import type {ReactNode} from 'react';
+import {readWorkspaceNavigation,writeWorkspaceNavigation,workspacePreferenceKey} from '@/lib/resources/workspace-navigation';
+import {actionEligibility,INTERNAL_FILE_DRAG_TYPE,parseWorkspaceDrag,moveDropEligibility,classifyWorkspaceDrop,type WorkspaceLocation,type WorkspaceAction,type WorkspaceDrag} from '@/lib/resources/workspace-foundation';
+import {SidebarFolderTree,type SidebarFolder} from './sidebar-folder-tree';
+import {FileActionMenu,type FileAction} from './file-action-menu';
+import {Icon} from '@/components/ui/icon';
+import {ResourceToast,resourceConfirmation} from './resource-toast';
+import {loadWorkspacePage,canRestoreWorkspaceSnapshot,peekWorkspacePage,previewWorkspacePage,invalidateWorkspacePages,workspaceRequestUrl} from '@/lib/resources/workspace-page-cache';
+const subscribeOnline=(callback:()=>void)=>{window.addEventListener('online',callback);window.addEventListener('offline',callback);return()=>{window.removeEventListener('online',callback);window.removeEventListener('offline',callback);};};
+const onlineSnapshot=()=>navigator.onLine;
+const serverOnlineSnapshot=()=>true;
+let currentNavigationSearch='',navigationVersion=0;
+const subscribeNavigation=(callback:()=>void)=>{const update=(event?:Event)=>{if(event)navigationVersion++;currentNavigationSearch=window.location.search;callback();};update();window.addEventListener('popstate',update);window.addEventListener('ca-files-navigation',update);return()=>{window.removeEventListener('popstate',update);window.removeEventListener('ca-files-navigation',update);};};
+const navigationSnapshot=()=>`${navigationVersion}:${currentNavigationSearch}`;
+const serverNavigationSnapshot=()=> '0:';
+type SavedView={name:string;query:ManagerQuery;view:string;folder:string};
+type Dialog={action:'create-folder'|'rename-folder'|'move-folder'|'move'|'save-view'|'rename'|'tag'|'replace-version'|'create-page'|'erase'|'delete-folder'|'share';keys?:string[];id?:string};
+type OperationItem={key:string;label?:string;ok:boolean;error?:string;undo?:{action:'move'|'restore';folderId:string|null;revision:number}};
+type OperationResult={action:string;failed?:boolean;items:OperationItem[];message?:string;retry?:Record<string,unknown>};
+function WorkspaceBrowserContent({filesOnly=false,model,collection,academicContext,onContextChange,actions,revision=0,routeSearch,onExternalFiles}:{filesOnly?:boolean;model:ResourceLibraryReady;collection:'my'|'shared';academicContext:{subjectId:string;chapterId:string};onContextChange:(context:{subjectId:string;chapterId:string})=>void;actions:ReactNode;revision?:number;routeSearch:string;onExternalFiles?:(files:File[])=>void}){
+ const student=useStudentContext();
+ const online=useSyncExternalStore(subscribeOnline,onlineSnapshot,serverOnlineSnapshot);
+ const [drag,setDrag]=useState<WorkspaceDrag|null>(null),[drop,setDrop]=useState<{id:string;allowed:boolean}|null>(null),[notice,setNotice]=useState('');
+ useEffect(()=>{if(!notice||drag)return;const timer=window.setTimeout(()=>setNotice(''),3500);return()=>clearTimeout(timer);},[notice,drag]);
+ const initial=readWorkspaceNavigation(routeSearch,collection);
+ const preferenceKey=workspacePreferenceKey(student.userId??'guest',student.contextKey);
+ const storageKey=`ca-resource-views:${student.userId??'guest'}`;
+
+ const requestScope=JSON.stringify([student.userId??'guest',student.contextKey]);
+ const startingQuery={...initial.query,...(!routeSearch.includes('fmView')?academicContext:{})};
+ const startingPage=peekWorkspacePage(requestScope,workspaceRequestUrl(collection,initial.location.view,initial.location.folder,startingQuery,'',filesOnly));
+ const [resolvedUrl,setResolvedUrl]=useState(()=>startingPage?workspaceRequestUrl(collection,initial.location.view,initial.location.folder,startingQuery,'',filesOnly):'');
+ const [folderKind,setFolderKind]=useState<'folder'|'notebook'|'section'>('folder');
+ const [data,setData]=useState<WorkspacePage|null>(()=>startingPage?.data??previewWorkspacePage(requestScope,workspaceRequestUrl(collection,initial.location.view,initial.location.folder,startingQuery,'',filesOnly))??null),[query,setQuery]=useState<ManagerQuery|null>(startingQuery),[cursors,setCursors]=useState<string[]>(['']),[page,setPage]=useState(1),[error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[dialog,setDialog]=useState<Dialog|null>(null),[name,setName]=useState(''),[destination,setDestination]=useState(''),[views,setViews]=useState<SavedView[]>([]),[loading,setLoading]=useState(false);
+ const [selectedFolder,setSelectedFolder]=useState('');const lastFolderTap=useRef({id:'',at:0});
+ const folderMenuId=useId();
+ const [folderMenu,setFolderMenu]=useState<{id:string;x:number;y:number;trigger:HTMLElement}|null>(null);
+ const closeFolderMenu=useCallback((restore:boolean)=>{if(restore&&folderMenu?.trigger.isConnected)folderMenu.trigger.focus();setFolderMenu(null);},[folderMenu]);
+ const touchTransfer=useRef<DataTransfer|null>(null);
+ const pending=useRef(false);
+ const [tagMode,setTagMode]=useState<'replace'|'unchanged'|'clear'>('replace');
+ const [dialogError,setDialogError]=useState('');
+ function setOperation(result:OperationResult|null){
+  if(!result)return;const failed=result.items.filter(item=>!item.ok);const count=result.items.filter(item=>item.ok).length;
+  const messages:Record<string,string>={trash:'Moved to Trash.',move:'Moved.',restore:'Restored.',erase:'Deleted permanently.',rename:'Renamed.',tag:'Tags updated.',star:'Updated.',share:'Submitted for Community review.','create-folder':'Folder created.','rename-folder':'Folder renamed.','move-folder':'Folder moved.','delete-folder':'Folder deleted.','restore-folder':'Folder restored.'};
+  const message=result.failed?result.message??'The change could not be saved.':failed.length?`${count} updated; ${failed.length} need attention.`:result.message&&result.message!=='Change saved.'?result.message:messages[result.action]??'Changes saved.';
+  resourceConfirmation(requestScope,message,Boolean(result.failed||failed.length));
+ }
+ const view=initial.location.view,folder=initial.location.folder;
+ const restoredSubject=routeSearch.includes('fmView')?initial.query.subjectId:academicContext.subjectId;
+ const restoredChapter=routeSearch.includes('fmView')?initial.query.chapterId:academicContext.chapterId;
+ useEffect(()=>{if(routeSearch.includes('fmView'))onContextChange({subjectId:restoredSubject,chapterId:restoredChapter});},[routeSearch,restoredSubject,restoredChapter,onContextChange]);
+ const queryString=query?JSON.stringify(query):'';
+ const changeQuery=useCallback((next:ManagerQuery)=>{if(JSON.stringify(query)===JSON.stringify(next))return;const location=readWorkspaceNavigation(window.location.search,collection).location;const search=writeWorkspaceNavigation(window.location.search,location,next);window.history.replaceState(window.history.state,'',`${window.location.pathname}?${search}${window.location.hash}`);setQuery(old=>JSON.stringify(old)===JSON.stringify(next)?old:next);setPage(1);setCursors(['']);},[collection,query,setQuery,setPage,setCursors]);
+ const changeLayout=useCallback((layout:WorkspaceLocation['layout'])=>{const current=readWorkspaceNavigation(window.location.search,collection);window.history.replaceState(window.history.state,'',`${window.location.pathname}?${writeWorkspaceNavigation(window.location.search,{...current.location,layout},current.query)}${window.location.hash}`);},[collection]);
+ const closeDialog=useCallback(()=>{if(!pending.current)setDialog(null);},[]);
+ useEffect(()=>{const timer=window.setTimeout(()=>{try{const saved=JSON.parse(localStorage.getItem(storageKey)??'[]');if(Array.isArray(saved))setViews(saved.filter(v=>v&&typeof v.name==='string'&&v.query&&typeof v.view==='string'&&typeof v.folder==='string'&&Array.isArray(v.query.types)&&typeof v.query.query==='string'&&[24,48,96].includes(v.query.limit)).slice(0,12));}catch{}},0);return()=>clearTimeout(timer);},[storageKey]);
+ const cursor=cursors[page-1]??'';
+ const cacheKey=`workspace-page:${filesOnly?'files-only:':''}${student.contextKey}:${collection}:${view}:${folder}:${queryString}:${cursor}`;
+ useEffect(()=>{if(revision>0)invalidateWorkspacePages(requestScope);},[revision,requestScope]);
+ const requestUrl=workspaceRequestUrl(collection,view,folder,queryString?JSON.parse(queryString):startingQuery,cursor,filesOnly);
+ useEffect(()=>{
+  const controller=new AbortController(),cached=peekWorkspacePage(requestScope,requestUrl);let received=false;
+  Promise.resolve().then(()=>{if(!controller.signal.aborted){if(cached){setData(cached.data);setResolvedUrl(requestUrl);}setLoading(!cached);}});
+  if(!cached&&student.userId&&!refresh&&!revision&&canRestoreWorkspaceSnapshot(requestScope)){
+   const owner=student.userId;
+   void Promise.all([getOfflineMeta<WorkspacePage>(owner,cacheKey),getOfflineMeta<number>(owner,cacheKey+':saved-at'),getPendingMutations(owner)]).then(([snapshot,savedAt,pending])=>{
+    if(snapshot&&savedAt&&Date.now()-savedAt<30000&&!received&&!controller.signal.aborted&&canRestoreWorkspaceSnapshot(requestScope)&&!pending.some(item=>item.contextKey===student.contextKey)){setData(snapshot);setLoading(false);}
+   }).catch(()=>undefined);
+  }
+  loadWorkspacePage(requestScope,requestUrl,refresh>0||revision>0).then(payload=>{
+   if(controller.signal.aborted)return;received=true;setData(payload);setResolvedUrl(requestUrl);if(student.userId)void Promise.all([putOfflineMeta(student.userId,cacheKey,payload),putOfflineMeta(student.userId,cacheKey+':saved-at',Date.now())]).catch(()=>undefined);setError('');setLoading(false);
+  }).catch(async cause=>{if(controller.signal.aborted)return;received=true;setLoading(false);if(cause instanceof Error&&cause.message.includes('page expired')){setPage(1);setCursors(['']);}if(student.userId&&!navigator.onLine){const cached=await getOfflineMeta<WorkspacePage>(student.userId,cacheKey).catch(()=>null);if(cached&&!controller.signal.aborted){let projected=cached;for(const pending of await getPendingMutations(student.userId)){if(pending.contextKey!==student.contextKey||pending.status==='blocked')continue;const edit=JSON.parse(pending.body);if(edit.url==='/api/resources/workspace')projected=projectWorkspaceOperation(projected,edit.body,view,folder);}setData(projected);}else if(!controller.signal.aborted)setData({files:[],total:0,folders:[],path:[],nextCursor:null});}setError(navigator.onLine?(cause instanceof Error?cause.message:'Files could not be loaded.'):'Offline: this view shows its previously saved page. Complete search needs a connection.');});
+  return()=>controller.abort();
+ },[requestScope,requestUrl,refresh,revision,cacheKey,student.userId,student.contextKey,view,folder]);
+ // Preload only a few immediate destinations. Hover/focus warms any other folder.
+ const warmFolder=(id:string)=>{if(online)void loadWorkspacePage(requestScope,workspaceRequestUrl(collection,'folder',id,query??initial.query,'',filesOnly)).catch(()=>undefined);};
+ useEffect(()=>{
+  if(!data||!online)return;
+  const timer=window.setTimeout(()=>{
+   const children=data.folders.filter(item=>item.parent_id===(folder||null)).slice(0,2);
+   for(const item of children)void loadWorkspacePage(requestScope,workspaceRequestUrl(collection,'folder',item.id,JSON.parse(queryString||'{}'),'',filesOnly)).catch(()=>undefined);
+   void loadWorkspacePage(requestScope,workspaceRequestUrl(collection==='my'?'shared':'my','all','',JSON.parse(queryString||'{}'),'',filesOnly)).catch(()=>undefined);
+  },250);
+  return()=>clearTimeout(timer);
+ },[data,online,requestScope,collection,folder,queryString,filesOnly]);
+ useEffect(()=>{const refreshCurrent=()=>{if(navigator.onLine)setRefresh(value=>value+1);};window.addEventListener('focus',refreshCurrent);window.addEventListener('online',refreshCurrent);return()=>{window.removeEventListener('focus',refreshCurrent);window.removeEventListener('online',refreshCurrent);};},[]);
+ const selectView=(next:string,id='',nextQuery=query??initial.query)=>{const location={...readWorkspaceNavigation(window.location.search,collection).location,view:next as WorkspaceLocation['view'],folder:id};const search=writeWorkspaceNavigation(window.location.search,location,nextQuery);window.history.pushState(window.history.state,'',`${window.location.pathname}?${search}${window.location.hash}`);window.dispatchEvent(new Event('ca-files-navigation'));};
+ async function mutate(body:Record<string,unknown>){if(pending.current)return false;invalidateWorkspacePages(requestScope);pending.current=true;setBusy(true);setDialogError('');setOperation(null);try{if(!navigator.onLine){if(!student.userId)throw Error('Sign in before making offline changes.');if(!['create-folder','rename-folder','move-folder','delete-folder','restore-folder','move','star','trash','restore'].includes(String(body.action)))throw Error('This file action needs a connection.');let offlinePage=data;const keys=Array.isArray(body.keys)?body.keys:[null];for(const key of keys){const file=data?.files.find(item=>item.key===key);const f=[...(data?.folders??[]),...(data?.trashFolders??[])].find(item=>item.id===body.id);const expected=String(body.action)==='create-folder'?null:f?{name:f.name,parent_id:f.parent_id,trashed_at:f.trashed_at??null,trash_expires_at:f.trash_expires_at??null}:file?.workspaceBaseline??null;if(key&&!file)throw Error('Open this file online before editing it offline.');if(String(body.action).endsWith('-folder')&&body.action!=='create-folder'&&!f)throw Error('Open this folder online before changing it offline.');const saved=await offlineMutationFetch(student.userId,'/api/v1/resources/workspace',{...body,...(key?{keys:[key]}:{}),clientId:crypto.randomUUID()},{},expected);if(offlinePage)offlinePage=projectWorkspaceOperation(offlinePage,saved.body,view,folder);}if(offlinePage)setData(offlinePage);setOperation({action:String(body.action),items:[],message:'Saved on this device.'});return true;}const response=await fetch('/api/v1/resources/workspace',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const payload=await response.json();if(!response.ok){if([403,404].includes(response.status)){setRefresh(value=>value+1);setNotice(typeof payload.error==='string'?payload.error:'This action is no longer available. Review the current selection.');}throw Error(payload.error??'Action could not be completed.');}const items:OperationItem[]=Array.isArray(payload.results)?payload.results.map((item:OperationItem)=>({...item,label:data?.files.find(file=>file.key===item.key)?.name})):[];const failures=items.filter(item=>!item.ok);const failedKeys=failures.map(item=>item.key);
+   const retry=failures.length?{...body,...(body.action==='undo'?{items:(body.items as {key:string}[]).filter(item=>failedKeys.includes(item.key))}:{keys:failedKeys})}:undefined;
+   setOperation({action:String(body.action),items,message:items.length?undefined:'Change saved.',retry});
+   if(failures.length){setDialogError(failures.map(item=>item.error??'File could not be changed.').join(' '));setDialog(old=>old?.keys?{...old,keys:failedKeys}:old);}
+   setRefresh(value=>value+1);setPage(1);setCursors(['']);return failures.length===0;
+  }catch(cause){const message=cause instanceof Error?cause.message:'Action could not be completed.';setDialogError(message);setOperation({action:String(body.action),items:[],message,failed:true});return false;}finally{pending.current=false;setBusy(false);}}
+ function openDialog(value:Dialog,initialName=''){setDialog(value);setDialogError('');setTagMode((value.keys?.length??0)>1?'unchanged':'replace');setName(initialName);setDestination(value.action==='replace-version'?'':folder);}
+ async function submitDialog(){if(!dialog||pending.current)return;if(dialog.action==='tag'&&tagMode==='unchanged'){setDialog(null);return;}if(dialog.action==='save-view'){if(!query||!name.trim())return;const saved=[...views.filter(v=>v.name!==name.trim()),{name:name.trim().slice(0,60),query,view,folder}].slice(-12);try{localStorage.setItem(storageKey,JSON.stringify(saved));setViews(saved);setDialog(null);}catch{setDialogError('This device could not save the view.');}return;}if((dialog.action==='move'||dialog.action==='move-folder')&&!pickerEligibility(destination).allowed)return;if(await mutate({...dialog,confirm:dialog.action==='erase'||dialog.action==='share'?true:undefined,name,clientId:crypto.randomUUID(),tags:dialog.action==='tag'?(tagMode==='clear'?[]:name.split(',').map(v=>v.trim()).filter(Boolean)):undefined,kind:folderKind,sourceId:dialog.action==='replace-version'?destination:undefined,folderId:dialog.action==='create-folder'||dialog.action==='create-page'?folder:destination})){setDialog(null);if(dialog.action==='delete-folder'&&dialog.id===folder)selectView('folder',currentFolder?.parent_id??'');}}
+ const fileActions=(files:ManagedFile[]):FileAction[]=>{
+  if(collection!=='my')return[];
+  const keys=files.map(file=>file.key);const one=files.length===1?files[0]:null;
+  const candidates:{id:WorkspaceAction;label:string;execute:()=>void;danger?:boolean}[]=view==='trash'?[
+   {id:'restore',label:'Restore',execute:()=>void mutate({action:'restore',keys})},
+   {id:'erase',label:'Delete permanently',danger:true,execute:()=>{openDialog({action:'erase',keys});}}
+  ]:[
+   {id:'share',label:'Share with Community',execute:()=>openDialog({action:'share',keys})},
+   {id:'tag',label:'Tags',execute:()=>openDialog({action:'tag',keys})},
+   ...(one?[{id:'rename' as const,label:'Rename',execute:()=>openDialog({action:'rename',keys},one.name)},{id:'duplicate' as const,label:'Duplicate',execute:()=>void mutate({action:'duplicate',keys,clientId:crypto.randomUUID()})},...(one.kind!=='note'?[{id:'replace-version' as const,label:'Replace version',execute:()=>openDialog({action:'replace-version',keys})}]:[])]:[]),
+   {id:'move',label:'Move',execute:()=>openDialog({action:'move',keys})},
+   {id:'star',label:files.every(file=>file.starred)?'Unstar':'Star',execute:()=>void mutate({action:'star',keys,starred:!files.every(file=>file.starred)})},
+   {id:'trash',label:'Move to Trash',danger:true,execute:()=>void mutate({action:'trash',keys})}
+  ];
+  return candidates.map(action=>{const eligible=actionEligibility(action.id,files,{collection,online});return{...action,disabled:busy||loading||!eligible.allowed,reason:busy||loading?'Wait for the current operation.':eligible.reason,execute:()=>{const current=actionEligibility(action.id,files,{collection,online:navigator.onLine});if(busy||loading||!current.allowed){setError(current.reason??'Wait for the current operation.');return;}action.execute();}};});
+ };
+ const dropFolders=(data?.folders??[]).map(item=>({id:item.id,parentId:item.parent_id,trashed:Boolean(item.trashed_at)}));
+ function startDrag(event:React.DragEvent,entities:WorkspaceDrag['entities']){
+  if(collection!=='my'||view==='trash'||busy||loading||!student.userId){event.preventDefault();return;}
+  const value:WorkspaceDrag={version:1,ownerId:student.userId,scope:student.contextKey,entities};setDrag(value);event.dataTransfer.effectAllowed='copyMove';event.dataTransfer.setData(INTERNAL_FILE_DRAG_TYPE,JSON.stringify(value));setNotice(`${entities.length} item${entities.length===1?'':'s'} selected to move.`);
+ }
+ function destinationEligibility(value:WorkspaceDrag,id:string|null){
+  if(collection!=='my'||view==='trash'||busy||loading)return{allowed:false,reason:'Choose an available folder in My files.'};
+  for(const entity of value.entities){if(entity.kind==='file'){const file=data?.files.find(item=>item.key===entity.id);if(!file||(file.folderId??null)!==entity.parentId||!actionEligibility('move',[file],{collection,online}).allowed)return{allowed:false,reason:'These files are no longer available to move.'};}else{const source=data?.folders.find(item=>item.id===entity.id);if(!source||source.parent_id!==entity.parentId)return{allowed:false,reason:'The source folder changed. Select it again.'};if(source.kind==='section'&&data?.folders.find(item=>item.id===id)?.kind!=='notebook')return{allowed:false,reason:'Sections must remain inside a notebook.'};}}
+  return moveDropEligibility(value,id,dropFolders);
+ }
+ function dragOver(event:React.DragEvent){
+  const kind=classifyWorkspaceDrop(Array.from(event.dataTransfer.types));if(kind==='unsupported')return;
+  event.preventDefault();
+  if(kind==='upload'){const allowed=Boolean(onExternalFiles)&&collection==='my'&&view!=='trash';event.dataTransfer.dropEffect=allowed?'copy':'none';setNotice(allowed?'Drop files to review them before uploading.':'Open My files to upload files.');return;}
+  const community=(event.target as HTMLElement|null)?.closest('[data-workspace-drop="community"]');
+  if(community){const files=data?.files.filter(file=>drag?.entities.some(entity=>entity.kind==='file'&&entity.id===file.key))??[];const allowed=Boolean(drag)&&drag!.entities.every(entity=>entity.kind==='file')&&actionEligibility('share',files,{collection,online}).allowed&&!busy&&!loading;event.dataTransfer.dropEffect=allowed?'copy':'none';setDrop({id:'community',allowed});setNotice(allowed?'Drop to review sharing with Community.':'Choose your own files while online to share.');return;}
+  const target=(event.target as HTMLElement|null)?.closest<HTMLElement>('[data-folder-target],[data-workspace-drop="root"]');const id=target?.dataset.folderTarget??target?.dataset.workspaceDrop;
+  if(!drag||!id){event.dataTransfer.dropEffect='none';setDrop(old=>old?null:old);return;}
+  const eligible=destinationEligibility(drag,id==='root'?null:id);event.dataTransfer.dropEffect=eligible.allowed?'move':'none';setNotice(eligible.allowed?'Drop to move these items.':eligible.reason??'This destination is unavailable.');setDrop(old=>old?.id===id&&old.allowed===eligible.allowed?old:{id,allowed:eligible.allowed});
+ }
+ async function dropped(event:React.DragEvent){
+  const kind=classifyWorkspaceDrop(Array.from(event.dataTransfer.types));if(kind==='unsupported')return;
+  event.preventDefault();event.stopPropagation();setDrop(null);
+  if(kind==='upload'){
+   setDrag(null);if(!onExternalFiles||collection!=='my'||view==='trash'){setError('Open My files to upload files.');return;}
+   if(Array.from(event.dataTransfer.items).some(item=>item.webkitGetAsEntry?.()?.isDirectory)){setError('Drop individual files. Folder uploads are not supported yet.');return;}
+   const files=Array.from(event.dataTransfer.files);if(files.length>20){setError('Choose up to 20 files per upload batch.');return;}if(files.length)onExternalFiles(files);return;
+  }
+  const value=parseWorkspaceDrag(event.dataTransfer.getData(INTERNAL_FILE_DRAG_TYPE),student.userId??'',student.contextKey);
+  if(!value||!drag||JSON.stringify(value)!==JSON.stringify(drag)){setError('This drag has expired. Select the items again.');setDrag(null);return;}
+  const community=(event.target as HTMLElement|null)?.closest('[data-workspace-drop="community"]');
+  if(community){const files=data?.files.filter(file=>value.entities.some(entity=>entity.kind==='file'&&entity.id===file.key))??[];const eligible=actionEligibility('share',files,{collection,online:navigator.onLine});setDrag(null);if(value.entities.some(entity=>entity.kind!=='file')||!eligible.allowed||busy||loading){setError(eligible.reason??'Choose available files to share.');return;}openDialog({action:'share',keys:files.map(file=>file.key)});return;}
+  const target=(event.target as HTMLElement|null)?.closest<HTMLElement>('[data-folder-target],[data-workspace-drop="root"]');const id=target?.dataset.folderTarget??target?.dataset.workspaceDrop;
+  if(!id){setDrag(null);return;}const destination=id==='root'?null:id;const eligible=destinationEligibility(value,destination);
+  setDrag(null);if(!eligible.allowed){setError(eligible.reason??'This destination is unavailable.');return;}
+  const moving=value.entities.filter(entity=>entity.parentId!==destination);
+  let ok=true;
+  if(moving.every(entity=>entity.kind==='file'))ok=await mutate({action:'move',keys:moving.map(entity=>entity.id),folderId:destination});
+  else if(moving.length===1&&moving[0].kind==='folder')ok=await mutate({action:'move-folder',id:moving[0].id,folderId:destination});
+  else{setError('Move files and folders separately.');return;}
+  setNotice(ok?'':'Some items could not be moved. Your remaining selection is retained.');
+ }
+ function touchDrag(keys:string[],phase:FileDragPhase,x:number,y:number){
+  if(phase==='cancel'){touchTransfer.current=null;setDrag(null);setDrop(null);setNotice('');return;}
+  const files=data?.files.filter(file=>keys.includes(file.key))??[];
+  if(phase==='start'){if(files.length!==keys.length||files.some(file=>!file.canManage||file.trashedAt)||busy||loading)return;try{touchTransfer.current=new DataTransfer();}catch{setNotice('Use Move or Share in the selection toolbar.');return;}}
+  const transfer=touchTransfer.current;if(!transfer)return;
+  const target=document.elementFromPoint(x,y);const event={dataTransfer:transfer,target,preventDefault(){},stopPropagation(){}} as unknown as React.DragEvent;
+  if(phase==='start')startDrag(event,files.map(file=>({kind:'file',id:file.key,parentId:file.folderId??null})));
+  else if(phase==='move')dragOver(event);
+  else{touchTransfer.current=null;void dropped(event);}
+ }
+ const sidebarDrag=useEffectEvent((event:DragEvent)=>{if(!event.dataTransfer||event.defaultPrevented||!(event.target instanceof Element)||!event.target.closest('[data-workspace-drop]'))return;if(event.type==='drop')void dropped(event as unknown as React.DragEvent);else dragOver(event as unknown as React.DragEvent);});
+ useEffect(()=>{const handle=(event:DragEvent)=>sidebarDrag(event);document.addEventListener('dragover',handle);document.addEventListener('drop',handle);return()=>{document.removeEventListener('dragover',handle);document.removeEventListener('drop',handle);};},[]);
+ useEffect(()=>{for(const node of document.querySelectorAll<HTMLElement>('[data-workspace-drop]')){const id=node.dataset.workspaceDrop;const state=drag&&drop?.id===(id==='root'?'root':'community')?(drop.allowed?'allowed':'blocked'):undefined;if(state)node.dataset.dropState=state;else delete node.dataset.dropState;}return()=>{for(const node of document.querySelectorAll<HTMLElement>('[data-workspace-drop]'))delete node.dataset.dropState;};},[drag,drop]);
+ function pickerEligibility(id:string){
+  if(!dialog||!data)return{allowed:false,reason:'Wait for the folders to load.'};
+  const entities:WorkspaceDrag['entities']=dialog.action==='move-folder'?(data.folders.filter(item=>item.id===dialog.id).map(item=>({kind:'folder' as const,id:item.id,parentId:item.parent_id}))):data.files.filter(item=>dialog.keys?.includes(item.key)).map(item=>({kind:'file' as const,id:item.key,parentId:item.folderId??null}));
+  return destinationEligibility({version:1,ownerId:student.userId??'',scope:student.contextKey,entities},id||null);
+ }
+ function targetProps(id:string){return{'data-folder-target':id,'data-drop-state':drop?.id===id?(drop.allowed?'allowed':'blocked'):undefined};}
+ const folderList=(data?.folders??[]).filter(item=>item.parent_id===(folder||null));const currentFolder=data?.path.at(-1)?.id===folder?data.path.at(-1):undefined;
+ const communityFolders:SidebarFolder[]=model.subjects.flatMap(subject=>[{id:'subject:'+subject.id,name:subject.title,parent_id:null},...subject.chapters.map(chapter=>({id:'chapter:'+chapter.id,name:chapter.title,parent_id:'subject:'+subject.id}))]);
+ const sidebarFolders=collection==='shared'?communityFolders:view==='trash'?data?.trashFolders??[]:data?.folders??[];
+ const sidebarCurrent=collection==='shared'?(query?.chapterId?'chapter:'+query.chapterId:query?.subjectId?'subject:'+query.subjectId:''):folder;
+ const openSidebar=(id:string)=>{if(collection!=='shared'){selectView(view==='trash'?'trash':'folder',id);return;}const subject=model.subjects.find(subject=>id==='subject:'+subject.id||subject.chapters.some(chapter=>id==='chapter:'+chapter.id));if(subject)selectView('all','',{...query??initial.query,subjectId:subject.id,chapterId:id.startsWith('chapter:')?id.slice(8):''});};
+ const menuFolder=folderMenu?data?.folders.find(item=>item.id===folderMenu.id):undefined;
+
+
+ function showFolderMenu(id:string,trigger:HTMLElement,x:number,y:number){if(busy)return;setFolderMenu({id,trigger,x,y});}
+ const folderActions:FileAction[]=menuFolder?[
+  {id:'open',label:'Open',execute:()=>selectView('folder',menuFolder.id)},
+  {id:'rename',label:'Rename',disabled:busy||loading,execute:()=>openDialog({action:'rename-folder',id:menuFolder.id},menuFolder.name)},
+  {id:'move',label:'Move',disabled:busy||loading,execute:()=>openDialog({action:'move-folder',id:menuFolder.id})},
+  {id:'trash',label:'Delete empty folder',danger:true,disabled:busy||loading,execute:()=>openDialog({action:'delete-folder',id:menuFolder.id},menuFolder.name)}
+ ]:[];
+
+ return <div className="fm-server-workspace" aria-busy={loading} onDragOver={dragOver} onDrop={event=>void dropped(event)} onDragEnd={()=>{setDrag(null);setDrop(null);setNotice('');}} onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDrop(null);}}>
+  <SidebarFolderTree folders={sidebarFolders} current={sidebarCurrent} onOpen={openSidebar} onWarm={collection==='my'&&view!=='trash'?warmFolder:undefined} dropProps={collection==='my'&&view!=='trash'?targetProps:undefined}/>
+  {notice?<p role="status" className="fm-interaction-status">{notice}</p>:null}
+  {view==='trash'?<><p className="fm-trash-note">Files and empty folders can be restored for 30 days. Restore a file before opening or changing it.</p><div className="fm-real-folders">{data?.trashFolders?.map(item=><button key={item.id} disabled={busy} onClick={()=>void mutate({action:'restore-folder',id:item.id})}>Restore folder: {item.name}</button>)}</div></>:null}
+  {view==='folder'&&folder&&data&&!loading&&!currentFolder?<p role="alert">This folder is unavailable. <button onClick={()=>selectView('folder')}>Return to My files</button></p>:null}
+  {error?<p role="alert" className="phase7-inline-error">{error}<button onClick={()=>setRefresh(value=>value+1)}>Retry</button></p>:null}
+
+  <FileManager loading={loading||(!data&&!error)} filterView={collection==='my'?{value:view,folder,onApply:(next,nextQuery,nextFolder)=>selectView(next,next==='folder'?(nextFolder??folder):'',nextQuery)}:undefined} location={collection==='my'&&(view==='all'||view==='folder')?<nav className="fm-breadcrumbs" aria-label="Folder path"><button {...targetProps('root')} aria-current={!folder?'page':undefined} onPointerEnter={()=>warmFolder('')} onFocus={()=>warmFolder('')} onClick={()=>selectView('folder')}>Resources</button>{data?.path.map(item=><button aria-label={item.name} {...targetProps(item.id)} aria-current={item.id===folder?'page':undefined} key={item.id} onPointerEnter={()=>warmFolder(item.id)} onFocus={()=>warmFolder(item.id)} onClick={()=>selectView('folder',item.id)}>{item.name}</button>)}{currentFolder?<button type="button" aria-label="Current folder actions" aria-haspopup="menu" onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();showFolderMenu(currentFolder.id,event.currentTarget,rect.left,rect.bottom);}}><Icon name="more" size={16}/></button>:null}</nav>:<nav className="fm-breadcrumbs" aria-label="Folder path">{view==='trash'?<><button onClick={()=>selectView('trash')}>Trash</button>{data?.path.map(item=><button key={item.id} onClick={()=>selectView('trash',item.id)}>{item.name}</button>)}</>:<span>{collection==='shared'?'Community':view==='starred'?'Starred':'Recent'}</span>}</nav>} locationContent={(view==='folder'||view==='all')&&collection==='my'?<div className="fm-location-content"><div className="fm-real-folders">{folderList.map(item=><div className={`fm-folder-tile${selectedFolder===item.id?' is-selected':''}`} key={item.id}><button className="fm-folder-open" {...targetProps(item.id)} draggable={!busy&&!loading} onDragStart={event=>startDrag(event,[{kind:'folder',id:item.id,parentId:item.parent_id}])} onContextMenu={event=>{event.preventDefault();showFolderMenu(item.id,event.currentTarget,event.clientX,event.clientY);}} onKeyDown={event=>{if(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10')){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();showFolderMenu(item.id,event.currentTarget,rect.left,rect.bottom);}}} onPointerEnter={()=>warmFolder(item.id)} onFocus={()=>warmFolder(item.id)} aria-pressed={selectedFolder===item.id} onClick={event=>{setSelectedFolder(item.id);if(event.detail===0){selectView('folder',item.id);return;}if(window.matchMedia('(pointer:coarse)').matches){const at=performance.now();if(lastFolderTap.current.id===item.id&&at-lastFolderTap.current.at<400){lastFolderTap.current={id:'',at:0};selectView('folder',item.id);}else lastFolderTap.current={id:item.id,at};}}} onDoubleClick={()=>{if(!window.matchMedia('(pointer:coarse)').matches)selectView('folder',item.id);}}><svg className="fm-folder-glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>{item.kind!=='folder'?<path d={item.kind==='notebook'?'M8 10v7M11 10h6M11 14h6':'M8 11h8M8 15h5'}/>:null}</svg><span className="fm-folder-name" title={item.name}>{item.name}</span></button><button className="fm-folder-menu" type="button" disabled={busy} aria-label={`Actions for folder ${item.name}`} aria-haspopup="menu" aria-expanded={folderMenu?.id===item.id} aria-controls={folderMenu?.id===item.id?folderMenuId:undefined} onClick={event=>{if(folderMenu?.id===item.id){closeFolderMenu(true);return;}const rect=event.currentTarget.getBoundingClientRect();showFolderMenu(item.id,event.currentTarget,rect.right-264,rect.bottom);}}><Icon name="more" size={18}/></button></div>)}</div></div>:null} filesOnly={filesOnly} extraFilters={collection==='my'?(restore,close)=><div className="fm-saved-view-tools"><button type="button" onClick={()=>{close();openDialog({action:'save-view'});}}>Save applied view</button>{views.length?<select aria-label="Saved views" value="" onChange={event=>{const saved=views[Number(event.target.value)];if(!saved)return;restore(saved.query,saved.view,saved.folder);}}><option value="">Load saved view</option>{views.map((saved,index)=><option value={index} key={saved.name}>{saved.name}</option>)}</select>:null}</div>:undefined} onFileUpdated={()=>{invalidateWorkspacePages(requestScope);setRefresh(value=>value+1);setNotice('File details saved. Files outside the current filters may no longer appear.');}} preferenceKey={preferenceKey} initialLayout={routeSearch.includes('fmLayout')?initial.location.layout:undefined} onLayoutChange={changeLayout} files={data?.files??[]} title={collection==='shared'?'Community':view==='trash'?'Trash':view==='starred'?'Starred':view==='recent'?'Recent':currentFolder?.name??'My resources'} subjects={model.subjects} academicContext={routeSearch.includes('fmView')&&query?{subjectId:query.subjectId,chapterId:query.chapterId}:academicContext} onContextChange={value=>{onContextChange(value);setQuery(old=>old?{...old,...value}:old);}} actions={view==='trash'||collection!=='my'?undefined:<details className="fm-new-menu" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.currentTarget.removeAttribute('open');event.currentTarget.querySelector('summary')?.focus();}}}><summary><span aria-hidden="true">＋</span> New</summary><div onClick={event=>{const target=event.target as HTMLElement;if(target.closest('button,a'))event.currentTarget.closest('details')?.removeAttribute('open');}}>{actions}<button type="button" onClick={()=>{setFolderKind('folder');openDialog({action:'create-folder'});}}>New folder</button>{!filesOnly?<button type="button" onClick={()=>{setFolderKind('notebook');openDialog({action:'create-folder'});}}>New notebook</button>:null}{!filesOnly&&currentFolder?.kind==='notebook'?<button type="button" onClick={()=>{setFolderKind('section');openDialog({action:'create-folder'});}}>New section</button>:null}{!filesOnly&&currentFolder?<button type="button" onClick={()=>openDialog({action:'create-page'})}>New page</button>:null}<a href={`/notes/new?${new URLSearchParams({subjectId:academicContext.subjectId,chapterId:academicContext.chapterId})}`}>Create note</a></div></details>} remote={data?{pending:resolvedUrl!==requestUrl,total:data.total,page,hasMore:Boolean(data.nextCursor),onQueryChange:changeQuery,onPageChange:next=>{if(next>page&&data.nextCursor)setCursors(old=>{const list=[...old];list[page]=data.nextCursor!;return list;});setPage(next);}}:{total:0,page:1,hasMore:false,onQueryChange:changeQuery,onPageChange:()=>{}}} fileActions={fileActions} onTouchDragFiles={collection==='my'&&view!=='trash'?touchDrag:undefined} onDragFiles={collection==='my'&&view!=='trash'?(event,files)=>{if(files.some(file=>!file.canManage||file.trashedAt)){event.preventDefault();return;}startDrag(event,files.map(file=>({kind:'file',id:file.key,parentId:file.folderId??null})));}:undefined} onOpenFile={file=>{if(file.canManage&&!file.trashedAt)void fetch("/api/v1/resources/workspace",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"opened",keys:[file.key]})}).catch(()=>undefined);}} initialQuery={query??undefined}/>
+  {folderMenu&&menuFolder?<FileActionMenu id={folderMenuId} label="Folder actions" anchor={folderMenu.trigger} actions={folderActions} x={folderMenu.x} y={folderMenu.y} onClose={closeFolderMenu}/>:null}
+  <Modal open={Boolean(dialog)} onClose={closeDialog} title={dialog?.action==='share'?'Share with Community':dialog?.action==='erase'?'Delete permanently':dialog?.action==='delete-folder'?'Delete empty folder':dialog?.action==='create-page'?'New page':dialog?.action==='tag'?'Edit tags':dialog?.action==='rename'?'Rename file':dialog?.action==='replace-version'?'Replace with an uploaded file':dialog?.action==='save-view'?'Save current view':dialog?.action==='move'||dialog?.action==='move-folder'?'Move to folder':dialog?.action==='rename-folder'?'Rename folder':folderKind==='notebook'?'New notebook':folderKind==='section'?'New section':'New folder'}><form className="fm-workspace-dialog" data-destructive={dialog?.action==='erase'} onSubmit={event=>{event.preventDefault();void submitDialog();}}><fieldset disabled={busy} style={{border:0,padding:0,margin:0,minWidth:0}}>
+   {dialog?.action==='tag'?<label>Tag update<select aria-label="Tag update" value={tagMode} onChange={event=>setTagMode(event.target.value as typeof tagMode)}><option value="unchanged">Leave unchanged</option><option value="replace">Replace tags</option><option value="clear">Clear all tags</option></select></label>:null}
+   {dialog?.action==='share'?<><p>Share {dialog.keys?.length??0} selected file{dialog.keys?.length===1?'':'s'} with Community? Files stay in their folders and become visible to others after moderation. Attachments keep their own access settings.</p><ul className="fm-dialog-targets">{data?.files.filter(file=>dialog.keys?.includes(file.key)).map(file=><li key={file.key}>{file.name}</li>)}</ul></>:dialog?.action==='erase'?<><p>These {dialog.keys?.length??0} files will be permanently deleted. This cannot be undone.</p><ul className="fm-dialog-targets">{data?.files.filter(file=>dialog.keys?.includes(file.key)).map(file=><li key={file.key}>{file.name}</li>)}</ul></>:dialog?.action==='delete-folder'?<p>Delete “{name}” only if it is empty. Move every file and subfolder elsewhere first. Empty folders can be restored from Trash.</p>:dialog?.action==='create-folder'||dialog?.action==='rename-folder'||dialog?.action==='save-view'||dialog?.action==='rename'||dialog?.action==='tag'||dialog?.action==='create-page'?<label>{dialog?.action==='tag'?'Tags, separated by commas':'Name'}<input disabled={dialog.action==='tag'&&tagMode!=='replace'} autoFocus required={dialog.action!=='tag'} maxLength={dialog.action==='tag'?400:dialog.action==='rename'?160:dialog.action==='save-view'?60:120} value={name} onChange={event=>setName(event.target.value)}/>{dialog.action==='tag'?<p className="fm-dialog-hint">Replaces tags on the selected files. Use up to 12 tags, each up to 32 characters. Leave blank to remove all tags.</p>:null}</label>:dialog?.action==='replace-version'?<VersionPicker value={destination} onChange={setDestination} excludeKey={dialog.keys?.[0]}/>:dialog?<FileDestinationPicker folders={data?.folders??[]} value={destination} onChange={setDestination} eligibility={pickerEligibility} onCreate={async name=>{const id=crypto.randomUUID();const ok=await mutate({action:'create-folder',name,folderId:destination,kind:'folder',clientId:id});if(ok)setDestination(id);return ok;}}/>:null}
+   {dialogError?<p role="alert" className="fm-dialog-error">{dialogError} Your input has been retained.</p>:null}
+   <div className="fm-dialog-actions"><button type="button" onClick={closeDialog}>Cancel</button><button disabled={busy||(dialog?.action==='replace-version'&&!destination)||((dialog?.action==='move'||dialog?.action==='move-folder')&&!pickerEligibility(destination).allowed)} type="submit">{busy?'Saving…':dialog?.action==='share'?'Submit for review':dialog?.action==='erase'?'Delete permanently':dialog?.action==='delete-folder'?'Delete empty folder':dialog?.action==='move'||dialog?.action==='move-folder'?'Move here':'Save'}</button></div></fieldset></form></Modal>
+ </div>;
+}
+
+/** Remount collection state on navigation or owner/context changes; old pages never carry over. */
+export function WorkspaceBrowser(props:Omit<Parameters<typeof WorkspaceBrowserContent>[0],'routeSearch'>){
+ const student=useStudentContext();const navigation=useSyncExternalStore(subscribeNavigation,navigationSnapshot,serverNavigationSnapshot);const routeSearch=navigation.slice(navigation.indexOf(':')+1);
+ const scope=JSON.stringify([student.userId??'guest',student.contextKey]);
+ return <><ResourceToast key={scope} scope={scope}/><WorkspaceBrowserContent {...props} key={`${student.userId}:${student.contextKey}:${props.collection}:${navigation}`} routeSearch={routeSearch}/></>;
+}

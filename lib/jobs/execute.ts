@@ -1,3 +1,6 @@
+import {invokeResourceProcessing} from '@/lib/resources/processing-service';
+import {dispatchResourceProcessing} from '@/lib/resources/processing-outbox';
+import {purgeExpiredResourceTrash} from '@/lib/resources/trash-cleanup';
 import "server-only";
 
 import { getHotD1Database, type HotD1Database } from "@/lib/data/d1/runtime";
@@ -6,6 +9,7 @@ import { failIcaiSyncSource, finalizeIcaiSyncContinuation, runIcaiSyncSource, st
 import { runIcaiPhase5ReviewProbe } from "@/lib/icai/phase5";
 import { generateTodayPlanForUser } from "@/lib/smart-planner/service";
 import { enqueueBackgroundJob, type BackgroundJob } from "./queue";
+import { enqueueDueAccountDeletions, processAccountDeletion } from "@/lib/account-deletion/processor";
 
 function db(): HotD1Database { return getHotD1Database(); }
 function json(value: unknown) { return JSON.stringify(value ?? {}); }
@@ -100,19 +104,33 @@ export async function executeBackgroundJob(job: BackgroundJob) {
       const resourceId = typeof job.payload.resourceId === "string" ? job.payload.resourceId : null;
       const userId = typeof job.payload.userId === "string" ? job.payload.userId : null;
       if (!resourceId || !userId) throw new Error("Attachment processing requires resourceId and userId.");
-      await db().prepare("INSERT INTO attachment_processing_jobs(id,resource_id,user_id,status,attempts,updated_at) VALUES(?1,?2,?3,'ready',1,CURRENT_TIMESTAMP) ON CONFLICT(resource_id) DO UPDATE SET status='ready',attempts=attachment_processing_jobs.attempts+1,last_error=NULL,updated_at=CURRENT_TIMESTAMP")
+      await db().prepare("INSERT INTO attachment_processing_jobs(id,resource_id,user_id,status,attempts,updated_at) VALUES(?1,?2,?3,'processing',1,CURRENT_TIMESTAMP) ON CONFLICT(resource_id) DO UPDATE SET status='processing',attempts=attachment_processing_jobs.attempts+1,last_error=NULL,updated_at=CURRENT_TIMESTAMP")
         .bind(crypto.randomUUID(), resourceId, userId).run();
-      return { resourceId, status: "ready" };
+      try{const result=await invokeResourceProcessing(resourceId,userId) as {state:string};await db().prepare("UPDATE attachment_processing_jobs SET status=?1,last_error=?2,updated_at=CURRENT_TIMESTAMP WHERE resource_id=?3").bind(result.state==='quarantined'?'failed':'ready',result.state==='quarantined'?'File quarantined after inspection':null,resourceId).run();return {resourceId,status:result.state};}
+      catch(error){await db().prepare("UPDATE resource_inspections SET state='failed',last_error='Processing will retry',updated_at=CURRENT_TIMESTAMP WHERE resource_id=?1 AND state IN ('queued','processing')").bind(resourceId).run();await db().prepare("UPDATE attachment_processing_jobs SET status='failed',last_error='Processing will retry',updated_at=CURRENT_TIMESTAMP WHERE resource_id=?1").bind(resourceId).run();throw error;}
+    }
+    case "account-deletion-scan":
+      return enqueueDueAccountDeletions();
+    case "account-deletion-process": {
+      const requestId = typeof job.payload.requestId === "string" ? job.payload.requestId : "";
+      return processAccountDeletion(requestId);
     }
     case "cleanup": {
+      await purgeExpiredResourceTrash();
+      const derivatives=await db().prepare('SELECT object_key FROM resource_derivative_cleanup LIMIT 100').all<{object_key:string}>();
+      for(const row of derivatives.results??[]){try{await getResourceR2Bucket().delete(row.object_key);await db().prepare('DELETE FROM resource_derivative_cleanup WHERE object_key=?1').bind(row.object_key).run();}catch{/* Retry next sweep. */}}
+      await db().prepare("INSERT OR IGNORE INTO resource_processing_outbox(resource_id,owner_user_id) SELECT u.id,u.owner_user_id FROM uploaded_resources u WHERE NOT EXISTS(SELECT 1 FROM attachment_processing_jobs j WHERE j.resource_id=u.id) LIMIT 50").run();
+      await dispatchResourceProcessing();
       const days = Math.max(1, Math.min(90, Number(job.payload.retentionDays ?? 30)));
       await db().prepare("DELETE FROM background_jobs WHERE status='succeeded' AND updated_at < datetime('now', ?1)").bind(`-${days} days`).run();
       await db().prepare("DELETE FROM notification_outbox WHERE status='sent' AND created_at < datetime('now', ?1)").bind(`-${days} days`).run();
-      const abandoned = await db().prepare("SELECT id,object_key FROM r2_upload_intents WHERE status='issued' AND expires_at < CURRENT_TIMESTAMP LIMIT 100").all();
+      const abandoned = await db().prepare("SELECT id,object_key FROM r2_upload_intents WHERE (status='issued' AND expires_at < CURRENT_TIMESTAMP OR status='issued' AND julianday(expires_at)<julianday('now') OR status='failed' AND julianday(expires_at)<julianday('now','-7 days')) AND NOT EXISTS(SELECT 1 FROM uploaded_resources u WHERE u.storage_path=r2_upload_intents.object_key) LIMIT 100").all();
       try {
         const bucket = getResourceR2Bucket();
         for (const row of (abandoned.results ?? []) as Array<{id:string;object_key:string}>) {
-          await bucket.delete(row.object_key).catch(() => undefined);
+          const transfer=await db().prepare('SELECT multipart_id FROM resource_transfers WHERE intent_id=?1').bind(row.id).first<{multipart_id:string|null}>();
+          if(transfer?.multipart_id)await bucket.resumeMultipartUpload(row.object_key,transfer.multipart_id).abort().catch(()=>undefined);
+          await bucket.delete(row.object_key);
           await db().prepare("UPDATE r2_upload_intents SET status='abandoned' WHERE id=?1").bind(row.id).run();
         }
       } catch { /* R2 cleanup retries on the next scheduled run. */ }

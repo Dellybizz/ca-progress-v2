@@ -13,7 +13,7 @@ test("billing worker exposes only a provider-owned secure authorization fallback
   assert.match(worker,/url\.hostname\.endsWith\("\.razorpay\.com"\)/);
   assert.match(worker,/authorizationUrl/);
   assert.match(worker,/cache-control", "private, no-store"/);
-  assert.match(worker,/JSON\.stringify\(\{ \.\.\.payload, authorizationUrl \}\)/);
+  assert.match(worker,/JSON\.stringify\(\{ \.\.\.payload, authorizationUrl, initialAmount:local\?\.initial_price_subunits, recurringAmount:local\?\.recurring_price_subunits \}\)/);
 });
 
 test("API-created subscriptions authenticate through Razorpay Standard Checkout while preserving the hosted fallback",()=>{
@@ -21,7 +21,8 @@ test("API-created subscriptions authenticate through Razorpay Standard Checkout 
   assert.match(client,/subscription_id:created\.subscriptionId/);
   assert.match(client,/new window\.Razorpay\(/);
   assert.doesNotMatch(client,/window\.location\.assign\(authorizationUrl\)/);
-  assert.equal((client.match(/\/api\/payments\/create-subscription/g)||[]).length,1);
+  assert.equal((client.match(/\/api\/v1\/payments\/create-subscription/g)||[]).length,2);
+  assert.match(client,/result\.state==='cancelled'\|\|result\.state==='failed'/);
   assert.match(client,/setFallbackUrl\(authorizationUrl\)/);
   assert.match(client,/UPI QR not loading\?/);
   assert.match(client,/Open Razorpay secure page/);

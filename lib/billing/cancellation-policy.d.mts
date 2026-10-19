@@ -1,0 +1,3 @@
+export function enforceCancelledRenewal<T,S>(db:{prepare(q:string):S;batch(statements:S[]):Promise<unknown>},local:Record<string,unknown>,evidence:T):Promise<T & {forcePaidBoundary?:boolean}>;
+export function commercialGraceUntil<S>(db:{prepare(q:string):S},local:Record<string,unknown>,paidThrough:string|null,now?:string):Promise<string|null>;
+export function cancellationRefundEvent<S>(db:{prepare(q:string):S;batch(statements:S[]):Promise<unknown>},provider:(path:string)=>Promise<Record<string,unknown>>,payload:Record<string,unknown>,local:Record<string,unknown>|null,paymentId:string|null):Promise<boolean>;

@@ -27,7 +27,7 @@ test("Product Phase 1 destinations consume and validate Chapter Hub academic con
   const notesRoute = read("app/(student)/notes/page.tsx");
   const resourcesRoute = read("app/(student)/resources/page.tsx");
   const library = read("components/resources/resource-library.tsx");
-  const noteEditor = read("components/resources/note-editor.tsx");
+  const noteEditor = (read("components/resources/note-editor.tsx") + read("components/notes/note-studio.tsx"));
 
   assert.match(studyRoute, /initialSubjectId=\{cleanId\(params\.subjectId\)\}/);
   assert.match(studyRoute, /initialChapterId=\{cleanId\(params\.chapterId\)\}/);
@@ -40,10 +40,10 @@ test("Product Phase 1 destinations consume and validate Chapter Hub academic con
   assert.match(progressRoute, /initialChapterId=\{chapterId\}/);
   assert.match(progressPage, /initialChapterId=\{initialChapterId\}/);
   assert.match(progressTracker, /model\.chapters\.find\(\(chapter\) => chapter\.id === initialChapterId\)/);
-  for (const route of [notesRoute, resourcesRoute]) {
-    assert.match(route, /subjectId\?: string; chapterId\?: string/);
-    assert.match(route, /initialAcademicContext=\{\{ subjectId, chapterId \}\}/);
-  }
+  assert.match(notesRoute, /getResourceLibraryModel/);
+  assert.match(resourcesRoute, /initialAcademicContext=/);
+  assert.match(resourcesRoute, /subjectId:param\(params\.subjectId\)/);
+  assert.match(resourcesRoute, /chapterId:param\(params\.chapterId\)/);
   assert.match(library, /function resolveAcademicContext/);
   assert.match(library, /model\.subjects\.find\(\(item\) => item\.id === context\.subjectId\)/);
   assert.match(library, /subject\.chapters\.some\(\(chapter\) => chapter\.id === context\.chapterId\)/);

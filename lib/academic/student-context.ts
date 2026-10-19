@@ -1,4 +1,5 @@
 import "server-only";
+import {hasTentativeSetup} from "@/lib/profile/setup-state";
 
 import { cache } from "react";
 import { getD1RuntimeDatabase } from "@/lib/data/d1/client";
@@ -12,7 +13,10 @@ export type AcademicContextSelection = {
   attemptKey: string;
 };
 
+export const ACADEMIC_CONTEXT_CONTRACT_VERSION = 1 as const;
+
 export type StudentContextContract = {
+  contractVersion: typeof ACADEMIC_CONTEXT_CONTRACT_VERSION;
   mode: "guest" | "setup" | "invalid" | "ready" | "admin_preview";
   userId: string | null;
   displayName: string;
@@ -81,18 +85,24 @@ export async function validateAcademicContextSelection(input: { level: unknown; 
 async function resolveStudentContextUncached(): Promise<StudentContextContract> {
   const auth = await getRequestAuthContext();
   if (!auth.identity) return {
+    contractVersion: ACADEMIC_CONTEXT_CONTRACT_VERSION,
     mode: "guest", userId: null, displayName: "Guest", role: auth.role, entitlements: [], timezone: "Asia/Kolkata", dailyTargetMinutes: 120, locale: "en-IN",
     selection: null, levelId: null, groupIds: [], subjectIds: [], syllabusVersionIds: [], contextKey: "guest:en-IN", issue: null,
   };
   const profile = await getProfileForUser(auth.identity.id);
   const displayName = profile?.display_name || auth.identity.displayName || auth.identity.email || "Student";
   const base = {
+    contractVersion: ACADEMIC_CONTEXT_CONTRACT_VERSION,
     userId: auth.identity.id, displayName, role: auth.role, entitlements: auth.entitlements,
     timezone: profile?.timezone || "Asia/Kolkata", dailyTargetMinutes: profile?.daily_target_minutes || 120, locale: "en-IN" as const,
   };
   if (!profile?.onboarding_completed_at) return {
     ...base, mode: "setup", selection: null, levelId: null, groupIds: [], subjectIds: [], syllabusVersionIds: [],
     contextKey: `${auth.identity.id}:setup:${profile?.updated_at ?? "new"}`, issue: null,
+  };
+  if(!profile.attempt_key&&await hasTentativeSetup(auth.identity.id))return {
+    ...base,mode:'setup',selection:null,levelId:null,groupIds:[],subjectIds:[],syllabusVersionIds:[],
+    contextKey:`${auth.identity.id}:tentative:${profile.updated_at}`,issue:'Choose a verified attempt in Profile to enable subject-based study tools.',
   };
   const checked = await validateAcademicContextSelection({ level: profile.ca_level, group: profile.group_choice, attemptKey: profile.attempt_key });
   if (!checked.ok) return {
@@ -115,6 +125,7 @@ export async function getAdminPreviewContext(input: { level: unknown; group: unk
   const checked = await validateAcademicContextSelection(input);
   if (!checked.ok) throw new Error(checked.error);
   return {
+    contractVersion: ACADEMIC_CONTEXT_CONTRACT_VERSION,
     mode: "admin_preview", userId: null, displayName: "Admin preview", role: actor.role, entitlements: [], timezone: "Asia/Kolkata", dailyTargetMinutes: 120, locale: "en-IN",
     selection: checked.selection, ...checked.scope,
     contextKey: `preview:${checked.selection.level}:${checked.selection.group}:${checked.selection.attemptKey}`,

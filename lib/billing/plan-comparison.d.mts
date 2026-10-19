@@ -18,3 +18,5 @@ export type PlanComparisonRow = Readonly<{
 export const PLAN_COMPARISON_COLUMNS: readonly PlanComparisonColumn[];
 export const PLAN_COMPARISON_ROWS: readonly PlanComparisonRow[];
 export function planComparisonValue(row: PlanComparisonRow, tier: PlanTier): string;
+
+export function publishedComparisonValue(rule: import("./service").PlanEntitlement | undefined): string;

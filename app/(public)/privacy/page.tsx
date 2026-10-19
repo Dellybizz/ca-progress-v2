@@ -111,6 +111,7 @@ export default function PrivacyPage() {
         <p>
           For questions about this policy or requests relating to your personal information, use the support or contact method provided within CA Progress. Please do not send passwords, authentication tokens, or other sensitive credentials in a privacy request.
         </p>
+        <p><Link href="/account-deletion">Request account deletion</Link> from the app or website. A seven-day safety window allows accidental requests to be cancelled. Personal study data is then removed by the deletion process, while limited payment, tax, fraud-prevention and immutable audit evidence may be retained where legally required.</p>
       </section>
 
       <footer className={styles.footer}>

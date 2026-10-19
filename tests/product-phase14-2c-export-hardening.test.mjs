@@ -104,7 +104,7 @@ test("both Pro CSV routes fail closed and bind export ownership only to the auth
   for (const source of [study, tests]) {
     assert.match(source, /export async function GET\(\)/);
     assert.match(source, /const user = await optionalUser\(\)/);
-    assert.match(source, /billing\.mode !== "ready"/);
+    assert.match(source, /!access\.allowed/);
     assert.match(source, /status: 401/);
     assert.match(source, /status: 403/);
     assert.match(source, /private, no-store/);
@@ -116,17 +116,19 @@ test("both Pro CSV routes fail closed and bind export ownership only to the auth
     assert.doesNotMatch(source, /searchParams|request\.url|request\.json|userId/);
   }
 
-  assert.match(study, /canUseExport\(tier, "study_csv"\)/);
+  assert.match(study, /getPlanFeatureAccessForUser\(user\.id, "study_csv"\)/);
   assert.match(study, /createOwnedStudyCsvStream\(user\.id\)/);
-  assert.match(tests, /canUseExport\(tier, "test_history_csv"\)/);
+  assert.match(tests, /getPlanFeatureAccessForUser\(user\.id, "test_history_csv"\)/);
   assert.match(tests, /createOwnedTestHistoryCsvStream\(user\.id\)/);
 });
 
 test("Settings keeps Pro CSV actions entitlement-gated while allowing later Premium additions", () => {
   const settings = read(SETTINGS_PAGE);
   assert.match(settings, /const billingReady = billing\.mode === "ready"/);
-  assert.match(settings, /canUseExport\(tier, "study_csv"\)/);
-  assert.match(settings, /canUseExport\(tier, "test_history_csv"\)/);
+  assert.match(settings, /getPlanFeatureAccessForUser/);
+  assert.match(settings, /"study_csv"/);
+  assert.match(settings, /getPlanFeatureAccessForUser/);
+  assert.match(settings, /"test_history_csv"/);
   assert.match(settings, /href="\/api\/exports\/study"/);
   assert.match(settings, /href="\/api\/exports\/tests"/);
 });

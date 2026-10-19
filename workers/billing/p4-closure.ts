@@ -1,4 +1,6 @@
+import {supportedMandate} from "../../lib/billing/mandate-schedule.mjs";
 import p4FinalWorker from "./p4-final";
+import {providerFetch} from "./provider-http";
 
 type D1Result<T = Record<string, unknown>> = { results?: T[]; success?: boolean; meta?: { changes?: number } };
 type D1Statement = {
@@ -9,7 +11,7 @@ type D1Statement = {
 };
 type D1Database = { prepare(query: string): D1Statement };
 type Row = Record<string, unknown>;
-type ProviderSubscriptionSnapshot = { status?: unknown; short_url?: unknown };
+type ProviderSubscriptionSnapshot = { status?: unknown; short_url?: unknown; total_count?: unknown };
 type BillingJob =
   | { kind: "webhook"; raw: string; signature: string; eventId: string | null }
   | { kind: "reconcile"; subscriptionId: string; userId: string; reason: string; runId: string | null };
@@ -42,7 +44,7 @@ async function providerSubscriptionSnapshot(subscriptionId: string, env: Env) {
   const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
   if (!keyId || !keySecret) throw new Error("Razorpay recurring checkout is not configured.");
   if (!/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) throw new Error("Stored Razorpay subscription ID is invalid.");
-  const response = await fetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+  const response = await providerFetch(`https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`, {
     method: "GET",
     headers: {
       authorization: `Basic ${btoa(`${keyId}:${keySecret}`)}`,
@@ -53,19 +55,25 @@ async function providerSubscriptionSnapshot(subscriptionId: string, env: Env) {
   return await response.json() as ProviderSubscriptionSnapshot;
 }
 
-async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
+export async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
   if (request.method !== "POST" || new URL(request.url).pathname !== "/create-subscription") return null;
   if (request.headers.get("x-ca-progress-internal") !== "ca-progress-v2-web") return null;
   const userId = clean(request.headers.get("x-ca-progress-user-id"), 128);
   if (!userId) return null;
-  const body = await request.json().catch(() => null) as { planId?: unknown } | null;
+  const body = await request.json().catch(() => null) as { planId?: unknown; paymentMethod?: unknown; policyVersionId?: unknown } | null;
   const planId = clean(body?.planId, 100);
   if (!planId) return null;
 
   const db = database(env);
-  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status
+  const method = body?.paymentMethod ?? "upi";
+  if (!["upi", "card", "emandate"].includes(String(method))) return json({error:"Choose UPI, Card or eMandate."},400);
+  if (body?.policyVersionId) {
+    const effective = await db.prepare("SELECT id FROM plan_policy_versions WHERE plan_id=?1 AND state='published' AND (effective_at IS NULL OR effective_at<=?2) ORDER BY COALESCE(effective_at,published_at,created_at) DESC,version DESC LIMIT 1").bind(planId,new Date().toISOString()).first<Row>();
+    if (effective?.id !== body.policyVersionId) return json({error:"Pricing changed. Refresh the pricing page before checkout."},409);
+  }
+  const unresolved = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits,total_count,billing_duration_value,billing_duration_unit
     FROM razorpay_subscriptions
-    WHERE user_id=?1 AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
+    WHERE user_id=?1 AND gift_id IS NULL AND (status IS NULL OR status NOT IN ('cancelled','completed','expired'))
     ORDER BY created_at DESC LIMIT 21`).bind(userId).all<Row>();
   let rows = unresolved.results ?? [];
   if (rows.length > 20) {
@@ -73,23 +81,30 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
   }
 
   if (rows.length === 0) {
-    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status
-      FROM razorpay_subscriptions WHERE user_id=?1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
+    const latest = await db.prepare(`SELECT provider_subscription_id,plan_id,policy_version_id,provider_plan_id,recurring_provider_plan_id,billing_cycle,recurring_price_subunits,status,provider_offer_id,initial_price_subunits,total_count,billing_duration_value,billing_duration_unit
+      FROM razorpay_subscriptions WHERE user_id=?1 AND gift_id IS NULL AND COALESCE(provider_verified,0)<>1 ORDER BY created_at DESC LIMIT 1`).bind(userId).first<Row>();
     if (latest) rows = [latest];
   }
   if (rows.length === 0) return null;
 
   const verifiedOpen: Array<{ local: Row; providerStatus: string; authorizationUrl: string | null }> = [];
-  for (const local of rows) {
+  // Bound concurrency without accumulating one provider round trip per old setup.
+  const snapshots: PromiseSettledResult<ProviderSubscriptionSnapshot>[] = [];
+  for (let offset = 0; offset < rows.length; offset += 4) {
+    snapshots.push(...await Promise.allSettled(rows.slice(offset, offset + 4).map(local =>
+      providerSubscriptionSnapshot(clean(local.provider_subscription_id, 100), env))));
+  }
+  for (const [index, local] of rows.entries()) {
     const localStatus = clean(local.status, 32);
     if (!KNOWN_SUBSCRIPTION_STATUSES.has(localStatus)) {
       return json({ error: "Checkout is frozen because an existing subscription has an unknown local state. Reconcile billing before retrying.", code: "subscription_state_requires_reconciliation", localStatus }, 409);
     }
 
-    const subscriptionId = clean(local.provider_subscription_id, 100);
     let providerState: ProviderSubscriptionSnapshot;
     try {
-      providerState = await providerSubscriptionSnapshot(subscriptionId, env);
+      const snapshot = snapshots[index];
+      if (snapshot.status === "rejected") throw snapshot.reason;
+      providerState = snapshot.value;
     } catch {
       return json({ error: "Checkout is frozen because the existing Razorpay subscription could not be verified. Retry reconciliation before starting another subscription.", code: "provider_subscription_unverifiable" }, 503);
     }
@@ -103,6 +118,9 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
     const providerTerminal = TERMINAL_SUBSCRIPTION_STATUSES.has(providerStatus);
     if (localTerminal !== providerTerminal) {
       return json({ error: "Checkout is frozen because local and Razorpay subscription states disagree. Reconcile the existing subscription before starting another.", code: "subscription_state_mismatch", localStatus, providerStatus }, 409);
+    }
+    if (["created","authenticated"].includes(providerStatus) && !supportedMandate(local,providerState.total_count)) {
+      return json({error:"This old mandate exceeds the supported duration. Close the unpaid setup in Billing, then start a fresh checkout.",code:"mandate_schedule_unsupported"},409);
     }
     if (!providerTerminal) {
       verifiedOpen.push({ local, providerStatus, authorizationUrl: safeAuthorizationUrl(providerState.short_url) });
@@ -118,6 +136,7 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
     if (legacySplitPlan) {
       return json({ error: "This checkout uses the retired introductory-plan switching model and must be repaired before retrying. No new subscription was created.", code: "legacy_intro_plan_requires_repair" }, 409);
     }
+    if (samePlan && ((method !== "upi" && current.local.provider_offer_id) || (body?.policyVersionId && body.policyVersionId !== current.local.policy_version_id))) return json({error:"The pending subscription keeps its original offer and policy. Manage it in Billing before changing checkout terms."},409);
     if (samePlan && (current.providerStatus === "created" || current.providerStatus === "authenticated")) {
       const keyId = env.RAZORPAY_KEY_ID?.trim();
       if (!keyId) return json({ error: "Razorpay recurring checkout is not configured." }, 503);
@@ -126,6 +145,7 @@ async function freezeUnsafeSubscriptionCreation(request: Request, env: Env) {
         keyId,
         billingCycle: current.local.billing_cycle,
         recurringAmount: current.local.recurring_price_subunits,
+        initialAmount: current.local.initial_price_subunits,
         policyVersionId: current.local.policy_version_id,
         reused: true,
         providerStatus: current.providerStatus,
@@ -157,7 +177,7 @@ async function releaseFailedCheckoutReservation(request: Request, response: Resp
     .bind(stamp, claimKey, userId).run();
 }
 
-function safeAuthorizationUrl(value: unknown) {
+export function safeAuthorizationUrl(value: unknown) {
   const raw = clean(value, 500);
   if (!raw) return null;
   try {
@@ -184,11 +204,11 @@ async function enrichCheckoutResponse(method: string, pathname: string, response
   const subscriptionId = clean(payload?.subscriptionId, 100);
   if (!payload || !/^sub_[A-Za-z0-9]+$/.test(subscriptionId)) return response;
   const authorizationUrl = await providerAuthorizationUrl(subscriptionId, env).catch(() => null);
-  if (!authorizationUrl) return response;
+  const local=await database(env).prepare("SELECT initial_price_subunits,recurring_price_subunits FROM razorpay_subscriptions WHERE provider_subscription_id=?1").bind(subscriptionId).first<Row>();
   const headers = new Headers(response.headers);
   headers.set("content-type", "application/json; charset=utf-8");
   headers.set("cache-control", "private, no-store");
-  return new Response(JSON.stringify({ ...payload, authorizationUrl }), {
+  return new Response(JSON.stringify({ ...payload, authorizationUrl, initialAmount:local?.initial_price_subunits, recurringAmount:local?.recurring_price_subunits }), {
     status: response.status,
     statusText: response.statusText,
     headers,
@@ -201,7 +221,8 @@ async function sweepCampaignLifecycle(env: Env) {
   const released = await db.prepare(`UPDATE billing_campaign_claims
     SET state='failed',failed_at=?1,metadata_json=json_set(metadata_json,'$.failure','stale_checkout_reservation')
     WHERE state='reserved' AND provider_subscription_id IS NULL
-      AND datetime(reserved_at)<datetime('now','-30 minutes')`)
+      AND datetime(reserved_at)<datetime('now','-30 minutes')
+      AND NOT EXISTS(SELECT 1 FROM payment_checkout_attempts a WHERE a.user_id=billing_campaign_claims.user_id AND json_extract(a.contract_json,'$.campaignClaimId')=billing_campaign_claims.id AND a.state IN ('reserved','preparing','dispatching','uncertain','provider_created','ready','pending'))`)
     .bind(stamp).run();
   const retired = await db.prepare(`UPDATE billing_campaign_versions
     SET state='retired',retired_at=COALESCE(retired_at,?1)

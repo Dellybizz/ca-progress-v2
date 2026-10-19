@@ -1,0 +1,101 @@
+name: Owner Payment Rules Phase 6 Release
+on:
+  push:
+    branches: [payment-rules-phase6]
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: payment-system-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.event_name != 'pull_request' || (github.head_ref == 'payment-rules-phase6' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    environment: v2-staging
+    timeout-minutes: 55
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RAZORPAY_KEY_ID: ${{ secrets.RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.RAZORPAY_KEY_SECRET }}
+      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.RAZORPAY_WEBHOOK_SECRET }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      STORAGE_CLEANUP_EMAIL_FROM: ${{ vars.STORAGE_CLEANUP_EMAIL_FROM }}
+      NEXT_PUBLIC_APP_ENV: production
+      NEXT_PUBLIC_APP_NAME: CA Progress
+      NEXT_PUBLIC_APP_VERSION: ${{ github.event.pull_request.head.sha || github.sha }}
+      DEPLOY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22, cache: npm}
+      - run: npm ci --no-audit --no-fund
+      - name: Verify repository
+        run: npm run ci
+      - name: Verify all approved scenario groups
+        run: node scripts/payments/certify-owner-scenarios.mjs
+      - name: Rehearse retained migrations and second-stage replay
+        run: node scripts/payments/rehearse-owner-migrations.mjs
+      - name: Validate native service screens
+        run: npm run native:bundle
+      - name: Build production Cloudflare runtime
+        run: npm run cf:build
+      - name: Verify Worker size budgets
+        run: npm run cf:check
+      - name: Smoke generated SSR runtime
+        run: npm run cf:smoke
+      - name: Reject stale source commit
+        run: |
+          test "$(git ls-remote origin refs/heads/payment-rules-phase6 | cut -f1)" = "$DEPLOY_SHA"
+      - name: Record retained financial terms
+        run: node scripts/payments/verify-owner-release.mjs --before
+      - name: Capture Worker rollback versions
+        run: |
+          npx wrangler deployments list --name ca-progress-v2 --json > deployment-evidence/payment-rules-phase6/web-before.json
+          npx wrangler deployments list --name ca-progress-v2-billing --json > deployment-evidence/payment-rules-phase6/billing-before.json
+      - name: Apply missing retained migrations
+        run: npm run cf:migrate:retained
+      - name: Preserve and configure storage warning credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "$RESEND_API_KEY" ]; then
+            printf '%s' "$RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY --config workers/billing/wrangler.jsonc
+          fi
+          if [ -n "$STORAGE_CLEANUP_EMAIL_FROM" ]; then
+            printf '%s' "$STORAGE_CLEANUP_EMAIL_FROM" | npx wrangler secret put STORAGE_CLEANUP_EMAIL_FROM --config workers/billing/wrangler.jsonc
+          fi
+      - name: Deploy billing and web services
+        id: deploy
+        run: |
+          node scripts/run-cloudflare-command.mjs npx --no-install wrangler deploy -c workers/billing/wrangler.jsonc --var CA_PAYMENT_RELEASE_PAUSED:true
+          npm run cf:deploy:web
+      - name: Validate mappings and publish untouched approved annual defaults
+        run: node scripts/payments/provision-p1.mjs --publish-owner-annual-defaults
+      - name: Verify live rules, products, health and authentication
+        run: node scripts/payments/verify-owner-release.mjs
+      - name: Verify durable signed inbox convergence
+        run: node scripts/payments/verify-p4-convergence.mjs
+      - name: Open new checkouts after release verification
+        run: node scripts/run-cloudflare-command.mjs npx --no-install wrangler deploy -c workers/billing/wrangler.jsonc --var CA_PAYMENT_RELEASE_PAUSED:false
+      - name: Verify opened checkout health
+        run: node scripts/payments/verify-owner-release.mjs --require-open
+      - name: Capture deployed Worker versions
+        run: |
+          npx wrangler deployments list --name ca-progress-v2 --json > deployment-evidence/payment-rules-phase6/web-after.json
+          npx wrangler deployments list --name ca-progress-v2-billing --json > deployment-evidence/payment-rules-phase6/billing-after.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: payment-rules-phase6-${{ github.sha }}
+          path: |
+            deployment-evidence/payment-rules-phase6/*.json
+            deployment-evidence/payment-system-p1/provider-mappings.json
+            deployment-evidence/payment-system-p4/*.json
+          retention-days: 30

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CA Progress</string>
+    <string name="title_activity_main">CA Progress</string>
+    <string name="package_name">in.zanisheluxe.caprogress</string>
+    <string name="custom_url_scheme">in.zanisheluxe.caprogress</string>
+</resources>

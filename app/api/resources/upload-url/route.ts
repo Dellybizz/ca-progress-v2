@@ -1,8 +1,9 @@
+import {validateResourceLocation} from '@/lib/resources/location';
 import { NextResponse } from "next/server";
 import { optionalUser } from "@/lib/auth/server";
 import { getResourceStorageAccess } from "@/lib/billing/service";
 import { createR2PresignedUrl } from "@/lib/resources/r2-presign";
-import { RESOURCE_MAX_BYTES, normalizeFilename } from "@/lib/resources/validation";
+import { normalizeFilename } from "@/lib/resources/validation";
 import { getHotD1Database } from "@/lib/data/d1/runtime";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ async function createUploadIntent(request: Request) {
   const mimeType = typeof body?.mimeType === "string" ? body.mimeType.trim().toLowerCase() : "";
   const sizeBytes = Number(body?.sizeBytes);
   const ext = extension(filename);
-  if (!filename || filename.length > 180 || !Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > RESOURCE_MAX_BYTES) return error("File name or size is invalid.", 400, "UPLOAD_DESCRIPTOR_INVALID");
+  if (!filename || filename.length > 180 || !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) return error("File name or size is invalid.", 400, "UPLOAD_DESCRIPTOR_INVALID");
   if (!MIME_BY_EXTENSION[ext]?.includes(mimeType)) return error("File MIME type does not match the allowed extension.", 400, "UPLOAD_MIME_INVALID");
 
   let access;
@@ -37,6 +38,10 @@ async function createUploadIntent(request: Request) {
   if (!access.allowed) return error(access.upgradeMessage || "Your plan does not allow file storage.", 403, "ENTITLEMENT_REQUIRED");
   if (access.limitBytes !== null && access.usedBytes + sizeBytes > access.limitBytes) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
 
+  let location;
+  try { location=await validateResourceLocation(getHotD1Database(),body?.subjectId,body?.chapterId); }
+  catch(error) { return NextResponse.json({error:error instanceof Error?error.message:'Invalid file location.',code:'UPLOAD_LOCATION_INVALID'},{status:400}); }
+
   const objectKey = `uploads/${identity.id}/${crypto.randomUUID()}/${normalizeFilename(filename)}`;
   let signed;
   try { signed = await createR2PresignedUrl({ key: objectKey, method: "PUT", expiresInSeconds: 300, contentType: mimeType }); }
@@ -44,7 +49,7 @@ async function createUploadIntent(request: Request) {
 
   const uploadId = crypto.randomUUID();
   const issuedAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+  const expiresAt = new Date(Date.now() + (body?.durable === true ? 24 * 60 * 60_000 : 5 * 60_000)).toISOString();
   try {
     const reservation = await getHotD1Database().prepare(`
       INSERT INTO r2_upload_intents(id,user_id,object_key,filename,mime_type,expected_size_bytes,metadata_json,expires_at)
@@ -52,15 +57,17 @@ async function createUploadIntent(request: Request) {
       WHERE (
         COALESCE((SELECT SUM(size_bytes) FROM uploaded_resources WHERE owner_user_id=?2), 0)
         + COALESCE((SELECT SUM(expected_size_bytes) FROM r2_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?9), 0)
+        + COALESCE((SELECT SUM(size_bytes) FROM test_attempt_attachments WHERE user_id=?2), 0)
+        + COALESCE((SELECT SUM(expected_size_bytes) FROM test_attachment_upload_intents WHERE user_id=?2 AND status='issued' AND expires_at>?9), 0)
         + ?6
-      ) <= ?10
+      ) <= COALESCE(?10,9223372036854775807)
     `)
-      .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: body?.subjectId ?? null, chapterId: body?.chapterId ?? null, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt, issuedAt, access.limitBytes).run() as D1RunResult;
+      .bind(uploadId, identity.id, objectKey, filename, mimeType, sizeBytes, JSON.stringify({ title: body?.title ?? "", description: body?.description ?? "", subjectId: location.subjectId, chapterId: location.chapterId, visibility: body?.visibility === "shared" ? "shared" : "private" }), expiresAt, issuedAt, access.limitBytes).run() as D1RunResult;
     if (Number(reservation.meta?.changes ?? 0) !== 1) return error(access.upgradeMessage || "Your plan storage allowance has been reached.", 403, "STORAGE_LIMIT_REACHED");
   } catch {
     return error("Upload intent could not be persisted.", 503, "UPLOAD_INTENT_PERSIST_FAILED");
   }
-  return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: RESOURCE_MAX_BYTES }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ uploadId, uploadUrl: signed.url, expiresAt, headers: { "Content-Type": mimeType }, maxBytes: null }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request) {

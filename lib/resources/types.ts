@@ -6,6 +6,8 @@ export type ResourceEntityType = "note" | "upload";
 export type ResourceReportReason = "spam" | "misleading" | "copyright" | "unsafe" | "other";
 
 export type NoteCard = {
+  revision?:number;
+  documentJson?:string|null;
   id: string;
   title: string;
   excerpt: string;
@@ -28,6 +30,7 @@ export type NoteCard = {
 };
 
 export type UploadCard = {
+  important?: boolean;
   id: string;
   title: string;
   description: string | null;

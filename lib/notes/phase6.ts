@@ -1,3 +1,4 @@
+import {isWorkspaceTrashed} from '@/lib/resources/workspace';
 import "server-only";
 
 import { getAcademicCatalog } from "@/lib/academic/query";
@@ -129,11 +130,13 @@ async function validateLocation(userId: string, subjectId: string | null, chapte
   return { levelId: row?.level_id ?? null };
 }
 
-async function validateOwnedResources(userId: string, resourceIds: string[]) {
-  const ids = [...new Set(resourceIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))].slice(0, 20);
+async function validateOwnedResources(userId: string, resourceIds: string[], existingIds: string[] = []) {
+  const ids = [...new Set(resourceIds)];
+  if(ids.length>20||ids.some(id=>!/^[0-9a-f-]{36}$/i.test(id)))throw new Error('Choose up to 20 valid note files.');
   if (!ids.length) return [];
   const db = getHotD1Database();
   const rows = await db.prepare(`SELECT id,extension FROM uploaded_resources WHERE owner_user_id=?1 AND id IN (${ids.map((_, index) => `?${index + 2}`).join(",")})`).bind(userId, ...ids).all<{ id: string; extension: string }>();
+  for(const id of ids){if(!existingIds.includes(id)&&await isWorkspaceTrashed('upload',id,db))throw new Error('Restore a file from Trash before attaching it.');}
   if ((rows.results ?? []).length !== ids.length) throw new Error("A linked note file is missing or is not owned by you.");
   return (rows.results ?? []).map((row) => ({ id: row.id, kind: ["jpg","jpeg","png","webp"].includes(row.extension.toLowerCase()) ? "image" : row.extension.toLowerCase() === "pdf" ? "pdf" : "file" }));
 }
@@ -141,6 +144,7 @@ async function validateOwnedResources(userId: string, resourceIds: string[]) {
 export async function savePhase6Note(input: {
   id: string | null;
   createId?: string | null;
+  documentJson?:string;
   userId: string;
   ownerLabel: string;
   title: string;
@@ -155,7 +159,8 @@ export async function savePhase6Note(input: {
   resourceIds: string[];
 }) {
   const location = await validateLocation(input.userId, input.subjectId, input.chapterId, input.topicId);
-  const linkedResources = await validateOwnedResources(input.userId, input.resourceIds);
+  const previousLinks=input.id?(await getHotD1Database().prepare('SELECT resource_id FROM note_resource_links WHERE note_id=?1 AND user_id=?2').bind(input.id,input.userId).all<{resource_id:string}>()).results??[]:[];
+  const linkedResources = await validateOwnedResources(input.userId, input.resourceIds,previousLinks.map(link=>link.resource_id));
   const source = input.sourceMessageId ? await resolveCommunitySource(input.userId, input.sourceMessageId) : null;
   const visibility = source && !input.id ? "private" : input.visibility;
   const result = await saveHotNote({
@@ -183,7 +188,7 @@ export async function savePhase6Note(input: {
   const sourceAnswer = source?.answer ?? existing?.source_answer ?? null;
   const sourceCreatedAt = source?.createdAt ?? existing?.source_created_at ?? null;
   const sourcePath = source?.discussionPath ?? existing?.source_discussion_path ?? null;
-  const documentJson = JSON.stringify({ version: 1, format: "html", html: input.bodyHtml });
+  const documentJson = input.documentJson??JSON.stringify({ version: 1, format: "html", html: input.bodyHtml });
 
   await db.prepare(`INSERT INTO note_revision_metadata(
       note_id,user_id,level_id,subject_id,chapter_id,topic_id,document_json,source_type,
@@ -204,7 +209,8 @@ export async function savePhase6Note(input: {
 }
 
 export async function getPhase6NoteExtras(noteIds: string[], viewerId: string) {
-  const ids = [...new Set(noteIds)].slice(0, 400);
+  const ids = [...new Set(noteIds)];
+  if(ids.length>80){const combined=new Map<string,NotePhase6Extra>();for(let i=0;i<ids.length;i+=80){const chunk=await getPhase6NoteExtras(ids.slice(i,i+80),viewerId);for(const [id,extra] of chunk)combined.set(id,extra);}return combined;}
   const result = new Map<string, NotePhase6Extra>();
   if (!ids.length) return result;
   const db = getHotD1Database();
