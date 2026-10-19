@@ -1,10 +1,11 @@
+import {installContextTools} from './context-tools.mjs';
 import {chromium} from 'playwright';import {build} from 'esbuild';import fs from 'node:fs';import http from 'node:http';import assert from 'node:assert/strict';
 const b=await build({stdin:{contents:"export * from './lib/notes/ca-formats';export * from './lib/notes/structured-document';",resolveDir:process.cwd()},bundle:true,write:false,platform:'node',format:'esm'}),a=await import('data:text/javascript;base64,'+Buffer.from(b.outputFiles[0].text).toString('base64'));
 const make=(id,variant)=>{const f=a.CA_FORMATS.find(f=>f.id===id);return a.buildCAFormat(f,{title:f.name,variant,currency:'₹',periods:['2026'],rows:a.formatRows(f,variant)});};
 const root='/tmp/note-studio-preview',server=http.createServer((req,res)=>{const name=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/app.css')?'app.css':'index.html';res.setHeader('Content-Type',name.endsWith('.js')?'application/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(root+'/'+name));});let browser;
 try{await new Promise(r=>server.listen(8798,'127.0.0.1',r));browser=await chromium.launch({executablePath:process.env.CA_BROWSER_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--no-zygote']});
 for(const width of [1440,390,320,768,820,1024]){
- const page=await browser.newPage({viewport:{width,height:1000},hasTouch:width===390});page.setDefaultTimeout(10000);const errors=[],saves=[];page.on('pageerror',e=>errors.push(e.message));let revision=0;
+ const page=await browser.newPage({viewport:{width,height:1000},hasTouch:width===390});installContextTools(page);page.setDefaultTimeout(10000);const errors=[],saves=[];page.on('pageerror',e=>errors.push(e.message));let revision=0;
  await page.route('**/api/**',route=>{if(route.request().method()==='POST'){const body=route.request().postDataJSON();a.validateStructuredNote(body.document,body.resourceIds);saves.push(body);return route.fulfill({json:{id:body.id||body.clientId,noteRevision:++revision}});}return route.fulfill({json:{files:[]}});});
  await page.goto('http://127.0.0.1:8798/notes/new');const content=page.getByRole('textbox',{name:'Note content',exact:true});await content.waitFor();await page.getByRole('textbox',{name:'Note title',exact:true}).fill('Phase 3 accounting '+width);await content.evaluate((el,nodes)=>el.editor.commands.setContent({type:'doc',content:nodes}),make('profit','Vertical'));
  const read=()=>content.evaluate(el=>el.editor.getJSON().content.find(n=>n.type==='table'));

@@ -107,7 +107,7 @@ export function attachGraphEditing({editor,getPos}:Pick<NodeViewRendererProps,'e
  }
  function refresh(){
   if(destroyed)return;const graph=['hierarchy','tree','flow'].includes(read().attrs.kind);dock();shell.hidden=!graph||!editor.isEditable||editor.state.selection.from!==getPos();status.hidden=!graph;graphic.classList.toggle('is-direct-graph',graph&&editor.isEditable);
-  if(!graph||!editor.isEditable){popup.hidden=true;if(graph){const n=read();graphic.innerHTML=renderObject(n.attrs.kind,current(),n.attrs.title,n.attrs.variant);stage=undefined;tools=undefined;}return;}
+  if(!graph||!editor.isEditable){popup.hidden=true;if(!graph){stage=undefined;tools=undefined;}if(graph){const n=read();graphic.innerHTML=renderObject(n.attrs.kind,current(),n.attrs.title,n.attrs.variant);stage=undefined;tools=undefined;}return;}
   try{const focused=graphic.contains(document.activeElement)?(document.activeElement as Element)?.closest<SVGElement>('[data-node-id]')?.dataset.nodeId:undefined;const model=current();stage=document.createElement('div');stage.className='note-graph-stage';graphic.replaceChildren(stage);draw(model);if(menuId&&!model.nodes.some(n=>n.id===menuId)&&menuType==='node'){pending=undefined;menuId='';popup.hidden=true;}positionMenu();if(focused)focusNode(focused);}catch(error){message(error);}
  }
  button(shell,'Add root element','+ Root',()=>add(selected||current().nodes[0].id,'free'));

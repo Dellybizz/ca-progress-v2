@@ -21,8 +21,8 @@ on:
       - tests/**
       - .github/workflows/resources-phase1.yml
   pull_request:
-    branches: [main]
-    types: [opened, synchronize, reopened]
+    branches: [main, onboarding-design-phase7]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,7 +31,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   verify:
-    if: github.event_name != 'pull_request' || (github.head_ref == 'onboarding-design-phase7' && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || ((github.head_ref == 'onboarding-design-phase7' || github.base_ref == 'onboarding-design-phase7') && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -82,7 +82,7 @@ jobs:
             /tmp/note-studio-preview/notes-print*.pdf
           if-no-files-found: ignore
   editor-certification:
-    if: github.event_name != 'pull_request' || (github.head_ref == 'onboarding-design-phase7' && github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || ((github.head_ref == 'onboarding-design-phase7' || github.base_ref == 'onboarding-design-phase7') && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -102,6 +102,7 @@ jobs:
           node scripts/notes/certification-check.mjs
           NOTES_TEST_ENGINE=webkit node scripts/notes/certification-check.mjs
           node scripts/notes/register-check.mjs
+          node scripts/notes/register-gestures-check.mjs
           NOTES_TEST_ENGINE=webkit node scripts/notes/register-check.mjs
           node scripts/notes/manipulation-check.mjs
           NOTES_TEST_ENGINE=webkit node scripts/notes/manipulation-check.mjs
@@ -113,11 +114,14 @@ jobs:
           name: notes-editor-certification-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             /tmp/note-studio-preview/notes-certification-*.json
+            /tmp/note-studio-preview/notes-context-menu-*
+            /tmp/note-studio-preview/notes-gestures-*
             /tmp/note-studio-preview/notes-register-*
             /tmp/note-studio-preview/notes-manipulation-*
             /tmp/note-studio-preview/notes-layout-*
           if-no-files-found: warn
   deploy:
+    if: github.event_name != 'pull_request' || github.head_ref == 'onboarding-design-phase7'
     needs: [verify, editor-certification]
     runs-on: ubuntu-latest
     environment: v2-staging
