@@ -1,3 +1,4 @@
+import {installContextTools} from './context-tools.mjs';
 import {chromium} from 'playwright';
 import {build} from 'esbuild';
 import fs from 'node:fs';
@@ -13,7 +14,7 @@ let browser;
 try{
  await new Promise(r=>server.listen(8791,'127.0.0.1',r));
  browser=await chromium.launch({executablePath:process.env.CA_BROWSER_EXECUTABLE,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--no-zygote']});
- const page=await browser.newPage();await page.route('**/api/**',route=>route.fulfill({json:{id:'11111111-1111-4111-8111-111111111111',noteRevision:1}}));
+ const page=await browser.newPage();installContextTools(page);await page.route('**/api/**',route=>route.fulfill({json:{id:'11111111-1111-4111-8111-111111111111',noteRevision:1}}));
  await page.goto('http://127.0.0.1:8791/notes/new');await page.getByRole('textbox',{name:'Note content',exact:true}).waitFor();
  const report=await page.evaluate(async table=>{
   const editor=document.querySelector('.tiptap').editor;

@@ -1,3 +1,4 @@
+import {installContextTools} from './context-tools.mjs';
 const findInk=n=>n.type==='ink'?n:(n.content??[]).map(findInk).find(Boolean);
 import {checkInk} from './ink-check.mjs';
 import {checkFinancialFormats} from './financial-check.mjs';
@@ -7,7 +8,7 @@ const built=await build({stdin:{contents:"export * from './lib/notes/structured-
 const out='/tmp/note-studio-preview',server=http.createServer((req,res)=>{const file=req.url.startsWith('/app.js')?'app.js':req.url.startsWith('/app.css')?'app.css':'index.html';res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(out+'/'+file));});let browser;
 try{await new Promise(r=>server.listen(8790,'127.0.0.1',r));browser=await chromium.launch({executablePath:process.env.CA_BROWSER_EXECUTABLE||undefined,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--no-zygote']});
 for(const width of [1440,390,320,768,820,1024]){
- const page=await browser.newPage({viewport:{width,height:900},hasTouch:width===390});const errors=[],saves=[];page.setDefaultTimeout(10000);let revision=0,delay=0,fail=false;page.on('pageerror',e=>errors.push(e.message));
+ const page=await browser.newPage({viewport:{width,height:900},hasTouch:width===390});const errors=[],saves=[];installContextTools(page);page.setDefaultTimeout(10000);let revision=0,delay=0,fail=false;page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/api/notes',async route=>{const body=route.request().postDataJSON();if(delay)await new Promise(r=>setTimeout(r,delay));if(fail){fail=false;return route.fulfill({status:503,json:{error:'Temporary save failure. Your draft is retained.'}});}try{protocol.validateStructuredNote(body.document,body.resourceIds);const html=protocol.renderStructuredNote(body.document);saves.push({...body,html});return route.fulfill({json:{id:body.id||body.clientId,noteRevision:++revision}});}catch(e){fs.writeFileSync(out+'/invalid-document.json',JSON.stringify(body.document,null,2));console.error('Invalid document:',e.message);return route.fulfill({status:400,json:{error:e.message}});}});
  await page.route('**/api/v1/resources/workspace**',route=>route.fulfill({json:{files:[{id:'22222222-2222-4222-8222-222222222222',name:'Study diagram',kind:'image',extension:'png'}],nextCursor:null}}));
  await page.route('**/api/resources/*/access',route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><rect width="600" height="300" fill="#eef2ff"/><path d="M50 230L200 100L350 170L550 40" fill="none" stroke="#6366f1" stroke-width="6"/></svg>'}));
