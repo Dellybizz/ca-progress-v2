@@ -34,3 +34,4 @@
 .note-register .note-graph-node-tools :is(.note-graph-add,.note-graph-options){display:none!important}
 .note-object-selection .note-format-grab{display:none!important}
 .note-editing-dock .note-context-tools{display:flex;flex-wrap:wrap;gap:6px;padding:0;background:none}.note-editing-dock .note-context-tools>button:first-child{display:none}.note-editing-dock .note-graph-toolbar{display:flex;flex-wrap:wrap;overflow:visible;width:100%;min-width:0}.note-editing-dock .note-manipulation-bar{width:100%;min-width:0;max-width:100%;overflow:visible;flex-wrap:wrap}.note-editing-dock .note-manipulation-measure{flex-basis:100%;white-space:normal}.note-editing-dock button{border:1px solid var(--color-border);border-radius:8px;padding:7px 10px;background:var(--color-surface);color:var(--color-text)}.note-editing-dock>.note-context-actions>button:first-child{color:var(--color-brand);background:var(--color-brand-soft)}
+.note-editing-dock [hidden]{display:none!important}
