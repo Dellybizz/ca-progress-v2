@@ -25,3 +25,12 @@
 .note-register-print-flow td:is([data-ca-kind=amount],[data-ca-kind=number],[data-ca-kind=percent]),.note-register-print-flow td:is([data-ca-kind=amount],[data-ca-kind=number],[data-ca-kind=percent]) p{white-space:nowrap;overflow-wrap:normal}.note-register-print-flow td:is([data-ca-kind=amount],[data-ca-kind=number],[data-ca-kind=percent]) p{overflow:hidden;text-overflow:ellipsis}
 .note-register .note-document .note-account-sides{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .note-document .note-diagram-graphic:not(.is-direct-graph)>svg,.note-register-print-flow .note-diagram-graphic[style]>svg{width:100%;height:100%;max-width:100%;max-height:100%!important;display:block;object-fit:contain}
+
+/* Context tools remain inside their scrollable popover at every viewport size. */
+.note-studio .note-editing-dock :is(.note-object-live-panel,.note-table-live-panel){position:static;width:100%;max-width:100%;height:auto;max-height:none;margin:8px 0}
+.note-studio .note-editing-dock :is(.note-object-live-tools,.note-table-live-tools,.note-financial-dock,.note-table-live-bar,.note-financial-dock-footer,.note-financial-boundaries,.note-table-edge-tools){width:100%;min-width:0;max-width:100%;flex-wrap:wrap}
+.note-studio:has(.note-table-live-panel,.note-object-live-panel) .note-workspace{padding-right:0;padding-bottom:0}
+.note-studio .note-editing-dock[hidden]{display:none!important}
+.note-register .note-graph-node-tools :is(.note-graph-add,.note-graph-options){display:none!important}
+.note-object-selection .note-format-grab{display:none!important}
+.note-editing-dock .note-context-tools{display:flex;flex-wrap:wrap;gap:6px;padding:0;background:none}.note-editing-dock .note-context-tools>button:first-child{display:none}.note-editing-dock .note-graph-toolbar{display:flex;flex-wrap:wrap;overflow:visible;width:100%;min-width:0}.note-editing-dock .note-manipulation-bar{width:100%;min-width:0;max-width:100%;overflow:visible;flex-wrap:wrap}.note-editing-dock .note-manipulation-measure{flex-basis:100%;white-space:normal}.note-editing-dock button{border:1px solid var(--color-border);border-radius:8px;padding:7px 10px;background:var(--color-surface);color:var(--color-text)}.note-editing-dock>.note-context-actions>button:first-child{color:var(--color-brand);background:var(--color-brand-soft)}

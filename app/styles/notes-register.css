@@ -41,3 +41,10 @@
 .note-register .note-register-content,.note-register-print-flow{--color-text:#172033;--color-text-muted:#64748b;--color-text-faint:#94a3b8;--color-surface:#ffffff;--color-bg-subtle:#f8fafc;--color-border:#cbd5e1;--color-border-strong:#94a3b8}
 
 .note-scroll-canvas.is-page{scroll-padding-top:70px}
+
+/* Selection shows handles; editing controls are opened explicitly. */
+.note-studio:not([data-context-open]) .note-editing-dock{display:none!important}
+.note-studio .note-editing-dock:not([hidden]){position:fixed;z-index:120;width:min(360px,calc(100vw - 16px));max-height:min(60dvh,480px);overflow:auto;display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:12px;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);box-shadow:0 12px 40px #0f172a26}
+.note-editing-dock>header,.note-context-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}.note-editing-dock button{min-height:40px}.note-editing-dock details>summary{cursor:pointer;padding:10px 0;font-weight:600}.note-editing-dock .note-manipulation-bar{display:flex;flex-wrap:wrap}.note-context-actions>button{flex:1}.note-register .note-object-edit{display:none!important}
+.note-register-bottom{display:flex;justify-content:center;align-items:center;gap:16px;padding:24px 8px}.note-register-bottom button{width:48px;height:48px;border-radius:50%;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-brand);font-size:28px;box-shadow:0 3px 12px #0f172a12}.note-register-bottom button:disabled{opacity:.4}
+@media print{.note-editing-dock,.note-register-bottom{display:none!important}}
